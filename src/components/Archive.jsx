@@ -38,8 +38,8 @@ export default function Archive({ db, ur, openTask, openProject, restoreTask, re
       </div>
 
       <div className="toolbar">
-        <input className="inp" type="date" style={{ width: 160 }} value={fFrom} onChange={e => setFFrom(e.target.value)} />
-        <input className="inp" type="date" style={{ width: 160 }} value={fTo} onChange={e => setFTo(e.target.value)} />
+        <input className="inp arch-date-inp" type="date" value={fFrom} onChange={e => setFFrom(e.target.value)} />
+        <input className="inp arch-date-inp" type="date" value={fTo} onChange={e => setFTo(e.target.value)} />
         <select className="inp sel sm" value={fProj} onChange={e => setFProj(e.target.value)}>
           <option value="all">Все проекты</option>{projOptions.map(p => <option key={p.id} value={p.id}>{p.code}</option>)}
         </select>
@@ -51,7 +51,7 @@ export default function Archive({ db, ur, openTask, openProject, restoreTask, re
         </select>
       </div>
 
-      <div className="rep-panel" style={{ marginBottom: 14 }}>
+      <div className="rep-panel">
         <div className="rep-panel-title">Архивные проекты ({projList.length})</div>
         <table className="tbl">
           <thead><tr><th>Код</th><th>Название</th><th>Тип</th><th>В архиве с</th><th></th></tr></thead>
@@ -93,6 +93,29 @@ export default function Archive({ db, ur, openTask, openProject, restoreTask, re
           </tbody>
         </table>
       </div>
+
+      {openProj && (
+        <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setOpenProj(null); }}>
+          <div className="modal" style={{ maxWidth: 720 }}>
+            <div className="modal-head"><h3>{openProj.code} — {openProj.name}</h3><button className="icon-btn" onClick={() => setOpenProj(null)}><Ic d={ICONS.x} size={16} /></button></div>
+            <div className="modal-body">
+              <div className="info-box">Режим «только чтение».</div>
+              <table className="tbl">
+                <thead><tr><th>Задача</th><th>Статус</th><th>План / факт</th></tr></thead>
+                <tbody>
+                  {db.tasks.filter(t => t.projectId === openProj.id).map(t => (
+                    <tr key={t.id}>
+                      <td><b>{t.title}</b></td>
+                      <td>{TASK_STATUSES[t.status]?.label || t.status}</td>
+                      <td>{t.plannedHours ?? '—'} / {getTaskSpent(t)} ч</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

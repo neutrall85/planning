@@ -24,14 +24,13 @@ export default function NotifPanel({ list, setDb, onNavigate, onClose }) {
           <div 
             key={n.id} 
             className={`notif-item${n.read ? '' : ' new'}`} 
-            style={{ cursor: 'pointer' }} 
             onClick={() => handleClick(n)}
           >
             <div>{n.text}</div>
             <div className="mut sm">{fmtDT(n.ts)}</div>
           </div>
         ))}
-        {list.length === 0 && <div className="mut sm" style={{ padding: 12 }}>Нет уведомлений</div>}
+        {list.length === 0 && <div className="mut sm notif-empty">Нет уведомлений</div>}
       </div>
       <p className="mut sm notif-note">E-mail-дубли отправляются по настройкам профиля.</p>
     </div>

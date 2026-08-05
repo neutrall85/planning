@@ -34,7 +34,7 @@ export default function Staff({ db, setDb, ur, openRoles, openDepts, openVacatio
         <div className="st-name">
           <div className="st-fio">
             {e.last} {e.first}
-            {isFired && <span className="vac-badge" style={{ background: '#fef2f2', color: '#dc2626' }}>Уволен</span>}
+            {isFired && <span className="vac-badge fired">Уволен</span>}
             {vacNow && <span className="vac-badge">в отпуске до {fmtDMY(vacNow.end)}</span>}
           </div>
           <div className="st-pos">
@@ -49,10 +49,10 @@ export default function Staff({ db, setDb, ur, openRoles, openDepts, openVacatio
             <span key={r} className="role-chip" style={{ background: ROLES[r].color + '1e', color: ROLES[r].color }}>{ROLES[r].short}</span>
           ))}
           {e.roles.includes('kb_chief') && (e.kbIds || []).map(k => (
-            <span key={k} className="role-chip" style={{ background: '#e0f2fe', color: '#0369a1' }}>{db.kbs.find(x => x.id === k)?.name}</span>
+            <span key={k} className="role-chip blue">{db.kbs.find(x => x.id === k)?.name}</span>
           ))}
           {e.roles.includes('head') && (e.headDeptIds || []).map(d => (
-            <span key={d} className="role-chip" style={{ background: '#eff6ff', color: '#1d4ed8' }}>{db.departments.find(x => x.id === d)?.name}</span>
+            <span key={d} className="role-chip indigo">{db.departments.find(x => x.id === d)?.name}</span>
           ))}
         </div>
         {!isFired && (
@@ -198,9 +198,9 @@ export default function Staff({ db, setDb, ur, openRoles, openDepts, openVacatio
             </button>
           </div>
           {showFired && (
-            <div style={{ padding: 14 }}>
+            <div className="st-empty-box">
               {firedEmployees.map(e => rowFor(e, true))}
-              {firedEmployees.length === 0 && <div className="mut sm" style={{ padding: 12 }}>В архиве нет уволенных сотрудников</div>}
+              {firedEmployees.length === 0 && <div className="mut sm st-empty-txt">В архиве нет уволенных сотрудников</div>}
             </div>
           )}
         </div>

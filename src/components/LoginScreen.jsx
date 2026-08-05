@@ -188,7 +188,7 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
                 <button
                   type="button"
                   onClick={togglePasswordVisibility}
-                  style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#64748b', cursor: 'pointer' }}
+                  className="pass-toggle-btn"
                 >
                   <Ic d={ICONS.eye} size={18} />
                 </button>
