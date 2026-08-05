@@ -21,12 +21,38 @@ export default class DataStore {
 
   login(email, password) {
     const found = this._data.employees.find(e => e.email.toLowerCase() === email.trim().toLowerCase());
+    
+    // Проверка блокировки после 5 неудачных попыток (15 минут)
+    if (found && found.lockUntil && Date.now() < found.lockUntil) {
+      const remainingMinutes = Math.ceil((found.lockUntil - Date.now()) / 60000);
+      return `Учётная запись заблокирована на ${remainingMinutes} мин. после 5 неудачных попыток входа`;
+    }
+    
     if (found && found.pass === password && !found.fired) {
+      // Сброс счётчика неудачных попыток при успешном входе
+      if (found.failed > 0) {
+        found.failed = 0;
+        found.lockUntil = 0;
+        this.upsertEmployee(found);
+      }
       this._currentUser = found;
       this._notify();
       return true;
     }
-    return false;
+    
+    // Увеличение счётчика неудачных попыток
+    if (found) {
+      found.failed = (found.failed || 0) + 1;
+      if (found.failed >= 5) {
+        // Блокировка на 15 минут
+        found.lockUntil = Date.now() + 15 * 60 * 1000;
+        this.upsertEmployee(found);
+        return 'Учётная запись заблокирована на 15 мин. после 5 неудачных попыток входа';
+      }
+      this.upsertEmployee(found);
+    }
+    
+    return 'Неправильно введен логин/пароль';
   }
   logout() {
     this._currentUser = null;

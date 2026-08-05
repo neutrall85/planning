@@ -1,7 +1,7 @@
-import React from 'react';
+import { useId } from 'react';
 
 export const FormField = ({ label, type = 'text', value, onChange, disabled, options, ...props }) => {
-  const id = `field-${Math.random().toString(36).slice(2,6)}`;
+  const id = `field-${useId()}`;
   return (
     <>
       <label className="lbl" htmlFor={id}>{label}</label>

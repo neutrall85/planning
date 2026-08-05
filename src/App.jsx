@@ -1,9 +1,7 @@
-import React from 'react';
 import { StoreProvider } from './context/StoreContext';
 import { useStore, useAuth } from './hooks';
 import LoginScreen from './components/LoginScreen';
 import MainLayout from './components/MainLayout';
-import ErrorBoundary from './components/ErrorBoundary';
 
 function AppContent() {
   const { store, data, login, logout } = useStore();

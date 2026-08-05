@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { DOMAIN } from '../utils/constants';
 import { uid } from '../utils/date';
+import { Ic, ICONS } from './Icons';
 
 function passIssues(p) {
   return [
@@ -16,11 +17,44 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
   const [mode, setMode] = useState("login");
   const [lg, setLg] = useState("");
   const [pw, setPw] = useState("");
+  const [showPass, setShowPass] = useState(false);
+  const [passTimer, setPassTimer] = useState(null);
+  const passTimerRef = useRef(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const [shake, setShake] = useState(false);
   const [reg, setReg] = useState({ first: "", last: "", email: "", pass: "", pass2: "" });
   const [forgot, setForgot] = useState("");
+  
+  // Очистка таймера при размонтировании
+  useEffect(() => {
+    return () => {
+      if (passTimerRef.current) clearTimeout(passTimerRef.current);
+    };
+  }, []);
+  
+  // Функция скрытия пароля через 10 секунд
+  const hidePasswordAfterDelay = () => {
+    if (passTimerRef.current) clearTimeout(passTimerRef.current);
+    passTimerRef.current = setTimeout(() => {
+      setShowPass(false);
+    }, 10000);
+  };
+  
+  const togglePasswordVisibility = () => {
+    setShowPass(prev => {
+      if (!prev) {
+        // Показываем пароль и запускаем таймер на 10 секунд
+        hidePasswordAfterDelay();
+        return true;
+      } else {
+        // Скрываем пароль и сбрасываем таймер
+        if (passTimerRef.current) clearTimeout(passTimerRef.current);
+        return false;
+      }
+    });
+  };
+  
   const fail = (m) => { setErr(m); setShake(true); setTimeout(() => setShake(false), 450); };
   const doLogin = (loginVal, passVal) => {
     setBusy(true);
@@ -90,7 +124,12 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
               <label className="lbl">Логин (e-mail)</label>
               <div className="email-inp"><input className="inp" value={lg} onChange={(e) => { setLg(e.target.value); setErr(null); }} placeholder="ivanov" autoFocus /><span className="email-dom">{"@" + DOMAIN}</span></div>
               <label className="lbl">Пароль</label>
-              <input className="inp" type="password" value={pw} onChange={(e) => { setPw(e.target.value); setErr(null); }} placeholder="с учётом регистра" />
+              <div className="password-inp-wrap" style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <input className="inp" type={showPass ? "text" : "password"} value={pw} onChange={(e) => { setPw(e.target.value); setErr(null); }} placeholder="с учётом регистра" style={{ paddingRight: 40 }} />
+                <button type="button" onClick={togglePasswordVisibility} style={{ position: 'absolute', right: 8, background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--mut)' }} title={showPass ? "Скрыть пароль" : "Показать пароль на 10 секунд"}>
+                  <Ic d={showPass ? ICONS.eyeOff : ICONS.eye} size={18} />
+                </button>
+              </div>
             </>)}
           </>)}
           {mode === "register" && (<>
