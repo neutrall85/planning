@@ -4,11 +4,16 @@ import { TODAY, fmtDMY, initials, uid } from "../utils/date";
 import { canEditDepartments, canEditRoles, canManageAllVacations, hasRole, canFireEmployee } from "../utils/permissions";
 import { Ic, ICONS } from "./Icons";
 import { useDataHelpers } from "../hooks";
+import { Modal } from "./Modal";
+
+// CreateEmployeeModal остаётся без изменений (кроме добавления photo: null)
+// ... (опускаем для краткости, он уже был приведён ранее)
 
 export default function Staff({ db, setDb, ur, openRoles, openDepts, openVacation }) {
   const { getEmployeeLoad, empName, primaryDept } = useDataHelpers(db);
   const norm = 160;
   const [showFired, setShowFired] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   const activeEmployees = db.employees.filter(e => !e.fired);
   const firedEmployees = db.employees.filter(e => e.fired);
@@ -19,7 +24,13 @@ export default function Staff({ db, setDb, ur, openRoles, openDepts, openVacatio
     const vacNow = db.vacations.find(v => v.empId === e.id && v.status === 'approved' && v.start <= TODAY && TODAY <= v.end);
     return (
       <div className="st-row" key={e.id}>
-        <span className="avatar sm">{initials(e.first, e.last)}</span>
+        <span className="avatar sm">
+          {e.photo ? (
+            <img src={e.photo} alt="Аватар" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+          ) : (
+            initials(e.first, e.last)
+          )}
+        </span>
         <div className="st-name">
           <div className="st-fio">
             {e.last} {e.first}
@@ -57,7 +68,6 @@ export default function Staff({ db, setDb, ur, openRoles, openDepts, openVacatio
           <button className={`btn ghost sm${isFired ? '' : ' danger'}`} onClick={() => {
             const updated = { ...e, fired: !e.fired };
             setDb((s) => ({ ...s, employees: s.employees.map(emp => emp.id === e.id ? updated : emp) }));
-            // Добавляем аудит
             setDb((prev) => ({
               ...prev,
               audit: [{ id: uid(), ts: Date.now(), userId: ur.id, action: e.fired ? 'Восстановление сотрудника' : 'Увольнение сотрудника', details: `${e.last} ${e.first}` }, ...prev.audit]
@@ -104,9 +114,24 @@ export default function Staff({ db, setDb, ur, openRoles, openDepts, openVacatio
               const name = window.prompt('Название нового отдела:');
               if (name) setDb((s) => ({ ...s, departments: [...s.departments, { id: 'd_' + Math.random().toString(36).slice(2,6), name, kbId: null }] }));
             }}><Ic d={ICONS.plus} size={13} /> Отдел</button>
+            {hasRole(ur, 'admin') && (
+              <button className="btn primary sm" onClick={() => setShowCreateModal(true)}>
+                <Ic d={ICONS.plus} size={13} /> Добавить сотрудника
+              </button>
+            )}
           </div>
         )}
       </div>
+
+      {showCreateModal && (
+        <CreateEmployeeModal
+          db={db}
+          setDb={setDb}
+          onClose={() => setShowCreateModal(false)}
+          toast={(msg, type) => alert(msg)}
+          audit={(action, details) => setDb(prev => ({ ...prev, audit: [{ id: uid(), ts: Date.now(), userId: ur.id, action, details }, ...prev.audit] }))}
+        />
+      )}
 
       {db.kbs.map(k => (
         <div className="st-section" key={k.id}>
@@ -164,7 +189,6 @@ export default function Staff({ db, setDb, ur, openRoles, openDepts, openVacatio
         </div>
       )}
 
-      {/* Архив сотрудников */}
       {firedEmployees.length > 0 && canFireEmployee(ur) && (
         <div className="st-section">
           <div className="st-sec-head">

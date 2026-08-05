@@ -11,86 +11,109 @@ export const canCreateProject = (user) => hasRole(user, "admin", "director", "kb
 export const canManageManager = (user) => hasRole(user, "admin", "director", "kb_chief");
 export const canExport = (user) => hasRole(user, "admin", "director", "economist");
 export const canEditRoles = (user) => hasRole(user, "admin");
-
 export const canFireEmployee = (user) => hasRole(user, "admin", "director", "hr");
 
-export const canEditTask = (user, task, data) => {
+// Право на изменение полей задачи (кроме статуса)
+export const canEditTaskFields = (user, task, data) => {
   if (!user || !task || !data) return false;
   if (task.archived) return false;
-  if (hasRole(user, "admin", "director", "economist")) return true;
-  
-  const assignees = task.assigneeIds || [];
-  const project = data.projects.find(p => p.id === task.projectId);
-  
-  if (!assignees.length && !project) return false;
-  
-  if (assignees.includes(user.id)) return true;
-  
-  if (hasRole(user, "kb_chief") && (user.kbIds || []).length) {
-    if (project && project.kbId && user.kbIds.includes(project.kbId)) return true;
-  }
-  
-  if (hasRole(user, "head") && assignees.some(id => {
-    const e = data.employees.find(x => x.id === id);
-    return e && e.departments.some(d => (user.headDeptIds || []).includes(d.deptId));
-  })) return true;
-  
-  if (hasRole(user, "pm") && project && project.managerId === user.id) return true;
-  
+  // Админ и экономист могут редактировать поля
+  if (hasRole(user, "admin", "economist")) return true;
+  // ГД не может редактировать поля (только статус)
+  if (hasRole(user, "director")) return false;
+  // ГК, РО, PM, исполнитель не могут редактировать поля
   return false;
 };
 
-// ИЗМЕНЕНИЕ: добавлена проверка creatorId для закрытия/отмены
+// Право на изменение статуса задачи
 export const canChangeTaskStatus = (user, task, newStatus, data) => {
   if (!user || !task || !data) return false;
   if (task.archived) return false;
   
-  if (newStatus !== 'closed' && newStatus !== 'cancelled') {
-    return canEditTask(user, task, data);
+  // Если задача уже закрыта или отменена, изменить может только админ
+  if (task.status === 'closed' || task.status === 'cancelled') {
+    return hasRole(user, 'admin');
   }
   
-  // Закрытие/отмена доступны:
-  // - админу, директору, экономисту
-  // - автору задачи (creatorId)
-  // - PM, руководителю отдела, гл. конструктору (с проверкой)
-  if (hasRole(user, "admin", "director", "economist")) return true;
+  // Разрешаем изменение статуса для:
+  // - админа (всегда)
+  // - ГД (может закрыть/отменить)
+  // - ГК (для своего КБ)
+  // - РО (для подчинённых)
+  // - PM (для своего проекта)
+  // - исполнителя (для своих задач, но только в новые, в работу, на проверку)
   
-  // ИЗМЕНЕНИЕ: автор задачи может закрыть/отменить
-  if (task.creatorId && task.creatorId === user.id) return true;
+  if (hasRole(user, "admin")) return true;
+  if (hasRole(user, "director")) return true; // ГД может закрыть/отменить
   
   const project = data.projects.find(p => p.id === task.projectId);
   
-  if (hasRole(user, "pm") && project && project.managerId === user.id) return true;
+  if (hasRole(user, "kb_chief") && project && project.kbId && (user.kbIds || []).includes(project.kbId)) {
+    return true;
+  }
   
   if (hasRole(user, "head") && (task.assigneeIds || []).some(id => {
     const e = data.employees.find(x => x.id === id);
     return e && e.departments.some(d => (user.headDeptIds || []).includes(d.deptId));
   })) return true;
   
-  if (hasRole(user, "kb_chief") && project && project.kbId && (user.kbIds || []).includes(project.kbId)) return true;
+  if (hasRole(user, "pm") && project && project.managerId === user.id) return true;
+  
+  if (task.assigneeIds && task.assigneeIds.includes(user.id)) {
+    // Исполнитель не может закрыть или отменить задачу
+    if (newStatus === 'closed' || newStatus === 'cancelled') return false;
+    return true;
+  }
   
   return false;
 };
 
-export const projectEditable = (user, project, data) => {
-  if (!project || project.archived) return false;
-  if (hasRole(user, "admin", "director", "economist", "kb_chief")) return true;
+// Право на редактирование полей проекта
+export const canEditProjectFields = (user, project) => {
+  if (!user || !project) return false;
+  if (project.archived) return false;
+  // Только админ может редактировать поля проекта
+  return hasRole(user, "admin");
+};
+
+// Право на изменение статуса проекта (кроме перевода в "Закрыт/Отменен" – это особая логика)
+export const canChangeProjectStatus = (user, project, newStatus) => {
+  if (!user || !project) return false;
+  if (project.archived) return false;
+  
+  // Перевод в "Закрыт" или "Отменен" – только автор, ГД или админ
+  if (newStatus === 'closed' || newStatus === 'cancelled') {
+    const creatorId = project.creatorId || (project.history?.find(h => h.who !== 'system')?.who);
+    if (hasRole(user, 'admin', 'director')) return true;
+    if (creatorId && creatorId === user.id) return true;
+    return false;
+  }
+  
+  // Изменение на другие статусы – админ, ГД, ГК (для своего КБ)
+  if (hasRole(user, 'admin', 'director')) return true;
+  if (hasRole(user, 'kb_chief') && project.kbId && (user.kbIds || []).includes(project.kbId)) return true;
   return false;
+};
+
+export const projectEditable = (user, project, data) => {
+  return canEditProjectFields(user, project);
 };
 
 export const assigneeOptions = (user, data) => {
   if (!user || !data) return [];
   let list = [];
   
+  let allEmployees = data.employees.filter(e => !e.fired);
+  
   if (hasRole(user, "admin", "director", "economist", "pm")) {
-    list = data.employees.filter(e => !e.fired);
+    list = allEmployees;
   } else if (hasRole(user, "kb_chief") && (user.kbIds || []).length) {
     const deptIds = data.departments.filter(d => d.kbId && user.kbIds.includes(d.kbId)).map(d => d.id);
-    list = data.employees.filter(e => !e.fired && (e.id === user.id || e.departments.some(x => deptIds.includes(x.deptId))));
+    list = allEmployees.filter(e => e.id === user.id || e.departments.some(x => deptIds.includes(x.deptId)) || hasRole(e, "director"));
   } else if (hasRole(user, "head")) {
-    list = data.employees.filter(e => !e.fired && (e.id === user.id || e.departments.some(x => (user.headDeptIds || []).includes(x.deptId))));
+    list = allEmployees.filter(e => e.id === user.id || e.departments.some(x => (user.headDeptIds || []).includes(x.deptId)) || hasRole(e, "director"));
   } else {
-    list = data.employees.filter(e => !e.fired && e.id === user.id);
+    list = allEmployees.filter(e => e.id === user.id);
   }
   
   return list.sort((a, b) => {

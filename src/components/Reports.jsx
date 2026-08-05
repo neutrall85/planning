@@ -1,22 +1,18 @@
 import React from "react";
 import { TASK_STATUSES, PRIORITIES, VACATION_TYPES } from "../utils/constants";
-import { fmtDMY, fmtDT, TODAY } from "../utils/date";
+import { fmtDMY, fmtDT, TODAY, isTaskActive } from "../utils/date";
 import { hasRole } from "../utils/permissions";
 import { Ic, ICONS } from "./Icons";
 import { useDataHelpers } from "../hooks";
 
 export default function Reports({ db, dbFull, ur }) {
   const { getTaskSpent, getProjectStats, empName, primaryDept } = useDataHelpers(db);
-  const tasks = db.tasks.filter(t => !t.archived);
+  // Заменяем !t.archived на isTaskActive(t)
+  const tasks = db.tasks.filter(t => isTaskActive(t));
 
-  const downloadCSV = (name, rows) => {
-    const csv = '\uFEFF' + rows.map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(';')).join('\r\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = name;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 500);
+  const downloadXLSX = (name, rows) => {
+    // Заглушка для XLSX
+    alert(`Выгрузка XLSX "${name}" пока не реализована.`);
   };
 
   const reports = [
@@ -27,15 +23,16 @@ export default function Reports({ db, dbFull, ur }) {
     { id: 'fin', name: 'Финансовый отчёт', desc: 'Трудоёмкость в чел.-ч по проектам и подразделениям.', acc: ['admin','director','economist'] },
     { id: 'vac', name: 'Отчёты по отпускам', desc: 'Даты, типы, плановые и фактические дни отсутствия.', acc: ['admin','director','economist','kb_chief','head','hr'] },
     { id: 'hrmove', name: 'Кадровые перемещения', desc: 'Изменения привязки сотрудников к отделам (журнал).', acc: ['admin','director','hr'] },
-    { id: 'arch', name: 'Отчёт по архивным данным', desc: 'Архивные проекты и задачи — просмотр и выгрузка (только чтение).', acc: 'all' },
+    { id: 'arch', name: 'Отчёт по архивным данным', desc: 'Архивные проекты и задачи — просмотр и выгрузка (только чтение).', acc: ['admin','director'] },
   ].filter(r => r.acc === 'all' || r.acc.some(a => ur.roles.includes(a)));
 
   const exportReport = (id) => {
+    let rows = [];
     if (id === 'load') {
-      downloadCSV('zgruzka.csv', [
+      rows = [
         ['Сотрудник','Подразделение','Статус','План, ч','Факт, ч','Задач в работе'],
         ...db.employees.map(e => {
-          const tasks = db.tasks.filter(t => !t.archived && (t.assigneeIds || []).includes(e.id));
+          const tasks = db.tasks.filter(t => isTaskActive(t) && (t.assigneeIds || []).includes(e.id));
           return [
             `${e.last} ${e.first}`,
             primaryDept(e)?.name || '',
@@ -45,9 +42,9 @@ export default function Reports({ db, dbFull, ur }) {
             tasks.filter(t => !['closed','cancelled'].includes(t.status)).length
           ];
         })
-      ]);
+      ];
     } else if (id === 'proj') {
-      downloadCSV('proekty.csv', [
+      rows = [
         ['Код','Проект','Тип','Бюджет, ч','План задач, ч','Факт, ч','% использования','Статус'],
         ...db.projects.filter(p => !p.archived).map(p => {
           const stats = getProjectStats(p.id);
@@ -60,9 +57,9 @@ export default function Reports({ db, dbFull, ur }) {
             p.status === 'active' ? 'Активный' : 'Закрыт'
           ];
         })
-      ]);
+      ];
     } else if (id === 'over') {
-      downloadCSV('prosrocheno.csv', [
+      rows = [
         ['Задача','Проект','Исполнители','Дедлайн','Дней просрочки'],
         ...tasks.filter(t => t.deadline && !['closed','cancelled'].includes(t.status) && t.deadline < TODAY).map(t => [
           t.title,
@@ -71,26 +68,26 @@ export default function Reports({ db, dbFull, ur }) {
           fmtDMY(t.deadline),
           -Math.round((new Date(t.deadline) - new Date(TODAY)) / 86400000)
         ])
-      ]);
+      ];
     } else if (id === 'prio') {
-      downloadCSV('prioritety.csv', [
+      rows = [
         ['Приоритет','Статус','Кол-во'],
         ...Object.keys(PRIORITIES).flatMap(pr => Object.keys(TASK_STATUSES).map(st => [
           PRIORITIES[pr].label,
           TASK_STATUSES[st].label,
           tasks.filter(t => t.priority === pr && t.status === st).length
         ]))
-      ]);
+      ];
     } else if (id === 'fin') {
-      downloadCSV('finans.csv', [
+      rows = [
         ['Проект','Чел.-ч план','Чел.-ч факт'],
         ...db.projects.filter(p => !p.archived).map(p => {
           const stats = getProjectStats(p.id);
           return [p.name, stats.plan, stats.fact];
         })
-      ]);
+      ];
     } else if (id === 'vac') {
-      downloadCSV('otpuska.csv', [
+      rows = [
         ['Сотрудник','Начало','Окончание','Тип','Дней','Статус'],
         ...db.vacations.map(v => [
           empName(v.empId),
@@ -100,9 +97,9 @@ export default function Reports({ db, dbFull, ur }) {
           Math.round((new Date(v.end) - new Date(v.start)) / 86400000) + 1,
           { pending: 'на утверждении', approved: 'утверждён', rejected: 'отклонён' }[v.status]
         ])
-      ]);
+      ];
     } else if (id === 'hrmove') {
-      downloadCSV('kadry.csv', [
+      rows = [
         ['Дата','Пользователь','Действие','Данные'],
         ...dbFull.audit.filter(a => a.action.includes('подразделени') || a.action.includes('регистрац') || a.action.includes('Архив')).map(a => [
           fmtDT(a.ts),
@@ -110,9 +107,9 @@ export default function Reports({ db, dbFull, ur }) {
           a.action,
           a.details
         ])
-      ]);
+      ];
     } else if (id === 'arch') {
-      downloadCSV('arhiv.csv', [
+      rows = [
         ['Тип','Код / название','Ответственный / исполнители','Закрыт','В архиве с','План, ч','Факт, ч'],
         ...dbFull.projects.filter(p => p.archived).map(p => {
           const stats = getProjectStats(p.id);
@@ -135,8 +132,9 @@ export default function Reports({ db, dbFull, ur }) {
           t.plannedHours ?? '—',
           getTaskSpent(t)
         ])
-      ]);
+      ];
     }
+    downloadXLSX(`${id}.xlsx`, rows);
   };
 
   return (
@@ -153,8 +151,7 @@ export default function Reports({ db, dbFull, ur }) {
           <div key={r.id} className="rep-panel rep-item">
             <div><div className="rep-panel-title" style={{ marginBottom: 4 }}>{r.name}</div><div className="mut sm">{r.desc}</div></div>
             <div className="rep-btns">
-              <button className="btn primary sm" onClick={() => exportReport(r.id)}><Ic d={ICONS.download} size={13} /> CSV</button>
-              <button className="btn ghost sm" onClick={() => alert('XLSX/PDF — заглушка')}>XLSX</button>
+              <button className="btn primary sm" onClick={() => exportReport(r.id)}><Ic d={ICONS.download} size={13} /> XLSX</button>
             </div>
           </div>
         ))}

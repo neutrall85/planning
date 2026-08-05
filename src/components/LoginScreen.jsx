@@ -25,9 +25,14 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
   const [shake, setShake] = useState(false);
   const [reg, setReg] = useState({ first: "", last: "", email: "", pass: "", pass2: "" });
   const [forgot, setForgot] = useState("");
-  // ИЗМЕНЕНИЕ: состояние для показа пароля и таймер
+  
+  // Состояние для показа пароля в логине
   const [showPassword, setShowPassword] = useState(false);
   const passwordTimerRef = useRef(null);
+  
+  // Состояние для показа пароля в регистрации
+  const [showRegPass, setShowRegPass] = useState(false);
+  const regPassTimerRef = useRef(null);
 
   const fail = (m) => { setErr(m); setShake(true); setTimeout(() => setShake(false), 450); };
   const doLogin = (loginVal, passVal) => {
@@ -39,10 +44,10 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
       setBusy(false);
     }, 30);
   };
-  // ИЗМЕНЕНИЕ: обработчик переключения видимости пароля
+  
+  // Обработчик переключения видимости пароля в логине
   const togglePasswordVisibility = () => {
     if (showPassword) {
-      // Если уже показан, скрываем и сбрасываем таймер
       setShowPassword(false);
       if (passwordTimerRef.current) {
         clearTimeout(passwordTimerRef.current);
@@ -54,6 +59,24 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
       passwordTimerRef.current = setTimeout(() => {
         setShowPassword(false);
         passwordTimerRef.current = null;
+      }, 10000);
+    }
+  };
+
+  // Обработчик переключения видимости пароля в регистрации
+  const toggleRegPassVisibility = () => {
+    if (showRegPass) {
+      setShowRegPass(false);
+      if (regPassTimerRef.current) {
+        clearTimeout(regPassTimerRef.current);
+        regPassTimerRef.current = null;
+      }
+    } else {
+      setShowRegPass(true);
+      if (regPassTimerRef.current) clearTimeout(regPassTimerRef.current);
+      regPassTimerRef.current = setTimeout(() => {
+        setShowRegPass(false);
+        regPassTimerRef.current = null;
       }, 10000);
     }
   };
@@ -86,7 +109,8 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
           notif: { deadlineEmail: true, overdueDigest: false, commentSub: true },
           failed: 0,
           lockUntil: 0,
-          fired: false
+          fired: false,
+          photo: null
         };
         setDb((s) => ({
           ...s,
@@ -119,13 +143,13 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
   };
   const issues = passIssues(reg.pass);
   const demos = [
-    { l: "admin", p: "Admin2026!", t: "Суперадминистратор" },
-    { l: "kozlov", p: "Director2026!", t: "Генеральный директор" },
-    { l: "lebedeva", p: "Econ2026!", t: "Главный экономист" },
-    { l: "romanov", p: "KbLa2026!", t: "Гл. конструктор КБ «ЛА»" },
-    { l: "nikitina", p: "Hr2026!", t: "HR-менеджер" },
-    { l: "fedorov", p: "Head2026!", t: "Руководитель отделов" },
-    { l: "morozov", p: "Pm2026!", t: "Ответственный по проекту" },
+    { l: "sergey.adminov", p: "Admin2026!", t: "Суперадминистратор" },
+    { l: "aleksey.gendirov", p: "Director2026!", t: "Генеральный директор" },
+    { l: "erik.ekonomistov", p: "Econ2026!", t: "Главный экономист" },
+    { l: "ivan.konstruktorov", p: "KbLa2026!", t: "Гл. конструктор КБ «ЛА»" },
+    { l: "jlga.personalova", p: "Hr2026!", t: "HR-менеджер" },
+    { l: "mikhail.otdelov", p: "Head2026!", t: "Руководитель отделов" },
+    { l: "kirill.proektov", p: "Pm2026!", t: "Ответственный по проекту" },
     { l: "isaev", p: "Exec2026!", t: "Исполнитель" },
   ];
   return (
@@ -146,10 +170,10 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
           {mode !== "register" && (<>
             <h3>{mode === "forgot" ? "Восстановление пароля" : "Вход в систему"}</h3>
             <div className="login-sub">{mode === "forgot" ? "Ссылка будет отправлена на зарегистрированный e-mail" : "Логин — e-mail без домена " + "@" + DOMAIN}</div>
-            {mode === "forgot" ? (<>
+            {mode === "forgot" ? (<>\
               <label className="lbl">E-mail</label>
               <div className="email-inp"><input className="inp" value={forgot} onChange={(e) => { setForgot(e.target.value); setErr(null); }} placeholder="ivanov" autoFocus /><span className="email-dom">{"@" + DOMAIN}</span></div>
-            </>) : (<>
+            </>) : (<>\
               <label className="lbl">Логин (e-mail)</label>
               <div className="email-inp"><input className="inp" value={lg} onChange={(e) => { setLg(e.target.value); setErr(null); }} placeholder="ivanov" autoFocus /><span className="email-dom">{"@" + DOMAIN}</span></div>
               <label className="lbl">Пароль</label>
@@ -181,14 +205,29 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
             <label className="lbl">E-mail *</label>
             <div className="email-inp"><input className="inp" value={reg.email} onChange={(e) => setReg({ ...reg, email: e.target.value })} placeholder="ivanov" /><span className="email-dom">{"@" + DOMAIN}</span></div>
             <label className="lbl">Пароль *</label>
-            <input className="inp" type="password" value={reg.pass} onChange={(e) => setReg({ ...reg, pass: e.target.value })} />
+            {/* Добавлен глаз для пароля в регистрации */}
+            <div style={{ position: 'relative' }}>
+              <input
+                className="inp"
+                type={showRegPass ? "text" : "password"}
+                value={reg.pass}
+                onChange={(e) => setReg({ ...reg, pass: e.target.value })}
+              />
+              <button
+                type="button"
+                onClick={toggleRegPassVisibility}
+                style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#64748b', cursor: 'pointer' }}
+              >
+                <Ic d={ICONS.eye} size={18} />
+              </button>
+            </div>
             <div className="pass-checks">{issues.map((i) => <span key={i.t} className={i.ok ? "ok" : ""}>✓ {i.t}</span>)}</div>
             <label className="lbl">Подтверждение пароля *</label>
             <input className="inp" type="password" value={reg.pass2} onChange={(e) => setReg({ ...reg, pass2: e.target.value })} />
           </>)}
           {err && <div className="login-err">{err}</div>}
           <button className="btn primary big" type="submit" disabled={busy}>{busy ? "Выполняется вход…" : mode === "login" ? "Войти" : mode === "register" ? "Зарегистрироваться" : "Отправить ссылку"}</button>
-          {mode === "login" && (<>
+          {mode === "login" && (<>\
             <div className="login-links">
               <button type="button" className="link" onClick={() => { setMode("forgot"); setErr(null); }}>Забыли пароль?</button>
               <button type="button" className="link" onClick={() => { setMode("register"); setErr(null); }}>Регистрация</button>

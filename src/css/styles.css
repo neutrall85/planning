@@ -607,6 +607,7 @@ input, select, textarea {
   width: 20px;
   height: 20px;
   font-size: 8.5px;
+  flex-shrink: 0; /* дополнительно */
 }
 .pdot {
   width: 8px;
@@ -903,10 +904,12 @@ input, select, textarea {
   font-size: 11.5px;
   color: #334155;
   font-weight: 600;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* ИСПРАВЛЕНИЕ: убрали overflow: hidden и text-overflow, добавили overflow: visible */
+  overflow: visible;
   white-space: nowrap;
+}
+.kassignee .avatar.xs {
+  flex-shrink: 0; /* чтобы кружочки не сжимались */
 }
 .khours {
   display: inline-flex;
@@ -2041,4 +2044,57 @@ input, select, textarea {
   background: #fff;
   border: 1.5px dashed var(--line);
   border-radius: 14px;
+}
+
+/* --- профиль: аватар --- */
+.profile-avatar {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1e3a8a, #0ea5e9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.profile-avatar .avatar-placeholder {
+  color: #fff;
+  font-size: 42px;
+  font-weight: 700;
+}
+.photo-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+.photo-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ========== ДОБАВЛЕНО: СТИЛИ ДЛЯ ГАЛОЧЕК ПАРОЛЯ ========== */
+.pass-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  font-size: 12px;
+  color: var(--mut);
+  margin-top: 4px;
+  grid-column: 2; /* Чтобы блок вставал под полем ввода, а не под лейблом */
+}
+.pass-checks span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.pass-checks .ok {
+  color: #10b981;
+  font-weight: 700;
 }

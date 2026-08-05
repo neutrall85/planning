@@ -5,9 +5,9 @@ import { hasRole, canApproveVacation } from "../utils/permissions";
 import { Ic, ICONS } from "./Icons";
 import { useDataHelpers } from "../hooks";
 
-export default function Requests({ db, setDb, ur }) {
+export default function Requests({ db, setDb, ur, initialTab = 'hours' }) {
   const { empName } = useDataHelpers(db);
-  const [tab, setTab] = useState('hours');
+  const [tab, setTab] = useState(initialTab);
 
   const tabs = [];
   if (hasRole(ur, 'director', 'admin')) tabs.push(['hours', 'Изменение часов']);
@@ -28,8 +28,44 @@ export default function Requests({ db, setDb, ur }) {
   const decideVac = (v, ok) => setDb((s) => ({ ...s, vacations: s.vacations.map((x) => (x.id === v.id ? { ...x, status: ok ? "approved" : "rejected" } : x)) }));
   const decideRD = (r, ok) => setDb((s) => ({ ...s, roleDelegations: s.roleDelegations.map((x) => (x.id === r.id ? { ...x, status: ok ? "active" : "rejected" } : x)) }));
   const decideReg = (r, ok) => {
-    if (ok) setDb((s) => ({ ...s, regRequests: s.regRequests.map((x) => (x.id === r.id ? { ...x, status: "approved" } : x)), employees: [...s.employees, { id: "e_" + Math.random().toString(36).slice(2,6), last: r.last, first: r.first, email: r.email, pass: r.pass, position: "Сотрудник", departments: [], roles: ["executor"], kbIds: [], headDeptIds: [], phone: "", tab: String(1000 + Math.floor(Math.random() * 8999)), notif: { deadlineEmail: true, overdueDigest: false, commentSub: true }, failed: 0, lockUntil: 0 }] }));
-    else setDb((s) => ({ ...s, regRequests: s.regRequests.map((x) => (x.id === r.id ? { ...x, status: "rejected" } : x)) }));
+    if (ok) {
+      setDb((s) => {
+        const existing = s.employees.find(e => e.email === r.email);
+        if (existing) {
+          const updated = { ...existing, roles: ['executor'] };
+          return { 
+            ...s, 
+            employees: s.employees.map(e => e.id === updated.id ? updated : e),
+            regRequests: s.regRequests.map(x => x.id === r.id ? { ...x, status: "approved" } : x)
+          };
+        } else {
+          const newEmp = { 
+            id: "e_" + Math.random().toString(36).slice(2,6),
+            last: r.last,
+            first: r.first,
+            email: r.email,
+            pass: r.pass,
+            position: "Сотрудник",
+            departments: [],
+            roles: ["executor"],
+            kbIds: [],
+            headDeptIds: [],
+            phone: "",
+            tab: String(1000 + Math.floor(Math.random() * 8999)),
+            notif: { deadlineEmail: true, overdueDigest: false, commentSub: true },
+            failed: 0,
+            lockUntil: 0
+          };
+          return { 
+            ...s, 
+            employees: [...s.employees, newEmp],
+            regRequests: s.regRequests.map(x => x.id === r.id ? { ...x, status: "approved" } : x)
+          };
+        }
+      });
+    } else {
+      setDb((s) => ({ ...s, regRequests: s.regRequests.map((x) => (x.id === r.id ? { ...x, status: "rejected" } : x)) }));
+    }
   };
 
   return (
@@ -40,13 +76,34 @@ export default function Requests({ db, setDb, ur }) {
         <div className="rep-panel">
           <div className="rep-panel-title">Запросы на изменение плановых часов</div>
           <table className="tbl">
-            <thead><tr><th>Объект</th><th>Текущее</th><th>Предлагаемое</th><th>Запросил</th><th>Решение</th></tr></thead>
+            <thead>
+              <tr>
+                <th>Объект</th>
+                <th>Текущее</th>
+                <th>Предлагаемое</th>
+                <th>Обоснование</th> {/* ИЗМЕНЕНИЕ: добавлен заголовок */}
+                <th>Запросил</th>
+                <th>Решение</th>
+              </tr>
+            </thead>
             <tbody>
               {db.hoursRequests.map(r => (
                 <tr key={r.id}>
                   <td><b>{r.kind === "task" ? db.tasks.find(t => t.id === r.targetId)?.title : db.projects.find(p => p.id === r.targetId)?.name}</b></td>
-                  <td>{r.oldH} ч</td><td><b>{r.newH} ч</b></td><td>{empName(r.reqId)}</td>
-                  <td>{r.status === "pending" ? (<><button className="btn primary sm" onClick={() => decideHours(r, true)}>Подтвердить</button> <button className="btn danger sm" onClick={() => decideHours(r, false)}>Отклонить</button></>) : <span className={"st-chip " + (r.status === "approved" ? "approved" : "rejected")}>{r.status}</span>}</td>
+                  <td>{r.oldH} ч</td>
+                  <td><b>{r.newH} ч</b></td>
+                  <td className="mut sm">{r.reason}</td> {/* ИЗМЕНЕНИЕ: отображение обоснования */}
+                  <td>{empName(r.reqId)}</td>
+                  <td>
+                    {r.status === "pending" ? (
+                      <>
+                        <button className="btn primary sm" onClick={() => decideHours(r, true)}>Подтвердить</button>
+                        <button className="btn danger sm" onClick={() => decideHours(r, false)}>Отклонить</button>
+                      </>
+                    ) : (
+                      <span className={"st-chip " + (r.status === "approved" ? "approved" : "rejected")}>{r.status}</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

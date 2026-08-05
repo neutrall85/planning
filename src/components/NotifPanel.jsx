@@ -2,13 +2,15 @@ import React from 'react';
 import { fmtDT } from '../utils/date';
 import { Ic } from './Icons';
 
-export default function NotifPanel({ list, setDb, onNavigate }) {
+export default function NotifPanel({ list, setDb, onNavigate, onClose }) {
   const markAllRead = () => {
     setDb((s) => ({ ...s, notifications: s.notifications.map((n) => ({ ...n, read: true })) }));
+    if (onClose) onClose();
   };
 
   const handleClick = (item) => {
     if (onNavigate) onNavigate(item);
+    if (onClose) onClose();
   };
 
   return (

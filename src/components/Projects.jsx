@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { PROJECT_STATUSES, PROJECT_TYPES } from '../utils/constants';
-import { fmtDMY, initials } from '../utils/date';
+import { fmtDMY, initials, isTaskActive } from '../utils/date';
 import { Ic, ICONS } from './Icons';
 import { computeScope, hasRole } from '../utils/permissions';
 
@@ -10,6 +10,12 @@ export default function Projects({ db, ur, openProject, openHoursReq, closeProje
   const list = scope.all 
     ? db.projects.filter(p => !p.archived) 
     : db.projects.filter(p => !p.archived && scope.projIds.has(p.id));
+
+  // Функция проверки, может ли пользователь закрыть/отменить проект
+  const canCloseProject = (project) => {
+    const creatorId = project.creatorId || (project.history?.find(h => h.who !== 'system')?.who);
+    return hasRole(ur, 'admin') || hasRole(ur, 'director') || (creatorId && creatorId === ur.id);
+  };
 
   return (
     <div>
@@ -23,7 +29,8 @@ export default function Projects({ db, ur, openProject, openHoursReq, closeProje
       </div>
       <div className="pj-grid">
         {list.map(p => {
-          const tasks = db.tasks.filter(t => t.projectId === p.id && !t.archived);
+          // В карточке проекта используем isTaskActive вместо !t.archived
+          const tasks = db.tasks.filter(t => t.projectId === p.id && isTaskActive(t));
           const plan = tasks.reduce((s, t) => s + (t.plannedHours || 0), 0);
           const fact = tasks.reduce((s, t) => s + t.logs.reduce((lsum, l) => lsum + l.hours, 0), 0);
           const usePct = p.budget ? Math.round((fact / Math.max(1, p.budget)) * 100) : 0;
@@ -78,12 +85,14 @@ export default function Projects({ db, ur, openProject, openHoursReq, closeProje
                       <Ic d={ICONS.edit} size={15} />
                     </button>
                   )}
-                  {/* Кнопка "Отменить проект" – только для активных и не административных, доступна админу, ГД, экономисту, ГК */}
-                  {hasRole(ur, 'admin', 'director', 'economist', 'kb_chief') && p.status === 'active' && (
-                    <button className="icon-btn danger" title="Отменить проект" onClick={() => {
-                      if (window.confirm(`Отменить проект "${p.name}"? Все задачи проекта будут переведены в статус "Отменена".`)) {
-                        cancelProject(p);
-                      }
+                  {/* Кнопка "Закрыть/Отменить проект" – только для автора, ГД или админа */}
+                  {canCloseProject(p) && p.status !== 'closed' && p.status !== 'cancelled' && (
+                    <button className="icon-btn danger" title="Закрыть/Отменить проект" onClick={() => {
+                      const action = window.confirm(`Закрыть проект "${p.name}"? Все задачи проекта будут переведены в статус "Закрыта".`) 
+                        ? 'close' 
+                        : (window.confirm(`Отменить проект "${p.name}"? Все задачи проекта будут переведены в статус "Отменена".`) ? 'cancel' : null);
+                      if (action === 'close') closeProject(p);
+                      else if (action === 'cancel') cancelProject(p);
                     }}>
                       <Ic d={ICONS.x} size={15} />
                     </button>

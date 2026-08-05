@@ -6,6 +6,8 @@ export default class DataStore {
     this._data = this._buildMock();
     this._currentUser = null;
     this._listeners = [];
+    // При инициализации архивируем задачи, закрытые более 3 месяцев назад
+    this._archiveOldTasks(3);
   }
 
   subscribe(callback) {
@@ -21,15 +23,11 @@ export default class DataStore {
 
   login(email, password) {
     const found = this._data.employees.find(e => e.email.toLowerCase() === email.trim().toLowerCase());
-    
-    // Проверка блокировки после 5 неудачных попыток (15 минут)
     if (found && found.lockUntil && Date.now() < found.lockUntil) {
       const remainingMinutes = Math.ceil((found.lockUntil - Date.now()) / 60000);
       return `Учётная запись заблокирована на ${remainingMinutes} мин. после 5 неудачных попыток входа`;
     }
-    
     if (found && found.pass === password && !found.fired) {
-      // Сброс счётчика неудачных попыток при успешном входе
       if (found.failed > 0) {
         found.failed = 0;
         found.lockUntil = 0;
@@ -39,60 +37,142 @@ export default class DataStore {
       this._notify();
       return true;
     }
-    
-    // Увеличение счётчика неудачных попыток
     if (found) {
       found.failed = (found.failed || 0) + 1;
       if (found.failed >= 5) {
-        // Блокировка на 15 минут
         found.lockUntil = Date.now() + 15 * 60 * 1000;
         this.upsertEmployee(found);
         return 'Учётная запись заблокирована на 15 мин. после 5 неудачных попыток входа';
       }
       this.upsertEmployee(found);
     }
-    
     return 'Неправильно введен логин/пароль';
   }
+
   logout() {
     this._currentUser = null;
     this._notify();
+  }
+
+  // ––– Архивация старых задач (вызывается после каждой мутации) –––
+  _archiveOldTasks(months = 3) {
+    const cutoff = addMonths(new Date(), -months);
+    const cutoffIso = iso(cutoff);
+    let changed = false;
+    this._data.tasks = this._data.tasks.map(t => {
+      if (t.archived) return t;
+      if ((t.status === 'closed' || t.status === 'cancelled') && t.closedAt && t.closedAt < cutoffIso) {
+        changed = true;
+        return { ...t, archived: true, archivedAt: TODAY };
+      }
+      return t;
+    });
+    if (changed) {
+      this._notify();
+      this.addAudit('Автоматическая архивация задач', `Задачи, закрытые более ${months} мес., перемещены в архив`);
+    }
   }
 
   // ––– Мутации –––
   upsertTask(task) {
     const idx = this._data.tasks.findIndex(t => t.id === task.id);
     let tasks;
+    let auditMessage = '';
     if (idx >= 0) {
+      const old = this._data.tasks[idx];
+      const changes = [];
+      if (old.title !== task.title) changes.push(`Название: "${old.title}" → "${task.title}"`);
+      if (old.plannedHours !== task.plannedHours) changes.push(`Плановые часы: ${old.plannedHours ?? '—'} → ${task.plannedHours ?? '—'}`);
+      if (JSON.stringify(old.assigneeIds) !== JSON.stringify(task.assigneeIds)) {
+        changes.push(`Исполнители: ${old.assigneeIds.map(id => this.empName(id)).join(', ')} → ${task.assigneeIds.map(id => this.empName(id)).join(', ')}`);
+      }
+      if (old.status !== task.status) {
+        changes.push(`Статус: ${TASK_STATUSES[old.status].label} → ${TASK_STATUSES[task.status].label}`);
+        if ((task.status === 'closed' || task.status === 'cancelled') && old.status !== task.status) {
+          task.closedAt = TODAY;
+          if (task.creatorId) {
+            this.addNotification(task.creatorId, `Задача "${task.title}" ${task.status === 'closed' ? 'закрыта' : 'отменена'}`, { targetType: 'task', targetId: task.id });
+          }
+          const project = this._data.projects.find(p => p.id === task.projectId);
+          if (project && project.managerId && project.managerId !== task.creatorId) {
+            this.addNotification(project.managerId, `Задача "${task.title}" проекта ${project.code} ${task.status === 'closed' ? 'закрыта' : 'отменена'}`, { targetType: 'task', targetId: task.id });
+          }
+        }
+      }
+      if (changes.length > 0) {
+        auditMessage = `Изменение задачи "${task.title}": ${changes.join('; ')}`;
+        this.addAudit('Изменение задачи', auditMessage);
+      }
       tasks = this._data.tasks.map(t => t.id === task.id ? task : t);
     } else {
       tasks = [...this._data.tasks, task];
+      this.addAudit('Создание задачи', task.title);
+      (task.assigneeIds || []).forEach(id => {
+        if (id !== this._currentUser?.id) {
+          this.addNotification(id, `Вам назначена задача "${task.title}"`, { targetType: 'task', targetId: task.id });
+        }
+      });
     }
     this._data = { ...this._data, tasks };
     this._notify();
+    this._archiveOldTasks(3);
   }
+
   deleteTask(id) {
+    const task = this._data.tasks.find(t => t.id === id);
+    if (task) {
+      this.addAudit('Удаление задачи', task.title);
+    }
     this._data = { ...this._data, tasks: this._data.tasks.filter(t => t.id !== id) };
     this._notify();
   }
+
   upsertProject(project) {
     const idx = this._data.projects.findIndex(p => p.id === project.id);
     let projects;
+    let auditMessage = '';
     if (idx >= 0) {
       const oldProject = this._data.projects[idx];
-      if (project.status === 'cancelled' && oldProject.status !== 'cancelled') {
-        this._data.tasks = this._data.tasks.map(t => 
-          t.projectId === project.id ? { ...t, status: 'cancelled' } : t
-        );
+      const changes = [];
+      if (oldProject.name !== project.name) changes.push(`Название: "${oldProject.name}" → "${project.name}"`);
+      if (oldProject.budget !== project.budget) changes.push(`Бюджет: ${oldProject.budget ?? '—'} → ${project.budget ?? '—'}`);
+      if (oldProject.status !== project.status) {
+        changes.push(`Статус: ${PROJECT_STATUSES[oldProject.status]} → ${PROJECT_STATUSES[project.status]}`);
+        if ((project.status === 'closed' || project.status === 'cancelled') && oldProject.status !== project.status) {
+          project.archived = true;
+          project.archivedAt = TODAY;
+          this._data.tasks = this._data.tasks.map(t => {
+            if (t.projectId === project.id) {
+              const updated = { ...t, archived: true, archivedAt: TODAY };
+              if (t.creatorId) {
+                this.addNotification(t.creatorId, `Задача "${t.title}" проекта ${project.code} архивирована (проект закрыт)`, { targetType: 'task', targetId: t.id });
+              }
+              return updated;
+            }
+            return t;
+          });
+          this.addNotification(project.managerId || 'system', `Проект "${project.name}" архивирован`, { targetType: 'project', targetId: project.id });
+        }
+      }
+      if (changes.length > 0) {
+        auditMessage = `Изменение проекта "${project.name}": ${changes.join('; ')}`;
+        this.addAudit('Изменение проекта', auditMessage);
       }
       projects = this._data.projects.map(p => p.id === project.id ? project : p);
     } else {
       projects = [...this._data.projects, project];
+      this.addAudit('Создание проекта', project.name);
     }
     this._data = { ...this._data, projects };
     this._notify();
+    this._archiveOldTasks(3);
   }
+
   deleteProject(id) {
+    const project = this._data.projects.find(p => p.id === id);
+    if (project) {
+      this.addAudit('Удаление проекта', project.name);
+    }
     this._data = {
       ...this._data,
       projects: this._data.projects.filter(p => p.id !== id),
@@ -100,32 +180,111 @@ export default class DataStore {
     };
     this._notify();
   }
+
   upsertVacation(vac) {
     const idx = this._data.vacations.findIndex(v => v.id === vac.id);
     let vacations;
     if (idx >= 0) {
+      const old = this._data.vacations[idx];
+      this.addAudit('Изменение отпуска', `${vac.empId} ${fmtDMY(vac.start)}—${fmtDMY(vac.end)}`);
       vacations = this._data.vacations.map(v => v.id === vac.id ? vac : v);
     } else {
       vacations = [...this._data.vacations, vac];
+      this.addAudit('Создание отпуска', `${vac.empId} ${fmtDMY(vac.start)}—${fmtDMY(vac.end)}`);
     }
     this._data = { ...this._data, vacations };
     this._notify();
+    if (vac.delegation.enabled && vac.status === 'approved' && vac.start <= TODAY) {
+      this.applyDelegation(vac.id);
+    }
   }
+
   deleteVacation(id) {
+    const vac = this._data.vacations.find(v => v.id === id);
+    if (vac) {
+      this.addAudit('Удаление отпуска', `${vac.empId} ${fmtDMY(vac.start)}—${fmtDMY(vac.end)}`);
+      if (vac.delegation.enabled) {
+        this.revertDelegation(id);
+      }
+    }
     this._data = { ...this._data, vacations: this._data.vacations.filter(v => v.id !== id) };
     this._notify();
   }
+
+  // ––– Делегирование задач при отпуске –––
+  applyDelegation(vacationId) {
+    const vac = this._data.vacations.find(v => v.id === vacationId);
+    if (!vac || !vac.delegation.enabled || vac.status !== 'approved') return;
+    const start = vac.start;
+    const end = vac.end;
+    const fromId = vac.empId;
+    const toId = vac.delegation.subId;
+    const statuses = vac.delegation.statuses.length ? vac.delegation.statuses : ['new', 'inwork', 'review'];
+    this._data.tasks = this._data.tasks.map(t => {
+      if (t.archived) return t;
+      if (!t.assigneeIds.includes(fromId)) return t;
+      if (!statuses.includes(t.status)) return t;
+      if (t.deadline && t.deadline < start) return t;
+      const newAssignees = t.assigneeIds.filter(id => id !== fromId);
+      if (!newAssignees.includes(toId)) newAssignees.push(toId);
+      const updated = { ...t, assigneeIds: newAssignees };
+      updated.history = [...updated.history, {
+        ts: Date.now(),
+        who: 'system',
+        text: `Задача переназначена с ${this.empName(fromId)} на ${this.empName(toId)} на период отпуска с ${fmtDMY(start)} по ${fmtDMY(end)}`
+      }];
+      return updated;
+    });
+    this._notify();
+    this.addNotification(toId, `Вам переданы задачи ${this.empName(fromId)} на время отпуска`, { targetType: 'vacation', targetId: vacationId });
+    this.addNotification(fromId, `Ваши задачи переданы ${this.empName(toId)} на период отпуска`, { targetType: 'vacation', targetId: vacationId });
+  }
+
+  revertDelegation(vacationId) {
+    const vac = this._data.vacations.find(v => v.id === vacationId);
+    if (!vac || !vac.delegation.enabled) return;
+    const fromId = vac.empId;
+    const toId = vac.delegation.subId;
+    this._data.tasks = this._data.tasks.map(t => {
+      if (t.archived) return t;
+      if (!t.assigneeIds.includes(toId)) return t;
+      const hasDelegation = t.history.some(h => h.text.includes(`переназначена с ${this.empName(fromId)} на ${this.empName(toId)}`));
+      if (!hasDelegation) return t;
+      const newAssignees = t.assigneeIds.filter(id => id !== toId);
+      if (!newAssignees.includes(fromId)) newAssignees.push(fromId);
+      const updated = { ...t, assigneeIds: newAssignees };
+      updated.history = [...updated.history, {
+        ts: Date.now(),
+        who: 'system',
+        text: `Задача возвращена ${this.empName(fromId)} по окончании отпуска`
+      }];
+      return updated;
+    });
+    this._notify();
+    this.addNotification(fromId, `Задачи возвращены вам по окончании отпуска`, { targetType: 'vacation', targetId: vacationId });
+  }
+
+  // ––– Управление сотрудниками –––
   upsertEmployee(emp) {
     const idx = this._data.employees.findIndex(e => e.id === emp.id);
     let employees;
     if (idx >= 0) {
+      const old = this._data.employees[idx];
+      if (JSON.stringify(old.departments) !== JSON.stringify(emp.departments)) {
+        this.addAudit('Изменение подразделений', `${emp.last} ${emp.first}: ${old.departments.map(d => d.deptId).join(',')} → ${emp.departments.map(d => d.deptId).join(',')}`);
+      }
+      if (JSON.stringify(old.roles) !== JSON.stringify(emp.roles)) {
+        this.addAudit('Изменение ролей', `${emp.last} ${emp.first}: ${old.roles.join(', ')} → ${emp.roles.join(', ')}`);
+      }
       employees = this._data.employees.map(e => e.id === emp.id ? emp : e);
     } else {
       employees = [...this._data.employees, emp];
+      this.addAudit('Создание сотрудника', `${emp.last} ${emp.first}`);
     }
     this._data = { ...this._data, employees };
     this._notify();
   }
+
   upsertDepartment(dept) {
     const idx = this._data.departments.findIndex(d => d.id === dept.id);
     let departments;
@@ -133,10 +292,12 @@ export default class DataStore {
       departments = this._data.departments.map(d => d.id === dept.id ? dept : d);
     } else {
       departments = [...this._data.departments, dept];
+      this.addAudit('Создание отдела', dept.name);
     }
     this._data = { ...this._data, departments };
     this._notify();
   }
+
   upsertKb(kb) {
     const idx = this._data.kbs.findIndex(k => k.id === kb.id);
     let kbs;
@@ -144,10 +305,12 @@ export default class DataStore {
       kbs = this._data.kbs.map(k => k.id === kb.id ? kb : k);
     } else {
       kbs = [...this._data.kbs, kb];
+      this.addAudit('Создание КБ', kb.name);
     }
     this._data = { ...this._data, kbs };
     this._notify();
   }
+
   addAudit(action, details) {
     this._data = {
       ...this._data,
@@ -158,6 +321,7 @@ export default class DataStore {
     };
     this._notify();
   }
+
   addNotification(userId, text, target = null) {
     this._data = {
       ...this._data,
@@ -168,10 +332,28 @@ export default class DataStore {
     };
     this._notify();
   }
+
+  markNotificationRead(id) {
+    this._data = {
+      ...this._data,
+      notifications: this._data.notifications.map(n => n.id === id ? { ...n, read: true } : n)
+    };
+    this._notify();
+  }
+
+  markAllNotificationsRead(userId) {
+    this._data = {
+      ...this._data,
+      notifications: this._data.notifications.map(n => n.userId === userId ? { ...n, read: true } : n)
+    };
+    this._notify();
+  }
+
   addHoursRequest(req) {
     this._data = { ...this._data, hoursRequests: [req, ...this._data.hoursRequests] };
     this._notify();
   }
+
   upsertRoleDelegation(rd) {
     const idx = this._data.roleDelegations.findIndex(r => r.id === rd.id);
     let roleDelegations;
@@ -179,59 +361,19 @@ export default class DataStore {
       roleDelegations = this._data.roleDelegations.map(r => r.id === rd.id ? rd : r);
     } else {
       roleDelegations = [...this._data.roleDelegations, rd];
+      this.addAudit('Создание делегирования ролей', `${rd.fromId} → ${rd.toId}: ${rd.roles.join(', ')}`);
     }
     this._data = { ...this._data, roleDelegations };
     this._notify();
   }
 
-  // ИЗМЕНЕНИЕ: метод для автоматической архивации
-  runArchive(months) {
-    const now = new Date();
-    const cutoff = addMonths(now, -months);
-    const cutoffIso = iso(cutoff);
-    let changed = false;
-
-    // Архивация проектов
-    const updatedProjects = this._data.projects.map(p => {
-      if (p.archived) return p;
-      // Не архивируем долгосрочные административные проекты
-      if (p.ptype === 'admin' && p.longterm) return p;
-      if (p.status === 'closed' && p.closedAt && p.closedAt < cutoffIso) {
-        changed = true;
-        return { ...p, archived: true, archivedAt: TODAY };
-      }
-      if (p.status === 'cancelled' && p.closedAt && p.closedAt < cutoffIso) {
-        changed = true;
-        return { ...p, archived: true, archivedAt: TODAY };
-      }
-      return p;
-    });
-
-    // Архивация задач
-    const updatedTasks = this._data.tasks.map(t => {
-      if (t.archived) return t;
-      // Задачи административных долгосрочных проектов не архивируем
-      const project = updatedProjects.find(p => p.id === t.projectId);
-      if (project && project.ptype === 'admin' && project.longterm) return t;
-      if ((t.status === 'closed' || t.status === 'cancelled') && t.closedAt && t.closedAt < cutoffIso) {
-        changed = true;
-        return { ...t, archived: true, archivedAt: TODAY };
-      }
-      return t;
-    });
-
-    if (changed) {
-      this._data = {
-        ...this._data,
-        projects: updatedProjects,
-        tasks: updatedTasks
-      };
-      this._notify();
-      this.addAudit('Автоматическая архивация', `Архивированы проекты и задачи, закрытые более ${months} мес.`);
-    }
-    return changed;
+  // ––– Утилиты –––
+  empName(id) {
+    const e = this._data.employees.find(x => x.id === id);
+    return e ? `${e.last} ${e.first}` : '—';
   }
 
+  // ––– Моковые данные –––
   _buildMock() {
     const D = (off) => iso(addDays(new Date(), off));
     const settings = { archiveMonths: 6 };
@@ -253,12 +395,11 @@ export default class DataStore {
       { id: "d_otk", name: "Отдел технического контроля (ОТК)", kbId: null },
       { id: "d_hr", name: "Отдел кадров", kbId: null },
     ];
-    // ИЗМЕНЕНИЕ: добавлено поле extension
     const E = (id, last, first, email, pass, position, deps, roles, extra = {}) =>
-      ({ id, last, first, email, pass, position, departments: deps, roles, kbIds: extra.kbIds || [], headDeptIds: extra.headDeptIds || [], phone: extra.phone || "+7 900 000-00-00", extension: extra.extension || "123", tab: extra.tab || String(1000 + Math.floor(Math.random() * 8999)), notif: { deadlineEmail: true, overdueDigest: false, commentSub: true }, failed: 0, lockUntil: 0, fired: false });
+      ({ id, last, first, email, pass, position, departments: deps, roles, kbIds: extra.kbIds || [], headDeptIds: extra.headDeptIds || [], phone: extra.phone || "+7 900 000-00-00", extension: extra.extension || "123", tab: extra.tab || String(1000 + Math.floor(Math.random() * 8999)), notif: { deadlineEmail: true, overdueDigest: false, commentSub: true }, failed: 0, lockUntil: 0, fired: false, passwordHistory: [], photo: null });
     const employees = [
-      E("e_smirnov", "Смирнов", "Артём", "admin", "Admin2026!", "Администратор системы", [{ deptId: "d_it", primary: true }], ["admin"], { extension: "101" }),
-      E("e_kozlov", "Козлов", "Дмитрий", "kozlov", "Director2026!", "Генеральный директор", [{ deptId: "d_mgmt", primary: true }], ["director"], { extension: "102" }),
+      E("sergey.adminov", "Админов", "Сергей", "sergey.adminov", "Admin2026!", "Администратор системы", [{ deptId: "d_it", primary: true }], ["sergey.adminov"], { extension: "101" }),
+      E("e_kozlov", "Козлов", "Дмитрий", "kozlov", "Director2026!", "Генеральный директор", [], ["director"], { extension: "102" }),
       E("e_lebedeva", "Лебедева", "Мария", "lebedeva", "Econ2026!", "Главный экономист", [{ deptId: "d_mgmt", primary: true }], ["economist"], { extension: "103" }),
       E("e_romanov", "Романов", "Владимир", "romanov", "KbLa2026!", "Главный конструктор КБ «ЛА»", [{ deptId: "d_mgmt", primary: true }], ["kb_chief", "executor"], { kbIds: ["kb_la"], extension: "104" }),
       E("e_belova", "Белова", "Наталья", "belova", "KbAd2026!", "Главный конструктор КБ «АД»", [{ deptId: "d_mgmt", primary: true }], ["kb_chief", "executor"], { kbIds: ["kb_ad"], extension: "105" }),
@@ -285,18 +426,17 @@ export default class DataStore {
       E("e_somova", "Сомова", "Екатерина", "somova", "Exec2026!", "UX-дизайнер", [{ deptId: "d_it", primary: true }, { deptId: "d_av1", primary: false }], ["executor"], { extension: "126" }),
     ];
     const projects = [
-      { id: "p_lm24", code: "ЛМ-24", name: "Лёгкий многоцелевой самолёт ЛМ-24", desc: "ОКР по созданию лёгкого многоцелевого самолёта.", kbId: "kb_la", managerId: "e_morozov", start: D(-25), end: D(50), status: "active", budget: 180, color: "#0ea5e9", ptype: "prod", archived: false, archivedAt: null, closedAt: null },
-      { id: "p_cert", code: "СЕРТ-24", name: "Сертификация самолёта ЛМ-24", desc: "Комплекс сертификационных работ.", kbId: "kb_la", managerId: "e_fedorov", start: D(-10), end: D(45), status: "active", budget: 90, color: "#8b5cf6", ptype: "prod", archived: false, archivedAt: null, closedAt: null },
-      { id: "p_heli", code: "В-112", name: "Модернизация вертолёта В-112", desc: "Модернизация планера и систем.", kbId: "kb_la", managerId: "e_gromov", start: D(-30), end: D(35), status: "active", budget: 120, color: "#f43f5e", ptype: "prod", archived: false, archivedAt: null, closedAt: null },
-      { id: "p_rd900", code: "РД-900", name: "Турбовинтовой двигатель РД-900", desc: "Перспективный ТВД.", kbId: "kb_ad", managerId: "e_krylov", start: D(-20), end: D(60), status: "active", budget: 200, color: "#f59e0b", ptype: "prod", archived: false, archivedAt: null, closedAt: null },
-      { id: "p_apu", code: "ВСУ-14", name: "Вспомогательная силовая установка ВСУ-14", desc: "ВСУ для ЛМ-24.", kbId: "kb_ad", managerId: "e_medvedev", start: D(-12), end: D(30), status: "active", budget: 70, color: "#10b981", ptype: "prod", archived: false, archivedAt: null, closedAt: null },
-      { id: "p_port", code: "ИТ-ПОРТ", name: "Корпоративный портал предприятия", desc: "Внутренний портал и сервисы.", kbId: null, managerId: "e_petrov", start: D(-8), end: D(25), status: "active", budget: 80, color: "#64748b", ptype: "prod", archived: false, archivedAt: null, closedAt: null },
-      { id: "p_event", code: "АДМ-1", name: "Внутренние мероприятия предприятия", desc: "Административный проект: организационные работы и мероприятия.", kbId: null, managerId: "", start: D(-5), end: null, status: "active", budget: null, color: "#14b8a6", ptype: "admin", archived: false, archivedAt: null, closedAt: null },
-      { id: "p_old", code: "ИТ-15", name: "Модернизация локальной сети предприятия", desc: "Проект завершён более полугода назад — подлежит архивации.", kbId: null, managerId: "e_petrov", start: D(-300), end: D(-230), status: "closed", budget: 120, color: "#94a3b8", ptype: "prod", archived: false, archivedAt: null, closedAt: D(-215) },
-      { id: "p_long", code: "АДМ-0", name: "Многолетняя программа внутренних мероприятий", desc: "Долгосрочный административный проект — исключение из архивации.", kbId: null, managerId: "e_nikitina", start: D(-400), end: null, status: "closed", budget: null, color: "#f59e0b", ptype: "admin", longterm: true, archived: false, archivedAt: null, closedAt: D(-300) },
+      { id: "p_lm24", code: "ЛМ-24", name: "Лёгкий многоцелевой самолёт ЛМ-24", desc: "ОКР по созданию лёгкого многоцелевого самолёта.", kbId: "kb_la", managerId: "e_morozov", start: D(-25), end: D(50), status: "active", budget: 180, color: "#0ea5e9", ptype: "prod", archived: false, archivedAt: null, closedAt: null, creatorId: "e_kozlov" },
+      { id: "p_cert", code: "СЕРТ-24", name: "Сертификация самолёта ЛМ-24", desc: "Комплекс сертификационных работ.", kbId: "kb_la", managerId: "e_fedorov", start: D(-10), end: D(45), status: "active", budget: 90, color: "#8b5cf6", ptype: "prod", archived: false, archivedAt: null, closedAt: null, creatorId: "e_kozlov" },
+      { id: "p_heli", code: "В-112", name: "Модернизация вертолёта В-112", desc: "Модернизация планера и систем.", kbId: "kb_la", managerId: "e_gromov", start: D(-30), end: D(35), status: "active", budget: 120, color: "#f43f5e", ptype: "prod", archived: false, archivedAt: null, closedAt: null, creatorId: "e_kozlov" },
+      { id: "p_rd900", code: "РД-900", name: "Турбовинтовой двигатель РД-900", desc: "Перспективный ТВД.", kbId: "kb_ad", managerId: "e_krylov", start: D(-20), end: D(60), status: "active", budget: 200, color: "#f59e0b", ptype: "prod", archived: false, archivedAt: null, closedAt: null, creatorId: "e_kozlov" },
+      { id: "p_apu", code: "ВСУ-14", name: "Вспомогательная силовая установка ВСУ-14", desc: "ВСУ для ЛМ-24.", kbId: "kb_ad", managerId: "e_medvedev", start: D(-12), end: D(30), status: "active", budget: 70, color: "#10b981", ptype: "prod", archived: false, archivedAt: null, closedAt: null, creatorId: "e_kozlov" },
+      { id: "p_port", code: "ИТ-ПОРТ", name: "Корпоративный портал предприятия", desc: "Внутренний портал и сервисы.", kbId: null, managerId: "e_petrov", start: D(-8), end: D(25), status: "active", budget: 80, color: "#64748b", ptype: "prod", archived: false, archivedAt: null, closedAt: null, creatorId: "e_kozlov" },
+      { id: "p_event", code: "АДМ-1", name: "Внутренние мероприятия предприятия", desc: "Административный проект: организационные работы и мероприятия.", kbId: null, managerId: "", start: D(-5), end: null, status: "active", budget: null, color: "#14b8a6", ptype: "admin", archived: false, archivedAt: null, closedAt: null, creatorId: "e_kozlov" },
+      { id: "p_old", code: "ИТ-15", name: "Модернизация локальной сети предприятия", desc: "Проект завершён более полугода назад — подлежит архивации.", kbId: null, managerId: "e_petrov", start: D(-300), end: D(-230), status: "closed", budget: 120, color: "#94a3b8", ptype: "prod", archived: true, archivedAt: D(-215), closedAt: D(-215), creatorId: "e_kozlov" },
+      { id: "p_long", code: "АДМ-0", name: "Многолетняя программа внутренних мероприятий", desc: "Долгосрочный административный проект — исключение из архивации.", kbId: null, managerId: "e_nikitina", start: D(-400), end: null, status: "closed", budget: null, color: "#f59e0b", ptype: "admin", longterm: true, archived: false, archivedAt: null, closedAt: D(-300), creatorId: "e_kozlov" },
     ];
     const now = Date.now();
-    // ИЗМЕНЕНИЕ: добавлен creatorId для задач (из первого who в истории)
     const T = (id, title, projectId, assigneeIds, planned, s, dl, status, priority, desc, extra = {}) => {
       const history = extra.history || [{ ts: now - 86400000 * 6, who: extra.creatorId || "e_kozlov", text: "Задача создана" }];
       const creatorId = extra.creatorId || (history.length > 0 ? history[0].who : "e_kozlov");
@@ -304,7 +444,7 @@ export default class DataStore {
         id, title, desc: desc || "", projectId, assigneeIds: Array.isArray(assigneeIds) ? assigneeIds : [assigneeIds],
         plannedHours: planned, start: D(s), deadline: dl === null ? null : D(dl),
         status, priority, logs: [], comments: [], history,
-        creatorId, // ИЗМЕНЕНИЕ
+        creatorId,
         delegatedFrom: null, archived: false, archivedAt: null, closedAt: null, ...extra,
       };
     };
@@ -349,11 +489,11 @@ export default class DataStore {
       { id: "rg1", first: "Олег", last: "Новиков", email: "novikov", pass: "Exec2026!", status: "pending", ts: now - 3600000 * 26 },
     ];
     const notifications = [
-      { id: uid(), userId: "e_kozlov", text: "Запрос на изменение плановых часов по задаче «Отчёт по прочности фюзеляжа» ожидает решения.", ts: now - 3600000 * 5, read: false },
-      { id: uid(), userId: "e_fedorov", text: "Тихонов Е. подал заявку на отпуск с делегированием задач — требуется утверждение.", ts: now - 3600000 * 8, read: false },
-      { id: uid(), userId: "e_kim", text: "Вам переданы задачи Сомовой Е. на период отпуска.", ts: now - 3600000 * 30, read: false },
-      { id: uid(), userId: "e_smirnov", text: "Новая заявка на регистрацию: Новиков Олег.", ts: now - 3600000 * 26, read: false },
-      { id: uid(), userId: "e_isaev", text: "Морозов К. упомянул вас в обсуждении задачи «Расчёт подъёмной силы крыла».", ts: now - 3600000 * 20, read: false },
+      { id: uid(), userId: "e_kozlov", text: "Запрос на изменение плановых часов по задаче «Отчёт по прочности фюзеляжа» ожидает решения.", ts: now - 3600000 * 5, read: false, targetType: 'hours', targetId: 'hr1' },
+      { id: uid(), userId: "e_fedorov", text: "Тихонов Е. подал заявку на отпуск с делегированием задач — требуется утверждение.", ts: now - 3600000 * 8, read: false, targetType: 'vacation', targetId: 'v2' },
+      { id: uid(), userId: "e_kim", text: "Вам переданы задачи Сомовой Е. на период отпуска.", ts: now - 3600000 * 30, read: false, targetType: 'task', targetId: 't08' },
+      { id: uid(), userId: "e_smirnov", text: "Новая заявка на регистрацию: Новиков Олег.", ts: now - 3600000 * 26, read: false, targetType: 'registration', targetId: 'rg1' },
+      { id: uid(), userId: "e_isaev", text: "Морозов К. упомянул вас в обсуждении задачи «Расчёт подъёмной силы крыла».", ts: now - 3600000 * 20, read: false, targetType: 'task', targetId: 't01' },
     ];
     const audit = [
       { id: uid(), ts: now - 86400000 * 2, userId: "e_morozov", action: "Запрос изменения часов", details: "t04: 32 → 48 ч" },

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { iso, addDays, fmtDMY } from '../utils/date';
+import { iso, addDays, fmtDMY, isTaskActive } from '../utils/date';
 import { taskVisible, computeScope } from '../utils/permissions';
 import { Ic, ICONS } from './Icons';
 
@@ -30,7 +30,8 @@ export default function Calendar({ db, ur, openTask }) {
   const [mode, setMode] = useState('month');
   const [anchor, setAnchor] = useState(new Date());
   
-  const tasks = db.tasks.filter(t => taskVisible(ur, scope, t, db) && t.deadline && !['closed','cancelled'].includes(t.status));
+  // Заменяем !t.archived на isTaskActive(t)
+  const tasks = db.tasks.filter(t => isTaskActive(t) && taskVisible(ur, scope, t, db) && t.deadline && !['closed','cancelled'].includes(t.status));
 
   const byDay = useMemo(() => {
     const m = {}; tasks.forEach(t => { (m[t.deadline] = m[t.deadline] || []).push(t); }); return m;

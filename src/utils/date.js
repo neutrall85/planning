@@ -12,3 +12,16 @@ export const fmtDMY = (s) => { if (!s) return "—"; const d = parseISO(s); retu
 export const fmtDT = (ts) => { const d = new Date(ts); return `${fmtDMY(iso(d))} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
 export const uid = () => Math.random().toString(36).slice(2,10);
 export const initials = (f,l) => `${(f||"?")[0]}${(l||"?")[0]}`;
+
+// Новая функция: активна ли задача для отображения в рабочих интерфейсах
+export const isTaskActive = (task) => {
+  if (!task) return false;
+  // Если задача не архивная, она всегда активна
+  if (!task.archived) return true;
+  // Если архивная, но имеет closedAt менее 3 месяцев назад, тоже активна
+  if (task.closedAt) {
+    const cutoff = addMonths(new Date(), -3);
+    return task.closedAt >= iso(cutoff);
+  }
+  return false;
+};

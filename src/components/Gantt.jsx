@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { TODAY, iso, addDays, parseISO, fmtD, fmtDMY } from '../utils/date';
+import { TODAY, iso, addDays, parseISO, fmtD, fmtDMY, isTaskActive } from '../utils/date';
 import { TASK_STATUSES } from '../utils/constants';
 import { useDataHelpers } from '../hooks';
 import { computeScope, taskVisible } from '../utils/permissions';
@@ -8,7 +8,8 @@ import { Ic, ICONS } from './Icons';
 export default function Gantt({ db, ur, openTask }) {
   const { empName, getTaskSpent, vacOverlap } = useDataHelpers(db);
   const scope = useMemo(() => computeScope(ur, db), [ur, db]);
-  const tasks = db.tasks.filter(t => !t.archived && taskVisible(ur, scope, t, db) && t.start && t.deadline);
+  // Заменяем !t.archived на isTaskActive(t)
+  const tasks = db.tasks.filter(t => isTaskActive(t) && taskVisible(ur, scope, t, db) && t.start && t.deadline);
 
   const [mode, setMode] = useState('month');
   const [anchor, setAnchor] = useState(() => {

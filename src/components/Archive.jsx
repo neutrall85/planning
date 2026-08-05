@@ -5,14 +5,13 @@ import { canRestore } from '../utils/permissions';
 import { Ic, ICONS } from './Icons';
 import { useDataHelpers } from '../hooks';
 
-export default function Archive({ db, ur, openTask, runArchive, setArchiveMonths, restoreTask, restoreProject }) {
+export default function Archive({ db, ur, openTask, openProject, restoreTask, restoreProject }) {
   const { getTaskSpent, empName } = useDataHelpers(db);
   const [fFrom, setFFrom] = useState('');
   const [fTo, setFTo] = useState('');
   const [fProj, setFProj] = useState('all');
   const [fExec, setFExec] = useState('all');
   const [fDept, setFDept] = useState('all');
-  const [openProj, setOpenProj] = useState(null);
 
   const archProjects = db.projects.filter(p => p.archived);
   const archTasks = db.tasks.filter(t => t.archived);
@@ -35,10 +34,7 @@ export default function Archive({ db, ur, openTask, runArchive, setArchiveMonths
   return (
     <div>
       <div className="sec-head">
-        <div className="sec-note">Архив закрытых задач и проектов. Только чтение. Автоматическая архивация 03:00.</div>
-        <div className="arch-tools">
-          {ur?.roles.includes('admin') && <button className="btn ghost sm" onClick={runArchive}><Ic d={ICONS.archive} size={13} /> Запустить архивацию сейчас</button>}
-        </div>
+        <div className="sec-note">Архив закрытых задач и проектов. Только чтение.</div>
       </div>
 
       <div className="toolbar">
@@ -67,7 +63,8 @@ export default function Archive({ db, ur, openTask, runArchive, setArchiveMonths
                 <td>{PROJECT_TYPES[p.ptype || 'prod']}</td>
                 <td>{fmtDMY(p.archivedAt)}</td>
                 <td>
-                  <button className="btn ghost sm" onClick={() => setOpenProj(p)}>Открыть</button>
+                  {/* ИЗМЕНЕНИЕ: вызываем openProject вместо локального окна */}
+                  <button className="btn ghost sm" onClick={() => openProject(p.id)}>Открыть</button>
                   {canRestore(ur) && <button className="btn ghost sm" onClick={() => restoreProject(p.id)}><Ic d={ICONS.restore} size={12} /> Восстановить</button>}
                 </td>
               </tr>
@@ -96,29 +93,6 @@ export default function Archive({ db, ur, openTask, runArchive, setArchiveMonths
           </tbody>
         </table>
       </div>
-
-      {openProj && (
-        <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setOpenProj(null); }}>
-          <div className="modal" style={{ maxWidth: 720 }}>
-            <div className="modal-head"><h3>{openProj.code} — {openProj.name}</h3><button className="icon-btn" onClick={() => setOpenProj(null)}><Ic d={ICONS.x} size={16} /></button></div>
-            <div className="modal-body">
-              <div className="info-box">Режим «только чтение».</div>
-              <table className="tbl">
-                <thead><tr><th>Задача</th><th>Статус</th><th>План / факт</th></tr></thead>
-                <tbody>
-                  {db.tasks.filter(t => t.projectId === openProj.id).map(t => (
-                    <tr key={t.id}>
-                      <td><b>{t.title}</b></td>
-                      <td>{TASK_STATUSES[t.status]?.label || t.status}</td>
-                      <td>{t.plannedHours ?? '—'} / {getTaskSpent(t)} ч</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

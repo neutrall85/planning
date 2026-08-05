@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAuth, useStore } from '../hooks';
-import { hasRole, canCreateTask, canExport, canEditTask, canCreateProject } from '../utils/permissions';
+import { hasRole, canCreateTask, canExport, canCreateProject, canChangeTaskStatus, canChangeProjectStatus } from '../utils/permissions';
 import { ICONS, Ic } from './Icons';
 import { initials, TODAY, fmtDMY, fmtDT } from '../utils/date';
 import { TASK_STATUSES, ROLES, PROJECT_STATUSES } from '../utils/constants';
@@ -23,6 +23,26 @@ export default function MainLayout({ store, data, user }) {
   const [modal, setModal] = useState(null);
   const [notifOpen, setNotifOpen] = useState(false);
   const [vacModalOpen, setVacModalOpen] = useState(false);
+  const notifRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (notifOpen && notifRef.current && !notifRef.current.contains(e.target)) {
+        setNotifOpen(false);
+      }
+    };
+    const handleEsc = (e) => {
+      if (e.key === 'Escape' && notifOpen) {
+        setNotifOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEsc);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEsc);
+    };
+  }, [notifOpen]);
 
   const spent = (task) => task.logs.reduce((s, l) => s + l.hours, 0);
   const planSum = (projectId) => data.tasks.filter(t => t.projectId === projectId).reduce((s, t) => s + (t.plannedHours || 0), 0);
@@ -48,7 +68,7 @@ export default function MainLayout({ store, data, user }) {
   const myNotifs = data.notifications.filter(n => n.userId === user.id);
   const unread = myNotifs.filter(n => !n.read).length;
 
-  const openTask = (taskId = null) => setModal({ type: 'task', taskId });
+  const openTask = (taskId = null, initialTab = 'form') => setModal({ type: 'task', taskId, initialTab });
   const openProject = (projectId = null) => setModal({ type: 'project', projectId });
   const openHoursReq = (kind, targetId) => setModal({ type: 'hours', kind, targetId });
   const openRoles = (empId) => setModal({ type: 'roles', empId });
@@ -56,14 +76,15 @@ export default function MainLayout({ store, data, user }) {
   const openVacation = (vacationId = null, forEmpId = null) => setModal({ type: 'vacation', vacationId, forEmpId });
   const openDelegation = () => setModal({ type: 'delegation' });
 
+  const [requestsTab, setRequestsTab] = useState('hours');
+
   const handleMoveTask = (taskId, newStatus) => {
     const task = data.tasks.find(t => t.id === taskId);
     if (!task) return;
-    if ((newStatus === 'closed' || newStatus === 'cancelled') && !canEditTask(user, task, data)) {
+    if ((newStatus === 'closed' || newStatus === 'cancelled') && !canChangeTaskStatus(user, task, newStatus, data)) {
       alert('У вас нет прав на закрытие или отмену этой задачи.');
       return;
     }
-    // ИЗМЕНЕНИЕ: при закрытии/отмене задача архивируется
     const isClosing = (newStatus === 'closed' || newStatus === 'cancelled') && task.status !== newStatus;
     const updatedTask = {
       ...task,
@@ -76,7 +97,6 @@ export default function MainLayout({ store, data, user }) {
     store.upsertTask(updatedTask);
     store.addAudit('Изменение статуса задачи', `${task.title} → ${TASK_STATUSES[newStatus].label}`);
 
-    // ИЗМЕНЕНИЕ: уведомления при изменении статуса
     if (newStatus === 'review') {
       const creatorId = task.creatorId || task.history?.find(h => h.who !== 'system')?.who || task.history[0]?.who;
       const project = data.projects.find(p => p.id === task.projectId);
@@ -103,7 +123,6 @@ export default function MainLayout({ store, data, user }) {
         );
       }
     }
-    // ИЗМЕНЕНИЕ: уведомление автору при закрытии/отмене
     if (isClosing) {
       const creatorId = task.creatorId;
       if (creatorId && creatorId !== user.id) {
@@ -119,13 +138,25 @@ export default function MainLayout({ store, data, user }) {
   const handleNotificationNavigate = (notification) => {
     const { targetType, targetId } = notification;
     if (!targetType || !targetId) return;
+    store.markNotificationRead(notification.id);
     switch (targetType) {
-      case 'task': openTask(targetId); break;
+      case 'task': 
+        openTask(targetId, 'chat');
+        break;
       case 'project': openProject(targetId); break;
-      case 'hours': openHoursReq('task', targetId); break;
+      case 'hours': 
+        setRequestsTab('hours');
+        setView('requests');
+        break;
       case 'vacation': openVacation(targetId); break;
       case 'delegation':
-      case 'registration': setView('requests'); break;
+        setRequestsTab('rd');
+        setView('requests');
+        break;
+      case 'registration':
+        setRequestsTab('reg');
+        setView('requests');
+        break;
       default: break;
     }
     setNotifOpen(false);
@@ -139,7 +170,13 @@ export default function MainLayout({ store, data, user }) {
           <div><div className="logo-name">АЭРОПЛАН</div><div className="logo-sub">планирование и учёт времени</div></div>
         </div>
         <div className="user-card" onClick={() => setView('cabinet')} style={{ cursor: 'pointer', marginBottom: '16px' }}>
-          <div className="avatar">{initials(user.first, user.last)}</div>
+          <div className="avatar">
+            {user.photo ? (
+              <img src={user.photo} alt="Аватар" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+            ) : (
+              initials(user.first, user.last)
+            )}
+          </div>
           <div className="user-meta">
             <div className="user-name">{user.last} {user.first}</div>
             <div className="user-roles">{user.roles.join(' · ')}</div>
@@ -166,7 +203,7 @@ export default function MainLayout({ store, data, user }) {
           </div>
           <div className="top-tools">
             <button className="btn ghost" onClick={() => setVacModalOpen(true)}><Ic d={ICONS.beach} size={15} /> Сотрудники в отпусках</button>
-            <div className="bell-wrap">
+            <div className="bell-wrap" ref={notifRef}>
               <button className={`icon-btn bell${unread ? ' has' : ''}`} onClick={() => setNotifOpen(v => !v)}>
                 <Ic d={ICONS.bell} size={17} />
                 {unread > 0 && <span className="bell-count">{unread}</span>}
@@ -176,6 +213,7 @@ export default function MainLayout({ store, data, user }) {
                   list={myNotifs} 
                   setDb={(fn) => { store._data = fn(store._data); store._notify(); }} 
                   onNavigate={handleNotificationNavigate}
+                  onClose={() => setNotifOpen(false)}
                 />
               )}
             </div>
@@ -186,7 +224,14 @@ export default function MainLayout({ store, data, user }) {
           {view === 'kanban' && <Kanban db={data} ur={user} openTask={openTask} onMove={handleMoveTask} onNew={() => openTask(null)} />}
           {view === 'gantt' && <Gantt db={data} ur={user} openTask={openTask} />}
           {view === 'calendar' && <Calendar db={data} ur={user} openTask={openTask} />}
-          {view === 'projects' && <Projects db={data} ur={user} openProject={openProject} openHoursReq={openHoursReq} closeProject={(p) => { store.upsertProject({...p, status:'closed', closedAt:TODAY}); data.tasks.filter(t=>t.projectId===p.id && !['closed','cancelled'].includes(t.status)).forEach(t=>{store.upsertTask({...t, status:'closed', closedAt:TODAY})}); store.addAudit('Закрытие проекта', p.name); }} cancelProject={(p) => { store.upsertProject({...p, status:'cancelled'}); store.addAudit('Отмена проекта', p.name); }} />}
+          {view === 'projects' && <Projects db={data} ur={user} openProject={openProject} openHoursReq={openHoursReq} 
+            closeProject={(p) => {
+              store.upsertProject({...p, status: 'closed', closedAt: TODAY});
+            }} 
+            cancelProject={(p) => {
+              store.upsertProject({...p, status: 'cancelled'});
+            }} 
+          />}
           {view === 'cabinet' && <Cabinet store={store} data={data} user={user} openTask={openTask} openVacation={openVacation} openDelegation={openDelegation} />}
           {view === 'staff' && <Staff 
             db={data} 
@@ -197,8 +242,38 @@ export default function MainLayout({ store, data, user }) {
             openVacation={openVacation} 
           />}
           {view === 'reports' && <Reports db={data} ur={user} />}
-          {view === 'archive' && <Archive db={data} ur={user} openTask={openTask} runArchive={() => store.runArchive(data.settings?.archiveMonths || 6)} setArchiveMonths={(m) => { store._data.settings.archiveMonths = m; store._notify(); }} restoreTask={(id) => { const t = data.tasks.find(x => x.id === id); store.upsertTask({...t, archived: false, archivedAt: null}); }} restoreProject={(id) => { const p = data.projects.find(x => x.id === id); store.upsertProject({...p, archived: false, archivedAt: null}); data.tasks.filter(t => t.projectId === id).forEach(t=>{store.upsertTask({...t, archived: false, archivedAt: null})}); }} />}
-          {view === 'requests' && <Requests db={data} setDb={(fn) => { store._data = fn(store._data); store._notify(); }} ur={user} />}
+          {view === 'archive' && <Archive db={data} ur={user} openTask={openTask} openProject={openProject} setArchiveMonths={(m) => { store._data.settings.archiveMonths = m; store._notify(); }} 
+            restoreTask={(id) => { 
+              const t = data.tasks.find(x => x.id === id); 
+              store.upsertTask({
+                ...t, 
+                archived: false, 
+                archivedAt: null,
+                closedAt: null,
+                status: 'new'  // ← восстановление в статус «Новая»
+              }); 
+            }} 
+            restoreProject={(id) => { 
+              const p = data.projects.find(x => x.id === id); 
+              store.upsertProject({
+                ...p, 
+                archived: false, 
+                archivedAt: null,
+                closedAt: null,
+                status: 'active'  // ← восстановление в статус «Активный»
+              }); 
+              data.tasks.filter(t => t.projectId === id).forEach(t => {
+                store.upsertTask({
+                  ...t, 
+                  archived: false, 
+                  archivedAt: null,
+                  closedAt: null,
+                  status: 'new'  // ← все задачи проекта тоже в «Новая»
+                });
+              });
+            }} 
+          />}
+          {view === 'requests' && <Requests db={data} setDb={(fn) => { store._data = fn(store._data); store._notify(); }} ur={user} initialTab={requestsTab} />}
           {view === 'journal' && <Journal db={data} ur={user} />}
         </div>
       </main>
@@ -207,6 +282,7 @@ export default function MainLayout({ store, data, user }) {
         db={data} 
         ur={user} 
         taskId={modal.taskId} 
+        initialTab={modal.initialTab}
         planSum={planSum} 
         spent={spent}
         onClose={() => setModal(null)} 
@@ -224,7 +300,6 @@ export default function MainLayout({ store, data, user }) {
           }
           store.upsertTask(t);
           store.addAudit(isNew ? 'Создание задачи' : 'Изменение задачи', t.title);
-          // ИЗМЕНЕНИЕ: уведомление при создании задачи
           if (isNew) {
             const assignees = t.assigneeIds || [];
             assignees.forEach(id => {
@@ -240,11 +315,10 @@ export default function MainLayout({ store, data, user }) {
         toast={(msg) => alert(msg)} 
         patchTask={store.upsertTask} 
         notify={(userId, text, target) => store.addNotification(userId, text, target)} 
-        store={store} // ИЗМЕНЕНИЕ: передаём store
+        store={store} 
       />}
       {modal?.type === 'project' && <ProjectModal db={data} ur={user} projectId={modal.projectId} openTask={openTask} onClose={() => setModal(null)} onSave={(p, isNew) => { const old = data.projects.find(x => x.id === p.id); if (old && hasRole(user, 'admin')) { const changes = []; if (old.budget !== p.budget) changes.push(`Бюджет: ${old.budget ?? '—'} → ${p.budget ?? '—'}`); if (old.name !== p.name) changes.push(`Название: ${old.name} → ${p.name}`); if (old.managerId !== p.managerId) changes.push(`Ответственный: ${empName(old.managerId)} → ${empName(p.managerId)}`); if (old.status !== p.status) changes.push(`Статус: ${PROJECT_STATUSES[old.status]} → ${PROJECT_STATUSES[p.status]}`); if (changes.length > 0) { store.addAudit('Административное изменение проекта (прямое)', `${p.name}: ${changes.join('; ')}`); } } store.upsertProject(p); store.addAudit(isNew ? 'Создание проекта' : 'Изменение проекта', p.name); setModal(null); }} onDelete={(p) => { store.deleteProject(p.id); setModal(null); }} toast={(msg) => alert(msg)} />}
       {modal?.type === 'hours' && <HoursRequestModal db={data} ur={user} kind={modal.kind} targetId={modal.targetId} onClose={() => setModal(null)} onSubmit={(r) => { store.addHoursRequest(r); 
-        // ИЗМЕНЕНИЕ: уведомление автору задачи
         const target = modal.kind === 'task' ? data.tasks.find(t => t.id === modal.targetId) : null;
         const authorId = target?.creatorId || (target?.history?.length > 0 ? target.history[0].who : null);
         if (authorId) {

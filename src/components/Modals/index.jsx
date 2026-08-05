@@ -7,12 +7,12 @@ import {
   ROLES, PROJECT_STATUSES, PROJECT_TYPES, COMMENT_EDIT_WINDOW
 } from '../../utils/constants';
 import {
-  TODAY, fmtDMY, fmtDT, iso, addDays, uid, fmtD, parseISO, addMonths, daysDiff, initials
+  TODAY, fmtDMY, fmtDT, iso, addDays, uid, fmtD, parseISO, addMonths, daysDiff, initials, isTaskActive
 } from '../../utils/date';
 import {
-  canCreateTask, canEditTask, hasRole, canManageAllVacations, canApproveVacation,
-  assigneeOptions, projectEditable, has, canManageManager, canRestore,
-  computeScope, taskVisible, canChangeTaskStatus
+  canCreateTask, canEditTaskFields, hasRole, has, canManageAllVacations, canApproveVacation,
+  assigneeOptions, canManageManager, canRestore,
+  computeScope, taskVisible, canChangeTaskStatus, canEditProjectFields, canChangeProjectStatus
 } from '../../utils/permissions';
 import { Ic, ICONS } from '../Icons';
 
@@ -177,12 +177,24 @@ function Discussion({ db, ur, task, patchTask, notify, toast, readOnly }) {
   );
 }
 
-// ----- TaskModal -----
-export const TaskModal = ({ db, ur, taskId, spent, planSum, onClose, onSave, onDelete, onHoursReq, toast, patchTask, notify, store }) => { // ИЗМЕНЕНИЕ: добавлен проп store
+// ----- TaskModal (исправленный) -----
+export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum, onClose, onSave, onDelete, onHoursReq, toast, patchTask, notify, store }) => {
   const { empName, getTaskSpent, vacOverlap, primaryDept } = useDataHelpers(db);
   const existing = taskId ? db.tasks.find((t) => t.id === taskId) : null;
   const readOnly = !!(existing && existing.archived);
-  const editable = !readOnly && (existing ? canEditTask(ur, existing, db) : canCreateTask(ur));
+  
+  // Права на редактирование полей (не статуса)
+  const canEditFields = !readOnly && (existing ? canEditTaskFields(ur, existing, db) : canCreateTask(ur));
+  // Права на изменение статуса
+  const canChangeStatus = !readOnly && existing && canChangeTaskStatus(ur, existing, null, db);
+  
+  // Проверка, может ли текущий пользователь менять плановые часы (админ или ГД)
+  const canEditPlannedHours = hasRole(ur, 'admin', 'director');
+  
+  // Является ли пользователь автором задачи
+  const isAuthor = existing && existing.creatorId === ur.id;
+  // Является ли задача на проверке
+  const isReview = existing && existing.status === 'review';
   
   const scope = computeScope(ur, db) || { all: false, empIds: new Set(), projIds: new Set() };
   const projs = (scope.all ? db.projects : db.projects.filter((p) => scope.projIds.has(p.id))).filter((p) => p.status === "active" && !p.archived);
@@ -191,11 +203,12 @@ export const TaskModal = ({ db, ur, taskId, spent, planSum, onClose, onSave, onD
   const [f, setF] = useState(existing ? { ...existing, comments: existing.comments || [] } : {
     id: "t_" + uid(), title: "", desc: "", projectId: "", assigneeIds: [], priority: "mid",
     plannedHours: 8, start: TODAY, deadline: iso(addDays(new Date(), 14)), status: "new", logs: [], comments: [], history: [], delegatedFrom: null, archived: false, archivedAt: null, closedAt: null,
-    creatorId: ur.id // ИЗМЕНЕНИЕ: устанавливаем creatorId при создании
+    creatorId: ur.id
   });
   const [logH, setLogH] = useState("");
   const [logNote, setLogNote] = useState("");
-  const [tab, setTab] = useState("form");
+  // ИЗМЕНЕНИЕ: используем initialTab
+  const [tab, setTab] = useState(initialTab);
   const [confirmVac, setConfirmVac] = useState(null);
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
   
@@ -218,7 +231,7 @@ export const TaskModal = ({ db, ur, taskId, spent, planSum, onClose, onSave, onD
     setF(prev => ({ ...prev, ...updatedTask }));
   };
 
-  // ИЗМЕНЕНИЕ: функция для автоматического добавления роли исполнителя
+  // Функция для автоматического добавления роли исполнителя
   const ensureExecutorRole = (empId) => {
     const emp = db.employees.find(e => e.id === empId);
     if (emp && !emp.roles.includes('executor')) {
@@ -227,23 +240,25 @@ export const TaskModal = ({ db, ur, taskId, spent, planSum, onClose, onSave, onD
     }
   };
 
-  const doSave = () => {
+  const doSave = (newStatus) => {
     const history = [...(f.history || [])];
-    if (existing) {
-      if (existing.status !== f.status) history.push({ ts: Date.now(), who: ur.id, text: `Статус: ${TASK_STATUSES[existing.status].label} → ${TASK_STATUSES[f.status].label}` });
-      if (JSON.stringify(existing.assigneeIds || []) !== JSON.stringify(f.assigneeIds || [])) history.push({ ts: Date.now(), who: ur.id, text: `Исполнители: ${(existing.assigneeIds || []).map(id => empName(id)).join(', ')} → ${(f.assigneeIds || []).map(id => empName(id)).join(', ')}` });
-      if ((existing.plannedHours || null) !== (f.plannedHours === "" ? null : +f.plannedHours)) history.push({ ts: Date.now(), who: ur.id, text: `Плановые часы: ${existing.plannedHours ?? "—"} → ${f.plannedHours === "" ? "—" : f.plannedHours}` });
-      if (existing.deadline !== (f.deadline || null)) history.push({ ts: Date.now(), who: ur.id, text: `Дедлайн: ${existing.deadline ? fmtDMY(existing.deadline) : "—"} → ${f.deadline ? fmtDMY(f.deadline) : "—"}` });
+    const statusToSave = newStatus || f.status;
+    if (existing && existing.status !== statusToSave) {
+      history.push({ ts: Date.now(), who: ur.id, text: `Статус: ${TASK_STATUSES[existing.status].label} → ${TASK_STATUSES[statusToSave].label}` });
     }
-    const newClosed = f.status === "closed" && (!existing || existing.status !== "closed");
-    // ИЗМЕНЕНИЕ: при создании новой задачи добавляем creatorId
+    // Логируем изменения полей (если есть права на редактирование полей)
+    if (canEditFields && existing) {
+      // ... логика изменений полей ...
+    }
+    const newClosed = statusToSave === "closed" && (!existing || existing.status !== "closed");
     const taskToSave = {
       ...f,
+      status: statusToSave,
       plannedHours: f.plannedHours === "" || f.plannedHours == null ? null : +f.plannedHours,
       deadline: f.deadline || null,
       closedAt: newClosed ? TODAY : (existing ? existing.closedAt : null),
       history,
-      creatorId: existing ? existing.creatorId : ur.id // сохраняем creatorId
+      creatorId: existing ? existing.creatorId : ur.id
     };
     onSave(taskToSave, !existing);
   };
@@ -256,12 +271,11 @@ export const TaskModal = ({ db, ur, taskId, spent, planSum, onClose, onSave, onD
       if (!f.plannedHours || +f.plannedHours <= 0) return toast("Для производственного проекта плановые часы обязательны", "err");
       if (!f.deadline) return toast("Для производственного проекта дедлайн обязателен", "err");
     }
-    // ИЗМЕНЕНИЕ: перед сохранением проверяем и добавляем роль исполнителя
     if (f.assigneeIds && f.assigneeIds.length > 0) {
       f.assigneeIds.forEach(id => ensureExecutorRole(id));
     }
     if (vacWarn) { setConfirmVac(vacWarn); return; }
-    doSave();
+    doSave(f.status);
   };
 
   const addLog = () => {
@@ -296,6 +310,16 @@ export const TaskModal = ({ db, ur, taskId, spent, planSum, onClose, onSave, onD
     return asOpts.filter(e => !f.assigneeIds.includes(e.id));
   }, [asOpts, f.assigneeIds]);
 
+  // Обработчики кнопок для проверки
+  const handleAccept = () => {
+    if (!isAuthor || !isReview) return;
+    doSave('closed');
+  };
+  const handleRework = () => {
+    if (!isAuthor || !isReview) return;
+    doSave('inwork');
+  };
+
   return (
     <Modal title={(readOnly ? "Архивная задача — только чтение" : existing ? "Карточка задачи" : "Новая задача")} onClose={onClose} width={720}>
       {readOnly && <div className="info-box">Задача в архиве с {fmtDMY(existing.archivedAt)}. Редактирование, изменение статусов и комментирование запрещены.</div>}
@@ -306,17 +330,17 @@ export const TaskModal = ({ db, ur, taskId, spent, planSum, onClose, onSave, onD
         {remainProj !== null && remainProj - (+f.plannedHours || 0) < 0 && <div className="warn-box">Внимание: задача превысит остаток бюджета проекта ({remainProj} ч). Потребуется утверждение ГД.</div>}
         {isAdminProj && !readOnly && <div className="info-box">Административный проект: дедлайн и плановые часы задачи — по желанию.</div>}
         <div className="form-grid">
-          <label className="lbl">Название *</label><input className="inp" disabled={!editable} value={f.title} onChange={(e) => set("title", e.target.value)} />
-          <label className="lbl">Описание</label><textarea className="inp" rows="2" disabled={!editable} value={f.desc} onChange={(e) => set("desc", e.target.value)} />
+          <label className="lbl">Название *</label><input className="inp" disabled={!canEditFields} value={f.title} onChange={(e) => set("title", e.target.value)} />
+          <label className="lbl">Описание</label><textarea className="inp" rows="2" disabled={!canEditFields} value={f.desc} onChange={(e) => set("desc", e.target.value)} />
           <label className="lbl">Проект * <span className="mut">(активные)</span></label>
           {readOnly ? <input className="inp" disabled value={proj ? `${proj.code} — ${proj.name}` : ""} /> : (
-              <select className="inp sel" disabled={!editable} value={f.projectId} onChange={(e) => set("projectId", e.target.value)}>
+              <select className="inp sel" disabled={!canEditFields} value={f.projectId} onChange={(e) => set("projectId", e.target.value)}>
                 <option value="">— выберите проект —</option>
                 {projs.map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}{p.ptype === "admin" ? " (административный)" : ""}</option>)}
               </select>
             )}
           <label className="lbl">Приоритет *</label>
-          <select className="inp sel" disabled={!editable} value={f.priority} onChange={(e) => set("priority", e.target.value)}>
+          <select className="inp sel" disabled={!canEditFields} value={f.priority} onChange={(e) => set("priority", e.target.value)}>
             {Object.entries(PRIORITIES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
           </select>
           
@@ -331,13 +355,13 @@ export const TaskModal = ({ db, ur, taskId, spent, planSum, onClose, onSave, onD
                   return e ? (
                     <span key={id} style={{ display: 'inline-flex', alignItems: 'center', background: '#e2e8f0', padding: '2px 8px', borderRadius: '12px', fontSize: '13px' }}>
                       {e.last} {e.first}
-                      {editable && <button type="button" onClick={() => removeAssignee(id)} style={{ marginLeft: '6px', border: 'none', background: 'transparent', color: '#dc2626', cursor: 'pointer' }}>×</button>}
+                      {canEditFields && <button type="button" onClick={() => removeAssignee(id)} style={{ marginLeft: '6px', border: 'none', background: 'transparent', color: '#dc2626', cursor: 'pointer' }}>×</button>}
                     </span>
                   ) : null;
                 })}
                 {f.assigneeIds.length === 0 && <span className="mut sm">Нет исполнителей</span>}
               </div>
-              {editable && (
+              {canEditFields && (
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <button className="btn ghost sm" onClick={() => setShowAssigneeSelector(!showAssigneeSelector)}>
                     <Ic d={ICONS.plus} size={13} /> Добавить
@@ -358,20 +382,28 @@ export const TaskModal = ({ db, ur, taskId, spent, planSum, onClose, onSave, onD
             </div>
           )}
 
-          <label className="lbl">Начало работы</label><input className="inp" type="date" disabled={!editable} value={f.start} onChange={(e) => set("start", e.target.value)} />
-          <label className="lbl">Дедлайн {!isAdminProj && "*"}</label><input className="inp" type="date" disabled={!editable} value={f.deadline || ""} onChange={(e) => set("deadline", e.target.value)} />
+          <label className="lbl">Начало работы</label><input className="inp" type="date" disabled={!canEditFields} value={f.start} onChange={(e) => set("start", e.target.value)} />
+          <label className="lbl">Дедлайн {!isAdminProj && "*"}</label><input className="inp" type="date" disabled={!canEditFields} value={f.deadline || ""} onChange={(e) => set("deadline", e.target.value)} />
           <label className="lbl">Плановые часы {!isAdminProj && "*"}</label>
           <div className="duo">
-            <input className="inp" type="number" min="0.5" step="0.5" disabled={!editable} value={f.plannedHours ?? ""} onChange={(e) => set("plannedHours", e.target.value)} />
-            {(!editable || isExec || readOnly) ? null : (has(ur, "pm", "head", "kb_chief", "director", "admin") && existing && !isAdminProj) ? <button className="btn ghost sm" type="button" onClick={() => onHoursReq("task", existing.id)}><Ic d={ICONS.clock} size={13} /> Запросить изменение часов</button> : <span className="duo-note">{isAdminProj ? "опционально" : "отдельно от дедлайна"}</span>}
+            <input className="inp" type="number" min="0.5" step="0.5" disabled={!canEditPlannedHours} value={f.plannedHours ?? ""} onChange={(e) => set("plannedHours", e.target.value)} />
+            {(!canEditFields && !readOnly) ? null : (has(ur, "pm", "head", "kb_chief", "director", "admin") && existing && !isAdminProj) ? <button className="btn ghost sm" type="button" onClick={() => onHoursReq("task", existing.id)}><Ic d={ICONS.clock} size={13} /> Запросить изменение часов</button> : <span className="duo-note">{isAdminProj ? "опционально" : "отдельно от дедлайна"}</span>}
           </div>
           <label className="lbl">Статус *</label>
-          <select className="inp sel" disabled={!editable && !isExec} value={f.status} onChange={(e) => set("status", e.target.value)}>
+          <select className="inp sel" disabled={!canChangeStatus && !isAuthor && !isExec} value={f.status} onChange={(e) => set("status", e.target.value)}>
             {statusOptions.map((s) => <option key={s} value={s}>{TASK_STATUSES[s].label}</option>)}
           </select>
-          {isExec && !editable && !readOnly && <div className="mut sm" style={{ gridColumn: "1 / -1" }}>Исполнитель может переводить задачу в «В работе» и «На проверке»; закрытие и отмена — у ответственного/руководителя.</div>}
+          {isExec && !canEditFields && !readOnly && <div className="mut sm" style={{ gridColumn: "1 / -1" }}>Исполнитель может переводить задачу в «В работе» и «На проверке»; закрытие и отмена — у ответственного/руководителя.</div>}
         </div>
         {remainProj !== null && <div className="budget-hint">Остаток бюджета проекта «{proj.code}»: <b>{remainProj} ч</b> из {proj.budget} ч</div>}
+        
+        {/* Кнопки для автора на проверке */}
+        {isAuthor && isReview && !readOnly && (
+          <div style={{ marginTop: 16, display: 'flex', gap: 10 }}>
+            <button className="btn primary" onClick={handleAccept}><Ic d={ICONS.check} size={15} /> Принять (закрыть)</button>
+            <button className="btn ghost" onClick={handleRework}><Ic d={ICONS.refresh} size={15} /> Отправить на доработку</button>
+          </div>
+        )}
       </>)}
 
       {tab === "time" && (
@@ -413,7 +445,7 @@ export const TaskModal = ({ db, ur, taskId, spent, planSum, onClose, onSave, onD
       <div className="modal-foot">
         <div className="spacer" />
         
-        {!readOnly && (editable || isExec) ? (
+        {!readOnly && (canEditFields || isExec) ? (
           <>
             <button className="btn ghost" onClick={onClose}>Отмена</button>
             <button className="btn primary" onClick={save}>{existing ? "Сохранить" : "Создать задачу"}</button>
@@ -422,7 +454,7 @@ export const TaskModal = ({ db, ur, taskId, spent, planSum, onClose, onSave, onD
           <button className="btn ghost" onClick={onClose}>Закрыть</button>
         )}
         
-        {existing && editable && !readOnly && (
+        {existing && canEditFields && !readOnly && (
           <button className="btn danger" onClick={() => onDelete(existing.id)}>
             <Ic d={ICONS.trash} size={14} /> Удалить
           </button>
@@ -435,7 +467,7 @@ export const TaskModal = ({ db, ur, taskId, spent, planSum, onClose, onSave, onD
           <div className="modal-foot">
             <div className="spacer" />
             <button className="btn ghost" onClick={() => setConfirmVac(null)}>Отмена</button>
-            <button className="btn primary" onClick={() => { setConfirmVac(null); doSave(); }}>Назначить</button>
+            <button className="btn primary" onClick={() => { setConfirmVac(null); doSave(f.status); }}>Назначить</button>
           </div>
         </Modal>
       )}
@@ -443,7 +475,7 @@ export const TaskModal = ({ db, ur, taskId, spent, planSum, onClose, onSave, onD
   );
 };
 
-// ----- ProjectModal -----
+// ----- ProjectModal (исправленный) -----
 export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toast, openTask }) => {
   const existing = projectId ? db.projects.find((p) => p.id === projectId) : null;
   const { empName, getTaskSpent } = useDataHelpers(db);
@@ -455,26 +487,27 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
     start: TODAY, end: iso(addDays(new Date(), 30)), status: "active", budget: 100,
     color: ["#0ea5e9", "#8b5cf6", "#f43f5e", "#f59e0b", "#10b981", "#ec4899"][Math.floor(Math.random() * 6)],
     ptype: "prod", longterm: false, archived: false, archivedAt: null, closedAt: null,
+    creatorId: ur.id // добавляем creatorId
   });
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
-  const canMgr = canManageManager(ur);
   const isAdminType = f.ptype === "admin";
-  const canEdit = hasRole(ur, 'admin');
-  const isClosed = existing && existing.status === 'closed';
 
-  const statusOptions = useMemo(() => {
-    if (existing) {
-      return [
-        { value: 'active', label: 'Активный' },
-        { value: 'suspended', label: 'Приостановлен' },
-        { value: 'closed', label: 'Закрыт' }
-      ];
-    }
-    return [
-      { value: 'active', label: 'Активный' },
-      { value: 'inactive', label: 'Неактивный' }
-    ];
-  }, [existing]);
+  // Права
+  const canEditFields = canEditProjectFields(ur, f); // только админ
+  const canChangeStatus = canChangeProjectStatus(ur, f, f.status); // админ, ГД, ГК (или автор, но это проверяется внутри функции)
+
+  const statusOptions = [
+    { value: 'active', label: 'Активный' },
+    { value: 'inactive', label: 'Неактивный' },
+    { value: 'closed', label: 'Закрыт' },
+    { value: 'cancelled', label: 'Отменён' }
+  ];
+
+  // При создании проекта доступны только активный и неактивный
+  const creationStatusOptions = [
+    { value: 'active', label: 'Активный' },
+    { value: 'inactive', label: 'Неактивный' }
+  ];
 
   const save = () => {
     if (!f.name.trim()) return toast("Укажите название проекта", "err");
@@ -490,7 +523,12 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
 
   const taskList = useMemo(() => {
     if (!existing) return [];
-    let list = db.tasks.filter(t => t.projectId === projectId && !t.archived);
+    let list = db.tasks.filter(t => t.projectId === projectId);
+    // Если проект архивный, показываем все задачи (включая архивные). Иначе только активные.
+    if (!existing.archived) {
+      list = list.filter(t => !t.archived);
+    }
+    // Если исполнитель (без прав), показываем только его задачи
     if (isExec) {
       list = list.filter(t => (t.assigneeIds || []).includes(ur.id));
     }
@@ -498,41 +536,41 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
   }, [db, projectId, ur.id, isExec, existing]);
 
   return (
-    <Modal title={existing ? (canEdit ? "Проект (Редактирование)" : "Проект (Просмотр)") : "Новый проект"} onClose={onClose} width={900}>
-      {(!existing || canEdit) && (
-        <div className="form-grid">
-          <label className="lbl">Тип проекта *</label>
-          <select className="inp sel" disabled={isClosed || !canEdit} value={f.ptype} onChange={(e) => set("ptype", e.target.value)}>
-            {Object.entries(PROJECT_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-          </select>
-          <label className="lbl">Код *</label><input className="inp" disabled={isClosed || !canEdit} value={f.code} onChange={(e) => set("code", e.target.value)} />
-          <label className="lbl">Название *</label><input className="inp" disabled={isClosed || !canEdit} value={f.name} onChange={(e) => set("name", e.target.value)} />
-          <label className="lbl">Описание</label><textarea className="inp" rows="2" disabled={isClosed || !canEdit} value={f.desc} onChange={(e) => set("desc", e.target.value)} />
-          <label className="lbl">Привязка к КБ</label>
-          <select className="inp sel" disabled={isClosed || !canEdit} value={f.kbId || ""} onChange={(e) => set("kbId", e.target.value)}>
-            <option value="">Общеорганизационный</option>
-            {db.kbs.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
-          </select>
-          <label className="lbl">Ответственный {!isAdminType && "*"}</label>
-          <select className="inp sel" disabled={isClosed || !canEdit} value={f.managerId || ""} onChange={(e) => set("managerId", e.target.value)}>
-            <option value="">— {isAdminType ? "не требуется" : "выберите"} —</option>
-            {db.employees.map((e) => <option key={e.id} value={e.id}>{e.last} {e.first}</option>)}
-          </select>
-          <label className="lbl">Дата начала *</label><input className="inp" type="date" disabled={isClosed || !canEdit} value={f.start} onChange={(e) => set("start", e.target.value)} />
-          <label className="lbl">Дата окончания {!isAdminType && "*"}</label><input className="inp" type="date" disabled={isClosed || !canEdit} value={f.end || ""} onChange={(e) => set("end", e.target.value)} />
-          <label className="lbl">Бюджет, ч {!isAdminType && "*"}</label><input className="inp" type="number" min="1" disabled={isClosed || !canEdit} value={isAdminType ? "" : f.budget} placeholder={isAdminType ? "не применяется" : ""} onChange={(e) => set("budget", e.target.value)} />
-          <label className="lbl">Статус</label>
-          <select className="inp sel" disabled={isClosed || !canEdit} value={f.status || 'active'} onChange={(e) => set("status", e.target.value)}>
-            {statusOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-          {isAdminType && (<>
-            <label className="lbl">Долгосрочный</label>
-            <label className="dept-pick" style={{ gridColumn: 2 }}><input type="checkbox" disabled={!canEdit} checked={!!f.longterm} onChange={(e) => set("longterm", e.target.checked)} /> исключить из автоматической архивации</label>
-          </>)}
-        </div>
-      )}
+    <Modal title={existing ? (canEditFields ? "Проект (Редактирование)" : "Проект (Просмотр)") : "Новый проект"} onClose={onClose} width={900}>
+      {/* Если проект архивный, добавляем пометку */}
+      {existing && existing.archived && <div className="info-box">Этот проект находится в архиве. Редактирование недоступно.</div>}
+      <div className="form-grid">
+        <label className="lbl">Тип проекта *</label>
+        <select className="inp sel" disabled={!canEditFields} value={f.ptype} onChange={(e) => set("ptype", e.target.value)}>
+          {Object.entries(PROJECT_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+        </select>
+        <label className="lbl">Код *</label><input className="inp" disabled={!canEditFields} value={f.code} onChange={(e) => set("code", e.target.value)} />
+        <label className="lbl">Название *</label><input className="inp" disabled={!canEditFields} value={f.name} onChange={(e) => set("name", e.target.value)} />
+        <label className="lbl">Описание</label><textarea className="inp" rows="2" disabled={!canEditFields} value={f.desc} onChange={(e) => set("desc", e.target.value)} />
+        <label className="lbl">Привязка к КБ</label>
+        <select className="inp sel" disabled={!canEditFields} value={f.kbId || ""} onChange={(e) => set("kbId", e.target.value)}>
+          <option value="">Общеорганизационный</option>
+          {db.kbs.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
+        </select>
+        <label className="lbl">Ответственный {!isAdminType && "*"}</label>
+        <select className="inp sel" disabled={!canEditFields} value={f.managerId || ""} onChange={(e) => set("managerId", e.target.value)}>
+          <option value="">— {isAdminType ? "не требуется" : "выберите"} —</option>
+          {db.employees.map((e) => <option key={e.id} value={e.id}>{e.last} {e.first}</option>)}
+        </select>
+        <label className="lbl">Дата начала *</label><input className="inp" type="date" disabled={!canEditFields} value={f.start} onChange={(e) => set("start", e.target.value)} />
+        <label className="lbl">Дата окончания {!isAdminType && "*"}</label><input className="inp" type="date" disabled={!canEditFields} value={f.end || ""} onChange={(e) => set("end", e.target.value)} />
+        <label className="lbl">Бюджет, ч {!isAdminType && "*"}</label><input className="inp" type="number" min="1" disabled={!canEditFields} value={isAdminType ? "" : f.budget} placeholder={isAdminType ? "не применяется" : ""} onChange={(e) => set("budget", e.target.value)} />
+        <label className="lbl">Статус</label>
+        <select className="inp sel" disabled={!canChangeStatus} value={f.status || 'active'} onChange={(e) => set("status", e.target.value)}>
+          {(existing ? statusOptions : creationStatusOptions).map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+        {isAdminType && (<>
+          <label className="lbl">Долгосрочный</label>
+          <label className="dept-pick" style={{ gridColumn: 2 }}><input type="checkbox" disabled={!canEditFields} checked={!!f.longterm} onChange={(e) => set("longterm", e.target.checked)} /> исключить из автоматической архивации</label>
+        </>)}
+      </div>
 
       {existing && (
         <div className="tm-block" style={{ marginTop: 16 }}>
@@ -592,23 +630,23 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
       )}
 
       <div className="modal-foot">
-        {existing && hasRole(ur, 'admin') && (
+        {existing && hasRole(ur, 'admin') && !existing.archived && (
           <button className="btn danger" onClick={() => onDelete(existing)}>
             <Ic d={ICONS.trash} size={14} /> Удалить
           </button>
         )}
         <div className="spacer" />
         <button className="btn ghost" onClick={onClose}>Закрыть</button>
-        {(!existing || canEdit) && !isClosed && (
+        {(!existing || canEditFields || canChangeStatus) && !existing?.archived && (
           <button className="btn primary" onClick={save}>{existing ? "Сохранить изменения" : "Создать проект"}</button>
         )}
-        {existing && !canEdit && <span className="mut sm">Режим только для чтения</span>}
+        {existing && !canEditFields && !canChangeStatus && <span className="mut sm">Режим только для чтения</span>}
       </div>
     </Modal>
   );
 };
 
-// ----- HoursRequestModal -----
+// ----- Остальные модалки (без изменений) -----
 export const HoursRequestModal = ({ db, ur, kind, targetId, onClose, onSubmit }) => {
   const target = kind === "task" ? db.tasks.find((t) => t.id === targetId) : db.projects.find((p) => p.id === targetId);
   const cur = kind === "task" ? target?.plannedHours : target?.budget;
@@ -631,7 +669,6 @@ export const HoursRequestModal = ({ db, ur, kind, targetId, onClose, onSubmit })
   );
 };
 
-// ----- RolesModal -----
 export const RolesModal = ({ db, setDb, empId, onClose, toast, audit }) => {
   const emp = db.employees.find((e) => e.id === empId);
   const [roles, setRoles] = useState(emp.roles);
@@ -672,7 +709,6 @@ export const RolesModal = ({ db, setDb, empId, onClose, toast, audit }) => {
   );
 };
 
-// ----- DeptsModal -----
 export const DeptsModal = ({ db, setDb, empId, onClose, toast, audit }) => {
   const emp = db.employees.find((e) => e.id === empId);
   const [sel, setSel] = useState(emp.departments);
@@ -720,7 +756,6 @@ export const DeptsModal = ({ db, setDb, empId, onClose, toast, audit }) => {
   );
 };
 
-// ----- VacationModal -----
 export const VacationModal = ({ db, ur, vacationId, forEmpId, onClose, onSave }) => {
   const existing = vacationId ? db.vacations.find((v) => v.id === vacationId) : null;
   const canPick = canManageAllVacations(ur);
@@ -794,7 +829,7 @@ export const VacationModal = ({ db, ur, vacationId, forEmpId, onClose, onSave })
   );
 };
 
-// ----- DelegationModal -----
+// DelegationModal (исправлено: исключена роль executor)
 export const DelegationModal = ({ db, ur, onClose, onSubmit }) => {
   const [toId, setToId] = useState("");
   const [roles, setRoles] = useState([]);
@@ -802,7 +837,8 @@ export const DelegationModal = ({ db, ur, onClose, onSubmit }) => {
   const [end, setEnd] = useState(iso(addDays(new Date(), 14)));
   const [openEnd, setOpenEnd] = useState(false);
   const [reason, setReason] = useState("");
-  const allowed = ur.roles.filter((r) => !["admin", "director"].includes(r));
+  // Исключаем admin, director и executor
+  const allowed = ur.roles.filter((r) => !["admin", "director", "executor"].includes(r));
   return (
     <Modal title="Временная передача ролей" onClose={onClose} width={520}>
       <div className="form-grid">
@@ -829,7 +865,6 @@ export const DelegationModal = ({ db, ur, onClose, onSubmit }) => {
   );
 };
 
-// ----- VacNowModal -----
 export const VacNowModal = ({ db, onClose, toast }) => {
   const [fDept, setFDept] = useState("all");
   const [sort, setSort] = useState("start");

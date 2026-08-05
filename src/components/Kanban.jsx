@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { Ic, ICONS } from './Icons';
 import { TASK_STATUSES, TASK_STATUS_ORDER, PRIORITIES } from '../utils/constants';
-import { TODAY, fmtD, daysDiff, initials } from '../utils/date';
-import { computeScope, taskVisible, canEditTask, canCreateTask, canChangeTaskStatus } from '../utils/permissions';
+import { TODAY, fmtD, daysDiff, initials, isTaskActive } from '../utils/date';
+import { computeScope, taskVisible, canCreateTask, canChangeTaskStatus } from '../utils/permissions';
 
 export default function Kanban({ db, ur, openTask, onMove, onNew }) {
   const [fProj, setFProj] = useState("all");
@@ -15,7 +15,7 @@ export default function Kanban({ db, ur, openTask, onMove, onNew }) {
   const scope = useMemo(() => computeScope(ur, db), [ur, db]);
 
   const visible = useMemo(() => {
-    let list = db.tasks.filter((t) => !t.archived && taskVisible(ur, scope, t, db));
+    let list = db.tasks.filter((t) => isTaskActive(t) && taskVisible(ur, scope, t, db));
     if (fProj !== "all") list = list.filter(t => t.projectId === fProj);
     if (fExec !== "all") list = list.filter(t => (t.assigneeIds || []).includes(fExec));
     if (fPrio !== "all") list = list.filter(t => t.priority === fPrio);
@@ -82,7 +82,6 @@ export default function Kanban({ db, ur, openTask, onMove, onNew }) {
                 const id = e.dataTransfer.getData("text/plain"); 
                 if (id) {
                   const task = db.tasks.find(t => t.id === id);
-                  // Проверяем, можно ли перевести задачу в этот статус
                   if (task && !canChangeTaskStatus(ur, task, st, db)) {
                     alert('У вас нет прав на перевод задачи в статус ' + TASK_STATUSES[st].label);
                     return;
@@ -99,9 +98,6 @@ export default function Kanban({ db, ur, openTask, onMove, onNew }) {
                   const sp = t.logs.reduce((s, l) => s + l.hours, 0);
                   const overdue = t.deadline && !["closed", "cancelled"].includes(t.status) && t.deadline < TODAY;
                   const soon = t.deadline && !overdue && !["closed", "cancelled"].includes(t.status) && daysDiff(TODAY, t.deadline) <= 3;
-                  // Разрешено перетаскивать, если:
-                  // - задача не closed/cancelled (нельзя вернуть),
-                  // - пользователь может изменить статус на целевой st
                   const canDrag = (!["closed", "cancelled"].includes(t.status) && canChangeTaskStatus(ur, t, st, db));
                   return (
                     <div 
@@ -118,7 +114,13 @@ export default function Kanban({ db, ur, openTask, onMove, onNew }) {
                         {assignees.length > 0 && (
                           <span className="kassignee">
                             {assignees.slice(0, 2).map(a => (
-                              <span key={a.id} className="avatar xs" style={{ marginRight: -4 }}>{initials(a.first, a.last)}</span>
+                              <span key={a.id} className="avatar xs" style={{ marginRight: -4 }}>
+                                {a.photo ? (
+                                  <img src={a.photo} alt="Аватар" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                                ) : (
+                                  initials(a.first, a.last)
+                                )}
+                              </span>
                             ))}
                             {assignees.length > 2 && <span className="mut sm">+{assignees.length - 2}</span>}
                           </span>
