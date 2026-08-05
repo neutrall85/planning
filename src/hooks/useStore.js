@@ -1,0 +1,1 @@
+export { useStore } from '../context/StoreContext';
