@@ -6,7 +6,6 @@ export default class DataStore {
     this._data = this._buildMock();
     this._currentUser = null;
     this._listeners = [];
-    // При инициализации архивируем задачи, закрытые более 3 месяцев назад
     this._archiveOldTasks(3);
   }
 
@@ -54,7 +53,6 @@ export default class DataStore {
     this._notify();
   }
 
-  // ––– Архивация старых задач (вызывается после каждой мутации) –––
   _archiveOldTasks(months = 3) {
     const cutoff = addMonths(new Date(), -months);
     const cutoffIso = iso(cutoff);
@@ -73,7 +71,6 @@ export default class DataStore {
     }
   }
 
-  // ––– Мутации –––
   upsertTask(task) {
     const idx = this._data.tasks.findIndex(t => t.id === task.id);
     let tasks;
@@ -211,7 +208,6 @@ export default class DataStore {
     this._notify();
   }
 
-  // ––– Делегирование задач при отпуске –––
   applyDelegation(vacationId) {
     const vac = this._data.vacations.find(v => v.id === vacationId);
     if (!vac || !vac.delegation.enabled || vac.status !== 'approved') return;
@@ -264,7 +260,6 @@ export default class DataStore {
     this.addNotification(fromId, `Задачи возвращены вам по окончании отпуска`, { targetType: 'vacation', targetId: vacationId });
   }
 
-  // ––– Управление сотрудниками –––
   upsertEmployee(emp) {
     const idx = this._data.employees.findIndex(e => e.id === emp.id);
     let employees;
@@ -367,13 +362,11 @@ export default class DataStore {
     this._notify();
   }
 
-  // ––– Утилиты –––
   empName(id) {
     const e = this._data.employees.find(x => x.id === id);
     return e ? `${e.last} ${e.first}` : '—';
   }
 
-  // ––– Моковые данные –––
   _buildMock() {
     const D = (off) => iso(addDays(new Date(), off));
     const settings = { archiveMonths: 6 };
@@ -398,7 +391,15 @@ export default class DataStore {
     const E = (id, last, first, email, pass, position, deps, roles, extra = {}) =>
       ({ id, last, first, email, pass, position, departments: deps, roles, kbIds: extra.kbIds || [], headDeptIds: extra.headDeptIds || [], phone: extra.phone || "+7 900 000-00-00", extension: extra.extension || "123", tab: extra.tab || String(1000 + Math.floor(Math.random() * 8999)), notif: { deadlineEmail: true, overdueDigest: false, commentSub: true }, failed: 0, lockUntil: 0, fired: false, passwordHistory: [], photo: null });
     const employees = [
-      E("sergey.adminov", "Админов", "Сергей", "sergey.adminov", "Admin2026!", "Администратор системы", [{ deptId: "d_it", primary: true }], ["sergey.adminov"], { extension: "101" }),
+      E("sergey.adminov", "Админов", "Сергей", "sergey.adminov", "Admin2026!", "Администратор системы", [{ deptId: "d_it", primary: true }], ["admin"], { extension: "101" }),
+      E("aleksey.gendirov", "Гендиров", "Алексей", "aleksey.gendirov", "Director2026!", "Генеральный директор", [], ["director"], { extension: "102" }),
+      E("erik.ekonomistov", "Экономистов", "Эрик", "erik.ekonomistov", "Econ2026!", "Главный экономист", [{ deptId: "d_mgmt", primary: true }], ["economist"], { extension: "103" }),
+      E("ivan.konstruktorov", "Конструкторов", "Иван", "ivan.konstruktorov", "KbLa2026!", "Главный конструктор КБ «ЛА»", [{ deptId: "d_mgmt", primary: true }], ["kb_chief", "executor"], { kbIds: ["kb_la"], extension: "104" }),
+      E("olga.personalova", "Персоналова", "Ольга", "olga.personalova", "Hr2026!", "HR-менеджер", [{ deptId: "d_hr", primary: true }], ["hr", "executor"], { extension: "106" }),
+      E("mikhail.otdelov", "Отделов", "Михаил", "mikhail.otdelov", "Head2026!", "Начальник отдела аэродинамики", [{ deptId: "d_aero", primary: true }], ["head", "executor", "pm"], { headDeptIds: ["d_aero", "d_comp"], extension: "107" }),
+      E("kirill.proektov", "Проектов", "Кирилл", "kirill.proektov", "Pm2026!", "Ответственный по проекту", [{ deptId: "d_aero", primary: true }], ["pm", "executor"], { extension: "116" }),
+      E("isaev", "Исаев", "Роман", "isaev", "Exec2026!", "Инженер-аэродинамик", [{ deptId: "d_aero", primary: true }], ["executor"], { extension: "117" }),
+      // Остальные сотрудники оставлены с короткими логинами, они не участвуют в демо-кнопках
       E("e_kozlov", "Козлов", "Дмитрий", "kozlov", "Director2026!", "Генеральный директор", [], ["director"], { extension: "102" }),
       E("e_lebedeva", "Лебедева", "Мария", "lebedeva", "Econ2026!", "Главный экономист", [{ deptId: "d_mgmt", primary: true }], ["economist"], { extension: "103" }),
       E("e_romanov", "Романов", "Владимир", "romanov", "KbLa2026!", "Главный конструктор КБ «ЛА»", [{ deptId: "d_mgmt", primary: true }], ["kb_chief", "executor"], { kbIds: ["kb_la"], extension: "104" }),

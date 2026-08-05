@@ -25,12 +25,10 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
   const [shake, setShake] = useState(false);
   const [reg, setReg] = useState({ first: "", last: "", email: "", pass: "", pass2: "" });
   const [forgot, setForgot] = useState("");
-  
-  // Состояние для показа пароля в логине
+
   const [showPassword, setShowPassword] = useState(false);
   const passwordTimerRef = useRef(null);
-  
-  // Состояние для показа пароля в регистрации
+
   const [showRegPass, setShowRegPass] = useState(false);
   const regPassTimerRef = useRef(null);
 
@@ -44,8 +42,7 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
       setBusy(false);
     }, 30);
   };
-  
-  // Обработчик переключения видимости пароля в логине
+
   const togglePasswordVisibility = () => {
     if (showPassword) {
       setShowPassword(false);
@@ -63,7 +60,6 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
     }
   };
 
-  // Обработчик переключения видимости пароля в регистрации
   const toggleRegPassVisibility = () => {
     if (showRegPass) {
       setShowRegPass(false);
@@ -91,7 +87,6 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
         if (passIssues(reg.pass).some((i) => !i.ok)) return fail("Пароль не соответствует требованиям безопасности");
         if (reg.pass !== reg.pass2) return fail("Пароли не совпадают");
 
-        // ИЗМЕНЕНИЕ: сразу создаём сотрудника и выполняем вход
         const newEmployee = {
           id: "e_" + uid(),
           last: reg.last.trim(),
@@ -115,19 +110,16 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
         setDb((s) => ({
           ...s,
           employees: [...s.employees, newEmployee],
-          // Добавляем уведомление суперадмину (e_smirnov)
           notifications: [
-            { id: uid(), userId: "e_smirnov", text: `Новая регистрация: ${newEmployee.last} ${newEmployee.first}`, ts: Date.now(), read: false, targetType: null, targetId: null },
+            { id: uid(), userId: "sergey.adminov", text: `Новая регистрация: ${newEmployee.last} ${newEmployee.first}`, ts: Date.now(), read: false, targetType: null, targetId: null },
             ...s.notifications
           ]
         }));
         toast("Регистрация успешна! Выполняется вход...");
-        // Выполняем вход
         const loginOk = onLogin(reg.email.trim().toLowerCase(), reg.pass);
         if (!loginOk) {
           fail("Ошибка автоматического входа после регистрации.");
         }
-        // Очищаем поля
         setReg({ first: "", last: "", email: "", pass: "", pass2: "" });
         setMode("login");
         return;
@@ -142,16 +134,19 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
     }
   };
   const issues = passIssues(reg.pass);
+
+  // Демо-доступы в формате имя.фамилия
   const demos = [
     { l: "sergey.adminov", p: "Admin2026!", t: "Суперадминистратор" },
     { l: "aleksey.gendirov", p: "Director2026!", t: "Генеральный директор" },
     { l: "erik.ekonomistov", p: "Econ2026!", t: "Главный экономист" },
     { l: "ivan.konstruktorov", p: "KbLa2026!", t: "Гл. конструктор КБ «ЛА»" },
-    { l: "jlga.personalova", p: "Hr2026!", t: "HR-менеджер" },
+    { l: "olga.personalova", p: "Hr2026!", t: "HR-менеджер" },
     { l: "mikhail.otdelov", p: "Head2026!", t: "Руководитель отделов" },
     { l: "kirill.proektov", p: "Pm2026!", t: "Ответственный по проекту" },
     { l: "isaev", p: "Exec2026!", t: "Исполнитель" },
   ];
+
   return (
     <div className="login-wrap">
       <div className="login-hero">
@@ -167,7 +162,7 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
       </div>
       <div className="login-panel">
         <form className={"login-card" + (shake ? " shake" : "")} onSubmit={submit}>
-          {mode !== "register" && (<>
+          {mode !== "register" && (<>\
             <h3>{mode === "forgot" ? "Восстановление пароля" : "Вход в систему"}</h3>
             <div className="login-sub">{mode === "forgot" ? "Ссылка будет отправлена на зарегистрированный e-mail" : "Логин — e-mail без домена " + "@" + DOMAIN}</div>
             {mode === "forgot" ? (<>\
@@ -188,14 +183,14 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
                 <button
                   type="button"
                   onClick={togglePasswordVisibility}
-                  className="pass-toggle-btn"
+                  style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#64748b', cursor: 'pointer' }}
                 >
                   <Ic d={ICONS.eye} size={18} />
                 </button>
               </div>
             </>)}
           </>)}
-          {mode === "register" && (<>
+          {mode === "register" && (<>\
             <h3>Регистрация сотрудника</h3>
             <div className="login-sub">После регистрации вы автоматически войдёте с ролью «Исполнитель». Суперадминистратор получит уведомление.</div>
             <div className="reg-row">
@@ -205,7 +200,6 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
             <label className="lbl">E-mail *</label>
             <div className="email-inp"><input className="inp" value={reg.email} onChange={(e) => setReg({ ...reg, email: e.target.value })} placeholder="ivanov" /><span className="email-dom">{"@" + DOMAIN}</span></div>
             <label className="lbl">Пароль *</label>
-            {/* Добавлен глаз для пароля в регистрации */}
             <div style={{ position: 'relative' }}>
               <input
                 className="inp"
