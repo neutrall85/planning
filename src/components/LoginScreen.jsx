@@ -17,6 +17,9 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
   const [mode, setMode] = useState("login");
   const [lg, setLg] = useState("");
   const [pw, setPw] = useState("");
+  const [showPass, setShowPass] = useState(false);
+  const [passTimer, setPassTimer] = useState(null);
+  const passTimerRef = useRef(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const [shake, setShake] = useState(false);

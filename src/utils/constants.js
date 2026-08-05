@@ -27,9 +27,8 @@ export const PRIORITIES = {
 
 export const VACATION_TYPES = {
   annual: "Ежегодный",
-  unpaid: "Без сохранения содержания",
+  admin: "Административный",
   sick: "Больничный",
-  study: "Учебный",
   other: "Другой",
 };
 
@@ -44,4 +43,4 @@ export const PROJECT_STATUSES = {
 
 export const PROJECT_TYPES = { prod: "Производственный", admin: "Административный" };
 export const COMMENT_EDIT_WINDOW = 15 * 60000; // 15 минут
-export const DOMAIN = "aeroplan.ru";
+export const DOMAIN = "volga-dnepr.com";

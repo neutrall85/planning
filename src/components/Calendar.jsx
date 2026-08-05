@@ -1,16 +1,36 @@
-import React, { useState, useMemo } from 'react';
-import { TODAY, iso, addDays, parseISO, fmtDMY } from '../utils/date';
-import { TASK_STATUSES } from '../utils/constants';
+import { useState, useMemo } from 'react';
+import { iso, addDays, fmtDMY } from '../utils/date';
 import { taskVisible, computeScope } from '../utils/permissions';
 import { Ic, ICONS } from './Icons';
+
+const DayCell = ({ d, big, byDay, db, openTask }) => {
+  const dayIso = iso(d);
+  const list = byDay[dayIso] || [];
+  return (
+    <div className={`cal-cell${dayIso === iso(new Date()) ? ' today' : ''}`}>
+      <div className="cal-daynum">{d.getDate()}</div>
+      <div className="cal-chips">
+        {list.slice(0, big ? 12 : 3).map(t => {
+          const p = db.projects.find(x => x.id === t.projectId);
+          const assignees = (t.assigneeIds || []).map(id => db.employees.find(e => e.id === id)).filter(Boolean);
+          const a = assignees[0];
+          return (
+            <div key={t.id} className="cal-chip" style={{ borderColor: p?.color }} onClick={() => openTask(t.id)}>
+              <span className="pdot" style={{ background: p?.color }} />{t.title} <span className="mut">· {a?.last}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 export default function Calendar({ db, ur, openTask }) {
   const scope = useMemo(() => computeScope(ur, db), [ur, db]);
   const [mode, setMode] = useState('month');
   const [anchor, setAnchor] = useState(new Date());
-
+  
   const tasks = db.tasks.filter(t => taskVisible(ur, scope, t, db) && t.deadline && !['closed','cancelled'].includes(t.status));
-  const vacs = db.vacations.filter(v => v.status === 'approved');
 
   const byDay = useMemo(() => {
     const m = {}; tasks.forEach(t => { (m[t.deadline] = m[t.deadline] || []).push(t); }); return m;
@@ -24,28 +44,6 @@ export default function Calendar({ db, ur, openTask }) {
   const title = mode === 'month' ? `${['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'][anchor.getMonth()]} ${anchor.getFullYear()}` :
     mode === 'week' ? `Неделя ${fmtDMY(iso(addDays(anchor, -((anchor.getDay()+6)%7))))} — ${fmtDMY(iso(addDays(anchor, 6-((anchor.getDay()+6)%7))))}` : fmtDMY(iso(anchor));
 
-  const DayCell = ({ d, big }) => {
-    const dayIso = iso(d);
-    const list = byDay[dayIso] || [];
-    return (
-      <div className={`cal-cell${dayIso === TODAY ? ' today' : ''}`}>
-        <div className="cal-daynum">{d.getDate()}</div>
-        <div className="cal-chips">
-          {list.slice(0, big ? 12 : 3).map(t => {
-            const p = db.projects.find(x => x.id === t.projectId);
-            const assignees = (t.assigneeIds || []).map(id => db.employees.find(e => e.id === id)).filter(Boolean);
-            const a = assignees[0];
-            return (
-              <div key={t.id} className="cal-chip" style={{ borderColor: p?.color }} onClick={() => openTask(t.id)}>
-                <span className="pdot" style={{ background: p?.color }} />{t.title} <span className="mut">· {a?.last}</span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
-
   let body = null;
   if (mode === 'month') {
     const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
@@ -53,13 +51,13 @@ export default function Calendar({ db, ur, openTask }) {
     const cells = []; for (let i=0; i<42; i++) cells.push(addDays(first, i-offset));
     body = (<>
       <div className="cal-grid-head">{['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map(w => <div key={w} className="cal-wd">{w}</div>)}</div>
-      <div className="cal-grid">{cells.map(d => <div key={iso(d)} className={d.getMonth()===anchor.getMonth()?'':'outwrap'}><DayCell d={d} /></div>)}</div>
+      <div className="cal-grid">{cells.map(d => <div key={iso(d)} className={d.getMonth()===anchor.getMonth()?'':'outwrap'}><DayCell d={d} big={false} byDay={byDay} db={db} openTask={openTask} /></div>)}</div>
     </>);
   } else if (mode === 'week') {
     const mon = addDays(anchor, -((anchor.getDay()+6)%7));
-    body = <div className="cal-week">{[0,1,2,3,4,5,6].map(i => <DayCell key={i} d={addDays(mon, i)} big />)}</div>;
+    body = <div className="cal-week">{[0,1,2,3,4,5,6].map(i => <DayCell key={i} d={addDays(mon, i)} big byDay={byDay} db={db} openTask={openTask} />)}</div>;
   } else {
-    body = <div className="cal-week one"><DayCell d={anchor} big /></div>;
+    body = <div className="cal-week one"><DayCell d={anchor} big byDay={byDay} db={db} openTask={openTask} /></div>;
   }
 
   return (
