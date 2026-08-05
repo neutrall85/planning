@@ -178,7 +178,7 @@ function Discussion({ db, ur, task, patchTask, notify, toast, readOnly }) {
 }
 
 // ----- TaskModal -----
-export const TaskModal = ({ db, ur, taskId, spent, planSum, onClose, onSave, onDelete, onHoursReq, toast, patchTask, notify }) => {
+export const TaskModal = ({ db, ur, taskId, spent, planSum, onClose, onSave, onDelete, onHoursReq, toast, patchTask, notify, store }) => { // ИЗМЕНЕНИЕ: добавлен проп store
   const { empName, getTaskSpent, vacOverlap, primaryDept } = useDataHelpers(db);
   const existing = taskId ? db.tasks.find((t) => t.id === taskId) : null;
   const readOnly = !!(existing && existing.archived);
@@ -191,6 +191,7 @@ export const TaskModal = ({ db, ur, taskId, spent, planSum, onClose, onSave, onD
   const [f, setF] = useState(existing ? { ...existing, comments: existing.comments || [] } : {
     id: "t_" + uid(), title: "", desc: "", projectId: "", assigneeIds: [], priority: "mid",
     plannedHours: 8, start: TODAY, deadline: iso(addDays(new Date(), 14)), status: "new", logs: [], comments: [], history: [], delegatedFrom: null, archived: false, archivedAt: null, closedAt: null,
+    creatorId: ur.id // ИЗМЕНЕНИЕ: устанавливаем creatorId при создании
   });
   const [logH, setLogH] = useState("");
   const [logNote, setLogNote] = useState("");
@@ -217,6 +218,15 @@ export const TaskModal = ({ db, ur, taskId, spent, planSum, onClose, onSave, onD
     setF(prev => ({ ...prev, ...updatedTask }));
   };
 
+  // ИЗМЕНЕНИЕ: функция для автоматического добавления роли исполнителя
+  const ensureExecutorRole = (empId) => {
+    const emp = db.employees.find(e => e.id === empId);
+    if (emp && !emp.roles.includes('executor')) {
+      const updated = { ...emp, roles: [...emp.roles, 'executor'] };
+      store.upsertEmployee(updated);
+    }
+  };
+
   const doSave = () => {
     const history = [...(f.history || [])];
     if (existing) {
@@ -226,7 +236,16 @@ export const TaskModal = ({ db, ur, taskId, spent, planSum, onClose, onSave, onD
       if (existing.deadline !== (f.deadline || null)) history.push({ ts: Date.now(), who: ur.id, text: `Дедлайн: ${existing.deadline ? fmtDMY(existing.deadline) : "—"} → ${f.deadline ? fmtDMY(f.deadline) : "—"}` });
     }
     const newClosed = f.status === "closed" && (!existing || existing.status !== "closed");
-    onSave({ ...f, plannedHours: f.plannedHours === "" || f.plannedHours == null ? null : +f.plannedHours, deadline: f.deadline || null, closedAt: newClosed ? TODAY : (existing ? existing.closedAt : null), history }, !existing);
+    // ИЗМЕНЕНИЕ: при создании новой задачи добавляем creatorId
+    const taskToSave = {
+      ...f,
+      plannedHours: f.plannedHours === "" || f.plannedHours == null ? null : +f.plannedHours,
+      deadline: f.deadline || null,
+      closedAt: newClosed ? TODAY : (existing ? existing.closedAt : null),
+      history,
+      creatorId: existing ? existing.creatorId : ur.id // сохраняем creatorId
+    };
+    onSave(taskToSave, !existing);
   };
 
   const save = () => {
@@ -236,6 +255,10 @@ export const TaskModal = ({ db, ur, taskId, spent, planSum, onClose, onSave, onD
     if (!isAdminProj) {
       if (!f.plannedHours || +f.plannedHours <= 0) return toast("Для производственного проекта плановые часы обязательны", "err");
       if (!f.deadline) return toast("Для производственного проекта дедлайн обязателен", "err");
+    }
+    // ИЗМЕНЕНИЕ: перед сохранением проверяем и добавляем роль исполнителя
+    if (f.assigneeIds && f.assigneeIds.length > 0) {
+      f.assigneeIds.forEach(id => ensureExecutorRole(id));
     }
     if (vacWarn) { setConfirmVac(vacWarn); return; }
     doSave();

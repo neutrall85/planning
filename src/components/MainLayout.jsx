@@ -63,18 +63,22 @@ export default function MainLayout({ store, data, user }) {
       alert('У вас нет прав на закрытие или отмену этой задачи.');
       return;
     }
-    store.upsertTask({
+    // ИЗМЕНЕНИЕ: при закрытии/отмене задача архивируется
+    const isClosing = (newStatus === 'closed' || newStatus === 'cancelled') && task.status !== newStatus;
+    const updatedTask = {
       ...task,
       status: newStatus,
-      closedAt: newStatus === 'closed' && task.status !== 'closed' ? TODAY : task.closedAt,
+      closedAt: isClosing ? TODAY : task.closedAt,
+      archived: isClosing ? true : task.archived,
+      archivedAt: isClosing ? TODAY : task.archivedAt,
       history: [...task.history, { ts: Date.now(), who: user.id, text: `Статус → ${TASK_STATUSES[newStatus].label}` }]
-    });
+    };
+    store.upsertTask(updatedTask);
     store.addAudit('Изменение статуса задачи', `${task.title} → ${TASK_STATUSES[newStatus].label}`);
 
+    // ИЗМЕНЕНИЕ: уведомления при изменении статуса
     if (newStatus === 'review') {
-      const creatorId = task.history?.length > 0
-        ? task.history.find(h => h.who !== 'system')?.who || task.history[0]?.who
-        : null;
+      const creatorId = task.creatorId || task.history?.find(h => h.who !== 'system')?.who || task.history[0]?.who;
       const project = data.projects.find(p => p.id === task.projectId);
       let managerId = project?.managerId;
       if (!managerId) {
@@ -95,6 +99,17 @@ export default function MainLayout({ store, data, user }) {
         store.addNotification(
           managerId,
           `Задача "${task.title}" переведена на проверку исполнителем ${user.last} ${user.first}.`,
+          { targetType: 'task', targetId: task.id }
+        );
+      }
+    }
+    // ИЗМЕНЕНИЕ: уведомление автору при закрытии/отмене
+    if (isClosing) {
+      const creatorId = task.creatorId;
+      if (creatorId && creatorId !== user.id) {
+        store.addNotification(
+          creatorId,
+          `Задача "${task.title}" ${newStatus === 'closed' ? 'закрыта' : 'отменена'} пользователем ${user.last} ${user.first}.`,
           { targetType: 'task', targetId: task.id }
         );
       }
@@ -173,7 +188,6 @@ export default function MainLayout({ store, data, user }) {
           {view === 'calendar' && <Calendar db={data} ur={user} openTask={openTask} />}
           {view === 'projects' && <Projects db={data} ur={user} openProject={openProject} openHoursReq={openHoursReq} closeProject={(p) => { store.upsertProject({...p, status:'closed', closedAt:TODAY}); data.tasks.filter(t=>t.projectId===p.id && !['closed','cancelled'].includes(t.status)).forEach(t=>{store.upsertTask({...t, status:'closed', closedAt:TODAY})}); store.addAudit('Закрытие проекта', p.name); }} cancelProject={(p) => { store.upsertProject({...p, status:'cancelled'}); store.addAudit('Отмена проекта', p.name); }} />}
           {view === 'cabinet' && <Cabinet store={store} data={data} user={user} openTask={openTask} openVacation={openVacation} openDelegation={openDelegation} />}
-          {/* ИСПРАВЛЕНИЕ: Добавлен проп setDb */}
           {view === 'staff' && <Staff 
             db={data} 
             ur={user} 
@@ -183,7 +197,7 @@ export default function MainLayout({ store, data, user }) {
             openVacation={openVacation} 
           />}
           {view === 'reports' && <Reports db={data} ur={user} />}
-          {view === 'archive' && <Archive db={data} ur={user} openTask={openTask} runArchive={() => {}} setArchiveMonths={(m) => { store._data.settings.archiveMonths = m; store._notify(); }} restoreTask={(id) => { const t = data.tasks.find(x => x.id === id); store.upsertTask({...t, archived: false, archivedAt: null}); }} restoreProject={(id) => { const p = data.projects.find(x => x.id === id); store.upsertProject({...p, archived: false, archivedAt: null}); data.tasks.filter(t => t.projectId === id).forEach(t=>{store.upsertTask({...t, archived: false, archivedAt: null})}); }} />}
+          {view === 'archive' && <Archive db={data} ur={user} openTask={openTask} runArchive={() => store.runArchive(data.settings?.archiveMonths || 6)} setArchiveMonths={(m) => { store._data.settings.archiveMonths = m; store._notify(); }} restoreTask={(id) => { const t = data.tasks.find(x => x.id === id); store.upsertTask({...t, archived: false, archivedAt: null}); }} restoreProject={(id) => { const p = data.projects.find(x => x.id === id); store.upsertProject({...p, archived: false, archivedAt: null}); data.tasks.filter(t => t.projectId === id).forEach(t=>{store.upsertTask({...t, archived: false, archivedAt: null})}); }} />}
           {view === 'requests' && <Requests db={data} setDb={(fn) => { store._data = fn(store._data); store._notify(); }} ur={user} />}
           {view === 'journal' && <Journal db={data} ur={user} />}
         </div>
@@ -210,6 +224,15 @@ export default function MainLayout({ store, data, user }) {
           }
           store.upsertTask(t);
           store.addAudit(isNew ? 'Создание задачи' : 'Изменение задачи', t.title);
+          // ИЗМЕНЕНИЕ: уведомление при создании задачи
+          if (isNew) {
+            const assignees = t.assigneeIds || [];
+            assignees.forEach(id => {
+              if (id !== user.id) {
+                store.addNotification(id, `Вам назначена задача "${t.title}" (проект ${data.projects.find(p => p.id === t.projectId)?.code || '—'}).`, { targetType: 'task', targetId: t.id });
+              }
+            });
+          }
           setModal(null);
         }} 
         onDelete={(id) => { store.deleteTask(id); setModal(null); }} 
@@ -217,9 +240,21 @@ export default function MainLayout({ store, data, user }) {
         toast={(msg) => alert(msg)} 
         patchTask={store.upsertTask} 
         notify={(userId, text, target) => store.addNotification(userId, text, target)} 
+        store={store} // ИЗМЕНЕНИЕ: передаём store
       />}
       {modal?.type === 'project' && <ProjectModal db={data} ur={user} projectId={modal.projectId} openTask={openTask} onClose={() => setModal(null)} onSave={(p, isNew) => { const old = data.projects.find(x => x.id === p.id); if (old && hasRole(user, 'admin')) { const changes = []; if (old.budget !== p.budget) changes.push(`Бюджет: ${old.budget ?? '—'} → ${p.budget ?? '—'}`); if (old.name !== p.name) changes.push(`Название: ${old.name} → ${p.name}`); if (old.managerId !== p.managerId) changes.push(`Ответственный: ${empName(old.managerId)} → ${empName(p.managerId)}`); if (old.status !== p.status) changes.push(`Статус: ${PROJECT_STATUSES[old.status]} → ${PROJECT_STATUSES[p.status]}`); if (changes.length > 0) { store.addAudit('Административное изменение проекта (прямое)', `${p.name}: ${changes.join('; ')}`); } } store.upsertProject(p); store.addAudit(isNew ? 'Создание проекта' : 'Изменение проекта', p.name); setModal(null); }} onDelete={(p) => { store.deleteProject(p.id); setModal(null); }} toast={(msg) => alert(msg)} />}
-      {modal?.type === 'hours' && <HoursRequestModal db={data} ur={user} kind={modal.kind} targetId={modal.targetId} onClose={() => setModal(null)} onSubmit={(r) => { store.addHoursRequest(r); store.addNotification('e_kozlov', `Запрос на изменение часов`, { targetType: 'hours', targetId: r.id }); store.addAudit('Запрос изменения часов', `${r.oldH} → ${r.newH} ч`); setModal(null); }} />}
+      {modal?.type === 'hours' && <HoursRequestModal db={data} ur={user} kind={modal.kind} targetId={modal.targetId} onClose={() => setModal(null)} onSubmit={(r) => { store.addHoursRequest(r); 
+        // ИЗМЕНЕНИЕ: уведомление автору задачи
+        const target = modal.kind === 'task' ? data.tasks.find(t => t.id === modal.targetId) : null;
+        const authorId = target?.creatorId || (target?.history?.length > 0 ? target.history[0].who : null);
+        if (authorId) {
+          store.addNotification(authorId, `Запрос на изменение часов по ${modal.kind === 'task' ? 'задаче' : 'проекту'} "${target?.title || target?.name || ''}" от ${user.last} ${user.first}.`, { targetType: 'hours', targetId: r.id });
+        } else {
+          store.addNotification('e_kozlov', `Запрос на изменение часов`, { targetType: 'hours', targetId: r.id });
+        }
+        store.addAudit('Запрос изменения часов', `${r.oldH} → ${r.newH} ч`);
+        setModal(null); 
+      }} />}
       {modal?.type === 'roles' && <RolesModal db={data} setDb={(fn) => { store._data = fn(store._data); store._notify(); }} empId={modal.empId} onClose={() => setModal(null)} toast={(msg) => alert(msg)} audit={store.addAudit} />}
       {modal?.type === 'depts' && <DeptsModal db={data} setDb={(fn) => { store._data = fn(store._data); store._notify(); }} empId={modal.empId} onClose={() => setModal(null)} toast={(msg) => alert(msg)} audit={store.addAudit} />}
       {modal?.type === 'vacation' && <VacationModal db={data} ur={user} vacationId={modal.vacationId} forEmpId={modal.forEmpId || null} onClose={() => setModal(null)} onSave={(v, isNew) => { store.upsertVacation(v); store.addAudit(isNew ? 'Создание отпуска' : 'Изменение отпуска', `${v.empId} ${fmtDMY(v.start)}—${fmtDMY(v.end)}`); setModal(null); }} />}

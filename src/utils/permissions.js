@@ -12,10 +12,8 @@ export const canManageManager = (user) => hasRole(user, "admin", "director", "kb
 export const canExport = (user) => hasRole(user, "admin", "director", "economist");
 export const canEditRoles = (user) => hasRole(user, "admin");
 
-// Увольнение/восстановление
 export const canFireEmployee = (user) => hasRole(user, "admin", "director", "hr");
 
-// Базовая проверка на редактирование задачи (без учёта статуса)
 export const canEditTask = (user, task, data) => {
   if (!user || !task || !data) return false;
   if (task.archived) return false;
@@ -42,18 +40,23 @@ export const canEditTask = (user, task, data) => {
   return false;
 };
 
-// Проверка, может ли пользователь перевести задачу в указанный статус
+// ИЗМЕНЕНИЕ: добавлена проверка creatorId для закрытия/отмены
 export const canChangeTaskStatus = (user, task, newStatus, data) => {
   if (!user || !task || !data) return false;
   if (task.archived) return false;
   
-  // Если статус не closed и не cancelled – разрешено всем, кто может редактировать задачу
   if (newStatus !== 'closed' && newStatus !== 'cancelled') {
     return canEditTask(user, task, data);
   }
   
-  // Для closed/cancelled – только администраторы, директор, экономист, PM, руководитель отдела, гл. конструктор
+  // Закрытие/отмена доступны:
+  // - админу, директору, экономисту
+  // - автору задачи (creatorId)
+  // - PM, руководителю отдела, гл. конструктору (с проверкой)
   if (hasRole(user, "admin", "director", "economist")) return true;
+  
+  // ИЗМЕНЕНИЕ: автор задачи может закрыть/отменить
+  if (task.creatorId && task.creatorId === user.id) return true;
   
   const project = data.projects.find(p => p.id === task.projectId);
   
@@ -75,7 +78,6 @@ export const projectEditable = (user, project, data) => {
   return false;
 };
 
-// Возвращает список доступных исполнителей с сортировкой по фамилии, затем имени
 export const assigneeOptions = (user, data) => {
   if (!user || !data) return [];
   let list = [];

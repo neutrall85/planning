@@ -184,6 +184,54 @@ export default class DataStore {
     this._notify();
   }
 
+  // ИЗМЕНЕНИЕ: метод для автоматической архивации
+  runArchive(months) {
+    const now = new Date();
+    const cutoff = addMonths(now, -months);
+    const cutoffIso = iso(cutoff);
+    let changed = false;
+
+    // Архивация проектов
+    const updatedProjects = this._data.projects.map(p => {
+      if (p.archived) return p;
+      // Не архивируем долгосрочные административные проекты
+      if (p.ptype === 'admin' && p.longterm) return p;
+      if (p.status === 'closed' && p.closedAt && p.closedAt < cutoffIso) {
+        changed = true;
+        return { ...p, archived: true, archivedAt: TODAY };
+      }
+      if (p.status === 'cancelled' && p.closedAt && p.closedAt < cutoffIso) {
+        changed = true;
+        return { ...p, archived: true, archivedAt: TODAY };
+      }
+      return p;
+    });
+
+    // Архивация задач
+    const updatedTasks = this._data.tasks.map(t => {
+      if (t.archived) return t;
+      // Задачи административных долгосрочных проектов не архивируем
+      const project = updatedProjects.find(p => p.id === t.projectId);
+      if (project && project.ptype === 'admin' && project.longterm) return t;
+      if ((t.status === 'closed' || t.status === 'cancelled') && t.closedAt && t.closedAt < cutoffIso) {
+        changed = true;
+        return { ...t, archived: true, archivedAt: TODAY };
+      }
+      return t;
+    });
+
+    if (changed) {
+      this._data = {
+        ...this._data,
+        projects: updatedProjects,
+        tasks: updatedTasks
+      };
+      this._notify();
+      this.addAudit('Автоматическая архивация', `Архивированы проекты и задачи, закрытые более ${months} мес.`);
+    }
+    return changed;
+  }
+
   _buildMock() {
     const D = (off) => iso(addDays(new Date(), off));
     const settings = { archiveMonths: 6 };
@@ -205,35 +253,36 @@ export default class DataStore {
       { id: "d_otk", name: "Отдел технического контроля (ОТК)", kbId: null },
       { id: "d_hr", name: "Отдел кадров", kbId: null },
     ];
+    // ИЗМЕНЕНИЕ: добавлено поле extension
     const E = (id, last, first, email, pass, position, deps, roles, extra = {}) =>
-      ({ id, last, first, email, pass, position, departments: deps, roles, kbIds: extra.kbIds || [], headDeptIds: extra.headDeptIds || [], phone: extra.phone || "+7 900 000-00-00", tab: extra.tab || String(1000 + Math.floor(Math.random() * 8999)), notif: { deadlineEmail: true, overdueDigest: false, commentSub: true }, failed: 0, lockUntil: 0, fired: false });
+      ({ id, last, first, email, pass, position, departments: deps, roles, kbIds: extra.kbIds || [], headDeptIds: extra.headDeptIds || [], phone: extra.phone || "+7 900 000-00-00", extension: extra.extension || "123", tab: extra.tab || String(1000 + Math.floor(Math.random() * 8999)), notif: { deadlineEmail: true, overdueDigest: false, commentSub: true }, failed: 0, lockUntil: 0, fired: false });
     const employees = [
-      E("e_smirnov", "Смирнов", "Артём", "admin", "Admin2026!", "Администратор системы", [{ deptId: "d_it", primary: true }], ["admin"]),
-      E("e_kozlov", "Козлов", "Дмитрий", "kozlov", "Director2026!", "Генеральный директор", [{ deptId: "d_mgmt", primary: true }], ["director"]),
-      E("e_lebedeva", "Лебедева", "Мария", "lebedeva", "Econ2026!", "Главный экономист", [{ deptId: "d_mgmt", primary: true }], ["economist"]),
-      E("e_romanov", "Романов", "Владимир", "romanov", "KbLa2026!", "Главный конструктор КБ «ЛА»", [{ deptId: "d_mgmt", primary: true }], ["kb_chief", "executor"], { kbIds: ["kb_la"] }),
-      E("e_belova", "Белова", "Наталья", "belova", "KbAd2026!", "Главный конструктор КБ «АД»", [{ deptId: "d_mgmt", primary: true }], ["kb_chief", "executor"], { kbIds: ["kb_ad"] }),
-      E("e_nikitina", "Никитина", "Алина", "nikitina", "Hr2026!", "HR-менеджер", [{ deptId: "d_hr", primary: true }], ["hr", "executor"]),
-      E("e_fedorov", "Фёдоров", "Игорь", "fedorov", "Head2026!", "Начальник отдела аэродинамики", [{ deptId: "d_aero", primary: true }], ["head", "executor", "pm"], { headDeptIds: ["d_aero", "d_comp"] }),
-      E("e_gromov", "Громов", "Сергей", "gromov", "Head2026!", "Начальник отдела прочности", [{ deptId: "d_strla", primary: true }], ["head", "executor", "pm"], { headDeptIds: ["d_strla"] }),
-      E("e_ilina", "Ильина", "Анна", "ilina", "Exec2026!", "Ведущий инженер-компоновщик", [{ deptId: "d_comp", primary: true }], ["executor"]),
-      E("e_krylov", "Крылов", "Виктор", "krylov", "Head2026!", "Начальник отдела газодинамики", [{ deptId: "d_gas", primary: true }], ["head", "executor", "pm"], { headDeptIds: ["d_gas"] }),
-      E("e_medvedev", "Медведев", "Павел", "medvedev", "Head2026!", "Начальник отдела прочности двигателей", [{ deptId: "d_stren", primary: true }], ["head", "executor", "pm"], { headDeptIds: ["d_stren"] }),
-      E("e_orlova", "Орлова", "Елена", "orlova", "Head2026!", "Начальник отдела САУ", [{ deptId: "d_sau", primary: true }], ["head", "executor"], { headDeptIds: ["d_sau"] }),
-      E("e_petrov", "Петров", "Николай", "petrov", "Head2026!", "Начальник ИТ-отдела", [{ deptId: "d_it", primary: true }], ["head", "executor", "pm"], { headDeptIds: ["d_it"] }),
-      E("e_sokolov", "Соколов", "Михаил", "sokolov", "Head2026!", "Начальник ОТК", [{ deptId: "d_otk", primary: true }], ["executor"]),
-      E("e_vasileva", "Васильева", "Ольга", "vasileva", "Head2026!", "Начальник отдела кадров", [{ deptId: "d_hr", primary: true }], ["head"], { headDeptIds: ["d_hr"] }),
-      E("e_morozov", "Морозов", "Константин", "morozov", "Pm2026!", "Ведущий инженер", [{ deptId: "d_aero", primary: true }], ["pm", "executor"]),
-      E("e_isaev", "Исаев", "Роман", "isaev", "Exec2026!", "Инженер-аэродинамик", [{ deptId: "d_aero", primary: true }], ["executor"]),
-      E("e_zaitsev", "Зайцев", "Алексей", "zaitsev", "Exec2026!", "Инженер по прочности", [{ deptId: "d_strla", primary: true }], ["executor"]),
-      E("e_frolova", "Фролова", "Дарья", "frolova", "Exec2026!", "Инженер-расчётчик", [{ deptId: "d_strla", primary: true }], ["executor"]),
-      E("e_tolka", "Толкачёва", "Ирина", "tolkacheva", "Exec2026!", "Инженер-конструктор", [{ deptId: "d_comp", primary: true }], ["executor"]),
-      E("e_gusev", "Гусев", "Максим", "gusev", "Exec2026!", "Инженер по весам", [{ deptId: "d_comp", primary: true }], ["executor"]),
-      E("e_tihonov", "Тихонов", "Егор", "tihonov", "Exec2026!", "Инженер-газодинамик", [{ deptId: "d_gas", primary: true }], ["executor"]),
-      E("e_melnik", "Мельник", "Светлана", "melnik", "Exec2026!", "Инженер по ресурсу", [{ deptId: "d_stren", primary: true }, { deptId: "d_gas", primary: false }], ["executor"]),
-      E("e_koval", "Ковальчук", "Пётр", "kovalchuk", "Exec2026!", "Инженер-программист САУ", [{ deptId: "d_sau", primary: true }], ["executor"]),
-      E("e_kim", "Ким", "Александр", "kim", "Exec2026!", "Разработчик", [{ deptId: "d_it", primary: true }], ["executor"]),
-      E("e_somova", "Сомова", "Екатерина", "somova", "Exec2026!", "UX-дизайнер", [{ deptId: "d_it", primary: true }, { deptId: "d_av1", primary: false }], ["executor"]),
+      E("e_smirnov", "Смирнов", "Артём", "admin", "Admin2026!", "Администратор системы", [{ deptId: "d_it", primary: true }], ["admin"], { extension: "101" }),
+      E("e_kozlov", "Козлов", "Дмитрий", "kozlov", "Director2026!", "Генеральный директор", [{ deptId: "d_mgmt", primary: true }], ["director"], { extension: "102" }),
+      E("e_lebedeva", "Лебедева", "Мария", "lebedeva", "Econ2026!", "Главный экономист", [{ deptId: "d_mgmt", primary: true }], ["economist"], { extension: "103" }),
+      E("e_romanov", "Романов", "Владимир", "romanov", "KbLa2026!", "Главный конструктор КБ «ЛА»", [{ deptId: "d_mgmt", primary: true }], ["kb_chief", "executor"], { kbIds: ["kb_la"], extension: "104" }),
+      E("e_belova", "Белова", "Наталья", "belova", "KbAd2026!", "Главный конструктор КБ «АД»", [{ deptId: "d_mgmt", primary: true }], ["kb_chief", "executor"], { kbIds: ["kb_ad"], extension: "105" }),
+      E("e_nikitina", "Никитина", "Алина", "nikitina", "Hr2026!", "HR-менеджер", [{ deptId: "d_hr", primary: true }], ["hr", "executor"], { extension: "106" }),
+      E("e_fedorov", "Фёдоров", "Игорь", "fedorov", "Head2026!", "Начальник отдела аэродинамики", [{ deptId: "d_aero", primary: true }], ["head", "executor", "pm"], { headDeptIds: ["d_aero", "d_comp"], extension: "107" }),
+      E("e_gromov", "Громов", "Сергей", "gromov", "Head2026!", "Начальник отдела прочности", [{ deptId: "d_strla", primary: true }], ["head", "executor", "pm"], { headDeptIds: ["d_strla"], extension: "108" }),
+      E("e_ilina", "Ильина", "Анна", "ilina", "Exec2026!", "Ведущий инженер-компоновщик", [{ deptId: "d_comp", primary: true }], ["executor"], { extension: "109" }),
+      E("e_krylov", "Крылов", "Виктор", "krylov", "Head2026!", "Начальник отдела газодинамики", [{ deptId: "d_gas", primary: true }], ["head", "executor", "pm"], { headDeptIds: ["d_gas"], extension: "110" }),
+      E("e_medvedev", "Медведев", "Павел", "medvedev", "Head2026!", "Начальник отдела прочности двигателей", [{ deptId: "d_stren", primary: true }], ["head", "executor", "pm"], { headDeptIds: ["d_stren"], extension: "111" }),
+      E("e_orlova", "Орлова", "Елена", "orlova", "Head2026!", "Начальник отдела САУ", [{ deptId: "d_sau", primary: true }], ["head", "executor"], { headDeptIds: ["d_sau"], extension: "112" }),
+      E("e_petrov", "Петров", "Николай", "petrov", "Head2026!", "Начальник ИТ-отдела", [{ deptId: "d_it", primary: true }], ["head", "executor", "pm"], { headDeptIds: ["d_it"], extension: "113" }),
+      E("e_sokolov", "Соколов", "Михаил", "sokolov", "Head2026!", "Начальник ОТК", [{ deptId: "d_otk", primary: true }], ["executor"], { extension: "114" }),
+      E("e_vasileva", "Васильева", "Ольга", "vasileva", "Head2026!", "Начальник отдела кадров", [{ deptId: "d_hr", primary: true }], ["head"], { headDeptIds: ["d_hr"], extension: "115" }),
+      E("e_morozov", "Морозов", "Константин", "morozov", "Pm2026!", "Ведущий инженер", [{ deptId: "d_aero", primary: true }], ["pm", "executor"], { extension: "116" }),
+      E("e_isaev", "Исаев", "Роман", "isaev", "Exec2026!", "Инженер-аэродинамик", [{ deptId: "d_aero", primary: true }], ["executor"], { extension: "117" }),
+      E("e_zaitsev", "Зайцев", "Алексей", "zaitsev", "Exec2026!", "Инженер по прочности", [{ deptId: "d_strla", primary: true }], ["executor"], { extension: "118" }),
+      E("e_frolova", "Фролова", "Дарья", "frolova", "Exec2026!", "Инженер-расчётчик", [{ deptId: "d_strla", primary: true }], ["executor"], { extension: "119" }),
+      E("e_tolka", "Толкачёва", "Ирина", "tolkacheva", "Exec2026!", "Инженер-конструктор", [{ deptId: "d_comp", primary: true }], ["executor"], { extension: "120" }),
+      E("e_gusev", "Гусев", "Максим", "gusev", "Exec2026!", "Инженер по весам", [{ deptId: "d_comp", primary: true }], ["executor"], { extension: "121" }),
+      E("e_tihonov", "Тихонов", "Егор", "tihonov", "Exec2026!", "Инженер-газодинамик", [{ deptId: "d_gas", primary: true }], ["executor"], { extension: "122" }),
+      E("e_melnik", "Мельник", "Светлана", "melnik", "Exec2026!", "Инженер по ресурсу", [{ deptId: "d_stren", primary: true }, { deptId: "d_gas", primary: false }], ["executor"], { extension: "123" }),
+      E("e_koval", "Ковальчук", "Пётр", "kovalchuk", "Exec2026!", "Инженер-программист САУ", [{ deptId: "d_sau", primary: true }], ["executor"], { extension: "124" }),
+      E("e_kim", "Ким", "Александр", "kim", "Exec2026!", "Разработчик", [{ deptId: "d_it", primary: true }], ["executor"], { extension: "125" }),
+      E("e_somova", "Сомова", "Екатерина", "somova", "Exec2026!", "UX-дизайнер", [{ deptId: "d_it", primary: true }, { deptId: "d_av1", primary: false }], ["executor"], { extension: "126" }),
     ];
     const projects = [
       { id: "p_lm24", code: "ЛМ-24", name: "Лёгкий многоцелевой самолёт ЛМ-24", desc: "ОКР по созданию лёгкого многоцелевого самолёта.", kbId: "kb_la", managerId: "e_morozov", start: D(-25), end: D(50), status: "active", budget: 180, color: "#0ea5e9", ptype: "prod", archived: false, archivedAt: null, closedAt: null },
@@ -247,39 +296,45 @@ export default class DataStore {
       { id: "p_long", code: "АДМ-0", name: "Многолетняя программа внутренних мероприятий", desc: "Долгосрочный административный проект — исключение из архивации.", kbId: null, managerId: "e_nikitina", start: D(-400), end: null, status: "closed", budget: null, color: "#f59e0b", ptype: "admin", longterm: true, archived: false, archivedAt: null, closedAt: D(-300) },
     ];
     const now = Date.now();
-    const T = (id, title, projectId, assigneeIds, planned, s, dl, status, priority, desc, extra = {}) => ({
-      id, title, desc: desc || "", projectId, assigneeIds: Array.isArray(assigneeIds) ? assigneeIds : [assigneeIds],
-      plannedHours: planned, start: D(s), deadline: dl === null ? null : D(dl),
-      status, priority, logs: [], comments: [], history: [{ ts: now - 86400000 * 6, who: "e_kozlov", text: "Задача создана" }],
-      delegatedFrom: null, archived: false, archivedAt: null, closedAt: null, ...extra,
-    });
+    // ИЗМЕНЕНИЕ: добавлен creatorId для задач (из первого who в истории)
+    const T = (id, title, projectId, assigneeIds, planned, s, dl, status, priority, desc, extra = {}) => {
+      const history = extra.history || [{ ts: now - 86400000 * 6, who: extra.creatorId || "e_kozlov", text: "Задача создана" }];
+      const creatorId = extra.creatorId || (history.length > 0 ? history[0].who : "e_kozlov");
+      return {
+        id, title, desc: desc || "", projectId, assigneeIds: Array.isArray(assigneeIds) ? assigneeIds : [assigneeIds],
+        plannedHours: planned, start: D(s), deadline: dl === null ? null : D(dl),
+        status, priority, logs: [], comments: [], history,
+        creatorId, // ИЗМЕНЕНИЕ
+        delegatedFrom: null, archived: false, archivedAt: null, closedAt: null, ...extra,
+      };
+    };
     const L = (userId, off, hours, note) => ({ id: uid(), userId, date: D(off), hours, note });
     const tasks = [
-      T("t01", "Расчёт подъёмной силы крыла", "p_lm24", ["e_isaev"], 24, -12, 6, "inwork", "high", "Расчёт и оформление отчёта.", { logs: [L("e_isaev", -6, 6, "Проверка методики"), L("e_isaev", -2, 5, "Расчётная сетка")], comments: [ { id: "c1", parentId: null, authorId: "e_morozov", ts: now - 3600000 * 20, text: "@Исаев Роман — подключите, пожалуйста, отдел прочности к пятнице." }, { id: "c2", parentId: "c1", authorId: "e_isaev", ts: now - 3600000 * 18, text: "Принято, сегодня подготовлю исходные данные." } ] }),
-      T("t02", "3D-модель фюзеляжа", "p_lm24", ["e_tolka"], 40, -15, 12, "inwork", "mid", "Силовой набор и обводы.", { logs: [L("e_tolka", -5, 8, "Шпангоуты")] }),
-      T("t03", "Нагрузки на элероны", "p_lm24", ["e_zaitsev"], 16, -10, -2, "new", "crit", "Эпюры нагрузок для навесок."),
-      T("t04", "Отчёт по прочности фюзеляжа", "p_lm24", ["e_frolova"], 32, -8, 18, "review", "high", "Статика и усталость.", { logs: [L("e_frolova", -3, 12, "МКЭ-модель")] }),
-      T("t05", "Весовая сводка компоновки", "p_lm24", ["e_gusev"], 20, -5, 9, "inwork", "mid", "", { logs: [L("e_gusev", -1, 4, "Сведение таблиц")] }),
-      T("t06", "Программа лётных испытаний", "p_cert", ["e_fedorov"], 16, -2, 25, "new", "mid", "Совместно с лётной службой."),
-      T("t07", "Согласование плана статиспытаний", "p_cert", ["e_kim"], 12, -4, 4, "inwork", "high", "", { logs: [L("e_kim", -2, 3, "Замечания")] }),
-      T("t08", "Чертежи лопастей несущего винта", "p_heli", ["e_kim"], 36, -18, 20, "inwork", "high", "Переназначено на период отпуска Сомовой.", { delegatedFrom: "e_somova", logs: [L("e_somova", -7, 10, "Комлевая часть")] }),
-      T("t09", "Вибрационный расчёт главного редуктора", "p_heli", ["e_isaev"], 18, -6, 14, "new", "mid"),
-      T("t10", "Термогазодинамический расчёт компрессора", "p_rd900", ["e_tihonov"], 48, -14, 28, "inwork", "crit", "Режимы взлёт/крейсер.", { logs: [L("e_tihonov", -4, 12, "Характеристики ступеней")] }),
-      T("t11", "Прочность камеры сгорания", "p_rd900", ["e_medvedev"], 30, -9, 22, "inwork", "mid", "", { logs: [L("e_medvedev", -3, 6, "Теплонапряжённость")] }),
-      T("t12", "ТЗ на САУ-900", "p_rd900", ["e_orlova"], 20, -7, 10, "review", "mid", "", { logs: [L("e_orlova", -2, 8, "Разделы 3–5")] }),
-      T("t13", "Компрессор ВСУ-14", "p_apu", ["e_tihonov"], 22, -4, 16, "new", "mid"),
-      T("t14", "Испытания стартер-генератора ВСУ", "p_apu", ["e_gusev"], 14, -12, -4, "inwork", "high", "Стенд №3, протокол.", { logs: [L("e_gusev", -6, 6, "Прогон на стенде")] }),
-      T("t15", "Техническое задание портала", "p_port", ["e_kim"], 16, -8, 3, "closed", "mid", "", { logs: [L("e_kim", -5, 14, "ТЗ согласовано")], closedAt: D(-2) }),
-      T("t16", "Дизайн модуля учёта времени", "p_port", ["e_petrov"], 24, -3, 8, "inwork", "mid", "", { logs: [L("e_petrov", -1, 5, "Макеты канбан")] }),
-      T("t17", "Справочник сотрудников", "p_port", ["e_kim"], 12, 1, 13, "new", "low", "Переназначено на период отпуска Сомовой.", { delegatedFrom: "e_somova" }),
-      T("t18", "Сводка весовых балансов ЛМ-24", "p_lm24", ["e_ilina"], 10, -3, 2, "review", "high", "", { logs: [L("e_ilina", -1, 6, "Сверка")] }),
-      T("t19", "План сертификации узлов РД-900", "p_rd900", ["e_krylov"], 8, 2, 30, "new", "low"),
-      T("t20", "Архивация чертежей В-112", "p_heli", ["e_sokolov"], 6, -10, 1, "closed", "low", "", { logs: [L("e_sokolov", -4, 6, "Реестр передан")], closedAt: D(-3) }),
-      T("t21", "Подготовка зала ко Дню промышленности", "p_event", ["e_nikitina"], null, 0, 6, "new", "mid", "Административная задача."),
-      T("t22", "Заказать сувенирную продукцию", "p_event", ["e_vasileva"], 6, 1, 10, "new", "low", ""),
-      T("t_a1", "Монтаж оборудования точек доступа", "p_old", ["e_kim"], 30, -290, -240, "closed", "mid", "Завершено в прошлом отчётном периоде.", { logs: [L("e_kim", -250, 28, "Монтаж и пусконаладка")], closedAt: D(-215), comments: [ { id: "ca1", parentId: null, authorId: "e_petrov", ts: now - 86400000 * 220, text: "Прошу зафиксировать итоговую схему размещения точек." }, { id: "ca2", parentId: "ca1", authorId: "e_kim", ts: now - 86400000 * 218, text: "Схема приложена к отчёту, всё смонтировано." } ] }),
-      T("t_a2", "Аудит сетевых кабелей", "p_old", ["e_petrov"], 18, -280, -235, "closed", "low", "", { logs: [L("e_petrov", -240, 16, "Аудит завершён")], closedAt: D(-220) }),
-      T("t_a3", "Подготовка регламента мероприятий", "p_long", ["e_nikitina"], 10, -320, -305, "closed", "low", "Задача долгосрочного административного проекта — не архивируется.", { logs: [L("e_nikitina", -310, 9, "Регламент готов")], closedAt: D(-300) }),
+      T("t01", "Расчёт подъёмной силы крыла", "p_lm24", ["e_isaev"], 24, -12, 6, "inwork", "high", "Расчёт и оформление отчёта.", { logs: [L("e_isaev", -6, 6, "Проверка методики"), L("e_isaev", -2, 5, "Расчётная сетка")], comments: [ { id: "c1", parentId: null, authorId: "e_morozov", ts: now - 3600000 * 20, text: "@Исаев Роман — подключите, пожалуйста, отдел прочности к пятнице." }, { id: "c2", parentId: "c1", authorId: "e_isaev", ts: now - 3600000 * 18, text: "Принято, сегодня подготовлю исходные данные." } ], creatorId: "e_morozov" }),
+      T("t02", "3D-модель фюзеляжа", "p_lm24", ["e_tolka"], 40, -15, 12, "inwork", "mid", "Силовой набор и обводы.", { logs: [L("e_tolka", -5, 8, "Шпангоуты")], creatorId: "e_morozov" }),
+      T("t03", "Нагрузки на элероны", "p_lm24", ["e_zaitsev"], 16, -10, -2, "new", "crit", "Эпюры нагрузок для навесок.", { creatorId: "e_morozov" }),
+      T("t04", "Отчёт по прочности фюзеляжа", "p_lm24", ["e_frolova"], 32, -8, 18, "review", "high", "Статика и усталость.", { logs: [L("e_frolova", -3, 12, "МКЭ-модель")], creatorId: "e_morozov" }),
+      T("t05", "Весовая сводка компоновки", "p_lm24", ["e_gusev"], 20, -5, 9, "inwork", "mid", "", { logs: [L("e_gusev", -1, 4, "Сведение таблиц")], creatorId: "e_morozov" }),
+      T("t06", "Программа лётных испытаний", "p_cert", ["e_fedorov"], 16, -2, 25, "new", "mid", "Совместно с лётной службой.", { creatorId: "e_fedorov" }),
+      T("t07", "Согласование плана статиспытаний", "p_cert", ["e_kim"], 12, -4, 4, "inwork", "high", "", { logs: [L("e_kim", -2, 3, "Замечания")], creatorId: "e_fedorov" }),
+      T("t08", "Чертежи лопастей несущего винта", "p_heli", ["e_kim"], 36, -18, 20, "inwork", "high", "Переназначено на период отпуска Сомовой.", { delegatedFrom: "e_somova", logs: [L("e_somova", -7, 10, "Комлевая часть")], creatorId: "e_gromov" }),
+      T("t09", "Вибрационный расчёт главного редуктора", "p_heli", ["e_isaev"], 18, -6, 14, "new", "mid", "", { creatorId: "e_gromov" }),
+      T("t10", "Термогазодинамический расчёт компрессора", "p_rd900", ["e_tihonov"], 48, -14, 28, "inwork", "crit", "Режимы взлёт/крейсер.", { logs: [L("e_tihonov", -4, 12, "Характеристики ступеней")], creatorId: "e_krylov" }),
+      T("t11", "Прочность камеры сгорания", "p_rd900", ["e_medvedev"], 30, -9, 22, "inwork", "mid", "", { logs: [L("e_medvedev", -3, 6, "Теплонапряжённость")], creatorId: "e_krylov" }),
+      T("t12", "ТЗ на САУ-900", "p_rd900", ["e_orlova"], 20, -7, 10, "review", "mid", "", { logs: [L("e_orlova", -2, 8, "Разделы 3–5")], creatorId: "e_krylov" }),
+      T("t13", "Компрессор ВСУ-14", "p_apu", ["e_tihonov"], 22, -4, 16, "new", "mid", "", { creatorId: "e_medvedev" }),
+      T("t14", "Испытания стартер-генератора ВСУ", "p_apu", ["e_gusev"], 14, -12, -4, "inwork", "high", "Стенд №3, протокол.", { logs: [L("e_gusev", -6, 6, "Прогон на стенде")], creatorId: "e_medvedev" }),
+      T("t15", "Техническое задание портала", "p_port", ["e_kim"], 16, -8, 3, "closed", "mid", "", { logs: [L("e_kim", -5, 14, "ТЗ согласовано")], closedAt: D(-2), creatorId: "e_petrov" }),
+      T("t16", "Дизайн модуля учёта времени", "p_port", ["e_petrov"], 24, -3, 8, "inwork", "mid", "", { logs: [L("e_petrov", -1, 5, "Макеты канбан")], creatorId: "e_petrov" }),
+      T("t17", "Справочник сотрудников", "p_port", ["e_kim"], 12, 1, 13, "new", "low", "Переназначено на период отпуска Сомовой.", { delegatedFrom: "e_somova", creatorId: "e_petrov" }),
+      T("t18", "Сводка весовых балансов ЛМ-24", "p_lm24", ["e_ilina"], 10, -3, 2, "review", "high", "", { logs: [L("e_ilina", -1, 6, "Сверка")], creatorId: "e_morozov" }),
+      T("t19", "План сертификации узлов РД-900", "p_rd900", ["e_krylov"], 8, 2, 30, "new", "low", "", { creatorId: "e_krylov" }),
+      T("t20", "Архивация чертежей В-112", "p_heli", ["e_sokolov"], 6, -10, 1, "closed", "low", "", { logs: [L("e_sokolov", -4, 6, "Реестр передан")], closedAt: D(-3), creatorId: "e_gromov" }),
+      T("t21", "Подготовка зала ко Дню промышленности", "p_event", ["e_nikitina"], null, 0, 6, "new", "mid", "Административная задача.", { creatorId: "e_nikitina" }),
+      T("t22", "Заказать сувенирную продукцию", "p_event", ["e_vasileva"], 6, 1, 10, "new", "low", "", { creatorId: "e_nikitina" }),
+      T("t_a1", "Монтаж оборудования точек доступа", "p_old", ["e_kim"], 30, -290, -240, "closed", "mid", "Завершено в прошлом отчётном периоде.", { logs: [L("e_kim", -250, 28, "Монтаж и пусконаладка")], closedAt: D(-215), comments: [ { id: "ca1", parentId: null, authorId: "e_petrov", ts: now - 86400000 * 220, text: "Прошу зафиксировать итоговую схему размещения точек." }, { id: "ca2", parentId: "ca1", authorId: "e_kim", ts: now - 86400000 * 218, text: "Схема приложена к отчёту, всё смонтировано." } ], creatorId: "e_petrov" }),
+      T("t_a2", "Аудит сетевых кабелей", "p_old", ["e_petrov"], 18, -280, -235, "closed", "low", "", { logs: [L("e_petrov", -240, 16, "Аудит завершён")], closedAt: D(-220), creatorId: "e_petrov" }),
+      T("t_a3", "Подготовка регламента мероприятий", "p_long", ["e_nikitina"], 10, -320, -305, "closed", "low", "Задача долгосрочного административного проекта — не архивируется.", { logs: [L("e_nikitina", -310, 9, "Регламент готов")], closedAt: D(-300), creatorId: "e_nikitina" }),
     ];
     const vacations = [
       { id: "v1", empId: "e_somova", start: D(-2), end: D(5), type: "annual", comment: "Отдых, Сочи", status: "approved", delegation: { enabled: true, subId: "e_kim", statuses: ["inwork", "review"], state: "applied" } },
