@@ -18,7 +18,6 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
   const { empName, getEmployeeLoad } = useDataHelpers(data);
   const [tab, setTab] = useState('overview');
 
-  // Состояния для экспорта отчета
   const [expFrom, setExpFrom] = useState('');
   const [expTo, setExpTo] = useState('');
 
@@ -257,11 +256,32 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
                 <button className="btn ghost sm" onClick={() => alert('Письмо подтверждения отправлено на новый адрес (заглушка)')}>изменить</button>
               </div>
               
-              <label className="lbl">Телефон</label>
+              <label className="lbl">Мобильный телефон</label>
               <input className="inp" value={user.phone} onChange={e => {
                 const updated = { ...user, phone: e.target.value };
                 store.upsertEmployee(updated);
               }} />
+
+              {/* ИЗМЕНЕНИЕ: добавлено поле Внутренний номер телефона */}
+              <label className="lbl">Внутренний номер телефона *</label>
+              <input
+                className="inp"
+                value={user.extension || ''}
+                onChange={e => {
+                  const val = e.target.value;
+                  if (val.trim() === '') {
+                    alert('Внутренний номер телефона не может быть пустым');
+                    return;
+                  }
+                  const updated = { ...user, extension: val.trim() };
+                  store.upsertEmployee(updated);
+                }}
+                onBlur={e => {
+                  if (!e.target.value.trim()) {
+                    alert('Внутренний номер телефона обязателен');
+                  }
+                }}
+              />
               
               <label className="lbl">Табельный №</label>
               <input className="inp" value={user.tab} onChange={e => {

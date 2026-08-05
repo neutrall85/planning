@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { DOMAIN } from '../utils/constants';
 import { uid } from '../utils/date';
+import { Ic, ICONS } from './Icons';
 
 function passIssues(p) {
   return [
@@ -21,6 +22,10 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
   const [shake, setShake] = useState(false);
   const [reg, setReg] = useState({ first: "", last: "", email: "", pass: "", pass2: "" });
   const [forgot, setForgot] = useState("");
+  // ИЗМЕНЕНИЕ: состояние для показа пароля и таймер
+  const [showPassword, setShowPassword] = useState(false);
+  const passwordTimerRef = useRef(null);
+
   const fail = (m) => { setErr(m); setShake(true); setTimeout(() => setShake(false), 450); };
   const doLogin = (loginVal, passVal) => {
     setBusy(true);
@@ -31,6 +36,25 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
       setBusy(false);
     }, 30);
   };
+  // ИЗМЕНЕНИЕ: обработчик переключения видимости пароля
+  const togglePasswordVisibility = () => {
+    if (showPassword) {
+      // Если уже показан, скрываем и сбрасываем таймер
+      setShowPassword(false);
+      if (passwordTimerRef.current) {
+        clearTimeout(passwordTimerRef.current);
+        passwordTimerRef.current = null;
+      }
+    } else {
+      setShowPassword(true);
+      if (passwordTimerRef.current) clearTimeout(passwordTimerRef.current);
+      passwordTimerRef.current = setTimeout(() => {
+        setShowPassword(false);
+        passwordTimerRef.current = null;
+      }, 10000);
+    }
+  };
+
   const submit = (e) => {
     if (e && e.preventDefault) e.preventDefault();
     try {
@@ -40,8 +64,44 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
         if (db.employees.some((x) => x.email.toLowerCase() === reg.email.trim().toLowerCase()) || db.regRequests.some((x) => x.email.toLowerCase() === reg.email.trim().toLowerCase())) return fail("Такой e-mail уже зарегистрирован");
         if (passIssues(reg.pass).some((i) => !i.ok)) return fail("Пароль не соответствует требованиям безопасности");
         if (reg.pass !== reg.pass2) return fail("Пароли не совпадают");
-        setDb((s) => ({ ...s, regRequests: [{ id: uid(), first: reg.first.trim(), last: reg.last.trim(), email: reg.email.trim().toLowerCase(), pass: reg.pass, status: "pending", ts: Date.now() }, ...s.regRequests] }));
-        toast("На " + reg.email + "@" + DOMAIN + " отправлена ссылка активации (действует 24 часа). Заглушка.");
+
+        // ИЗМЕНЕНИЕ: сразу создаём сотрудника и выполняем вход
+        const newEmployee = {
+          id: "e_" + uid(),
+          last: reg.last.trim(),
+          first: reg.first.trim(),
+          email: reg.email.trim().toLowerCase(),
+          pass: reg.pass,
+          position: "Сотрудник",
+          departments: [],
+          roles: ["executor"],
+          kbIds: [],
+          headDeptIds: [],
+          phone: "",
+          extension: "",
+          tab: String(1000 + Math.floor(Math.random() * 8999)),
+          notif: { deadlineEmail: true, overdueDigest: false, commentSub: true },
+          failed: 0,
+          lockUntil: 0,
+          fired: false
+        };
+        setDb((s) => ({
+          ...s,
+          employees: [...s.employees, newEmployee],
+          // Добавляем уведомление суперадмину (e_smirnov)
+          notifications: [
+            { id: uid(), userId: "e_smirnov", text: `Новая регистрация: ${newEmployee.last} ${newEmployee.first}`, ts: Date.now(), read: false, targetType: null, targetId: null },
+            ...s.notifications
+          ]
+        }));
+        toast("Регистрация успешна! Выполняется вход...");
+        // Выполняем вход
+        const loginOk = onLogin(reg.email.trim().toLowerCase(), reg.pass);
+        if (!loginOk) {
+          fail("Ошибка автоматического входа после регистрации.");
+        }
+        // Очищаем поля
+        setReg({ first: "", last: "", email: "", pass: "", pass2: "" });
         setMode("login");
         return;
       }
@@ -90,12 +150,27 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
               <label className="lbl">Логин (e-mail)</label>
               <div className="email-inp"><input className="inp" value={lg} onChange={(e) => { setLg(e.target.value); setErr(null); }} placeholder="ivanov" autoFocus /><span className="email-dom">{"@" + DOMAIN}</span></div>
               <label className="lbl">Пароль</label>
-              <input className="inp" type="password" value={pw} onChange={(e) => { setPw(e.target.value); setErr(null); }} placeholder="с учётом регистра" />
+              <div style={{ position: 'relative' }}>
+                <input
+                  className="inp"
+                  type={showPassword ? "text" : "password"}
+                  value={pw}
+                  onChange={(e) => { setPw(e.target.value); setErr(null); }}
+                  placeholder="с учётом регистра"
+                />
+                <button
+                  type="button"
+                  onClick={togglePasswordVisibility}
+                  style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#64748b', cursor: 'pointer' }}
+                >
+                  <Ic d={ICONS.eye} size={18} />
+                </button>
+              </div>
             </>)}
           </>)}
           {mode === "register" && (<>
             <h3>Регистрация сотрудника</h3>
-            <div className="login-sub">После активации заявку одобрит суперадминистратор</div>
+            <div className="login-sub">После регистрации вы автоматически войдёте с ролью «Исполнитель». Суперадминистратор получит уведомление.</div>
             <div className="reg-row">
               <div><label className="lbl">Имя *</label><input className="inp" value={reg.first} onChange={(e) => setReg({ ...reg, first: e.target.value })} /></div>
               <div><label className="lbl">Фамилия *</label><input className="inp" value={reg.last} onChange={(e) => setReg({ ...reg, last: e.target.value })} /></div>
