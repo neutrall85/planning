@@ -12,6 +12,9 @@ export default function Archive({ db, ur, openTask, openProject, restoreTask, re
   const [fProj, setFProj] = useState('all');
   const [fExec, setFExec] = useState('all');
   const [fDept, setFDept] = useState('all');
+  
+  // ОШИБКА БЫЛА ЗДЕСЬ: отсутствовало объявление openProj
+  const [openProj, setOpenProj] = useState(null);
 
   const archProjects = db.projects.filter(p => p.archived);
   const archTasks = db.tasks.filter(t => t.archived);

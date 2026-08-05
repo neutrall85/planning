@@ -31,7 +31,6 @@ body {
   background: var(--bg);
   color: var(--txt);
   font-size: 14px;
-  min-width: 1280px;
 }
 
 button {
@@ -479,6 +478,10 @@ input, select, textarea {
   flex: 1;
   overflow: auto;
   padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  /* ИЗМЕНЕНИЕ: позволяет flex-контейнеру корректно сжиматься */
+  min-width: 0;
 }
 
 /* --- common components --- */
@@ -1226,12 +1229,18 @@ input, select, textarea {
   box-shadow: var(--sh);
   padding: 16px;
   animation: fadeUp .3s ease;
+  width: 100%;
+  box-sizing: border-box;
+  height: auto; /* растягивается по содержимому */
 }
+
 .cal-head {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 8px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
 }
 .cal-right {
   display: flex;
@@ -1246,7 +1255,7 @@ input, select, textarea {
 .cal-title {
   font-size: 17px;
   font-weight: 800;
-  min-width: 220px;
+  min-width: 120px;
   text-align: center;
 }
 .cal-note {
@@ -1256,7 +1265,7 @@ input, select, textarea {
 }
 .cal-grid-head {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 6px;
   margin-bottom: 6px;
 }
@@ -1267,30 +1276,35 @@ input, select, textarea {
   text-transform: uppercase;
   letter-spacing: .5px;
   padding: 0 6px;
+  text-align: center;
 }
 .cal-wd.wk {
   color: #f59e0b;
 }
+
+/* Основная сетка — каждая строка растягивается по содержимому */
 .cal-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  grid-auto-rows: 102px;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-auto-rows: auto; /* ключевое свойство — высота строк зависит от контента */
   gap: 6px;
 }
+
 .outwrap {
   opacity: .4;
 }
+
 .cal-cell {
   background: #fbfcfe;
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 6px;
-  overflow: auto;
+  overflow: visible; /* содержимое не обрезается */
   transition: .15s;
-  height: 100%;
-}
-.cal-week .cal-cell {
-  min-height: 340px;
+  height: auto; /* ячейка растягивается */
+  display: flex;
+  flex-direction: column;
+  min-height: 80px; /* минимальная высота, чтобы ячейки были не слишком маленькими */
 }
 .cal-cell:hover {
   border-color: #cbd5e1;
@@ -1304,6 +1318,7 @@ input, select, textarea {
   color: #fff;
   border-radius: 6px;
   padding: 0 5px;
+  width: fit-content;
 }
 .cal-daynum {
   font-size: 12px;
@@ -1311,58 +1326,110 @@ input, select, textarea {
   color: #475569;
   display: inline-block;
   margin-bottom: 4px;
+  flex-shrink: 0;
 }
-.vac-chip {
-  display: flex;
-  gap: 5px;
-  align-items: center;
-  font-size: 10px;
-  font-weight: 700;
-  color: #047857;
-  background: #ecfdf5;
-  border: 1px solid #a7f3d0;
-  border-radius: 6px;
-  padding: 2.5px 6px;
-  margin-bottom: 3px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+
 .cal-chips {
   display: flex;
   flex-direction: column;
   gap: 3px;
+  overflow: visible; /* содержимое не обрезается */
+  flex: 1;
 }
+/* Задачи (чипсы) */
 .cal-chip {
   display: flex;
-  gap: 5px;
-  align-items: center;
-  font-size: 10.5px;
-  font-weight: 600;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 4px 6px 3px 6px;
   border: 1px solid;
   border-radius: 6px;
-  padding: 2.5px 6px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  cursor: pointer;
   background: #fff;
+  cursor: pointer;
+  width: 100%;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  overflow: hidden;
 }
 .cal-chip:hover {
   background: #f0f9ff;
 }
-.cal-more {
-  font-size: 10px;
-  color: var(--mut);
-  font-weight: 700;
+.cal-task-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
 }
+.cal-executor {
+  font-size: 9.5px;
+  color: var(--mut);
+  font-weight: 400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+}
+
+/* Недельный режим */
 .cal-week {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 6px;
+}
+.cal-week .cal-cell {
+  min-height: 80px; /* минимальная высота для недельного режима */
 }
 .cal-week.one {
   grid-template-columns: 1fr;
+}
+/* --- calendar: task chip with executor below --- */
+/* --- calendar: task chip with executor below --- */
+.cal-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start; /* Выравнивание по левому краю для всей плашки */
+  gap: 1px;
+  padding: 4px 6px 3px 6px;
+  border: 1px solid;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  width: 100%;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.cal-chip:hover {
+  background: #f0f9ff;
+}
+
+.cal-task-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+}
+
+.cal-executor {
+  font-size: 9.5px;
+  color: var(--mut);
+  font-weight: 400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+  /* Убрали padding-left, теперь текст исполнителя начинается на той же линии, что и текст задачи */
 }
 
 /* --- projects --- */

@@ -135,7 +135,6 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
   };
   const issues = passIssues(reg.pass);
 
-  // Демо-доступы в формате имя.фамилия
   const demos = [
     { l: "sergey.adminov", p: "Admin2026!", t: "Суперадминистратор" },
     { l: "aleksey.gendirov", p: "Director2026!", t: "Генеральный директор" },
@@ -162,80 +161,94 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
       </div>
       <div className="login-panel">
         <form className={"login-card" + (shake ? " shake" : "")} onSubmit={submit}>
-          {mode !== "register" && (<>\
-            <h3>{mode === "forgot" ? "Восстановление пароля" : "Вход в систему"}</h3>
-            <div className="login-sub">{mode === "forgot" ? "Ссылка будет отправлена на зарегистрированный e-mail" : "Логин — e-mail без домена " + "@" + DOMAIN}</div>
-            {mode === "forgot" ? (<>\
-              <label className="lbl">E-mail</label>
-              <div className="email-inp"><input className="inp" value={forgot} onChange={(e) => { setForgot(e.target.value); setErr(null); }} placeholder="ivanov" autoFocus /><span className="email-dom">{"@" + DOMAIN}</span></div>
-            </>) : (<>\
-              <label className="lbl">Логин (e-mail)</label>
-              <div className="email-inp"><input className="inp" value={lg} onChange={(e) => { setLg(e.target.value); setErr(null); }} placeholder="ivanov" autoFocus /><span className="email-dom">{"@" + DOMAIN}</span></div>
-              <label className="lbl">Пароль</label>
+          {mode !== "register" && (
+            <>
+              <h3>{mode === "forgot" ? "Восстановление пароля" : "Вход в систему"}</h3>
+              <div className="login-sub">{mode === "forgot" ? "Ссылка будет отправлена на зарегистрированный e-mail" : "Логин — e-mail без домена " + "@" + DOMAIN}</div>
+              {mode === "forgot" ? (
+                <>
+                  <label className="lbl">E-mail</label>
+                  <div className="email-inp"><input className="inp" value={forgot} onChange={(e) => { setForgot(e.target.value); setErr(null); }} placeholder="ivanov" autoFocus /><span className="email-dom">{"@" + DOMAIN}</span></div>
+                </>
+              ) : (
+                <>
+                  <label className="lbl">Логин (e-mail)</label>
+                  <div className="email-inp"><input className="inp" value={lg} onChange={(e) => { setLg(e.target.value); setErr(null); }} placeholder="ivanov" autoFocus /><span className="email-dom">{"@" + DOMAIN}</span></div>
+                  <label className="lbl">Пароль</label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      className="inp"
+                      type={showPassword ? "text" : "password"}
+                      value={pw}
+                      onChange={(e) => { setPw(e.target.value); setErr(null); }}
+                      placeholder="с учётом регистра"
+                    />
+                    <button
+                      type="button"
+                      onClick={togglePasswordVisibility}
+                      className="pass-toggle-btn"
+                    >
+                      <Ic d={ICONS.eye} size={18} />
+                    </button>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+
+          {mode === "register" && (
+            <>
+              <h3>Регистрация сотрудника</h3>
+              <div className="login-sub">После регистрации вы автоматически войдёте с ролью «Исполнитель». Суперадминистратор получит уведомление.</div>
+              <div className="reg-row">
+                <div><label className="lbl">Имя *</label><input className="inp" value={reg.first} onChange={(e) => setReg({ ...reg, first: e.target.value })} /></div>
+                <div><label className="lbl">Фамилия *</label><input className="inp" value={reg.last} onChange={(e) => setReg({ ...reg, last: e.target.value })} /></div>
+              </div>
+              <label className="lbl">E-mail *</label>
+              <div className="email-inp"><input className="inp" value={reg.email} onChange={(e) => setReg({ ...reg, email: e.target.value })} placeholder="ivanov" /><span className="email-dom">{"@" + DOMAIN}</span></div>
+              <label className="lbl">Пароль *</label>
               <div style={{ position: 'relative' }}>
                 <input
                   className="inp"
-                  type={showPassword ? "text" : "password"}
-                  value={pw}
-                  onChange={(e) => { setPw(e.target.value); setErr(null); }}
-                  placeholder="с учётом регистра"
+                  type={showRegPass ? "text" : "password"}
+                  value={reg.pass}
+                  onChange={(e) => setReg({ ...reg, pass: e.target.value })}
                 />
                 <button
                   type="button"
-                  onClick={togglePasswordVisibility}
-                  style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#64748b', cursor: 'pointer' }}
+                  onClick={toggleRegPassVisibility}
+                  className="pass-toggle-btn"
                 >
                   <Ic d={ICONS.eye} size={18} />
                 </button>
               </div>
-            </>)}
-          </>)}
-          {mode === "register" && (<>\
-            <h3>Регистрация сотрудника</h3>
-            <div className="login-sub">После регистрации вы автоматически войдёте с ролью «Исполнитель». Суперадминистратор получит уведомление.</div>
-            <div className="reg-row">
-              <div><label className="lbl">Имя *</label><input className="inp" value={reg.first} onChange={(e) => setReg({ ...reg, first: e.target.value })} /></div>
-              <div><label className="lbl">Фамилия *</label><input className="inp" value={reg.last} onChange={(e) => setReg({ ...reg, last: e.target.value })} /></div>
-            </div>
-            <label className="lbl">E-mail *</label>
-            <div className="email-inp"><input className="inp" value={reg.email} onChange={(e) => setReg({ ...reg, email: e.target.value })} placeholder="ivanov" /><span className="email-dom">{"@" + DOMAIN}</span></div>
-            <label className="lbl">Пароль *</label>
-            <div style={{ position: 'relative' }}>
-              <input
-                className="inp"
-                type={showRegPass ? "text" : "password"}
-                value={reg.pass}
-                onChange={(e) => setReg({ ...reg, pass: e.target.value })}
-              />
-              <button
-                type="button"
-                onClick={toggleRegPassVisibility}
-                style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#64748b', cursor: 'pointer' }}
-              >
-                <Ic d={ICONS.eye} size={18} />
-              </button>
-            </div>
-            <div className="pass-checks">{issues.map((i) => <span key={i.t} className={i.ok ? "ok" : ""}>✓ {i.t}</span>)}</div>
-            <label className="lbl">Подтверждение пароля *</label>
-            <input className="inp" type="password" value={reg.pass2} onChange={(e) => setReg({ ...reg, pass2: e.target.value })} />
-          </>)}
+              <div className="pass-checks">{issues.map((i) => <span key={i.t} className={i.ok ? "ok" : ""}>✓ {i.t}</span>)}</div>
+              <label className="lbl">Подтверждение пароля *</label>
+              <input className="inp" type="password" value={reg.pass2} onChange={(e) => setReg({ ...reg, pass2: e.target.value })} />
+            </>
+          )}
+
           {err && <div className="login-err">{err}</div>}
           <button className="btn primary big" type="submit" disabled={busy}>{busy ? "Выполняется вход…" : mode === "login" ? "Войти" : mode === "register" ? "Зарегистрироваться" : "Отправить ссылку"}</button>
-          {mode === "login" && (<>\
-            <div className="login-links">
-              <button type="button" className="link" onClick={() => { setMode("forgot"); setErr(null); }}>Забыли пароль?</button>
-              <button type="button" className="link" onClick={() => { setMode("register"); setErr(null); }}>Регистрация</button>
-            </div>
-            <div className="cookie-note">Сессия хранится в cookie 30 дней (HttpOnly, Secure, SameSite=Lax — на стороне сервера).</div>
-            <div className="demo-title">Демо-доступы — клик сразу выполняет вход</div>
-            <div className="demo-grid">
-              {demos.map((d) => (
-                <button type="button" key={d.l} className="demo-chip" onClick={() => { setLg(d.l); setPw(d.p); setErr(null); doLogin(d.l, d.p); }}>
-                  <span className="demo-login">{d.l}</span><span className="demo-role">{d.t}</span>
-                </button>
-              ))}
-            </div>
-          </>)}
+
+          {mode === "login" && (
+            <>
+              <div className="login-links">
+                <button type="button" className="link" onClick={() => { setMode("forgot"); setErr(null); }}>Забыли пароль?</button>
+                <button type="button" className="link" onClick={() => { setMode("register"); setErr(null); }}>Регистрация</button>
+              </div>
+              <div className="cookie-note">Сессия хранится в cookie 30 дней (HttpOnly, Secure, SameSite=Lax — на стороне сервера).</div>
+              <div className="demo-title">Демо-доступы — клик сразу выполняет вход</div>
+              <div className="demo-grid">
+                {demos.map((d) => (
+                  <button type="button" key={d.l} className="demo-chip" onClick={() => { setLg(d.l); setPw(d.p); setErr(null); doLogin(d.l, d.p); }}>
+                    <span className="demo-login">{d.l}</span><span className="demo-role">{d.t}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
           {mode !== "login" && <div className="login-links"><button type="button" className="link" onClick={() => { setMode("login"); setErr(null); }}>← Назад ко входу</button></div>}
         </form>
       </div>

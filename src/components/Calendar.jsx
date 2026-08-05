@@ -5,18 +5,23 @@ import { Ic, ICONS } from './Icons';
 
 const DayCell = ({ d, big, byDay, db, openTask }) => {
   const dayIso = iso(d);
-  const list = byDay[dayIso] || [];
+  const tasks = byDay[dayIso] || [];
+
   return (
     <div className={`cal-cell${dayIso === iso(new Date()) ? ' today' : ''}`}>
       <div className="cal-daynum">{d.getDate()}</div>
       <div className="cal-chips">
-        {list.slice(0, big ? 12 : 3).map(t => {
+        {tasks.slice(0, big ? 12 : 3).map(t => {
           const p = db.projects.find(x => x.id === t.projectId);
           const assignees = (t.assigneeIds || []).map(id => db.employees.find(e => e.id === id)).filter(Boolean);
-          const a = assignees[0];
+          const execNames = assignees.map(a => a.last).join(', ');
           return (
             <div key={t.id} className="cal-chip" style={{ borderColor: p?.color }} onClick={() => openTask(t.id)}>
-              <span className="pdot" style={{ background: p?.color }} />{t.title} <span className="mut">· {a?.last}</span>
+              <div className="cal-task-title">
+                <span className="pdot" style={{ background: p?.color }} />
+                <span>{t.title}</span>
+              </div>
+              <div className="cal-executor">{execNames}</div>
             </div>
           );
         })}
@@ -29,12 +34,13 @@ export default function Calendar({ db, ur, openTask }) {
   const scope = useMemo(() => computeScope(ur, db), [ur, db]);
   const [mode, setMode] = useState('month');
   const [anchor, setAnchor] = useState(new Date());
-  
-  // Заменяем !t.archived на isTaskActive(t)
+
   const tasks = db.tasks.filter(t => isTaskActive(t) && taskVisible(ur, scope, t, db) && t.deadline && !['closed','cancelled'].includes(t.status));
 
   const byDay = useMemo(() => {
-    const m = {}; tasks.forEach(t => { (m[t.deadline] = m[t.deadline] || []).push(t); }); return m;
+    const m = {};
+    tasks.forEach(t => { (m[t.deadline] = m[t.deadline] || []).push(t); });
+    return m;
   }, [tasks]);
 
   const shift = (dir) => {
@@ -74,7 +80,7 @@ export default function Calendar({ db, ur, openTask }) {
           <div className="seg">{['day','week','month'].map(m => <button key={m} className={`seg-btn${mode===m?' on':''}`} onClick={() => setMode(m)}>{['День','Неделя','Месяц'][['day','week','month'].indexOf(m)]}</button>)}</div>
         </div>
       </div>
-      <div className="cal-note">Отпуска: руководители видят подчинённых, HR/ГД/суперадминистратор — всех.</div>
+      <div className="cal-note">Только задачи с дедлайнами.</div>
       {body}
     </div>
   );
