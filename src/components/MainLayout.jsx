@@ -138,7 +138,7 @@ export default function MainLayout({ store, data, user }) {
           <div className="logo-mark">АП</div>
           <div><div className="logo-name">АЭРОПЛАН</div><div className="logo-sub">планирование и учёт времени</div></div>
         </div>
-        <div className="user-card" onClick={() => setView('cabinet')} style={{ cursor: 'pointer', marginBottom: '16px' }}>
+        <div className="user-card user-card-clickable" onClick={() => setView('cabinet')}>
           <div className="avatar">{initials(user.first, user.last)}</div>
           <div className="user-meta">
             <div className="user-name">{user.last} {user.first}</div>
