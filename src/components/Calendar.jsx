@@ -37,7 +37,7 @@ export default function Calendar({ db, ur, openTask }) {
   const [showOnlyMy, setShowOnlyMy] = useState(false);
 
   // Определяем, показывать ли чекбокс – только если пользователь видит не только свои задачи
-  const canSeeAll = hasRole(ur, "admin", "director", "economist", "kb_chief", "head", "pm", "project_manager");
+  const canSeeAll = hasRole(ur, "admin", "director", "economist", "kb_chief", "head", "project_lead", "project_manager");
 
   // Сначала получаем все задачи, которые видны пользователю
   let allTasks = db.tasks.filter(t => isTaskActive(t) && taskVisible(ur, scope, t, db) && t.deadline && !['closed','cancelled'].includes(t.status));

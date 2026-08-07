@@ -7,7 +7,7 @@ import { computeScope, hasRole } from '../utils/permissions';
 export default function Projects({ db, ur, openProject, openHoursReq, closeProject, cancelProject }) {
   const scope = useMemo(() => computeScope(ur, db), [ur, db]);
   const [showOnlyMyProjects, setShowOnlyMyProjects] = useState(false);
-  const canSeeAllProjects = hasRole(ur, "admin", "director", "economist", "kb_chief", "head", "pm", "project_manager");
+  const canSeeAllProjects = hasRole(ur, "admin", "director", "economist", "kb_chief", "head", "project_lead", "project_manager");
 
   let list = scope.all 
     ? db.projects.filter(p => !p.archived) 
@@ -98,7 +98,7 @@ export default function Projects({ db, ur, openProject, openHoursReq, closeProje
                   )}
                 </div>
                 <div className="pj-actions" onClick={(e) => e.stopPropagation()}>
-                  {((hasRole(ur, 'pm') && p.managerId === ur.id) || hasRole(ur, 'admin', 'director', 'economist', 'kb_chief')) && p.status === 'active' && p.ptype !== 'admin' && (
+                  {((hasRole(ur, 'project_lead') && p.managerId === ur.id) || hasRole(ur, 'admin', 'director', 'economist', 'kb_chief')) && p.status === 'active' && p.ptype !== 'admin' && (
                     <button className="btn ghost sm" onClick={() => openHoursReq('project', p.id)}>
                       <Ic d={ICONS.clock} size={13} /> Запросить изменение часов
                     </button>

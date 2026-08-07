@@ -16,7 +16,7 @@ export default function Kanban({ db, ur, openTask, onMove, onNew }) {
   const scope = useMemo(() => computeScope(ur, db), [ur, db]);
 
   // Определяем, показывать ли чекбокс "Только мои задачи" – только если пользователь видит не только свои задачи
-  const canSeeAll = hasRole(ur, "admin", "director", "economist", "kb_chief", "head", "pm", "project_manager");
+  const canSeeAll = hasRole(ur, "admin", "director", "economist", "kb_chief", "head", "project_lead", "project_manager");
 
   const visible = useMemo(() => {
     let list = db.tasks.filter((t) => isTaskActive(t) && taskVisible(ur, scope, t, db));

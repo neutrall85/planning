@@ -59,7 +59,7 @@ export default function MainLayout({ store, data, user }) {
     { id: 'calendar', label: 'Календарь', icon: ICONS.cal },
     { id: 'projects', label: 'Проекты', icon: ICONS.folder },
     ...(hasRole(user, 'admin', 'director', 'economist', 'kb_chief', 'head', 'hr') ? [{ id: 'staff', label: 'Персонал', icon: ICONS.users }] : []),
-    ...(canExport(user) || hasRole(user, 'kb_chief', 'head', 'pm', 'hr') ? [{ id: 'reports', label: 'Отчёты', icon: ICONS.chart }] : []),
+    ...(canExport(user) || hasRole(user, 'kb_chief', 'head', 'project_lead', 'hr') ? [{ id: 'reports', label: 'Отчёты', icon: ICONS.chart }] : []),
     { id: 'archive', label: 'Архив', icon: ICONS.archive },
     { id: 'requests', label: 'Запросы и заявки', icon: ICONS.inbox },
     ...(hasRole(user, 'admin', 'director') ? [{ id: 'journal', label: 'Журнал аудита', icon: ICONS.book }] : []),
@@ -106,7 +106,7 @@ export default function MainLayout({ store, data, user }) {
       let managerId = project?.managerId;
       if (!managerId) {
         const pmCandidate = data.employees.find(e =>
-          e.roles.includes('pm') &&
+          e.roles.includes('project_lead') &&
           data.tasks.some(t => t.projectId === task.projectId && t.assigneeId === e.id)
         );
         if (pmCandidate) managerId = pmCandidate.id;

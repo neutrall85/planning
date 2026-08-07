@@ -4,7 +4,7 @@ export const ROLES = {
   economist:        { label: "Главный экономист", short: "ГЭ", color: "#8b5cf6" },
   kb_chief:         { label: "Главный конструктор КБ", short: "ГК", color: "#0ea5e9" },
   head:             { label: "Руководитель отдела", short: "РО", color: "#3b82f6" },
-  pm:               { label: "Ответственный по проекту", short: "ОП", color: "#ec4899" },
+  project_lead:     { label: "Ответственный по проекту", short: "ОП", color: "#ec4899" },
   project_manager:  { label: "Менеджер проектов", short: "МП", color: "#f97316" }, // новая роль
   hr:               { label: "HR-менеджер", short: "HR", color: "#14b8a6" },
   executor:         { label: "Исполнитель", short: "ИСП", color: "#64748b" },

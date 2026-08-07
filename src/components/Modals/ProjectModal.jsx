@@ -23,7 +23,7 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
   const existing = projectId ? db.projects.find((p) => p.id === projectId) : null;
   const { empName, getTaskSpent } = useDataHelpers(db);
   const scope = computeScope(ur, db);
-  const isExec = !scope.all && !hasRole(ur, 'director', 'economist', 'kb_chief', 'head', 'pm');
+  const isExec = !scope.all && !hasRole(ur, 'director', 'economist', 'kb_chief', 'head', 'project_lead');
 
   const [f, setF] = useState(existing ? { ...existing } : {
     id: "p_" + uid(),
@@ -100,7 +100,7 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
     return list;
   }, [db, projectId, ur.id, isExec, existing]);
 
-  const canComment = hasRole(ur, 'admin', 'director', 'kb_chief', 'pm', 'project_manager');
+  const canComment = hasRole(ur, 'admin', 'director', 'kb_chief', 'project_lead', 'project_manager');
   const isProjectManager = existing && existing.managerId === ur.id;
   const canCommentFinal = canComment || isProjectManager;
 

@@ -6,7 +6,7 @@ export const has = hasRole;
 export const canEditDepartments = (user) => hasRole(user, "admin", "director", "hr");
 export const canManageAllVacations = (user) => hasRole(user, "admin", "director", "hr");
 export const canRestore = (user) => hasRole(user, "admin", "director");
-export const canCreateTask = (user) => hasRole(user, "admin", "director", "economist", "kb_chief", "head", "pm", "project_manager");
+export const canCreateTask = (user) => hasRole(user, "admin", "director", "economist", "kb_chief", "head", "project_lead", "project_manager");
 export const canCreateProject = (user) => hasRole(user, "admin", "director", "kb_chief", "project_manager");
 export const canManageManager = (user) => hasRole(user, "admin", "director", "kb_chief", "project_manager");
 export const canExport = (user) => hasRole(user, "admin", "director", "economist");
@@ -43,7 +43,7 @@ export const canChangeTaskStatus = (user, task, newStatus, data) => {
     const e = data.employees.find(x => x.id === id);
     return e && e.departments.some(d => (user.headDeptIds || []).includes(d.deptId));
   })) return true;
-  if (hasRole(user, "pm") && project && project.managerId === user.id) return true;
+  if (hasRole(user, "project_lead") && project && project.managerId === user.id) return true;
   if (task.assigneeIds && task.assigneeIds.includes(user.id)) {
     if (newStatus === 'closed' || newStatus === 'cancelled') return false;
     return true;
@@ -86,7 +86,7 @@ export const assigneeOptions = (user, data) => {
   let list = [];
   let allEmployees = data.employees.filter(e => !e.fired);
 
-  if (hasRole(user, "admin", "director", "economist", "pm", "project_manager")) {
+  if (hasRole(user, "admin", "director", "economist", "project_lead", "project_manager")) {
     list = allEmployees;
   } else if (hasRole(user, "kb_chief") && (user.kbIds || []).length) {
     const deptIds = data.departments.filter(d => d.kbId && user.kbIds.includes(d.kbId)).map(d => d.id);
@@ -132,7 +132,7 @@ export function computeScope(u, db) {
   if (hasRole(u, "head") && (u.headDeptIds || []).length) {
     db.employees.filter(e => !e.fired).forEach(e => { if (e.departments.some(x => u.headDeptIds.includes(x.deptId))) empIds.add(e.id); });
   }
-  if (hasRole(u, "pm")) db.projects.forEach(p => { if (p.managerId === u.id) projIds.add(p.id); });
+  if (hasRole(u, "project_lead")) db.projects.forEach(p => { if (p.managerId === u.id) projIds.add(p.id); });
   db.tasks.forEach(t => {
     if (t.assigneeIds && t.assigneeIds.some(id => empIds.has(id))) projIds.add(t.projectId);
   });
@@ -146,7 +146,7 @@ export function taskVisible(u, scope, t, db) {
   if (!scope.projIds.has(t.projectId)) return false;
   const proj = db.projects.find(p => p.id === t.projectId);
   if (!proj) return false;
-  if (hasRole(u, "pm") && proj.managerId === u.id) return true;
+  if (hasRole(u, "project_lead") && proj.managerId === u.id) return true;
   if (hasRole(u, "kb_chief") && proj.kbId && (u.kbIds || []).includes(proj.kbId)) return true;
   if (hasRole(u, "head")) return true;
   return false;
