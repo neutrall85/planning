@@ -5,7 +5,7 @@ import { hasRole, canApproveVacation } from "../utils/permissions";
 import { Ic, ICONS } from "./Icons";
 import { useDataHelpers } from "../hooks";
 
-export default function Requests({ db, setDb, ur, initialTab = 'hours' }) {
+export default function Requests({ db, setDb, ur, initialTab = 'hours', addAudit }) {
   const { empName } = useDataHelpers(db);
   const [tab, setTab] = useState(initialTab);
 
@@ -21,18 +21,45 @@ export default function Requests({ db, setDb, ur, initialTab = 'hours' }) {
       if (ok) {
         if (r.kind === "task") st.tasks = st.tasks.map((t) => (t.id === r.targetId ? { ...t, plannedHours: r.newH } : t));
         else st.projects = st.projects.map((p) => (p.id === r.targetId ? { ...p, budget: r.newH } : p));
+        addAudit('Утверждение запроса часов', { task: r.kind === "task" ? db.tasks.find(t => t.id === r.targetId)?.title : db.projects.find(p => p.id === r.targetId)?.name, newHours: r.newH }, 'hoursRequest', r.id);
+      } else {
+        addAudit('Отклонение запроса часов', { task: r.kind === "task" ? db.tasks.find(t => t.id === r.targetId)?.title : db.projects.find(p => p.id === r.targetId)?.name }, 'hoursRequest', r.id);
       }
       return st;
     });
   };
-  const decideVac = (v, ok) => setDb((s) => ({ ...s, vacations: s.vacations.map((x) => (x.id === v.id ? { ...x, status: ok ? "approved" : "rejected" } : x)) }));
-  const decideRD = (r, ok) => setDb((s) => ({ ...s, roleDelegations: s.roleDelegations.map((x) => (x.id === r.id ? { ...x, status: ok ? "active" : "rejected" } : x)) }));
+
+  const decideVac = (v, ok) => {
+    setDb((s) => {
+      const updated = { ...s, vacations: s.vacations.map((x) => (x.id === v.id ? { ...x, status: ok ? "approved" : "rejected" } : x)) };
+      if (ok) {
+        addAudit('Утверждение отпуска', { employee: empName(v.empId), period: `${fmtDMY(v.start)}—${fmtDMY(v.end)}` }, 'vacation', v.id);
+      } else {
+        addAudit('Отклонение отпуска', { employee: empName(v.empId), period: `${fmtDMY(v.start)}—${fmtDMY(v.end)}` }, 'vacation', v.id);
+      }
+      return updated;
+    });
+  };
+
+  const decideRD = (r, ok) => {
+    setDb((s) => {
+      const updated = { ...s, roleDelegations: s.roleDelegations.map((x) => (x.id === r.id ? { ...x, status: ok ? "active" : "rejected" } : x)) };
+      if (ok) {
+        addAudit('Принятие делегирования', { from: empName(r.fromId), to: empName(r.toId), roles: r.roles.join(', ') }, 'delegation', r.id);
+      } else {
+        addAudit('Отклонение делегирования', { from: empName(r.fromId), to: empName(r.toId), roles: r.roles.join(', ') }, 'delegation', r.id);
+      }
+      return updated;
+    });
+  };
+
   const decideReg = (r, ok) => {
     if (ok) {
       setDb((s) => {
         const existing = s.employees.find(e => e.email === r.email);
         if (existing) {
           const updated = { ...existing, roles: ['executor'] };
+          addAudit('Одобрение регистрации', { email: r.email, employee: `${r.last} ${r.first}` }, 'registration', r.id);
           return { 
             ...s, 
             employees: s.employees.map(e => e.id === updated.id ? updated : e),
@@ -56,6 +83,7 @@ export default function Requests({ db, setDb, ur, initialTab = 'hours' }) {
             failed: 0,
             lockUntil: 0
           };
+          addAudit('Одобрение регистрации', { email: r.email, employee: `${r.last} ${r.first}` }, 'registration', r.id);
           return { 
             ...s, 
             employees: [...s.employees, newEmp],
@@ -64,7 +92,10 @@ export default function Requests({ db, setDb, ur, initialTab = 'hours' }) {
         }
       });
     } else {
-      setDb((s) => ({ ...s, regRequests: s.regRequests.map((x) => (x.id === r.id ? { ...x, status: "rejected" } : x)) }));
+      setDb((s) => {
+        addAudit('Отклонение регистрации', { email: r.email, employee: `${r.last} ${r.first}` }, 'registration', r.id);
+        return { ...s, regRequests: s.regRequests.map((x) => (x.id === r.id ? { ...x, status: "rejected" } : x)) };
+      });
     }
   };
 
@@ -81,7 +112,7 @@ export default function Requests({ db, setDb, ur, initialTab = 'hours' }) {
                 <th>Объект</th>
                 <th>Текущее</th>
                 <th>Предлагаемое</th>
-                <th>Обоснование</th> {/* ИЗМЕНЕНИЕ: добавлен заголовок */}
+                <th>Обоснование</th>
                 <th>Запросил</th>
                 <th>Решение</th>
               </tr>
@@ -92,7 +123,7 @@ export default function Requests({ db, setDb, ur, initialTab = 'hours' }) {
                   <td><b>{r.kind === "task" ? db.tasks.find(t => t.id === r.targetId)?.title : db.projects.find(p => p.id === r.targetId)?.name}</b></td>
                   <td>{r.oldH} ч</td>
                   <td><b>{r.newH} ч</b></td>
-                  <td className="mut sm">{r.reason}</td> {/* ИЗМЕНЕНИЕ: отображение обоснования */}
+                  <td className="mut sm">{r.reason}</td>
                   <td>{empName(r.reqId)}</td>
                   <td>
                     {r.status === "pending" ? (

@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Ic, ICONS } from './Icons';
 import { TASK_STATUSES, TASK_STATUS_ORDER, PRIORITIES } from '../utils/constants';
 import { TODAY, fmtD, daysDiff, initials, isTaskActive } from '../utils/date';
-import { computeScope, taskVisible, canCreateTask, canChangeTaskStatus } from '../utils/permissions';
+import { computeScope, taskVisible, canCreateTask, canChangeTaskStatus, hasRole } from '../utils/permissions';
 
 export default function Kanban({ db, ur, openTask, onMove, onNew }) {
   const [fProj, setFProj] = useState("all");
@@ -11,8 +11,12 @@ export default function Kanban({ db, ur, openTask, onMove, onNew }) {
   const [fDept, setFDept] = useState("all");
   const [q, setQ] = useState("");
   const [dragOverCol, setDragOverCol] = useState(null);
+  const [showOnlyMy, setShowOnlyMy] = useState(false);
 
   const scope = useMemo(() => computeScope(ur, db), [ur, db]);
+
+  // Определяем, показывать ли чекбокс "Только мои задачи" – только если пользователь видит не только свои задачи
+  const canSeeAll = hasRole(ur, "admin", "director", "economist", "kb_chief", "head", "pm", "project_manager");
 
   const visible = useMemo(() => {
     let list = db.tasks.filter((t) => isTaskActive(t) && taskVisible(ur, scope, t, db));
@@ -27,8 +31,12 @@ export default function Kanban({ db, ur, openTask, onMove, onNew }) {
       const s = q.trim().toLowerCase();
       list = list.filter(t => t.title.toLowerCase().includes(s) || (db.projects.find(p => p.id === t.projectId)?.name || "").toLowerCase().includes(s));
     }
+    // Фильтр "Только мои задачи"
+    if (showOnlyMy) {
+      list = list.filter(t => (t.assigneeIds || []).includes(ur.id));
+    }
     return list;
-  }, [db, ur, scope, fProj, fExec, fPrio, fDept, q]);
+  }, [db, ur, scope, fProj, fExec, fPrio, fDept, q, showOnlyMy]);
 
   const isOnlyExecutor = ur.roles.length === 1 && ur.roles[0] === 'executor';
 
@@ -58,6 +66,12 @@ export default function Kanban({ db, ur, openTask, onMove, onNew }) {
             <option value="all">Все подразделения</option>
             {db.departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
           </select>
+        )}
+        {canSeeAll && (
+          <label className="dept-pick" style={{ marginLeft: 8 }}>
+            <input type="checkbox" checked={showOnlyMy} onChange={(e) => setShowOnlyMy(e.target.checked)} />
+            <span style={{ fontSize: 13 }}>Только мои задачи</span>
+          </label>
         )}
         <div className="spacer" />
         {canCreateTask(ur) && (

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { PROJECT_STATUSES, PROJECT_TYPES } from '../utils/constants';
 import { fmtDMY, initials, isTaskActive } from '../utils/date';
 import { Ic, ICONS } from './Icons';
@@ -6,12 +6,20 @@ import { computeScope, hasRole } from '../utils/permissions';
 
 export default function Projects({ db, ur, openProject, openHoursReq, closeProject, cancelProject }) {
   const scope = useMemo(() => computeScope(ur, db), [ur, db]);
+  const [showOnlyMyProjects, setShowOnlyMyProjects] = useState(false);
+  const canSeeAllProjects = hasRole(ur, "admin", "director", "economist", "kb_chief", "head", "pm", "project_manager");
 
-  const list = scope.all 
+  let list = scope.all 
     ? db.projects.filter(p => !p.archived) 
     : db.projects.filter(p => !p.archived && scope.projIds.has(p.id));
 
-  // Функция проверки, может ли пользователь закрыть/отменить проект
+  // Фильтр "проекты с моими задачами"
+  if (showOnlyMyProjects) {
+    const myTasks = db.tasks.filter(t => (t.assigneeIds || []).includes(ur.id) && !t.archived);
+    const myProjectIds = new Set(myTasks.map(t => t.projectId));
+    list = list.filter(p => myProjectIds.has(p.id));
+  }
+
   const canCloseProject = (project) => {
     const creatorId = project.creatorId || (project.history?.find(h => h.who !== 'system')?.who);
     return hasRole(ur, 'admin') || hasRole(ur, 'director') || (creatorId && creatorId === ur.id);
@@ -21,15 +29,22 @@ export default function Projects({ db, ur, openProject, openHoursReq, closeProje
     <div>
       <div className="sec-head">
         <div className="sec-note">Производственные и административные проекты.</div>
-        {hasRole(ur, 'admin', 'director', 'kb_chief') && (
-          <button className="btn primary" onClick={() => openProject(null)}>
-            <Ic d={ICONS.plus} size={15} /> Проект
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          {canSeeAllProjects && (
+            <label className="dept-pick">
+              <input type="checkbox" checked={showOnlyMyProjects} onChange={(e) => setShowOnlyMyProjects(e.target.checked)} />
+              <span style={{ fontSize: 13 }}>Показать проекты с моими задачами</span>
+            </label>
+          )}
+          {hasRole(ur, 'admin', 'director', 'kb_chief', 'project_manager') && (
+            <button className="btn primary" onClick={() => openProject(null)}>
+              <Ic d={ICONS.plus} size={15} /> Проект
+            </button>
+          )}
+        </div>
       </div>
       <div className="pj-grid">
         {list.map(p => {
-          // В карточке проекта используем isTaskActive вместо !t.archived
           const tasks = db.tasks.filter(t => t.projectId === p.id && isTaskActive(t));
           const plan = tasks.reduce((s, t) => s + (t.plannedHours || 0), 0);
           const fact = tasks.reduce((s, t) => s + t.logs.reduce((lsum, l) => lsum + l.hours, 0), 0);
@@ -67,12 +82,20 @@ export default function Projects({ db, ur, openProject, openHoursReq, closeProje
               )}
               <div className="pj-foot">
                 <div className="pj-avatars">
-                   {tasks.slice(0, 6).flatMap(t => {
-                      return (t.assigneeIds || []).map(id => {
-                        const a = db.employees.find(e => e.id === id);
-                        return a && <span key={a.id} className="avatar xs" title={`${a.last} ${a.first}`}>{initials(a.first, a.last)}</span>;
-                      });
-                   })}
+                  {tasks.slice(0, 6).flatMap(t =>
+                    (t.assigneeIds || []).map(id => {
+                      const a = db.employees.find(e => e.id === id);
+                      return a && (
+                        <span
+                          key={`${t.id}-${a.id}`}  // <--- УНИКАЛЬНЫЙ КЛЮЧ
+                          className="avatar xs"
+                          title={`${a.last} ${a.first}`}
+                        >
+                          {initials(a.first, a.last)}
+                        </span>
+                      );
+                    })
+                  )}
                 </div>
                 <div className="pj-actions" onClick={(e) => e.stopPropagation()}>
                   {((hasRole(ur, 'pm') && p.managerId === ur.id) || hasRole(ur, 'admin', 'director', 'economist', 'kb_chief')) && p.status === 'active' && p.ptype !== 'admin' && (
@@ -85,7 +108,6 @@ export default function Projects({ db, ur, openProject, openHoursReq, closeProje
                       <Ic d={ICONS.edit} size={15} />
                     </button>
                   )}
-                  {/* Кнопка "Закрыть/Отменить проект" – только для автора, ГД или админа */}
                   {canCloseProject(p) && p.status !== 'closed' && p.status !== 'cancelled' && (
                     <button className="icon-btn danger" title="Закрыть/Отменить проект" onClick={() => {
                       const action = window.confirm(`Закрыть проект "${p.name}"? Все задачи проекта будут переведены в статус "Закрыта".`) 

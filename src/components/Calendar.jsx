@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { iso, addDays, fmtDMY, isTaskActive } from '../utils/date';
-import { taskVisible, computeScope } from '../utils/permissions';
+import { taskVisible, computeScope, hasRole } from '../utils/permissions';
 import { Ic, ICONS } from './Icons';
 
 const DayCell = ({ d, big, byDay, db, openTask }) => {
@@ -34,14 +34,24 @@ export default function Calendar({ db, ur, openTask }) {
   const scope = useMemo(() => computeScope(ur, db), [ur, db]);
   const [mode, setMode] = useState('month');
   const [anchor, setAnchor] = useState(new Date());
+  const [showOnlyMy, setShowOnlyMy] = useState(false);
 
-  const tasks = db.tasks.filter(t => isTaskActive(t) && taskVisible(ur, scope, t, db) && t.deadline && !['closed','cancelled'].includes(t.status));
+  // Определяем, показывать ли чекбокс – только если пользователь видит не только свои задачи
+  const canSeeAll = hasRole(ur, "admin", "director", "economist", "kb_chief", "head", "pm", "project_manager");
+
+  // Сначала получаем все задачи, которые видны пользователю
+  let allTasks = db.tasks.filter(t => isTaskActive(t) && taskVisible(ur, scope, t, db) && t.deadline && !['closed','cancelled'].includes(t.status));
+
+  // Применяем фильтр "Только мои задачи"
+  if (showOnlyMy) {
+    allTasks = allTasks.filter(t => (t.assigneeIds || []).includes(ur.id));
+  }
 
   const byDay = useMemo(() => {
     const m = {};
-    tasks.forEach(t => { (m[t.deadline] = m[t.deadline] || []).push(t); });
+    allTasks.forEach(t => { (m[t.deadline] = m[t.deadline] || []).push(t); });
     return m;
-  }, [tasks]);
+  }, [allTasks]);
 
   const shift = (dir) => {
     if (mode === 'month') setAnchor(new Date(anchor.getFullYear(), anchor.getMonth() + dir, 1));
@@ -78,6 +88,12 @@ export default function Calendar({ db, ur, openTask }) {
         <div className="cal-right">
           <button className="btn ghost sm" onClick={() => setAnchor(new Date())}>Сегодня</button>
           <div className="seg">{['day','week','month'].map(m => <button key={m} className={`seg-btn${mode===m?' on':''}`} onClick={() => setMode(m)}>{['День','Неделя','Месяц'][['day','week','month'].indexOf(m)]}</button>)}</div>
+          {canSeeAll && (
+            <label className="dept-pick" style={{ marginLeft: 8 }}>
+              <input type="checkbox" checked={showOnlyMy} onChange={(e) => setShowOnlyMy(e.target.checked)} />
+              <span style={{ fontSize: 13 }}>Мои задачи</span>
+            </label>
+          )}
         </div>
       </div>
       <div className="cal-note">Только задачи с дедлайнами.</div>

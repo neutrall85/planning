@@ -142,8 +142,9 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
     { l: "ivan.konstruktorov", p: "KbLa2026!", t: "Гл. конструктор КБ «ЛА»" },
     { l: "olga.personalova", p: "Hr2026!", t: "HR-менеджер" },
     { l: "mikhail.otdelov", p: "Head2026!", t: "Руководитель отделов" },
+    { l: "nikolay.managerov", p: "Pm2026!", t: "Менеджер проектов" },
     { l: "kirill.proektov", p: "Pm2026!", t: "Ответственный по проекту" },
-    { l: "isaev", p: "Exec2026!", t: "Исполнитель" },
+    { l: "isaev", p: "Exec2026!", t: "Исполнитель" }
   ];
 
   return (

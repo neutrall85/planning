@@ -6,8 +6,8 @@ import { Ic, ICONS } from "./Icons";
 import { useDataHelpers } from "../hooks";
 import { Modal } from "./Modal";
 
-// CreateEmployeeModal остаётся без изменений (кроме добавления photo: null)
-// ... (опускаем для краткости, он уже был приведён ранее)
+// CreateEmployeeModal – оставляем без изменений (не показан, но он есть в проекте)
+// ...
 
 export default function Staff({ db, setDb, ur, openRoles, openDepts, openVacation }) {
   const { getEmployeeLoad, empName, primaryDept } = useDataHelpers(db);
@@ -18,6 +18,7 @@ export default function Staff({ db, setDb, ur, openRoles, openDepts, openVacatio
   const activeEmployees = db.employees.filter(e => !e.fired);
   const firedEmployees = db.employees.filter(e => e.fired);
 
+  // Функция для отрисовки одной строки сотрудника
   const rowFor = (e, isFired = false) => {
     const l = getEmployeeLoad(e.id);
     const pct = Math.min(100, Math.round((l.plan / norm) * 100));
@@ -80,6 +81,7 @@ export default function Staff({ db, setDb, ur, openRoles, openDepts, openVacatio
     );
   };
 
+  // Функция для построения блока подразделения
   const deptsBlock = (deptList, employees) => deptList.map(d => {
     const members = employees.filter(e => e.departments.some(x => x.deptId === d.id) && !e.fired);
     if (!members.length) return null;
@@ -94,6 +96,15 @@ export default function Staff({ db, setDb, ur, openRoles, openDepts, openVacatio
         {members.map(e => rowFor(e))}
       </div>
     );
+  });
+
+  // Собираем сотрудников без отдела (тех, у кого departments пустой)
+  const noDeptEmployees = activeEmployees.filter(e => e.departments.length === 0);
+  // Сортируем так, чтобы Генеральный директор был первым
+  noDeptEmployees.sort((a, b) => {
+    if (a.roles.includes('director') && !b.roles.includes('director')) return -1;
+    if (!a.roles.includes('director') && b.roles.includes('director')) return 1;
+    return a.last.localeCompare(b.last);
   });
 
   const allVacs = [...db.vacations].sort((a,b) => (a.start < b.start ? 1 : -1));
@@ -133,26 +144,47 @@ export default function Staff({ db, setDb, ur, openRoles, openDepts, openVacatio
         />
       )}
 
-      {db.kbs.map(k => (
-        <div className="st-section" key={k.id}>
+      {/* --- СЕКЦИЯ: СОТРУДНИКИ БЕЗ ПОДРАЗДЕЛЕНИЙ (РУКОВОДСТВО) --- */}
+      {noDeptEmployees.length > 0 && (
+        <div className="st-section">
           <div className="st-sec-head">
-            <div className="st-sec-title">{k.name}</div>
-            <div className="st-sec-sub">
-              {k.full} · главный конструктор: {db.employees.filter(e => e.roles.includes('kb_chief') && e.kbIds.includes(k.id) && !e.fired).map(e => `${e.last} ${e.first}`).join(', ') || '—'}
-            </div>
+            <div className="st-sec-title">Руководство и сотрудники без подразделений</div>
+            <div className="st-sec-sub">{noDeptEmployees.length} чел.</div>
           </div>
-          {deptsBlock(db.departments.filter(d => d.kbId === k.id), activeEmployees)}
+          {noDeptEmployees.map(e => rowFor(e))}
         </div>
-      ))}
+      )}
 
-      <div className="st-section">
-        <div className="st-sec-head">
-          <div className="st-sec-title">Отделы вне КБ</div>
-          <div className="st-sec-sub">Подразделения прямого подчинения</div>
+      {/* --- КБ и отделы --- */}
+      {db.kbs.map(k => {
+        const deptsInKb = db.departments.filter(d => d.kbId === k.id);
+        const membersInKb = activeEmployees.filter(e => e.departments.some(d => deptsInKb.some(x => x.id === d.deptId)));
+        if (!membersInKb.length && deptsInKb.length === 0) return null;
+        return (
+          <div className="st-section" key={k.id}>
+            <div className="st-sec-head">
+              <div className="st-sec-title">{k.name}</div>
+              <div className="st-sec-sub">
+                {k.full} · главный конструктор: {db.employees.filter(e => e.roles.includes('kb_chief') && e.kbIds.includes(k.id) && !e.fired).map(e => `${e.last} ${e.first}`).join(', ') || '—'}
+              </div>
+            </div>
+            {deptsBlock(deptsInKb, activeEmployees)}
+          </div>
+        );
+      })}
+
+      {/* --- Отделы вне КБ --- */}
+      {db.departments.filter(d => d.kbId === null).length > 0 && (
+        <div className="st-section">
+          <div className="st-sec-head">
+            <div className="st-sec-title">Отделы вне КБ</div>
+            <div className="st-sec-sub">Подразделения прямого подчинения</div>
+          </div>
+          {deptsBlock(db.departments.filter(d => d.kbId === null), activeEmployees)}
         </div>
-        {deptsBlock(db.departments.filter(d => d.kbId === null), activeEmployees)}
-      </div>
+      )}
 
+      {/* --- Все отпуска (для HR/админов) --- */}
       {canManageAllVacations(ur) && (
         <div className="st-section">
           <div className="st-sec-head">
@@ -189,6 +221,7 @@ export default function Staff({ db, setDb, ur, openRoles, openDepts, openVacatio
         </div>
       )}
 
+      {/* --- Архив уволенных --- */}
       {firedEmployees.length > 0 && canFireEmployee(ur) && (
         <div className="st-section">
           <div className="st-sec-head">

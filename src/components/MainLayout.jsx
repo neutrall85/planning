@@ -95,7 +95,10 @@ export default function MainLayout({ store, data, user }) {
       history: [...task.history, { ts: Date.now(), who: user.id, text: `Статус → ${TASK_STATUSES[newStatus].label}` }]
     };
     store.upsertTask(updatedTask);
-    store.addAudit('Изменение статуса задачи', `${task.title} → ${TASK_STATUSES[newStatus].label}`);
+    store.addAudit('Изменение статуса задачи', {
+      task: task.title,
+      status: `${TASK_STATUSES[task.status].label} → ${TASK_STATUSES[newStatus].label}`
+    }, 'task', task.id);
 
     if (newStatus === 'review') {
       const creatorId = task.creatorId || task.history?.find(h => h.who !== 'system')?.who || task.history[0]?.who;
@@ -273,7 +276,13 @@ export default function MainLayout({ store, data, user }) {
               });
             }} 
           />}
-          {view === 'requests' && <Requests db={data} setDb={(fn) => { store._data = fn(store._data); store._notify(); }} ur={user} initialTab={requestsTab} />}
+          {view === 'requests' && <Requests 
+            db={data} 
+            setDb={(fn) => { store._data = fn(store._data); store._notify(); }} 
+            ur={user} 
+            initialTab={requestsTab} 
+            addAudit={store.addAudit.bind(store)} 
+          />}
           {view === 'journal' && <Journal db={data} ur={user} />}
         </div>
       </main>
@@ -289,17 +298,22 @@ export default function MainLayout({ store, data, user }) {
         onSave={(t, isNew) => {
           const old = data.tasks.find(x => x.id === t.id);
           if (old && hasRole(user, 'admin')) {
-            const changes = [];
-            if (old.plannedHours !== t.plannedHours) changes.push(`Плановые часы: ${old.plannedHours ?? '—'} → ${t.plannedHours ?? '—'}`);
-            if (old.status !== t.status) changes.push(`Статус: ${TASK_STATUSES[old.status].label} → ${TASK_STATUSES[t.status].label}`);
-            if (JSON.stringify(old.assigneeIds || []) !== JSON.stringify(t.assigneeIds || [])) changes.push(`Исполнители: ${(old.assigneeIds || []).map(id => empName(id)).join(', ')} → ${(t.assigneeIds || []).map(id => empName(id)).join(', ')}`);
-            if (old.deadline !== t.deadline) changes.push(`Дедлайн: ${old.deadline ? fmtDMY(old.deadline) : '—'} → ${t.deadline ? fmtDMY(t.deadline) : '—'}`);
-            if (changes.length > 0) {
-              store.addAudit('Административное изменение задачи (прямое)', `${t.title}: ${changes.join('; ')}`);
+            const changes = {};
+            if (old.plannedHours !== t.plannedHours) changes.plannedHours = `${old.plannedHours ?? '—'} → ${t.plannedHours ?? '—'}`;
+            if (old.status !== t.status) changes.status = `${TASK_STATUSES[old.status].label} → ${TASK_STATUSES[t.status].label}`;
+            if (JSON.stringify(old.assigneeIds || []) !== JSON.stringify(t.assigneeIds || [])) changes.assignees = `${(old.assigneeIds || []).map(id => empName(id)).join(', ')} → ${(t.assigneeIds || []).map(id => empName(id)).join(', ')}`;
+            if (old.deadline !== t.deadline) changes.deadline = `${old.deadline ? fmtDMY(old.deadline) : '—'} → ${t.deadline ? fmtDMY(t.deadline) : '—'}`;
+            if (Object.keys(changes).length) {
+              store.addAudit('Административное изменение задачи (прямое)', changes, 'task', t.id);
             }
           }
           store.upsertTask(t);
-          store.addAudit(isNew ? 'Создание задачи' : 'Изменение задачи', t.title);
+          store.addAudit(isNew ? 'Создание задачи' : 'Изменение задачи', {
+            title: t.title,
+            project: data.projects.find(p => p.id === t.projectId)?.code,
+            plannedHours: t.plannedHours,
+            assignees: (t.assigneeIds || []).map(id => empName(id)).join(', '),
+          }, 'task', t.id);
           if (isNew) {
             const assignees = t.assigneeIds || [];
             assignees.forEach(id => {
@@ -310,14 +324,52 @@ export default function MainLayout({ store, data, user }) {
           }
           setModal(null);
         }} 
-        onDelete={(id) => { store.deleteTask(id); setModal(null); }} 
+        onDelete={(id) => { 
+          const task = data.tasks.find(t => t.id === id);
+          store.deleteTask(id); 
+          store.addAudit('Удаление задачи', { title: task?.title }, 'task', id);
+          setModal(null); 
+        }} 
         onHoursReq={openHoursReq} 
         toast={(msg) => alert(msg)} 
         patchTask={store.upsertTask} 
         notify={(userId, text, target) => store.addNotification(userId, text, target)} 
         store={store} 
       />}
-      {modal?.type === 'project' && <ProjectModal db={data} ur={user} projectId={modal.projectId} openTask={openTask} onClose={() => setModal(null)} onSave={(p, isNew) => { const old = data.projects.find(x => x.id === p.id); if (old && hasRole(user, 'admin')) { const changes = []; if (old.budget !== p.budget) changes.push(`Бюджет: ${old.budget ?? '—'} → ${p.budget ?? '—'}`); if (old.name !== p.name) changes.push(`Название: ${old.name} → ${p.name}`); if (old.managerId !== p.managerId) changes.push(`Ответственный: ${empName(old.managerId)} → ${empName(p.managerId)}`); if (old.status !== p.status) changes.push(`Статус: ${PROJECT_STATUSES[old.status]} → ${PROJECT_STATUSES[p.status]}`); if (changes.length > 0) { store.addAudit('Административное изменение проекта (прямое)', `${p.name}: ${changes.join('; ')}`); } } store.upsertProject(p); store.addAudit(isNew ? 'Создание проекта' : 'Изменение проекта', p.name); setModal(null); }} onDelete={(p) => { store.deleteProject(p.id); setModal(null); }} toast={(msg) => alert(msg)} />}
+      {modal?.type === 'project' && <ProjectModal 
+        db={data} 
+        ur={user} 
+        projectId={modal.projectId} 
+        openTask={openTask} 
+        onClose={() => setModal(null)} 
+        onSave={(p, isNew) => {
+          const old = data.projects.find(x => x.id === p.id);
+          if (old && hasRole(user, 'admin')) {
+            const changes = {};
+            if (old.budget !== p.budget) changes.budget = `${old.budget ?? '—'} → ${p.budget ?? '—'}`;
+            if (old.name !== p.name) changes.name = `${old.name} → ${p.name}`;
+            if (old.managerId !== p.managerId) changes.manager = `${empName(old.managerId)} → ${empName(p.managerId)}`;
+            if (old.status !== p.status) changes.status = `${PROJECT_STATUSES[old.status]} → ${PROJECT_STATUSES[p.status]}`;
+            if (Object.keys(changes).length) {
+              store.addAudit('Административное изменение проекта (прямое)', changes, 'project', p.id);
+            }
+          }
+          store.upsertProject(p);
+          store.addAudit(isNew ? 'Создание проекта' : 'Изменение проекта', {
+            name: p.name,
+            code: p.code,
+            budget: p.budget,
+          }, 'project', p.id);
+          setModal(null);
+        }} 
+        onDelete={(p) => { 
+          store.deleteProject(p.id); 
+          store.addAudit('Удаление проекта', { name: p.name }, 'project', p.id);
+          setModal(null); 
+        }} 
+        toast={(msg) => alert(msg)} 
+        store={store}
+      />}
       {modal?.type === 'hours' && <HoursRequestModal db={data} ur={user} kind={modal.kind} targetId={modal.targetId} onClose={() => setModal(null)} onSubmit={(r) => { store.addHoursRequest(r); 
         const target = modal.kind === 'task' ? data.tasks.find(t => t.id === modal.targetId) : null;
         const authorId = target?.creatorId || (target?.history?.length > 0 ? target.history[0].who : null);
@@ -326,13 +378,17 @@ export default function MainLayout({ store, data, user }) {
         } else {
           store.addNotification('e_kozlov', `Запрос на изменение часов`, { targetType: 'hours', targetId: r.id });
         }
-        store.addAudit('Запрос изменения часов', `${r.oldH} → ${r.newH} ч`);
+        store.addAudit('Запрос изменения часов', {
+          target: modal.kind === 'task' ? target?.title : target?.name,
+          oldH: r.oldH,
+          newH: r.newH,
+        }, 'hoursRequest', r.id);
         setModal(null); 
       }} />}
       {modal?.type === 'roles' && <RolesModal db={data} setDb={(fn) => { store._data = fn(store._data); store._notify(); }} empId={modal.empId} onClose={() => setModal(null)} toast={(msg) => alert(msg)} audit={store.addAudit} />}
       {modal?.type === 'depts' && <DeptsModal db={data} setDb={(fn) => { store._data = fn(store._data); store._notify(); }} empId={modal.empId} onClose={() => setModal(null)} toast={(msg) => alert(msg)} audit={store.addAudit} />}
-      {modal?.type === 'vacation' && <VacationModal db={data} ur={user} vacationId={modal.vacationId} forEmpId={modal.forEmpId || null} onClose={() => setModal(null)} onSave={(v, isNew) => { store.upsertVacation(v); store.addAudit(isNew ? 'Создание отпуска' : 'Изменение отпуска', `${v.empId} ${fmtDMY(v.start)}—${fmtDMY(v.end)}`); setModal(null); }} />}
-      {modal?.type === 'delegation' && <DelegationModal db={data} ur={user} onClose={() => setModal(null)} onSubmit={(rd) => { store.upsertRoleDelegation(rd); store.addNotification(rd.toId, `Вам предложено временное принятие ролей: ${rd.roles.map(r => ROLES[r].label).join(", ")}.`, { targetType: 'delegation', targetId: rd.id }); store.addAudit('Запрос делегирования ролей', `${user.last} ${user.first} → ${rd.toId}`); setModal(null); }} />}
+      {modal?.type === 'vacation' && <VacationModal db={data} ur={user} vacationId={modal.vacationId} forEmpId={modal.forEmpId || null} onClose={() => setModal(null)} onSave={(v, isNew) => { store.upsertVacation(v); store.addAudit(isNew ? 'Создание отпуска' : 'Изменение отпуска', { employee: empName(v.empId), period: `${fmtDMY(v.start)}—${fmtDMY(v.end)}` }, 'vacation', v.id); setModal(null); }} />}
+      {modal?.type === 'delegation' && <DelegationModal db={data} ur={user} onClose={() => setModal(null)} onSubmit={(rd) => { store.upsertRoleDelegation(rd); store.addNotification(rd.toId, `Вам предложено временное принятие ролей: ${rd.roles.map(r => ROLES[r].label).join(", ")}.`, { targetType: 'delegation', targetId: rd.id }); store.addAudit('Создание делегирования ролей', { from: empName(rd.fromId), to: empName(rd.toId), roles: rd.roles.join(', ') }, 'delegation', rd.id); setModal(null); }} />}
       {vacModalOpen && <VacNowModal db={data} onClose={() => setVacModalOpen(false)} toast={(msg) => alert(msg)} />}
     </div>
   );

@@ -6,22 +6,20 @@ export const has = hasRole;
 export const canEditDepartments = (user) => hasRole(user, "admin", "director", "hr");
 export const canManageAllVacations = (user) => hasRole(user, "admin", "director", "hr");
 export const canRestore = (user) => hasRole(user, "admin", "director");
-export const canCreateTask = (user) => hasRole(user, "admin", "director", "economist", "kb_chief", "head", "pm");
-export const canCreateProject = (user) => hasRole(user, "admin", "director", "kb_chief");
-export const canManageManager = (user) => hasRole(user, "admin", "director", "kb_chief");
+export const canCreateTask = (user) => hasRole(user, "admin", "director", "economist", "kb_chief", "head", "pm", "project_manager");
+export const canCreateProject = (user) => hasRole(user, "admin", "director", "kb_chief", "project_manager");
+export const canManageManager = (user) => hasRole(user, "admin", "director", "kb_chief", "project_manager");
 export const canExport = (user) => hasRole(user, "admin", "director", "economist");
 export const canEditRoles = (user) => hasRole(user, "admin");
 export const canFireEmployee = (user) => hasRole(user, "admin", "director", "hr");
 
-// Право на изменение полей задачи (кроме статуса)
+// Право на изменение полей задачи (кроме статуса) – менеджер проектов не может редактировать
 export const canEditTaskFields = (user, task, data) => {
   if (!user || !task || !data) return false;
   if (task.archived) return false;
-  // Админ и экономист могут редактировать поля
   if (hasRole(user, "admin", "economist")) return true;
-  // ГД не может редактировать поля (только статус)
-  if (hasRole(user, "director")) return false;
-  // ГК, РО, PM, исполнитель не могут редактировать поля
+  // Менеджер проектов не может редактировать поля (только создавать)
+  if (hasRole(user, "project_manager")) return false;
   return false;
 };
 
@@ -29,69 +27,53 @@ export const canEditTaskFields = (user, task, data) => {
 export const canChangeTaskStatus = (user, task, newStatus, data) => {
   if (!user || !task || !data) return false;
   if (task.archived) return false;
-  
-  // Если задача уже закрыта или отменена, изменить может только админ
   if (task.status === 'closed' || task.status === 'cancelled') {
     return hasRole(user, 'admin');
   }
-  
-  // Разрешаем изменение статуса для:
-  // - админа (всегда)
-  // - ГД (может закрыть/отменить)
-  // - ГК (для своего КБ)
-  // - РО (для подчинённых)
-  // - PM (для своего проекта)
-  // - исполнителя (для своих задач, но только в новые, в работу, на проверку)
-  
   if (hasRole(user, "admin")) return true;
-  if (hasRole(user, "director")) return true; // ГД может закрыть/отменить
-  
+  if (hasRole(user, "director")) return true;
+  // Менеджер проектов не может менять статус (только создавать задачи)
+  if (hasRole(user, "project_manager")) return false;
+
   const project = data.projects.find(p => p.id === task.projectId);
-  
   if (hasRole(user, "kb_chief") && project && project.kbId && (user.kbIds || []).includes(project.kbId)) {
     return true;
   }
-  
   if (hasRole(user, "head") && (task.assigneeIds || []).some(id => {
     const e = data.employees.find(x => x.id === id);
     return e && e.departments.some(d => (user.headDeptIds || []).includes(d.deptId));
   })) return true;
-  
   if (hasRole(user, "pm") && project && project.managerId === user.id) return true;
-  
   if (task.assigneeIds && task.assigneeIds.includes(user.id)) {
-    // Исполнитель не может закрыть или отменить задачу
     if (newStatus === 'closed' || newStatus === 'cancelled') return false;
     return true;
   }
-  
   return false;
 };
 
-// Право на редактирование полей проекта
+// Право на редактирование полей проекта – менеджер проектов не может редактировать
 export const canEditProjectFields = (user, project) => {
   if (!user || !project) return false;
   if (project.archived) return false;
-  // Только админ может редактировать поля проекта
-  return hasRole(user, "admin");
+  if (hasRole(user, "admin")) return true;
+  if (hasRole(user, "project_manager")) return false;
+  return false;
 };
 
-// Право на изменение статуса проекта (кроме перевода в "Закрыт/Отменен" – это особая логика)
+// Право на изменение статуса проекта
 export const canChangeProjectStatus = (user, project, newStatus) => {
   if (!user || !project) return false;
   if (project.archived) return false;
-  
-  // Перевод в "Закрыт" или "Отменен" – только автор, ГД или админ
   if (newStatus === 'closed' || newStatus === 'cancelled') {
     const creatorId = project.creatorId || (project.history?.find(h => h.who !== 'system')?.who);
     if (hasRole(user, 'admin', 'director')) return true;
     if (creatorId && creatorId === user.id) return true;
     return false;
   }
-  
-  // Изменение на другие статусы – админ, ГД, ГК (для своего КБ)
   if (hasRole(user, 'admin', 'director')) return true;
   if (hasRole(user, 'kb_chief') && project.kbId && (user.kbIds || []).includes(project.kbId)) return true;
+  // Менеджер проектов не может менять статус
+  if (hasRole(user, 'project_manager')) return false;
   return false;
 };
 
@@ -102,10 +84,9 @@ export const projectEditable = (user, project, data) => {
 export const assigneeOptions = (user, data) => {
   if (!user || !data) return [];
   let list = [];
-  
   let allEmployees = data.employees.filter(e => !e.fired);
-  
-  if (hasRole(user, "admin", "director", "economist", "pm")) {
+
+  if (hasRole(user, "admin", "director", "economist", "pm", "project_manager")) {
     list = allEmployees;
   } else if (hasRole(user, "kb_chief") && (user.kbIds || []).length) {
     const deptIds = data.departments.filter(d => d.kbId && user.kbIds.includes(d.kbId)).map(d => d.id);
@@ -115,7 +96,6 @@ export const assigneeOptions = (user, data) => {
   } else {
     list = allEmployees.filter(e => e.id === user.id);
   }
-  
   return list.sort((a, b) => {
     const cmp = a.last.localeCompare(b.last);
     return cmp !== 0 ? cmp : a.first.localeCompare(b.first);
@@ -139,11 +119,11 @@ export function computeScope(u, db) {
   if (!u || !db) return { all: false, empIds: new Set(), projIds: new Set() };
   const allE = new Set(db.employees.filter(e => !e.fired).map(e => e.id));
   const allP = new Set(db.projects.map(p => p.id));
-  if (hasRole(u, "admin", "director", "economist")) return { all: true, empIds: allE, projIds: allP };
-  
+  if (hasRole(u, "admin", "director", "economist", "project_manager")) {
+    return { all: true, empIds: allE, projIds: allP };
+  }
   const empIds = new Set([u.id]);
   const projIds = new Set();
-  
   if (hasRole(u, "kb_chief") && (u.kbIds || []).length) {
     const dIds = db.departments.filter(d => d.kbId && u.kbIds.includes(d.kbId)).map(d => d.id);
     db.employees.filter(e => !e.fired).forEach(e => { if (e.departments.some(x => dIds.includes(x.deptId))) empIds.add(e.id); });
@@ -153,11 +133,9 @@ export function computeScope(u, db) {
     db.employees.filter(e => !e.fired).forEach(e => { if (e.departments.some(x => u.headDeptIds.includes(x.deptId))) empIds.add(e.id); });
   }
   if (hasRole(u, "pm")) db.projects.forEach(p => { if (p.managerId === u.id) projIds.add(p.id); });
-  
   db.tasks.forEach(t => {
     if (t.assigneeIds && t.assigneeIds.some(id => empIds.has(id))) projIds.add(t.projectId);
   });
-  
   return { all: false, empIds, projIds };
 }
 
