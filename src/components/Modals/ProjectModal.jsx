@@ -17,7 +17,6 @@ const AIRCRAFT_TYPES = [
   'Су-57', 'МиГ-35', 'Ту-160', 'Ил-76', 'Ка-52', 'Другой'
 ];
 const PROJECT_TYPE_OPTIONS = ['Ремонт', 'Модификация'];
-const STAGES = ['Эскизный проект', 'Рабочая документация', 'Изготовление', 'Испытания', 'Сдача'];
 
 export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toast, openTask, store }) => {
   const existing = projectId ? db.projects.find((p) => p.id === projectId) : null;
@@ -46,7 +45,6 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
     customer: "",
     aircraftType: "",
     projectType: "",
-    stage: "",
     comments: existing?.comments || [],
     history: existing?.history || [{ ts: Date.now(), who: ur.id, text: "Проект создан" }],
     files: existing?.files || [],
@@ -78,7 +76,6 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
     if (!f.customer?.trim()) return toast("Укажите заказчика", "err");
     if (!f.aircraftType) return toast("Выберите тип ВС", "err");
     if (!f.projectType) return toast("Выберите тип проекта", "err");
-    if (!f.stage) return toast("Выберите стадию", "err");
 
     if (!isAdminType) {
       if (!f.managerId) return toast("Для производственного проекта ответственный обязателен", "err");
@@ -206,12 +203,7 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
             <option value="">— выберите —</option>
             {PROJECT_TYPE_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
-          <label className="lbl">Стадия *</label>
-          <select className="inp sel" disabled={!canEditFields} value={f.stage} onChange={(e) => set("stage", e.target.value)}>
-            <option value="">— выберите —</option>
-            {STAGES.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-          <label className="lbl">Привязка к КБ</label>
+          <label className="lbl">Подразделение</label>
           <select className="inp sel" disabled={!canEditFields} value={f.kbId || ""} onChange={(e) => set("kbId", e.target.value)}>
             <option value="">Общеорганизационный</option>
             {db.kbs.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
@@ -239,7 +231,12 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
 
       {tab === 'tasks' && existing && (
         <div className="tm-block" style={{ marginTop: 0 }}>
-          <div className="rep-panel-title">Задачи проекта ({taskList.length})</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <div className="rep-panel-title">Задачи проекта ({taskList.length})</div>
+            <button className="btn primary sm" onClick={() => openTask(null, 'form')} disabled={existing.archived}>
+              <Ic d={ICONS.plus} size={14} /> Создать задачу
+            </button>
+          </div>
           <div style={{ width: '100%', overflowX: 'auto' }}>
             <table className="tbl" style={{ minWidth: 800, fontSize: 13 }}>
               <thead>
