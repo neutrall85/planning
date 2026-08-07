@@ -377,19 +377,6 @@ export default function Journal({ db }) {
                         </td>
                         <td style={{ maxWidth: '400px' }}>
                           {renderDetails(entry)}
-                          {entry.targetType && (
-                            <div className="mut sm" style={{ fontSize: '11px', marginTop: '4px' }}>
-                              <span style={{ 
-                                background: '#f1f5f9', 
-                                padding: '2px 6px', 
-                                borderRadius: '4px',
-                                fontSize: '10px',
-                                fontWeight: 600,
-                              }}>
-                                {entry.targetType}
-                              </span>
-                            </div>
-                          )}
                         </td>
                       </tr>
                     </React.Fragment>
