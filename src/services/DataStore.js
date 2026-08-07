@@ -478,7 +478,7 @@ export default class DataStore {
         start: D(-25),
         end: D(50),
         status: "active",
-        budget: 180,
+        budget: 300,
         color: "#0ea5e9",
         ptype: "prod",
         archived: false,
