@@ -36,9 +36,17 @@ export default function Requests({ db, setDb, ur, initialTab = 'hours', addAudit
     // Вызываем addAudit ПОСЛЕ обновления состояния
     setTimeout(() => {
       if (ok) {
-        addAudit('Утверждение запроса часов', { task: targetTitle, newHours: r.newH }, 'hoursRequest', r.id);
+        addAudit('Утверждение запроса часов', { 
+          task: targetTitle, 
+          previousHours: r.oldH, 
+          newHours: r.newH 
+        }, 'hoursRequest', r.id);
       } else {
-        addAudit('Отклонение запроса часов', { task: targetTitle }, 'hoursRequest', r.id);
+        addAudit('Отклонение запроса часов', { 
+          task: targetTitle,
+          requestedHours: r.newH,
+          reason: r.reason
+        }, 'hoursRequest', r.id);
       }
     }, 0);
   };
@@ -54,9 +62,17 @@ export default function Requests({ db, setDb, ur, initialTab = 'hours', addAudit
     
     setTimeout(() => {
       if (ok) {
-        addAudit('Утверждение отпуска', { employee: employeeName, period }, 'vacation', v.id);
+        addAudit('Утверждение отпуска', { 
+          employee: employeeName, 
+          period,
+          type: VACATION_TYPES[v.type]?.label || v.type
+        }, 'vacation', v.id);
       } else {
-        addAudit('Отклонение отпуска', { employee: employeeName, period }, 'vacation', v.id);
+        addAudit('Отклонение отпуска', { 
+          employee: employeeName, 
+          period,
+          type: VACATION_TYPES[v.type]?.label || v.type
+        }, 'vacation', v.id);
       }
     }, 0);
   };
@@ -73,9 +89,19 @@ export default function Requests({ db, setDb, ur, initialTab = 'hours', addAudit
     
     setTimeout(() => {
       if (ok) {
-        addAudit('Принятие делегирования', { from: fromName, to: toName, roles: rolesStr }, 'delegation', r.id);
+        addAudit('Принятие делегирования', { 
+          from: fromName, 
+          to: toName, 
+          roles: rolesStr,
+          start: fmtDMY(r.start),
+          end: fmtDMY(r.end)
+        }, 'delegation', r.id);
       } else {
-        addAudit('Отклонение делегирования', { from: fromName, to: toName, roles: rolesStr }, 'delegation', r.id);
+        addAudit('Отклонение делегирования', { 
+          from: fromName, 
+          to: toName, 
+          roles: rolesStr 
+        }, 'delegation', r.id);
       }
     }, 0);
   };
@@ -120,7 +146,11 @@ export default function Requests({ db, setDb, ur, initialTab = 'hours', addAudit
       });
       
       setTimeout(() => {
-        addAudit('Одобрение регистрации', { email: r.email, employee: empNameStr }, 'registration', r.id);
+        addAudit('Одобрение регистрации', { 
+          email: r.email, 
+          employee: empNameStr,
+          position: r.position || 'Сотрудник'
+        }, 'registration', r.id);
       }, 0);
     } else {
       setDb((s) => {
@@ -128,7 +158,11 @@ export default function Requests({ db, setDb, ur, initialTab = 'hours', addAudit
       });
       
       setTimeout(() => {
-        addAudit('Отклонение регистрации', { email: r.email, employee: empNameStr }, 'registration', r.id);
+        addAudit('Отклонение регистрации', { 
+          email: r.email, 
+          employee: empNameStr,
+          reason: r.rejectionReason || 'Не указана'
+        }, 'registration', r.id);
       }, 0);
     }
   };
