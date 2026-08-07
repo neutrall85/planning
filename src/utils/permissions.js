@@ -17,7 +17,9 @@ export const canFireEmployee = (user) => hasRole(user, "admin", "director", "hr"
 export const canEditTaskFields = (user, task, data) => {
   if (!user || !task || !data) return false;
   if (task.archived) return false;
-  if (hasRole(user, "admin", "economist")) return true;
+  // Суперадминистратор может всё
+  if (hasRole(user, "admin")) return true;
+  if (hasRole(user, "economist")) return true;
   // Менеджер проектов не может редактировать поля (только создавать)
   if (hasRole(user, "project_manager")) return false;
   return false;
@@ -27,6 +29,10 @@ export const canEditTaskFields = (user, task, data) => {
 export const canChangeTaskStatus = (user, task, newStatus, data) => {
   if (!user || !task || !data) return false;
   if (task.archived) return false;
+  
+  // Суперадминистратор может всё
+  if (hasRole(user, "admin")) return true;
+  
   if (task.status === 'closed' || task.status === 'cancelled') {
     return hasRole(user, 'admin');
   }
@@ -37,7 +43,7 @@ export const canChangeTaskStatus = (user, task, newStatus, data) => {
   
   // Для административных проектов - пока разрешаем все переходы (будет уточнено)
   if (isAdminProject) {
-    if (hasRole(user, "admin", "director")) return true;
+    if (hasRole(user, "director")) return true;
     if (hasRole(user, "kb_chief") && project.kbId && (user.kbIds || []).includes(project.kbId)) {
       return true;
     }
@@ -55,8 +61,8 @@ export const canChangeTaskStatus = (user, task, newStatus, data) => {
   
   // Для производственных проектов строгая механика
   if (isProdProject) {
-    // Администратор и директор могут всё
-    if (hasRole(user, "admin", "director")) return true;
+    // Директор может всё
+    if (hasRole(user, "director")) return true;
     
     // Руководитель КБ
     if (hasRole(user, "kb_chief") && project.kbId && (user.kbIds || []).includes(project.kbId)) {
@@ -90,7 +96,6 @@ export const canChangeTaskStatus = (user, task, newStatus, data) => {
   }
   
   // Fallback для остальных случаев
-  if (hasRole(user, "admin")) return true;
   if (hasRole(user, "director")) return true;
   if (hasRole(user, "kb_chief") && project.kbId && (user.kbIds || []).includes(project.kbId)) {
     return true;
@@ -111,7 +116,9 @@ export const canChangeTaskStatus = (user, task, newStatus, data) => {
 export const canEditProjectFields = (user, project) => {
   if (!user || !project) return false;
   if (project.archived) return false;
+  // Суперадминистратор может всё
   if (hasRole(user, "admin")) return true;
+  // Менеджер проектов не может редактировать
   if (hasRole(user, "project_manager")) return false;
   return false;
 };
@@ -120,13 +127,15 @@ export const canEditProjectFields = (user, project) => {
 export const canChangeProjectStatus = (user, project, newStatus) => {
   if (!user || !project) return false;
   if (project.archived) return false;
+  // Суперадминистратор может всё
+  if (hasRole(user, 'admin')) return true;
   if (newStatus === 'closed' || newStatus === 'cancelled') {
     const creatorId = project.creatorId || (project.history?.find(h => h.who !== 'system')?.who);
-    if (hasRole(user, 'admin', 'director')) return true;
+    if (hasRole(user, 'director')) return true;
     if (creatorId && creatorId === user.id) return true;
     return false;
   }
-  if (hasRole(user, 'admin', 'director')) return true;
+  if (hasRole(user, 'director')) return true;
   if (hasRole(user, 'kb_chief') && project.kbId && (user.kbIds || []).includes(project.kbId)) return true;
   // Менеджер проектов не может менять статус
   if (hasRole(user, 'project_manager')) return false;
@@ -159,7 +168,9 @@ export const assigneeOptions = (user, data) => {
 };
 
 export const canApproveVacation = (user, vacation, data) => {
-  if (hasRole(user, "admin", "director")) return true;
+  // Суперадминистратор может всё
+  if (hasRole(user, "admin")) return true;
+  if (hasRole(user, "director")) return true;
   const emp = data.employees.find(e => e.id === vacation.empId);
   if (!emp || emp.id === user.id) return false;
   const primaryDeptId = emp.departments.find(x => x.primary)?.deptId;
