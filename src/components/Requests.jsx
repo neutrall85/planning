@@ -16,56 +16,78 @@ export default function Requests({ db, setDb, ur, initialTab = 'hours', addAudit
   if (hasRole(ur, 'admin')) tabs.push(['reg', 'Заявки на регистрацию']);
 
   const decideHours = (r, ok) => {
+    const targetTitle = ok 
+      ? (r.kind === "task" 
+          ? db.tasks.find(t => t.id === r.targetId)?.title 
+          : db.projects.find(p => p.id === r.targetId)?.name)
+      : (r.kind === "task" 
+          ? db.tasks.find(t => t.id === r.targetId)?.title 
+          : db.projects.find(p => p.id === r.targetId)?.name);
+    
     setDb((s) => {
       const st = { ...s, hoursRequests: s.hoursRequests.map((x) => (x.id === r.id ? { ...x, status: ok ? "approved" : "rejected" } : x)) };
       if (ok) {
         if (r.kind === "task") st.tasks = st.tasks.map((t) => (t.id === r.targetId ? { ...t, plannedHours: r.newH } : t));
         else st.projects = st.projects.map((p) => (p.id === r.targetId ? { ...p, budget: r.newH } : p));
-        const targetTitle = r.kind === "task" 
-          ? s.tasks.find(t => t.id === r.targetId)?.title 
-          : s.projects.find(p => p.id === r.targetId)?.name;
-        addAudit('Утверждение запроса часов', { task: targetTitle, newHours: r.newH }, 'hoursRequest', r.id);
-      } else {
-        const targetTitle = r.kind === "task" 
-          ? s.tasks.find(t => t.id === r.targetId)?.title 
-          : s.projects.find(p => p.id === r.targetId)?.name;
-        addAudit('Отклонение запроса часов', { task: targetTitle }, 'hoursRequest', r.id);
       }
       return st;
     });
+    
+    // Вызываем addAudit ПОСЛЕ обновления состояния
+    setTimeout(() => {
+      if (ok) {
+        addAudit('Утверждение запроса часов', { task: targetTitle, newHours: r.newH }, 'hoursRequest', r.id);
+      } else {
+        addAudit('Отклонение запроса часов', { task: targetTitle }, 'hoursRequest', r.id);
+      }
+    }, 0);
   };
 
   const decideVac = (v, ok) => {
+    const employeeName = empName(v.empId);
+    const period = `${fmtDMY(v.start)}—${fmtDMY(v.end)}`;
+    
     setDb((s) => {
       const updated = { ...s, vacations: s.vacations.map((x) => (x.id === v.id ? { ...x, status: ok ? "approved" : "rejected" } : x)) };
-      if (ok) {
-        addAudit('Утверждение отпуска', { employee: empName(v.empId), period: `${fmtDMY(v.start)}—${fmtDMY(v.end)}` }, 'vacation', v.id);
-      } else {
-        addAudit('Отклонение отпуска', { employee: empName(v.empId), period: `${fmtDMY(v.start)}—${fmtDMY(v.end)}` }, 'vacation', v.id);
-      }
       return updated;
     });
+    
+    setTimeout(() => {
+      if (ok) {
+        addAudit('Утверждение отпуска', { employee: employeeName, period }, 'vacation', v.id);
+      } else {
+        addAudit('Отклонение отпуска', { employee: employeeName, period }, 'vacation', v.id);
+      }
+    }, 0);
   };
 
   const decideRD = (r, ok) => {
+    const fromName = empName(r.fromId);
+    const toName = empName(r.toId);
+    const rolesStr = r.roles.join(', ');
+    
     setDb((s) => {
       const updated = { ...s, roleDelegations: s.roleDelegations.map((x) => (x.id === r.id ? { ...x, status: ok ? "active" : "rejected" } : x)) };
-      if (ok) {
-        addAudit('Принятие делегирования', { from: empName(r.fromId), to: empName(r.toId), roles: r.roles.join(', ') }, 'delegation', r.id);
-      } else {
-        addAudit('Отклонение делегирования', { from: empName(r.fromId), to: empName(r.toId), roles: r.roles.join(', ') }, 'delegation', r.id);
-      }
       return updated;
     });
+    
+    setTimeout(() => {
+      if (ok) {
+        addAudit('Принятие делегирования', { from: fromName, to: toName, roles: rolesStr }, 'delegation', r.id);
+      } else {
+        addAudit('Отклонение делегирования', { from: fromName, to: toName, roles: rolesStr }, 'delegation', r.id);
+      }
+    }, 0);
   };
 
   const decideReg = (r, ok) => {
+    const empNameStr = `${r.last} ${r.first}`;
+    
     if (ok) {
       setDb((s) => {
         const existing = s.employees.find(e => e.email === r.email);
         if (existing) {
           const updated = { ...existing, roles: ['executor'] };
-          addAudit('Одобрение регистрации', { email: r.email, employee: `${r.last} ${r.first}` }, 'registration', r.id);
           return { 
             ...s, 
             employees: s.employees.map(e => e.id === updated.id ? updated : e),
@@ -89,7 +111,6 @@ export default function Requests({ db, setDb, ur, initialTab = 'hours', addAudit
             failed: 0,
             lockUntil: 0
           };
-          addAudit('Одобрение регистрации', { email: r.email, employee: `${r.last} ${r.first}` }, 'registration', r.id);
           return { 
             ...s, 
             employees: [...s.employees, newEmp],
@@ -97,11 +118,18 @@ export default function Requests({ db, setDb, ur, initialTab = 'hours', addAudit
           };
         }
       });
+      
+      setTimeout(() => {
+        addAudit('Одобрение регистрации', { email: r.email, employee: empNameStr }, 'registration', r.id);
+      }, 0);
     } else {
       setDb((s) => {
-        addAudit('Отклонение регистрации', { email: r.email, employee: `${r.last} ${r.first}` }, 'registration', r.id);
         return { ...s, regRequests: s.regRequests.map((x) => (x.id === r.id ? { ...x, status: "rejected" } : x)) };
       });
+      
+      setTimeout(() => {
+        addAudit('Отклонение регистрации', { email: r.email, employee: empNameStr }, 'registration', r.id);
+      }, 0);
     }
   };
 
