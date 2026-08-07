@@ -21,9 +21,15 @@ export default function Requests({ db, setDb, ur, initialTab = 'hours', addAudit
       if (ok) {
         if (r.kind === "task") st.tasks = st.tasks.map((t) => (t.id === r.targetId ? { ...t, plannedHours: r.newH } : t));
         else st.projects = st.projects.map((p) => (p.id === r.targetId ? { ...p, budget: r.newH } : p));
-        addAudit('Утверждение запроса часов', { task: r.kind === "task" ? db.tasks.find(t => t.id === r.targetId)?.title : db.projects.find(p => p.id === r.targetId)?.name, newHours: r.newH }, 'hoursRequest', r.id);
+        const targetTitle = r.kind === "task" 
+          ? s.tasks.find(t => t.id === r.targetId)?.title 
+          : s.projects.find(p => p.id === r.targetId)?.name;
+        addAudit('Утверждение запроса часов', { task: targetTitle, newHours: r.newH }, 'hoursRequest', r.id);
       } else {
-        addAudit('Отклонение запроса часов', { task: r.kind === "task" ? db.tasks.find(t => t.id === r.targetId)?.title : db.projects.find(p => p.id === r.targetId)?.name }, 'hoursRequest', r.id);
+        const targetTitle = r.kind === "task" 
+          ? s.tasks.find(t => t.id === r.targetId)?.title 
+          : s.projects.find(p => p.id === r.targetId)?.name;
+        addAudit('Отклонение запроса часов', { task: targetTitle }, 'hoursRequest', r.id);
       }
       return st;
     });
