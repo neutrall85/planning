@@ -388,9 +388,6 @@ export default function Journal({ db }) {
                               }}>
                                 {entry.targetType}
                               </span>
-                              <span style={{ marginLeft: '6px', color: '#475569' }}>
-                                {entry.targetId}
-                              </span>
                             </div>
                           )}
                         </td>
