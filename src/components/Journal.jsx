@@ -72,8 +72,48 @@ export default function Journal({ db }) {
     });
   }, [allEntries, filters]);
 
-  const totalPages = Math.ceil(filteredEntries.length / pageSize);
-  const paginated = filteredEntries.slice((page - 1) * pageSize, page * pageSize);
+  // Группировка по датам (день/месяц)
+  const groupedEntries = useMemo(() => {
+    const groups = {};
+    filteredEntries.forEach(entry => {
+      const d = new Date(entry.ts);
+      const dayKey = fmtDMY(entry.ts);
+      const monthKey = `${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
+      
+      if (!groups[monthKey]) groups[monthKey] = {};
+      if (!groups[monthKey][dayKey]) groups[monthKey][dayKey] = [];
+      groups[monthKey][dayKey].push(entry);
+    });
+    
+    // Сортировка месяцев (от новых к старым)
+    const sortedMonths = Object.keys(groups).sort((a, b) => {
+      const [m1, y1] = a.split('.').map(Number);
+      const [m2, y2] = b.split('.').map(Number);
+      return y2 - y1 || m2 - m1;
+    });
+    
+    const result = [];
+    sortedMonths.forEach(month => {
+      const days = Object.keys(groups[month]).sort((a, b) => {
+        const [d1, m1, y1] = a.split('.').map(Number);
+        const [d2, m2, y2] = b.split('.').map(Number);
+        return y2 - y1 || m2 - m1 || d2 - d1;
+      });
+      days.forEach(day => {
+        result.push({ type: 'day', date: day, entries: groups[month][day] });
+      });
+    });
+    return result;
+  }, [filteredEntries]);
+
+  const totalEntries = filteredEntries.length;
+  const paginated = useMemo(() => {
+    const flat = [];
+    groupedEntries.forEach(g => g.entries.forEach(e => flat.push(e)));
+    return flat.slice((page - 1) * pageSize, page * pageSize);
+  }, [groupedEntries, page]);
+
+  const totalPages = Math.ceil(totalEntries / pageSize);
 
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -97,6 +137,26 @@ export default function Journal({ db }) {
     } catch {
       return <span className="mut sm">{String(entry.details)}</span>;
     }
+  };
+
+  const exportToCSV = () => {
+    const headers = ['Дата', 'Время', 'Пользователь', 'Действие', 'Детали'];
+    const rows = filteredEntries.map(e => {
+      const d = new Date(e.ts);
+      const date = fmtDMY(e.ts);
+      const time = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+      const user = e.userId === 'system' ? 'Система' : empName(e.userId) || e.userId;
+      const details = typeof e.details === 'string' ? e.details.replace(/"/g, '""') : '';
+      return [date, time, user, e.action, `"${details}"`].join(';');
+    });
+    const csv = [headers.join(';'), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `journal_${filters.dateFrom || 'start'}_${filters.dateTo || 'end'}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -154,45 +214,58 @@ export default function Journal({ db }) {
       </div>
 
       <div className="rep-panel" style={{ padding: '16px' }}>
-        <div className="rep-panel-title">
-          Всего записей: {filteredEntries.length}
-          <span className="mut sm" style={{ marginLeft: '12px', fontWeight: 'normal' }}>
-            (показано {paginated.length})
+        <div className="rep-panel-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>
+            Всего записей: {filteredEntries.length}
+            <span className="mut sm" style={{ marginLeft: '12px', fontWeight: 'normal' }}>
+              (показано {paginated.length})
+            </span>
           </span>
+          <button className="btn primary sm" onClick={exportToCSV}>
+            Выгрузить CSV
+          </button>
         </div>
-        <div style={{ width: '100%', overflowX: 'auto' }}>
-          <table className="tbl" style={{ minWidth: '700px', fontSize: '13px' }}>
-            <thead>
-              <tr>
-                <th>Дата / время</th>
-                <th>Пользователь</th>
-                <th>Действие</th>
-                <th>Детали / изменения</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paginated.map(entry => (
-                <tr key={entry.id}>
-                  <td className="mut sm" style={{ whiteSpace: 'nowrap' }}>{fmtDT(entry.ts)}</td>
-                  <td>
-                    <b>{entry.userId === 'system' ? 'Система' : empName(entry.userId) || entry.userId}</b>
-                  </td>
-                  <td><b>{entry.action}</b></td>
-                  <td>
-                    {renderDetails(entry)}
-                    {entry.targetType && (
-                      <div className="mut sm" style={{ fontSize: '11px' }}>
-                        {entry.targetType}: {entry.targetId}
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {paginated.length === 0 && (
-                <tr><td colSpan="4" className="mut" style={{ textAlign: 'center', padding: '20px' }}>Нет записей аудита</td></tr>
-              )}
-            </tbody>
-          </table>
+        
+        {/* Группировка по месяцам и дням */}
+        <div style={{ marginBottom: '16px' }}>
+          {groupedEntries.map(group => (
+            <div key={group.date} style={{ marginBottom: '12px' }}>
+              <div style={{ 
+                fontSize: '13px', 
+                fontWeight: 'bold', 
+                color: 'var(--muted)', 
+                marginBottom: '4px',
+                borderBottom: '1px solid var(--border)',
+                paddingBottom: '4px'
+              }}>
+                {group.date}
+              </div>
+              <table className="tbl" style={{ minWidth: '700px', fontSize: '13px' }}>
+                <tbody>
+                  {group.entries.map(entry => (
+                    <tr key={entry.id}>
+                      <td className="mut sm" style={{ whiteSpace: 'nowrap' }}>{fmtDT(entry.ts)}</td>
+                      <td>
+                        <b>{entry.userId === 'system' ? 'Система' : empName(entry.userId) || entry.userId}</b>
+                      </td>
+                      <td><b>{entry.action}</b></td>
+                      <td>
+                        {renderDetails(entry)}
+                        {entry.targetType && (
+                          <div className="mut sm" style={{ fontSize: '11px' }}>
+                            {entry.targetType}: {entry.targetId}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))}
+          {groupedEntries.length === 0 && (
+            <div className="mut" style={{ textAlign: 'center', padding: '20px' }}>Нет записей аудита</div>
+          )}
         </div>
 
         {totalPages > 1 && (
