@@ -159,6 +159,41 @@ export default function Journal({ db }) {
     URL.revokeObjectURL(url);
   };
 
+  // Плоский список для пагинации
+  const flatEntries = useMemo(() => {
+    const result = [];
+    let lastMonth = null;
+    
+    groupedEntries.forEach(group => {
+      const monthDate = new Date(group.date.split('.').reverse().join('-') + '-01');
+      const monthLabel = monthDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
+      
+      group.entries.forEach((entry, idx) => {
+        const isFirstInDay = idx === 0;
+        const dayLabel = isFirstInDay ? new Date(entry.ts).toLocaleDateString('ru-RU', { 
+          weekday: 'long', 
+          day: 'numeric' 
+        }) : null;
+        
+        result.push({
+          ...entry,
+          _monthLabel: lastMonth !== monthLabel ? monthLabel : null,
+          _dayLabel: dayLabel,
+        });
+        
+        if (lastMonth !== monthLabel) {
+          lastMonth = monthLabel;
+        }
+      });
+    });
+    
+    return result;
+  }, [groupedEntries]);
+
+  const paginatedFlat = useMemo(() => {
+    return flatEntries.slice((page - 1) * pageSize, page * pageSize);
+  }, [flatEntries, page]);
+
   return (
     <div className="rep">
       <div className="rep-panel" style={{ padding: '16px' }}>
@@ -218,7 +253,7 @@ export default function Journal({ db }) {
           <span>
             Всего записей: {filteredEntries.length}
             <span className="mut sm" style={{ marginLeft: '12px', fontWeight: 'normal' }}>
-              (показано {paginated.length})
+              (показано {paginatedFlat.length})
             </span>
           </span>
           <button className="btn primary sm" onClick={exportToCSV}>
@@ -226,66 +261,194 @@ export default function Journal({ db }) {
           </button>
         </div>
         
-        {/* Группировка по месяцам и дням */}
-        <div style={{ marginBottom: '16px' }}>
-          {groupedEntries.map(group => (
-            <div key={group.date} style={{ marginBottom: '12px' }}>
-              <div style={{ 
-                fontSize: '13px', 
-                fontWeight: 'bold', 
-                color: 'var(--muted)', 
-                marginBottom: '4px',
-                borderBottom: '1px solid var(--border)',
-                paddingBottom: '4px'
-              }}>
-                {group.date}
-              </div>
-              <table className="tbl" style={{ minWidth: '700px', fontSize: '13px' }}>
-                <tbody>
-                  {group.entries.map(entry => (
-                    <tr key={entry.id}>
-                      <td className="mut sm" style={{ whiteSpace: 'nowrap' }}>{fmtDT(entry.ts)}</td>
-                      <td>
-                        <b>{entry.userId === 'system' ? 'Система' : empName(entry.userId) || entry.userId}</b>
-                      </td>
-                      <td><b>{entry.action}</b></td>
-                      <td>
-                        {renderDetails(entry)}
-                        {entry.targetType && (
-                          <div className="mut sm" style={{ fontSize: '11px' }}>
-                            {entry.targetType}: {entry.targetId}
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        <div style={{ marginTop: '12px' }}>
+          {paginatedFlat.length === 0 ? (
+            <div className="mut" style={{ textAlign: 'center', padding: '40px 20px' }}>
+              <div style={{ fontSize: '48px', marginBottom: '12px', opacity: 0.3 }}>📋</div>
+              <div style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px' }}>Записей не найдено</div>
+              <div className="mut sm">Измените параметры фильтра или выберите другой период</div>
             </div>
-          ))}
-          {groupedEntries.length === 0 && (
-            <div className="mut" style={{ textAlign: 'center', padding: '20px' }}>Нет записей аудита</div>
+          ) : (
+            <table className="tbl" style={{ fontSize: '13px' }}>
+              <thead>
+                <tr>
+                  <th style={{ width: '160px', color: 'var(--mut)', textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.5px' }}>
+                    Дата и время
+                  </th>
+                  <th style={{ width: '180px', color: 'var(--mut)', textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.5px' }}>
+                    Пользователь
+                  </th>
+                  <th style={{ color: 'var(--mut)', textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.5px' }}>
+                    Действие
+                  </th>
+                  <th style={{ color: 'var(--mut)', textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.5px' }}>
+                    Детали
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedFlat.map((entry, index) => {
+                  const showMonth = entry._monthLabel !== null;
+                  const showDay = entry._dayLabel !== null;
+                  
+                  return (
+                    <React.Fragment key={entry.id}>
+                      {showMonth && (
+                        <tr>
+                          <td colSpan="4" style={{ 
+                            background: 'linear-gradient(90deg, #f8fafc, transparent)', 
+                            padding: '12px 10px 8px',
+                            borderTop: index === 0 ? 'none' : '2px solid var(--line)',
+                          }}>
+                            <div style={{ 
+                              fontSize: '12px', 
+                              fontWeight: 800, 
+                              color: '#1e293b',
+                              textTransform: 'capitalize',
+                              letterSpacing: '0.3px',
+                            }}>
+                              {entry._monthLabel}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      {showDay && (
+                        <tr>
+                          <td colSpan="4" style={{ 
+                            padding: '8px 10px 6px',
+                            borderTop: '1px dashed #e2e8f0',
+                          }}>
+                            <div style={{ 
+                              fontSize: '11px', 
+                              fontWeight: 700, 
+                              color: 'var(--acc)',
+                              textTransform: 'capitalize',
+                              letterSpacing: '0.3px',
+                            }}>
+                              {entry._dayLabel}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      <tr style={{ 
+                        background: showDay ? '#fafbff' : 'transparent',
+                        transition: 'background 0.15s',
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = showDay ? '#f0f7ff' : '#f8fafc'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = showDay ? '#fafbff' : 'transparent'}
+                      >
+                        <td style={{ 
+                          whiteSpace: 'nowrap', 
+                          fontSize: '12px',
+                          color: 'var(--mut)',
+                          fontFamily: 'monospace',
+                        }}>
+                          {fmtDT(entry.ts)}
+                        </td>
+                        <td>
+                          <div style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '8px',
+                            fontWeight: 600,
+                            fontSize: '13px',
+                          }}>
+                            <div className="avatar xs" style={{ 
+                              background: entry.userId === 'system' 
+                                ? 'linear-gradient(135deg, #64748b, #475569)' 
+                                : 'linear-gradient(135deg, #1e3a8a, #0ea5e9)',
+                              width: '24px',
+                              height: '24px',
+                              fontSize: '9px',
+                            }}>
+                              {entry.userId === 'system' ? 'S' : (empName(entry.userId) || entry.userId).charAt(0).toUpperCase()}
+                            </div>
+                            {entry.userId === 'system' ? 'Система' : empName(entry.userId) || entry.userId}
+                          </div>
+                        </td>
+                        <td>
+                          <div style={{ 
+                            fontWeight: 600, 
+                            fontSize: '13px',
+                            color: '#1e293b',
+                          }}>
+                            {entry.action}
+                          </div>
+                        </td>
+                        <td style={{ maxWidth: '400px' }}>
+                          {renderDetails(entry)}
+                          {entry.targetType && (
+                            <div className="mut sm" style={{ fontSize: '11px', marginTop: '4px' }}>
+                              <span style={{ 
+                                background: '#f1f5f9', 
+                                padding: '2px 6px', 
+                                borderRadius: '4px',
+                                fontSize: '10px',
+                                fontWeight: 600,
+                              }}>
+                                {entry.targetType}
+                              </span>
+                              <span style={{ marginLeft: '6px', color: '#475569' }}>
+                                {entry.targetId}
+                              </span>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
           )}
         </div>
 
         {totalPages > 1 && (
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '12px' }}>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'center',
+            gap: '12px', 
+            marginTop: '20px',
+            paddingTop: '16px',
+            borderTop: '1px solid var(--line)',
+          }}>
             <button
               className="btn ghost sm"
               disabled={page === 1}
               onClick={() => setPage(p => Math.max(1, p - 1))}
+              style={{ 
+                minWidth: '36px',
+                height: '36px',
+                padding: '0',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
             >
-              &lt;
+              ←
             </button>
-            <span style={{ alignSelf: 'center', fontSize: '13px' }}>
-              Страница {page} из {totalPages}
+            <span style={{ 
+              fontSize: '13px', 
+              color: 'var(--mut)',
+              fontWeight: 500,
+            }}>
+              Страница <b style={{ color: 'var(--txt)' }}>{page}</b> из <b style={{ color: 'var(--txt)' }}>{totalPages}</b>
             </span>
             <button
               className="btn ghost sm"
               disabled={page === totalPages}
               onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              style={{ 
+                minWidth: '36px',
+                height: '36px',
+                padding: '0',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
             >
-              &gt;
+              →
             </button>
           </div>
         )}
