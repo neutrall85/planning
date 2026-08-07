@@ -76,13 +76,13 @@ export const canChangeTaskStatus = (user, task, newStatus, data) => {
     if (hasRole(user, "project_manager")) return false;
     
     // Исполнитель может переводить только:
-    // - из "new" в "in_progress"
-    // - из "in_progress" в "review"
+    // - из "new" в "inwork"
+    // - из "inwork" в "review"
     // НЕ может закрывать задачу
     if (task.assigneeIds && task.assigneeIds.includes(user.id)) {
       if (newStatus === 'closed' || newStatus === 'cancelled') return false;
-      if (task.status === 'new' && newStatus === 'in_progress') return true;
-      if (task.status === 'in_progress' && newStatus === 'review') return true;
+      if (task.status === 'new' && newStatus === 'inwork') return true;
+      if (task.status === 'inwork' && newStatus === 'review') return true;
       return false;
     }
     
