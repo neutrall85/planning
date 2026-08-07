@@ -222,7 +222,7 @@ export default function MainLayout({ store, data, user }) {
 
         <div className="content">
           {view === 'kanban' && <Kanban db={data} ur={user} openTask={openTask} onMove={handleMoveTask} onNew={() => openTask(null)} />}
-          {view === 'gantt' && <Gantt db={data} ur={user} openTask={openTask} />}
+          {view === 'gantt' && <Gantt db={data} ur={user} openTask={openTask} patchTask={store.upsertTask} />}
           {view === 'calendar' && <Calendar db={data} ur={user} openTask={openTask} />}
           {view === 'projects' && <Projects db={data} ur={user} openProject={openProject} openHoursReq={openHoursReq} 
             closeProject={(p) => {

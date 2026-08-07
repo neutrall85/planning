@@ -2227,3 +2227,110 @@ input, select, textarea {
   color: #10b981;
   font-weight: 700;
 }
+/* --- Gantt: фильтры --- */
+.gantt-filters {
+  display: flex;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  background: #f8fafc;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.gantt-filters .inp.sm {
+  min-width: 150px;
+  font-size: 13px;
+}
+
+/* --- Gantt: базовый план --- */
+.gbar-baseline {
+  position: absolute;
+  top: 11px;
+  height: 24px;
+  border-radius: 7px;
+  z-index: 1;
+}
+
+/* --- Gantt: зависимости (SVG стрелки) --- */
+.gantt-dependencies {
+  overflow: visible;
+}
+.dependency-arrow path {
+  transition: stroke 0.15s ease, fill 0.15s ease;
+}
+.dependency-arrow:hover path {
+  stroke: #2563eb;
+  fill: #2563eb;
+}
+
+/* --- Popover для редактирования задачи --- */
+.task-edit-popover {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.15);
+  min-width: 280px;
+  max-width: 360px;
+  z-index: 1001;
+  animation: popIn 0.2s ease;
+}
+.popover-overlay {
+  position: fixed;
+  z-index: 1000;
+}
+.popover-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  background: #f8fafc;
+  border-radius: 12px 12px 0 0;
+}
+.popover-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--txt);
+}
+.popover-body {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.popover-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--line);
+  background: #f8fafc;
+  border-radius: 0 0 12px 12px;
+}
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.form-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--mut);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.form-static {
+  font-size: 13px;
+  color: var(--txt);
+  padding: 6px 0;
+}
+
+/* --- Иконка замка для админа --- */
+.icon-btn.xs {
+  padding: 2px;
+  border-radius: 4px;
+}
+.icon-btn.xs svg {
+  width: 12px;
+  height: 12px;
+}
