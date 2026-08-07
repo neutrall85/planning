@@ -54,13 +54,13 @@ export default function Reports({ db, ur }) {
   const [filterName, setFilterName] = useState('');
   const [results, setResults] = useState([]);
 
-  const allProjects = (safeDb.projects || []).filter(p => !p.archived);
+  const allProjects = (safeDb.projects || []);
   const visibleProjects = useMemo(() => {
     if (scope.all) return allProjects;
     return allProjects.filter(p => scope.projIds.has(p.id));
   }, [allProjects, scope]);
 
-  const allEmployees = (safeDb.employees || []).filter(e => !e.fired);
+  const allEmployees = (safeDb.employees || []);
   const visibleEmployees = useMemo(() => {
     if (scope.all) return allEmployees;
     return allEmployees.filter(e => scope.empIds.has(e.id));
@@ -73,7 +73,7 @@ export default function Reports({ db, ur }) {
     const employeesList = safeDb.employees || [];
 
     if (type === 'tasks') {
-      let tasks = tasksList.filter(t => !t.archived);
+      let tasks = tasksList;
       if (filters.dateFrom || filters.dateTo) {
         tasks = tasks.filter(t => {
           if (!t.createdAt) return false;
@@ -106,7 +106,7 @@ export default function Reports({ db, ur }) {
       tasks = tasks.filter(t => taskVisible(ur, scope, t, safeDb));
       setResults(tasks);
     } else if (type === 'projects') {
-      let projects = projectsList.filter(p => !p.archived);
+      let projects = projectsList;
       if (filters.dateFrom) projects = projects.filter(p => p.start >= filters.dateFrom);
       if (filters.dateTo) projects = projects.filter(p => p.start <= filters.dateTo);
       if (filters.deadlineFrom) projects = projects.filter(p => p.end && p.end >= filters.deadlineFrom);
@@ -119,9 +119,9 @@ export default function Reports({ db, ur }) {
       if (!scope.all) projects = projects.filter(p => scope.projIds.has(p.id));
       setResults(projects);
     } else if (type === 'employees') {
-      let employees = employeesList.filter(e => !e.fired);
+      let employees = employeesList;
       if (filters.projectId !== 'all') {
-        const taskIds = tasksList.filter(t => t.projectId === filters.projectId && !t.archived).map(t => t.id);
+        const taskIds = tasksList.filter(t => t.projectId === filters.projectId).map(t => t.id);
         employees = employees.filter(e =>
           tasksList.some(t => t.assigneeIds?.includes(e.id) && taskIds.includes(t.id))
         );
@@ -130,7 +130,7 @@ export default function Reports({ db, ur }) {
       // Фильтры по типу ВС, типу проекта, стадии, заказчику применяем через задачи
       if (filters.aircraftType !== 'all' || filters.projectType !== 'all' || filters.stage !== 'all' || filters.customer) {
         employees = employees.filter(e => {
-          const userTasks = tasksList.filter(t => t.assigneeIds?.includes(e.id) && !t.archived);
+          const userTasks = tasksList.filter(t => t.assigneeIds?.includes(e.id));
           if (userTasks.length === 0) return false;
           // Проверяем, есть ли хотя бы одна задача, соответствующая фильтрам по проекту
           return userTasks.some(t => {
@@ -148,7 +148,6 @@ export default function Reports({ db, ur }) {
     } else if (type === 'worklog') {
       let logs = [];
       tasksList.forEach(t => {
-        if (t.archived) return;
         (t.logs || []).forEach(l => {
           logs.push({
             ...l,
@@ -279,7 +278,7 @@ export default function Reports({ db, ur }) {
       results.forEach((e, idx) => {
         const dept = (e.departments || []).find(d => d.primary);
         const deptName = dept ? (safeDb.departments || []).find(d => d.id === dept.deptId)?.name : '—';
-        const tasks = (safeDb.tasks || []).filter(t => t.assigneeIds?.includes(e.id) && !t.archived);
+        const tasks = (safeDb.tasks || []).filter(t => t.assigneeIds?.includes(e.id));
         const plan = tasks.reduce((s, t) => s + (t.plannedHours || 0), 0);
         const fact = tasks.reduce((s, t) => s + getTaskSpent(t), 0);
         rows.push([
@@ -413,7 +412,7 @@ export default function Reports({ db, ur }) {
               {results.map((e, idx) => {
                 const dept = (e.departments || []).find(d => d.primary);
                 const deptName = dept ? (safeDb.departments || []).find(d => d.id === dept.deptId)?.name : '—';
-                const tasks = (safeDb.tasks || []).filter(t => t.assigneeIds?.includes(e.id) && !t.archived);
+                const tasks = (safeDb.tasks || []).filter(t => t.assigneeIds?.includes(e.id));
                 const plan = tasks.reduce((s, t) => s + (t.plannedHours || 0), 0);
                 const fact = tasks.reduce((s, t) => s + getTaskSpent(t), 0);
                 return (
