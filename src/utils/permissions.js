@@ -30,20 +30,76 @@ export const canChangeTaskStatus = (user, task, newStatus, data) => {
   if (task.status === 'closed' || task.status === 'cancelled') {
     return hasRole(user, 'admin');
   }
+  
+  const project = data.projects.find(p => p.id === task.projectId);
+  const isProdProject = project && project.ptype !== 'admin';
+  const isAdminProject = project && project.ptype === 'admin';
+  
+  // Для административных проектов - пока разрешаем все переходы (будет уточнено)
+  if (isAdminProject) {
+    if (hasRole(user, "admin", "director")) return true;
+    if (hasRole(user, "kb_chief") && project.kbId && (user.kbIds || []).includes(project.kbId)) {
+      return true;
+    }
+    if (hasRole(user, "head") && (task.assigneeIds || []).some(id => {
+      const e = data.employees.find(x => x.id === id);
+      return e && e.departments.some(d => (user.headDeptIds || []).includes(d.deptId));
+    })) return true;
+    if (hasRole(user, "project_lead") && project.managerId === user.id) return true;
+    if (task.assigneeIds && task.assigneeIds.includes(user.id)) {
+      if (newStatus === 'closed' || newStatus === 'cancelled') return false;
+      return true;
+    }
+    return false;
+  }
+  
+  // Для производственных проектов строгая механика
+  if (isProdProject) {
+    // Администратор и директор могут всё
+    if (hasRole(user, "admin", "director")) return true;
+    
+    // Руководитель КБ
+    if (hasRole(user, "kb_chief") && project.kbId && (user.kbIds || []).includes(project.kbId)) {
+      return true;
+    }
+    
+    // Руководитель подразделения
+    if (hasRole(user, "head") && (task.assigneeIds || []).some(id => {
+      const e = data.employees.find(x => x.id === id);
+      return e && e.departments.some(d => (user.headDeptIds || []).includes(d.deptId));
+    })) return true;
+    
+    // Ведущий проекта
+    if (hasRole(user, "project_lead") && project.managerId === user.id) return true;
+    
+    // Менеджер проектов не может менять статус
+    if (hasRole(user, "project_manager")) return false;
+    
+    // Исполнитель может переводить только:
+    // - из "new" в "in_progress"
+    // - из "in_progress" в "review"
+    // НЕ может закрывать задачу
+    if (task.assigneeIds && task.assigneeIds.includes(user.id)) {
+      if (newStatus === 'closed' || newStatus === 'cancelled') return false;
+      if (task.status === 'new' && newStatus === 'in_progress') return true;
+      if (task.status === 'in_progress' && newStatus === 'review') return true;
+      return false;
+    }
+    
+    return false;
+  }
+  
+  // Fallback для остальных случаев
   if (hasRole(user, "admin")) return true;
   if (hasRole(user, "director")) return true;
-  // Менеджер проектов не может менять статус (только создавать задачи)
-  if (hasRole(user, "project_manager")) return false;
-
-  const project = data.projects.find(p => p.id === task.projectId);
-  if (hasRole(user, "kb_chief") && project && project.kbId && (user.kbIds || []).includes(project.kbId)) {
+  if (hasRole(user, "kb_chief") && project.kbId && (user.kbIds || []).includes(project.kbId)) {
     return true;
   }
   if (hasRole(user, "head") && (task.assigneeIds || []).some(id => {
     const e = data.employees.find(x => x.id === id);
     return e && e.departments.some(d => (user.headDeptIds || []).includes(d.deptId));
   })) return true;
-  if (hasRole(user, "project_lead") && project && project.managerId === user.id) return true;
+  if (hasRole(user, "project_lead") && project.managerId === user.id) return true;
   if (task.assigneeIds && task.assigneeIds.includes(user.id)) {
     if (newStatus === 'closed' || newStatus === 'cancelled') return false;
     return true;

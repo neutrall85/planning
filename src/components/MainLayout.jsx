@@ -101,29 +101,32 @@ export default function MainLayout({ store, data, user }) {
     }, 'task', task.id);
 
     if (newStatus === 'review') {
-      const creatorId = task.creatorId || task.history?.find(h => h.who !== 'system')?.who || task.history[0]?.who;
       const project = data.projects.find(p => p.id === task.projectId);
-      let managerId = project?.managerId;
-      if (!managerId) {
-        const pmCandidate = data.employees.find(e =>
-          e.roles.includes('project_lead') &&
-          data.tasks.some(t => t.projectId === task.projectId && t.assigneeId === e.id)
-        );
-        if (pmCandidate) managerId = pmCandidate.id;
-      }
-      if (creatorId && creatorId !== user.id) {
-        store.addNotification(
-          creatorId,
-          `Задача "${task.title}" переведена на проверку исполнителем ${user.last} ${user.first}.`,
-          { targetType: 'task', targetId: task.id }
-        );
-      }
-      if (managerId && managerId !== user.id && managerId !== creatorId) {
-        store.addNotification(
-          managerId,
-          `Задача "${task.title}" переведена на проверку исполнителем ${user.last} ${user.first}.`,
-          { targetType: 'task', targetId: task.id }
-        );
+      // Уведомления только для производственных проектов
+      if (project && project.ptype !== 'admin') {
+        const creatorId = task.creatorId || task.history?.find(h => h.who !== 'system')?.who || task.history[0]?.who;
+        let managerId = project?.managerId;
+        if (!managerId) {
+          const pmCandidate = data.employees.find(e =>
+            e.roles.includes('project_lead') &&
+            data.tasks.some(t => t.projectId === task.projectId && (t.assigneeIds || []).includes(e.id))
+          );
+          if (pmCandidate) managerId = pmCandidate.id;
+        }
+        if (creatorId && creatorId !== user.id) {
+          store.addNotification(
+            creatorId,
+            `Задача "${task.title}" переведена на проверку исполнителем ${user.last} ${user.first}.`,
+            { targetType: 'task', targetId: task.id }
+          );
+        }
+        if (managerId && managerId !== user.id && managerId !== creatorId) {
+          store.addNotification(
+            managerId,
+            `Задача "${task.title}" переведена на проверку исполнителем ${user.last} ${user.first}.`,
+            { targetType: 'task', targetId: task.id }
+          );
+        }
       }
     }
     if (isClosing) {
