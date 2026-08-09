@@ -114,7 +114,7 @@ export default class DataStore {
       }
       if (changes.length > 0) {
         auditMessage = `Изменение задачи "${task.title}": ${changes.join('; ')}`;
-        this.addAudit('Изменение задачи', auditMessage);
+        this.addAudit('Изменение задачи', auditMessage, 'task', task.id);
       }
       tasks = this._data.tasks.map(t => t.id === task.id ? task : t);
     } else {
@@ -122,7 +122,7 @@ export default class DataStore {
         task.createdAt = new Date().toISOString();
       }
       tasks = [...this._data.tasks, task];
-      this.addAudit('Создание задачи', task.title);
+      this.addAudit('Создание задачи', task.title, 'task', task.id);
       (task.assigneeIds || []).forEach(id => {
         if (id !== this._currentUser?.id) {
           this.addNotification(id, `Вам назначена задача "${task.title}"`, { targetType: 'task', targetId: task.id });
@@ -152,6 +152,7 @@ export default class DataStore {
       const oldProject = this._data.projects[idx];
       const changes = [];
       if (oldProject.name !== project.name) changes.push(`Название: "${oldProject.name}" → "${project.name}"`);
+      if (oldProject.code !== project.code) changes.push(`Код: "${oldProject.code}" → "${project.code}"`);
       if (oldProject.budget !== project.budget) changes.push(`Бюджет: ${oldProject.budget ?? '—'} → ${project.budget ?? '—'}`);
       if (oldProject.status !== project.status) {
         changes.push(`Статус: ${PROJECT_STATUSES[oldProject.status]} → ${PROJECT_STATUSES[project.status]}`);
@@ -173,12 +174,12 @@ export default class DataStore {
       }
       if (changes.length > 0) {
         auditMessage = `Изменение проекта "${project.name}": ${changes.join('; ')}`;
-        this.addAudit('Изменение проекта', auditMessage);
+        this.addAudit('Изменение проекта', auditMessage, 'project', project.id);
       }
       projects = this._data.projects.map(p => p.id === project.id ? project : p);
     } else {
       projects = [...this._data.projects, project];
-      this.addAudit('Создание проекта', project.name);
+      this.addAudit('Создание проекта', project.name, 'project', project.id);
     }
     this._data = { ...this._data, projects };
     this._notify();

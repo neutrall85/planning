@@ -28,6 +28,7 @@ export const canChangeTaskStatus = (user, task, newStatus, data) => {
   if (!user || !task || !data) return false;
   if (task.archived) return false;
   if (task.status === 'closed' || task.status === 'cancelled') {
+    // Только администратор может reopening закрытые/отмененные задачи
     return hasRole(user, 'admin');
   }
   
@@ -35,9 +36,14 @@ export const canChangeTaskStatus = (user, task, newStatus, data) => {
   const isProdProject = project && project.ptype !== 'admin';
   const isAdminProject = project && project.ptype === 'admin';
   
-  // Для административных проектов - пока разрешаем все переходы (будет уточнено)
+  // Администратор может всё
+  if (hasRole(user, "admin")) return true;
+  
+  // Генеральный директор может всё
+  if (hasRole(user, "director")) return true;
+  
+  // Для административных проектов
   if (isAdminProject) {
-    if (hasRole(user, "admin", "director")) return true;
     if (hasRole(user, "kb_chief") && project.kbId && (user.kbIds || []).includes(project.kbId)) {
       return true;
     }
@@ -55,9 +61,6 @@ export const canChangeTaskStatus = (user, task, newStatus, data) => {
   
   // Для производственных проектов строгая механика
   if (isProdProject) {
-    // Администратор и директор могут всё
-    if (hasRole(user, "admin", "director")) return true;
-    
     // Руководитель КБ
     if (hasRole(user, "kb_chief") && project.kbId && (user.kbIds || []).includes(project.kbId)) {
       return true;
@@ -72,7 +75,7 @@ export const canChangeTaskStatus = (user, task, newStatus, data) => {
     // Ведущий проекта
     if (hasRole(user, "project_lead") && project.managerId === user.id) return true;
     
-    // Менеджер проектов не может менять статус
+    // Менеджер проектов не может менять статус задач (только проектов)
     if (hasRole(user, "project_manager")) return false;
     
     // Исполнитель может переводить только:
@@ -90,8 +93,6 @@ export const canChangeTaskStatus = (user, task, newStatus, data) => {
   }
   
   // Fallback для остальных случаев
-  if (hasRole(user, "admin")) return true;
-  if (hasRole(user, "director")) return true;
   if (hasRole(user, "kb_chief") && project.kbId && (user.kbIds || []).includes(project.kbId)) {
     return true;
   }
@@ -107,11 +108,12 @@ export const canChangeTaskStatus = (user, task, newStatus, data) => {
   return false;
 };
 
-// Право на редактирование полей проекта – менеджер проектов не может редактировать
+// Право на редактирование полей проекта – менеджер проектов не может редактировать поля, только статус
 export const canEditProjectFields = (user, project) => {
   if (!user || !project) return false;
   if (project.archived) return false;
-  if (hasRole(user, "admin")) return true;
+  if (hasRole(user, "admin", "director")) return true;
+  // Менеджер проектов не может редактировать поля проекта (только статус)
   if (hasRole(user, "project_manager")) return false;
   return false;
 };
@@ -120,16 +122,25 @@ export const canEditProjectFields = (user, project) => {
 export const canChangeProjectStatus = (user, project, newStatus) => {
   if (!user || !project) return false;
   if (project.archived) return false;
+  
+  // Администратор может всё
+  if (hasRole(user, 'admin')) return true;
+  
+  // Генеральный директор может всё
+  if (hasRole(user, 'director')) return true;
+  
+  // Менеджер проектов может менять статус (перетаскивать по канбану)
+  if (hasRole(user, 'project_manager')) return true;
+  
+  // Для закрытия/отмены проекта также может создатель
   if (newStatus === 'closed' || newStatus === 'cancelled') {
     const creatorId = project.creatorId || (project.history?.find(h => h.who !== 'system')?.who);
-    if (hasRole(user, 'admin', 'director')) return true;
     if (creatorId && creatorId === user.id) return true;
-    return false;
   }
-  if (hasRole(user, 'admin', 'director')) return true;
+  
+  // Руководитель КБ для своих проектов
   if (hasRole(user, 'kb_chief') && project.kbId && (user.kbIds || []).includes(project.kbId)) return true;
-  // Менеджер проектов не может менять статус
-  if (hasRole(user, 'project_manager')) return false;
+  
   return false;
 };
 
