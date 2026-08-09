@@ -7,6 +7,7 @@ import { computeScope, hasRole } from '../utils/permissions';
 export default function Projects({ db, ur, openProject, openHoursReq, closeProject, cancelProject }) {
   const scope = useMemo(() => computeScope(ur, db), [ur, db]);
   const [showOnlyMyProjects, setShowOnlyMyProjects] = useState(false);
+  const [sortBy, setSortBy] = useState("name"); // name, nameDesc, created, budget, budgetDesc
   const canSeeAllProjects = hasRole(ur, "admin", "director", "economist", "kb_chief", "head", "project_lead", "project_manager");
 
   let list = scope.all 
@@ -20,6 +21,24 @@ export default function Projects({ db, ur, openProject, openHoursReq, closeProje
     list = list.filter(p => myProjectIds.has(p.id));
   }
 
+  // Сортировка
+  list = [...list].sort((a, b) => {
+    switch (sortBy) {
+      case 'name':
+        return a.name.localeCompare(b.name, 'ru');
+      case 'nameDesc':
+        return b.name.localeCompare(a.name, 'ru');
+      case 'created':
+        return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+      case 'budget':
+        return (a.budget || 0) - (b.budget || 0);
+      case 'budgetDesc':
+        return (b.budget || 0) - (a.budget || 0);
+      default:
+        return 0;
+    }
+  });
+
   const canCloseProject = (project) => {
     const creatorId = project.creatorId || (project.history?.find(h => h.who !== 'system')?.who);
     return hasRole(ur, 'admin') || hasRole(ur, 'director') || (creatorId && creatorId === ur.id);
@@ -28,13 +47,20 @@ export default function Projects({ db, ur, openProject, openHoursReq, closeProje
   return (
     <div>
       <div className="sec-head">
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           {canSeeAllProjects && (
             <label className="dept-pick">
               <input type="checkbox" checked={showOnlyMyProjects} onChange={(e) => setShowOnlyMyProjects(e.target.checked)} />
               <span style={{ fontSize: 13 }}>Показать проекты с моими задачами</span>
             </label>
           )}
+          <select className="inp sel sm" value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={{ marginLeft: 8 }}>
+            <option value="name">По названию (А-Я)</option>
+            <option value="nameDesc">По названию (Я-А)</option>
+            <option value="created">По дате создания</option>
+            <option value="budget">По бюджету (возр.)</option>
+            <option value="budgetDesc">По бюджету (убыв.)</option>
+          </select>
           {hasRole(ur, 'admin', 'director', 'kb_chief', 'project_manager') && (
             <button className="btn primary" onClick={() => openProject(null)}>
               <Ic d={ICONS.plus} size={15} /> Проект
