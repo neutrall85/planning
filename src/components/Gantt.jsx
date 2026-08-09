@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { TODAY, iso, addDays, parseISO, fmtD, fmtDMY, isTaskActive } from '../utils/date';
-import { TASK_STATUSES } from '../utils/constants';
+import { TASK_STATUSES, DEPENDENCY_TYPES } from '../utils/constants';
 import { useDataHelpers } from '../hooks';
 import { computeScope, taskVisible } from '../utils/permissions';
 import { Ic, ICONS } from './Icons';
