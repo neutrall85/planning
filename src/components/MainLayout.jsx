@@ -79,6 +79,8 @@ export default function MainLayout({ store, data, user }) {
 
   const [requestsTab, setRequestsTab] = useState('hours');
   const [projectsView, setProjectsView] = useState('kanban');
+  const [showOnlyMyProjects, setShowOnlyMyProjects] = useState(false);
+  const [projectSortBy, setProjectSortBy] = useState("name");
 
   const handleMoveTask = (taskId, newStatus) => {
     const task = data.tasks.find(t => t.id === taskId);
@@ -234,7 +236,7 @@ export default function MainLayout({ store, data, user }) {
           {view === 'calendar' && <Calendar db={data} ur={user} openTask={openTask} />}
           {view === 'projects' && (
             <>
-              <div className="toolbar" style={{ marginBottom: 16 }}>
+              <div className="toolbar" style={{ marginBottom: 16, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
                 <div className="view-switcher">
                   <button 
                     className={`view-btn ${projectsView === 'list' ? 'active' : ''}`} 
@@ -249,9 +251,25 @@ export default function MainLayout({ store, data, user }) {
                     Канбан
                   </button>
                 </div>
+                <label className="dept-pick" style={{ margin: 0 }}>
+                  <input type="checkbox" checked={showOnlyMyProjects} onChange={(e) => setShowOnlyMyProjects(e.target.checked)} />
+                  <span style={{ fontSize: 13 }}>Показать проекты с моими задачами</span>
+                </label>
+                <select className="inp sel sm" value={projectSortBy} onChange={(e) => setProjectSortBy(e.target.value)} style={{ minWidth: 180 }}>
+                  <option value="name">По названию (А-Я)</option>
+                  <option value="nameDesc">По названию (Я-А)</option>
+                  <option value="created">По дате создания</option>
+                  <option value="budget">По бюджету (возр.)</option>
+                  <option value="budgetDesc">По бюджету (убыв.)</option>
+                </select>
+                {hasRole(user, 'admin', 'director', 'kb_chief', 'project_manager') && (
+                  <button className="btn primary" onClick={() => openProject(null)}>
+                    <Ic d={ICONS.plus} size={15} /> Проект
+                  </button>
+                )}
               </div>
               {projectsView === 'kanban' ? (
-                <ProjectsKanban db={data} ur={user} openProject={openProject}
+                <ProjectsKanban db={data} ur={user} openProject={openProject} showOnlyMyProjects={showOnlyMyProjects} sortBy={projectSortBy}
                   closeProject={(p) => {
                     store.upsertProject({...p, status: 'closed', closedAt: TODAY});
                   }} 
@@ -266,7 +284,7 @@ export default function MainLayout({ store, data, user }) {
                   }}
                 />
               ) : (
-                <Projects db={data} ur={user} openProject={openProject} openHoursReq={openHoursReq}
+                <Projects db={data} ur={user} openProject={openProject} openHoursReq={openHoursReq} showOnlyMyProjects={showOnlyMyProjects} sortBy={projectSortBy}
                   closeProject={(p) => {
                     store.upsertProject({...p, status: 'closed', closedAt: TODAY});
                   }} 

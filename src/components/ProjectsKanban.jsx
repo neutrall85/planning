@@ -15,12 +15,14 @@ const PROJECT_STATUS_CONFIG = {
   cancelled: { label: 'Отменён', color: '#ef4444' },
 };
 
-export default function ProjectsKanban({ db, ur, openProject, closeProject, cancelProject, moveProject }) {
+export default function ProjectsKanban({ db, ur, openProject, closeProject, cancelProject, moveProject, showOnlyMyProjects: parentShowOnlyMyProjects, sortBy: parentSortBy }) {
   const scope = useMemo(() => computeScope(ur, db), [ur, db]);
-  const [showOnlyMyProjects, setShowOnlyMyProjects] = useState(false);
-  const [dragOverCol, setDragOverCol] = useState(null);
-  const [sortBy, setSortBy] = useState("name"); // name, nameDesc, created, budget, budgetDesc
   const canSeeAllProjects = hasRole(ur, "admin", "director", "economist", "kb_chief", "head", "project_lead", "project_manager");
+  
+  // Используем пропсы от родителя, если переданы, иначе локальное состояние
+  const showOnlyMyProjects = parentShowOnlyMyProjects !== undefined ? parentShowOnlyMyProjects : false;
+  const sortBy = parentSortBy !== undefined ? parentSortBy : "name";
+  const [dragOverCol, setDragOverCol] = useState(null);
   
   let list = scope.all 
     ? db.projects.filter(p => !p.archived || p.status === 'closed' || p.status === 'cancelled') 
@@ -60,27 +62,6 @@ export default function ProjectsKanban({ db, ur, openProject, closeProject, canc
 
   return (
     <div>
-      <div className="toolbar">
-        {canSeeAllProjects && (
-          <label className="dept-pick">
-            <input type="checkbox" checked={showOnlyMyProjects} onChange={(e) => setShowOnlyMyProjects(e.target.checked)} />
-            <span style={{ fontSize: 13 }}>Показать проекты с моими задачами</span>
-          </label>
-        )}
-        <select className="inp sel sm" value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={{ marginLeft: 8 }}>
-          <option value="name">По названию (А-Я)</option>
-          <option value="nameDesc">По названию (Я-А)</option>
-          <option value="created">По дате создания</option>
-          <option value="budget">По бюджету (возр.)</option>
-          <option value="budgetDesc">По бюджету (убыв.)</option>
-        </select>
-        {canCreateProject && (
-          <button className="btn primary" onClick={() => openProject(null)}>
-            <Ic d={ICONS.plus} size={15} /> Проект
-          </button>
-        )}
-      </div>
-      
       <div className="kanban k5">
         {PROJECT_STATUS_ORDER.map((status) => {
           const projects = list.filter(p => p.status === status);
