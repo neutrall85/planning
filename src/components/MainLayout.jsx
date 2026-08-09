@@ -235,7 +235,6 @@ export default function MainLayout({ store, data, user }) {
           {view === 'projects' && (
             <>
               <div className="toolbar" style={{ marginBottom: 16 }}>
-                <div className="sec-note" style={{ flex: 1 }}>Производственные и административные проекты.</div>
                 <div className="view-switcher">
                   <button 
                     className={`view-btn ${projectsView === 'list' ? 'active' : ''}`} 
