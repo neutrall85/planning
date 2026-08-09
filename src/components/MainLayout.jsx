@@ -78,6 +78,7 @@ export default function MainLayout({ store, data, user }) {
   const openDelegation = () => setModal({ type: 'delegation' });
 
   const [requestsTab, setRequestsTab] = useState('hours');
+  const [projectsView, setProjectsView] = useState('kanban');
 
   const handleMoveTask = (taskId, newStatus) => {
     const task = data.tasks.find(t => t.id === taskId);
@@ -231,49 +232,46 @@ export default function MainLayout({ store, data, user }) {
           {view === 'kanban' && <Kanban db={data} ur={user} openTask={openTask} onMove={handleMoveTask} onNew={() => openTask(null)} />}
           {view === 'gantt' && <Gantt db={data} ur={user} openTask={openTask} patchTask={store.upsertTask} />}
           {view === 'calendar' && <Calendar db={data} ur={user} openTask={openTask} />}
-          {view === 'projects' && (() => {
-            const [projectsView, setProjectsView] = useState('kanban');
-            return (
-              <>
-                <div className="toolbar" style={{ marginBottom: 16 }}>
-                  <div className="sec-note" style={{ flex: 1 }}>Производственные и административные проекты.</div>
-                  <div className="btn-group">
-                    <button 
-                      className={`btn ghost sm ${projectsView === 'list' ? 'active' : ''}`} 
-                      onClick={() => setProjectsView('list')}
-                    >
-                      <Ic d={ICONS.list} size={15} /> Список
-                    </button>
-                    <button 
-                      className={`btn ghost sm ${projectsView === 'kanban' ? 'active' : ''}`} 
-                      onClick={() => setProjectsView('kanban')}
-                    >
-                      <Ic d={ICONS.kanban} size={15} /> Канбан
-                    </button>
-                  </div>
+          {view === 'projects' && (
+            <>
+              <div className="toolbar" style={{ marginBottom: 16 }}>
+                <div className="sec-note" style={{ flex: 1 }}>Производственные и административные проекты.</div>
+                <div className="btn-group">
+                  <button 
+                    className={`btn ghost sm ${projectsView === 'list' ? 'active' : ''}`} 
+                    onClick={() => setProjectsView('list')}
+                  >
+                    <Ic d={ICONS.list} size={15} /> Список
+                  </button>
+                  <button 
+                    className={`btn ghost sm ${projectsView === 'kanban' ? 'active' : ''}`} 
+                    onClick={() => setProjectsView('kanban')}
+                  >
+                    <Ic d={ICONS.kanban} size={15} /> Канбан
+                  </button>
                 </div>
-                {projectsView === 'kanban' ? (
-                  <ProjectsKanban db={data} ur={user} openProject={openProject}
-                    closeProject={(p) => {
-                      store.upsertProject({...p, status: 'closed', closedAt: TODAY});
-                    }} 
-                    cancelProject={(p) => {
-                      store.upsertProject({...p, status: 'cancelled'});
-                    }} 
-                  />
-                ) : (
-                  <Projects db={data} ur={user} openProject={openProject} openHoursReq={openHoursReq}
-                    closeProject={(p) => {
-                      store.upsertProject({...p, status: 'closed', closedAt: TODAY});
-                    }} 
-                    cancelProject={(p) => {
-                      store.upsertProject({...p, status: 'cancelled'});
-                    }} 
-                  />
-                )}
-              </>
-            );
-          })()}
+              </div>
+              {projectsView === 'kanban' ? (
+                <ProjectsKanban db={data} ur={user} openProject={openProject}
+                  closeProject={(p) => {
+                    store.upsertProject({...p, status: 'closed', closedAt: TODAY});
+                  }} 
+                  cancelProject={(p) => {
+                    store.upsertProject({...p, status: 'cancelled'});
+                  }} 
+                />
+              ) : (
+                <Projects db={data} ur={user} openProject={openProject} openHoursReq={openHoursReq}
+                  closeProject={(p) => {
+                    store.upsertProject({...p, status: 'closed', closedAt: TODAY});
+                  }} 
+                  cancelProject={(p) => {
+                    store.upsertProject({...p, status: 'cancelled'});
+                  }} 
+                />
+              )}
+            </>
+          )}
           {view === 'cabinet' && <Cabinet store={store} data={data} user={user} openTask={openTask} openVacation={openVacation} openDelegation={openDelegation} />}
           {view === 'staff' && <Staff 
             db={data} 
