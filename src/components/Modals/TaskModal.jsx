@@ -6,7 +6,7 @@ import {
   TASK_STATUSES, TASK_STATUS_ORDER, PRIORITIES, DEPENDENCY_TYPES,
 } from '../../utils/constants';
 import {
-  TODAY, fmtDMY, fmtDT, iso, addDays, addMonths, addYears, uid, fmtD,
+  TODAY, fmtDMY, fmtDT, iso, addDays, addMonths, addYears, uid, fmtD, parseISO,
 } from '../../utils/date';
 import {
   canCreateTask, canEditTaskFields, hasRole, has,
@@ -199,12 +199,63 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
     if (existing && existing.status !== statusToSave) {
       history.push({ ts: Date.now(), who: ur.id, text: `Статус: ${TASK_STATUSES[existing.status].label} → ${TASK_STATUSES[statusToSave].label}` });
     }
+    
+    // Обработка зависимостей и синхронизация дат
+    let finalStart = f.start;
+    let finalDeadline = f.deadline;
+    
+    if (f.dependencyId && f.dependencyType) {
+      const depTask = db.tasks.find(t => t.id === f.dependencyId);
+      if (depTask) {
+        switch (f.dependencyType) {
+          case 'SS': // Начало-Начало: синхронизируем начало с зависимой задачей
+            finalStart = depTask.start;
+            // Если есть дедлайн, сохраняем разницу между старым дедлайном и стартом
+            if (f.deadline && depTask.start) {
+              const diffDays = Math.round((new Date(f.deadline) - new Date(f.start || TODAY)) / (1000 * 60 * 60 * 24));
+              finalDeadline = iso(addDays(parseISO(depTask.start), diffDays));
+            }
+            break;
+          case 'FF': // Окончание-Окончание: синхронизируем дедлайн с зависимой задачей
+            if (depTask.deadline) {
+              finalDeadline = depTask.deadline;
+              // Сохраняем длительность задачи
+              if (f.start && f.deadline) {
+                const duration = Math.round((new Date(f.deadline) - new Date(f.start)) / (1000 * 60 * 60 * 24));
+                finalStart = iso(addDays(parseISO(depTask.deadline), -duration));
+              }
+            }
+            break;
+          case 'SF': // Начало-Окончание: задача завершается после начала зависимой
+            if (depTask.start) {
+              finalDeadline = depTask.start;
+              if (f.start && f.deadline) {
+                const duration = Math.round((new Date(f.deadline) - new Date(f.start)) / (1000 * 60 * 60 * 24));
+                finalStart = iso(addDays(parseISO(depTask.start), -duration));
+              }
+            }
+            break;
+          case 'FS': // Окончание-Начало: задача начинается после завершения зависимой
+          default:
+            if (depTask.deadline) {
+              finalStart = depTask.deadline;
+              if (f.deadline) {
+                const diffDays = Math.round((new Date(f.deadline) - new Date(f.start || TODAY)) / (1000 * 60 * 60 * 24));
+                finalDeadline = iso(addDays(parseISO(depTask.deadline), diffDays));
+              }
+            }
+            break;
+        }
+      }
+    }
+    
     const newClosed = statusToSave === "closed" && (!existing || existing.status !== "closed");
     const taskToSave = {
       ...f,
+      start: finalStart,
+      deadline: finalDeadline,
       status: statusToSave,
       plannedHours: f.plannedHours === "" || f.plannedHours == null ? null : +f.plannedHours,
-      deadline: f.deadline || null,
       closedAt: newClosed ? TODAY : (existing ? existing.closedAt : null),
       history,
       creatorId: existing ? existing.creatorId : ur.id
