@@ -22,8 +22,8 @@ export default function ProjectsKanban({ db, ur, openProject, closeProject, canc
   const canSeeAllProjects = hasRole(ur, "admin", "director", "economist", "kb_chief", "head", "project_lead", "project_manager");
   
   let list = scope.all 
-    ? db.projects.filter(p => !p.archived) 
-    : db.projects.filter(p => !p.archived && scope.projIds.has(p.id));
+    ? db.projects.filter(p => !p.archived || p.status === 'closed' || p.status === 'cancelled') 
+    : db.projects.filter(p => (!p.archived || p.status === 'closed' || p.status === 'cancelled') && scope.projIds.has(p.id));
 
   // Фильтр "проекты с моими задачами"
   if (showOnlyMyProjects) {
