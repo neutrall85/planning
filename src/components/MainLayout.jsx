@@ -236,18 +236,18 @@ export default function MainLayout({ store, data, user }) {
             <>
               <div className="toolbar" style={{ marginBottom: 16 }}>
                 <div className="sec-note" style={{ flex: 1 }}>Производственные и административные проекты.</div>
-                <div className="btn-group">
+                <div className="view-switcher">
                   <button 
-                    className={`btn ghost sm ${projectsView === 'list' ? 'active' : ''}`} 
+                    className={`view-btn ${projectsView === 'list' ? 'active' : ''}`} 
                     onClick={() => setProjectsView('list')}
                   >
-                    <Ic d={ICONS.list} size={15} /> Список
+                    Список
                   </button>
                   <button 
-                    className={`btn ghost sm ${projectsView === 'kanban' ? 'active' : ''}`} 
+                    className={`view-btn ${projectsView === 'kanban' ? 'active' : ''}`} 
                     onClick={() => setProjectsView('kanban')}
                   >
-                    <Ic d={ICONS.kanban} size={15} /> Канбан
+                    Канбан
                   </button>
                 </div>
               </div>
