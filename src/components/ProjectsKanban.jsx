@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { PROJECT_STATUSES, PROJECT_TYPES } from '../utils/constants';
 import { fmtDMY, initials, isTaskActive } from '../utils/date';
 import { Ic, ICONS } from './Icons';
-import { computeScope, hasRole } from '../utils/permissions';
+import { computeScope, hasRole, canChangeProjectStatus } from '../utils/permissions';
 
 // Порядок статусов для канбан-доски
 const PROJECT_STATUS_ORDER = ['inactive', 'active', 'closed', 'cancelled'];
@@ -15,9 +15,10 @@ const PROJECT_STATUS_CONFIG = {
   cancelled: { label: 'Отменён', color: '#ef4444' },
 };
 
-export default function ProjectsKanban({ db, ur, openProject, closeProject, cancelProject }) {
+export default function ProjectsKanban({ db, ur, openProject, closeProject, cancelProject, moveProject }) {
   const scope = useMemo(() => computeScope(ur, db), [ur, db]);
   const [showOnlyMyProjects, setShowOnlyMyProjects] = useState(false);
+  const [dragOverCol, setDragOverCol] = useState(null);
   const canSeeAllProjects = hasRole(ur, "admin", "director", "economist", "kb_chief", "head", "project_lead", "project_manager");
   
   let list = scope.all 
@@ -61,7 +62,27 @@ export default function ProjectsKanban({ db, ur, openProject, closeProject, canc
           const statusConfig = PROJECT_STATUS_CONFIG[status];
           
           return (
-            <div key={status} className="kcol">
+            <div 
+              key={status} 
+              className={`kcol${dragOverCol === status ? ' over' : ''}`}
+              onDragOver={(e) => { e.preventDefault(); setDragOverCol(status); }}
+              onDragLeave={() => setDragOverCol(null)}
+              onDrop={(e) => { 
+                e.preventDefault(); 
+                setDragOverCol(null); 
+                const id = e.dataTransfer.getData("text/plain"); 
+                if (id) {
+                  const project = db.projects.find(p => p.id === id);
+                  if (project && !canChangeProjectStatus(ur, project, status, db)) {
+                    alert('У вас нет прав на перевод проекта в статус ' + statusConfig.label);
+                    return;
+                  }
+                  if (moveProject) {
+                    moveProject(id, status);
+                  }
+                }
+              }}
+            >
               <div className="kcol-head">
                 <span className="kdot" style={{ background: statusConfig.color }} />
                 {statusConfig.label}
@@ -78,12 +99,15 @@ export default function ProjectsKanban({ db, ur, openProject, closeProject, canc
                     const usePct = p.budget ? Math.round((fact / Math.max(1, p.budget)) * 100) : 0;
                     const overPlan = p.budget != null && plan > p.budget;
                     const uniqueAssignees = [...new Set(tasks.flatMap(t => t.assigneeIds || []))];
+                    const canDrag = canChangeProjectStatus(ur, p, status, db);
                     
                     return (
                       <div 
                         key={p.id} 
                         className="kcard"
                         onClick={() => openProject(p.id)}
+                        draggable={canDrag}
+                        onDragStart={(e) => e.dataTransfer.setData("text/plain", p.id)}
                         style={{ cursor: 'pointer' }}
                       >
                         <div className="kcard-title">{p.name}</div>

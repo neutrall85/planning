@@ -258,7 +258,13 @@ export default function MainLayout({ store, data, user }) {
                   }} 
                   cancelProject={(p) => {
                     store.upsertProject({...p, status: 'cancelled'});
-                  }} 
+                  }}
+                  moveProject={(id, newStatus) => {
+                    const project = data.projects.find(p => p.id === id);
+                    if (project && project.status !== newStatus) {
+                      store.upsertProject({...project, status: newStatus});
+                    }
+                  }}
                 />
               ) : (
                 <Projects db={data} ur={user} openProject={openProject} openHoursReq={openHoursReq}
