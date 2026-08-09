@@ -8,6 +8,7 @@ import Kanban from './Kanban';
 import Gantt from './Gantt';
 import Calendar from './Calendar';
 import Projects from './Projects';
+import ProjectsKanban from './ProjectsKanban';
 import Cabinet from './Cabinet';
 import Staff from './Staff';
 import Reports from './Reports';
@@ -230,7 +231,7 @@ export default function MainLayout({ store, data, user }) {
           {view === 'kanban' && <Kanban db={data} ur={user} openTask={openTask} onMove={handleMoveTask} onNew={() => openTask(null)} />}
           {view === 'gantt' && <Gantt db={data} ur={user} openTask={openTask} patchTask={store.upsertTask} />}
           {view === 'calendar' && <Calendar db={data} ur={user} openTask={openTask} />}
-          {view === 'projects' && <Projects db={data} ur={user} openProject={openProject} openHoursReq={openHoursReq} 
+          {view === 'projects' && <ProjectsKanban db={data} ur={user} openProject={openProject}
             closeProject={(p) => {
               store.upsertProject({...p, status: 'closed', closedAt: TODAY});
             }} 
