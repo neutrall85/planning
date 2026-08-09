@@ -4,11 +4,13 @@ import { fmtDMY, initials, isTaskActive } from '../utils/date';
 import { Ic, ICONS } from './Icons';
 import { computeScope, hasRole } from '../utils/permissions';
 
-export default function Projects({ db, ur, openProject, openHoursReq, closeProject, cancelProject }) {
+export default function Projects({ db, ur, openProject, openHoursReq, closeProject, cancelProject, showOnlyMyProjects: parentShowOnlyMyProjects, sortBy: parentSortBy }) {
   const scope = useMemo(() => computeScope(ur, db), [ur, db]);
-  const [showOnlyMyProjects, setShowOnlyMyProjects] = useState(false);
-  const [sortBy, setSortBy] = useState("name"); // name, nameDesc, created, budget, budgetDesc
   const canSeeAllProjects = hasRole(ur, "admin", "director", "economist", "kb_chief", "head", "project_lead", "project_manager");
+  
+  // Используем пропсы от родителя, если переданы, иначе локальное состояние
+  const showOnlyMyProjects = parentShowOnlyMyProjects !== undefined ? parentShowOnlyMyProjects : false;
+  const sortBy = parentSortBy !== undefined ? parentSortBy : "name";
 
   let list = scope.all 
     ? db.projects.filter(p => !p.archived || p.status === 'closed' || p.status === 'cancelled') 
@@ -46,28 +48,6 @@ export default function Projects({ db, ur, openProject, openHoursReq, closeProje
 
   return (
     <div>
-      <div className="sec-head">
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-          {canSeeAllProjects && (
-            <label className="dept-pick">
-              <input type="checkbox" checked={showOnlyMyProjects} onChange={(e) => setShowOnlyMyProjects(e.target.checked)} />
-              <span style={{ fontSize: 13 }}>Показать проекты с моими задачами</span>
-            </label>
-          )}
-          <select className="inp sel sm" value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={{ marginLeft: 8 }}>
-            <option value="name">По названию (А-Я)</option>
-            <option value="nameDesc">По названию (Я-А)</option>
-            <option value="created">По дате создания</option>
-            <option value="budget">По бюджету (возр.)</option>
-            <option value="budgetDesc">По бюджету (убыв.)</option>
-          </select>
-          {hasRole(ur, 'admin', 'director', 'kb_chief', 'project_manager') && (
-            <button className="btn primary" onClick={() => openProject(null)}>
-              <Ic d={ICONS.plus} size={15} /> Проект
-            </button>
-          )}
-        </div>
-      </div>
       <div className="pj-grid">
         {list.map(p => {
           const tasks = db.tasks.filter(t => t.projectId === p.id && isTaskActive(t));
