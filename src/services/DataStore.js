@@ -1,5 +1,5 @@
 import { TODAY, iso, addDays, addMonths, uid, fmtDMY } from '../utils/date';
-import { TASK_STATUSES, TASK_STATUS_ORDER, PRIORITIES, VACATION_TYPES, PROJECT_STATUSES, PROJECT_TYPES } from '../utils/constants';
+import { TASK_STATUSES, TASK_STATUS_ORDER, PRIORITIES, VACATION_TYPES, PROJECT_STATUSES, PROJECT_TYPES, DEPENDENCY_TYPES } from '../utils/constants';
 
 export default class DataStore {
   constructor() {
@@ -111,6 +111,15 @@ export default class DataStore {
             this.addNotification(project.managerId, `Задача "${task.title}" проекта ${project.code} ${task.status === 'closed' ? 'закрыта' : 'отменена'}`, { targetType: 'task', targetId: task.id });
           }
         }
+      }
+      // Логирование изменений зависимостей
+      if (old.dependencyId !== task.dependencyId || old.dependencyType !== task.dependencyType) {
+        const oldDep = old.dependencyId ? this._data.tasks.find(t => t.id === old.dependencyId) : null;
+        const newDep = task.dependencyId ? this._data.tasks.find(t => t.id === task.dependencyId) : null;
+        const depTypeLabel = task.dependencyType ? DEPENDENCY_TYPES[task.dependencyType]?.label : '';
+        const oldDepStr = oldDep ? `"${oldDep.title}" (${DEPENDENCY_TYPES[old.dependencyType]?.label || 'FS'})` : 'нет';
+        const newDepStr = newDep ? `"${newDep.title}" (${depTypeLabel})` : 'нет';
+        changes.push(`Зависимость: ${oldDepStr} → ${newDepStr}`);
       }
       if (changes.length > 0) {
         auditMessage = `Изменение задачи "${task.title}": ${changes.join('; ')}`;

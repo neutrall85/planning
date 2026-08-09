@@ -3,7 +3,7 @@ import { Modal } from '../Modal';
 import Discussion from './Discussion';
 import { useDataHelpers } from '../../hooks';
 import {
-  TASK_STATUSES, TASK_STATUS_ORDER, PRIORITIES,
+  TASK_STATUSES, TASK_STATUS_ORDER, PRIORITIES, DEPENDENCY_TYPES,
 } from '../../utils/constants';
 import {
   TODAY, fmtDMY, fmtDT, iso, addDays, addMonths, addYears, uid, fmtD,
@@ -152,6 +152,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
     plannedHours: 8, start: TODAY, deadline: iso(addDays(new Date(), 14)), status: "new", logs: [], comments: [], history: [], delegatedFrom: null, archived: false, archivedAt: null, closedAt: null,
     creatorId: ur.id,
     dependencyId: null, // Связанная задача (должна быть выполнена перед текущей)
+    dependencyType: 'FS', // Тип зависимости: FS, SS, FF, SF
     // Поля для повторения (только для новых задач)
     repeatType: 'none',
     repeatInterval: 1,
@@ -435,6 +436,18 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
                 <option key={t.id} value={t.id}>{t.title}</option>
               ))
             }
+          </select>
+          
+          <label className="lbl">Тип зависимости</label>
+          <select 
+            className="inp sel" 
+            disabled={!canEditFields || !f.dependencyId} 
+            value={f.dependencyType || 'FS'} 
+            onChange={(e) => set("dependencyType", e.target.value)}
+          >
+            {Object.entries(DEPENDENCY_TYPES).map(([key, val]) => (
+              <option key={key} value={key}>{val.label} — {val.desc}</option>
+            ))}
           </select>
         </div>
 
