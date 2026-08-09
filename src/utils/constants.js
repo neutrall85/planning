@@ -36,7 +36,6 @@ export const VACATION_TYPES = {
 export const PROJECT_STATUSES = {
   active:    "Активный",
   inactive:  "Неактивный",
-  suspended: "Приостановлен",
   closed:    "Закрыт",
   cancelled: "Отменён"
 };

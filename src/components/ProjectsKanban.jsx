@@ -5,12 +5,11 @@ import { Ic, ICONS } from './Icons';
 import { computeScope, hasRole } from '../utils/permissions';
 
 // Порядок статусов для канбан-доски
-const PROJECT_STATUS_ORDER = ['active', 'suspended', 'inactive', 'closed', 'cancelled'];
+const PROJECT_STATUS_ORDER = ['inactive', 'active', 'closed', 'cancelled'];
 
 // Конфигурация цветов для статусов проектов
 const PROJECT_STATUS_CONFIG = {
   active: { label: 'Активный', color: '#10b981' },
-  suspended: { label: 'Приостановлен', color: '#f59e0b' },
   inactive: { label: 'Неактивный', color: '#94a3b8' },
   closed: { label: 'Закрыт', color: '#3b82f6' },
   cancelled: { label: 'Отменён', color: '#ef4444' },
