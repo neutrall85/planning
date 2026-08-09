@@ -2334,3 +2334,33 @@ input, select, textarea {
   width: 12px;
   height: 12px;
 }
+
+/* --- Переключатель видов (Список/Канбан) --- */
+.view-switcher {
+  display: flex;
+  background: #f1f5f9;
+  border-radius: 8px;
+  padding: 3px;
+  gap: 2px;
+}
+.view-btn {
+  border: none;
+  background: transparent;
+  color: var(--mut);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.view-btn:hover {
+  background: rgba(255, 255, 255, 0.5);
+  color: var(--txt);
+}
+.view-btn.active {
+  background: #fff;
+  color: var(--acc);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
