@@ -28,7 +28,6 @@ export default function Projects({ db, ur, openProject, openHoursReq, closeProje
   return (
     <div>
       <div className="sec-head">
-        <div className="sec-note">Производственные и административные проекты.</div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           {canSeeAllProjects && (
             <label className="dept-pick">

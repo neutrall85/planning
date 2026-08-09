@@ -61,7 +61,6 @@ export default function ProjectsKanban({ db, ur, openProject, closeProject, canc
   return (
     <div>
       <div className="toolbar">
-        <div className="sec-note" style={{ flex: 1 }}>Производственные и административные проекты.</div>
         {canSeeAllProjects && (
           <label className="dept-pick">
             <input type="checkbox" checked={showOnlyMyProjects} onChange={(e) => setShowOnlyMyProjects(e.target.checked)} />
