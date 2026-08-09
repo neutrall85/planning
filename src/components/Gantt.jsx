@@ -109,6 +109,28 @@ export default function Gantt({ db, ur, openTask, openProject }) {
   const { days, months, groups } = ganttData;
   const todayIdx = days.indexOf(TODAY);
   const width = days.length * DW;
+  
+  // Функция для получения координат в зависимости от типа зависимости
+  const getDepCoords = (t, depTask, depItem) => {
+    if (!depTask || !depItem) return null;
+    
+    const tLeft = t.sIdx * DW + DW/2;
+    const tRight = t.eIdx * DW + DW/2;
+    const depLeft = depItem.sIdx * DW + DW/2;
+    const depRight = depItem.eIdx * DW + DW/2;
+    
+    switch (t.dependencyType) {
+      case 'SS': // Начало-Начало
+        return { fromX: depLeft, toX: tLeft, fromY: -25, toY: -10 };
+      case 'FF': // Окончание-Окончание
+        return { fromX: depRight, toX: tRight, fromY: -25, toY: -10 };
+      case 'SF': // Начало-Окончание
+        return { fromX: depLeft, toX: tRight, fromY: -25, toY: -10 };
+      case 'FS': // Окончание-Начало (по умолчанию)
+      default:
+        return { fromX: depRight, toX: tLeft, fromY: -25, toY: -10 };
+    }
+  };
 
   return (
     <div className="gantt-panel">
@@ -195,30 +217,40 @@ export default function Gantt({ db, ur, openTask, openProject }) {
                     const pct = Math.min(100, (sp / Math.max(1, t.plannedHours || 0)) * 100);
                     const vac = a ? vacOverlap(a.id, t.start, t.deadline) : null;
                     const tip = `${t.title}: ${fmtD(t.start)} — ${fmtD(t.deadline)}, план ${t.plannedHours ?? '—'} ч${vac ? `. Исполнитель в отпуске ${fmtDMY(vac.start)}–${fmtDMY(vac.end)}` : ''}`;
-                    
                     // Проверяем, есть ли зависимость от другой задачи
                     const depTask = taskDeps[t.id];
                     let depLine = null;
                     if (depTask) {
                       const depItem = g.items.find(it => it.id === depTask.id);
                       if (depItem) {
-                        const depLeft = depItem.sIdx * DW + DW/2;
-                        const depRight = depItem.eIdx * DW + DW/2;
-                        // Рисуем линию от зависимой задачи к текущей
-                        depLine = (
-                          <svg 
-                            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}
-                          >
-                            <path
-                              d={`M ${depRight} ${-10} L ${depRight} ${-25} L ${left} ${-25} L ${left} ${-10}`}
-                              fill="none"
-                              stroke="#94a3b8"
-                              strokeWidth="2"
-                              strokeDasharray="4 2"
-                              markerEnd="url(#arrowhead)"
-                            />
-                          </svg>
-                        );
+                        const coords = getDepCoords(t, depTask, depItem);
+                        if (coords) {
+                          // Рисуем линию от зависимой задачи к текущей с учётом типа зависимости
+                          depLine = (
+                            <svg
+                              style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}
+                            >
+                              <path
+                                d={`M ${coords.fromX} ${coords.fromY} L ${coords.toX} ${coords.fromY} L ${coords.toX} ${coords.toY}`}
+                                fill="none"
+                                stroke="#94a3b8"
+                                strokeWidth="2"
+                                strokeDasharray="4 2"
+                                markerEnd="url(#arrowhead)"
+                              />
+                              {/* Добавляем метку типа зависимости */}
+                              <text
+                                x={(coords.fromX + coords.toX) / 2}
+                                y={coords.fromY - 5}
+                                fontSize="10"
+                                fill="#64748b"
+                                textAnchor="middle"
+                              >
+                                {t.dependencyType || 'FS'}
+                              </text>
+                            </svg>
+                          );
+                        }
                       }
                     }
                     
