@@ -5,7 +5,7 @@ import { useDataHelpers } from '../hooks';
 import { computeScope, taskVisible } from '../utils/permissions';
 import { Ic, ICONS } from './Icons';
 
-export default function Gantt({ db, ur, openTask }) {
+export default function Gantt({ db, ur, openTask, openProject }) {
   const { empName, getTaskSpent, vacOverlap } = useDataHelpers(db);
   const scope = useMemo(() => computeScope(ur, db), [ur, db]);
   // Заменяем !t.archived на isTaskActive(t)
@@ -164,40 +164,83 @@ export default function Gantt({ db, ur, openTask }) {
               {days.map(d => <div key={d} className={`gcell${([0,6].includes(parseISO(d).getDay()) ? ' wk' : '')}`} style={{ width: DW, flex: 'none' }} />)}
               {todayIdx >= 0 && <div className="gtoday" style={{ left: todayIdx * DW + DW/2 }} />}
             </div>
-            {groups.map(g => (
-              <div key={g.project.id}>
-                <div className="gantt-group">
-                  <div className="gantt-group-name">
-                    <span className="pdot" style={{ background: g.project.color }} />{g.project.code} · {g.project.name}
+            {groups.map(g => {
+              // Находим все зависимости для задач этого проекта
+              const taskDeps = g.items.reduce((acc, t) => {
+                if (t.dependencyId) {
+                  acc[t.id] = db.tasks.find(dt => dt.id === t.dependencyId);
+                }
+                return acc;
+              }, {});
+              
+              return (
+                <div key={g.project.id}>
+                  <div className="gantt-group">
+                    <div 
+                      className="gantt-group-name" 
+                      style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                      onClick={() => openProject && openProject(g.project.id)}
+                      title="Открыть проект"
+                    >
+                      <span className="pdot" style={{ background: g.project.color }} />{g.project.code} · {g.project.name}
+                    </div>
+                    <div style={{ width }} />
                   </div>
-                  <div style={{ width }} />
-                </div>
-                {g.items.map(t => {
-                  const assignees = (t.assigneeIds || []).map(id => db.employees.find(e => e.id === id)).filter(Boolean);
-                  const a = assignees[0];
-                  const left = t.sIdx * DW + 2;
-                  const w = Math.max((t.eIdx - t.sIdx + 1) * DW - 4, DW - 8);
-                  const sp = getTaskSpent(t);
-                  const pct = Math.min(100, (sp / Math.max(1, t.plannedHours || 0)) * 100);
-                  const vac = a ? vacOverlap(a.id, t.start, t.deadline) : null;
-                  const tip = `${t.title}: ${fmtD(t.start)} — ${fmtD(t.deadline)}, план ${t.plannedHours ?? '—'} ч${vac ? `. Исполнитель в отпуске ${fmtDMY(vac.start)}–${fmtDMY(vac.end)}` : ''}`;
-                  return (
-                    <div key={t.id} className="gantt-row">
-                      <div className="gantt-label" onClick={() => openTask(t.id)}>
-                        <span className={`gtitle${t.status === 'cancelled' ? ' dim' : ''}`}>{t.title}</span>
-                        <span className="gsub">{a ? a.last : ''} · {t.plannedHours ?? '—'} ч · {TASK_STATUSES[t.status].label}</span>
-                      </div>
-                      <div className="gantt-track" style={{ width }}>
-                        <div className="gbar" style={{ left, width: w, background: g.project.color + '33', border: `1px solid ${g.project.color}66`, cursor: 'pointer', opacity: t.status === 'cancelled' ? 0.45 : 1 }} onClick={() => openTask(t.id)} title={tip}>
-                          <div className="gbar-fill" style={{ width: pct + '%', background: t.status === 'closed' ? '#10b981' : g.project.color }} />
-                          {vac && <span className="gbar-vac" title="Исполнитель в отпуске в эти даты">🏖</span>}
+                  {g.items.map(t => {
+                    const assignees = (t.assigneeIds || []).map(id => db.employees.find(e => e.id === id)).filter(Boolean);
+                    const a = assignees[0];
+                    const left = t.sIdx * DW + 2;
+                    const w = Math.max((t.eIdx - t.sIdx + 1) * DW - 4, DW - 8);
+                    const sp = getTaskSpent(t);
+                    const pct = Math.min(100, (sp / Math.max(1, t.plannedHours || 0)) * 100);
+                    const vac = a ? vacOverlap(a.id, t.start, t.deadline) : null;
+                    const tip = `${t.title}: ${fmtD(t.start)} — ${fmtD(t.deadline)}, план ${t.plannedHours ?? '—'} ч${vac ? `. Исполнитель в отпуске ${fmtDMY(vac.start)}–${fmtDMY(vac.end)}` : ''}`;
+                    
+                    // Проверяем, есть ли зависимость от другой задачи
+                    const depTask = taskDeps[t.id];
+                    let depLine = null;
+                    if (depTask) {
+                      const depItem = g.items.find(it => it.id === depTask.id);
+                      if (depItem) {
+                        const depLeft = depItem.sIdx * DW + DW/2;
+                        const depRight = depItem.eIdx * DW + DW/2;
+                        // Рисуем линию от зависимой задачи к текущей
+                        depLine = (
+                          <svg 
+                            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}
+                          >
+                            <path
+                              d={`M ${depRight} ${-10} L ${depRight} ${-25} L ${left} ${-25} L ${left} ${-10}`}
+                              fill="none"
+                              stroke="#94a3b8"
+                              strokeWidth="2"
+                              strokeDasharray="4 2"
+                              markerEnd="url(#arrowhead)"
+                            />
+                          </svg>
+                        );
+                      }
+                    }
+                    
+                    return (
+                      <div key={t.id} className="gantt-row" style={{ position: 'relative' }}>
+                        {depLine}
+                        <div className="gantt-label" onClick={() => openTask(t.id)}>
+                          <span className={`gtitle${t.status === 'cancelled' ? ' dim' : ''}`}>{t.title}</span>
+                          <span className="gsub">{a ? a.last : ''} · {t.plannedHours ?? '—'} ч · {TASK_STATUSES[t.status].label}</span>
+                        </div>
+                        <div className="gantt-track" style={{ width }}>
+                          <div className="gbar" style={{ left, width: w, background: g.project.color + '33', border: `1px solid ${g.project.color}66`, cursor: 'pointer', opacity: t.status === 'cancelled' ? 0.45 : 1 }} onClick={() => openTask(t.id)} title={tip}>
+                            <div className="gbar-fill" style={{ width: pct + '%', background: t.status === 'closed' ? '#10b981' : g.project.color }} />
+                            {vac && <span className="gbar-vac" title="Исполнитель в отпуске в эти даты">🏖</span>}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
+                    );
+                  })}
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>

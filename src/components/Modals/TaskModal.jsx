@@ -151,6 +151,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
     id: "t_" + uid(), title: "", desc: "", projectId: "", assigneeIds: [], priority: "mid",
     plannedHours: 8, start: TODAY, deadline: iso(addDays(new Date(), 14)), status: "new", logs: [], comments: [], history: [], delegatedFrom: null, archived: false, archivedAt: null, closedAt: null,
     creatorId: ur.id,
+    dependencyId: null, // Связанная задача (должна быть выполнена перед текущей)
     // Поля для повторения (только для новых задач)
     repeatType: 'none',
     repeatInterval: 1,
@@ -419,6 +420,22 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
             {statusOptions.map((s) => <option key={s} value={s}>{TASK_STATUSES[s].label}</option>)}
           </select>
           {isExec && !canEditFields && !readOnly && <div className="mut sm" style={{ gridColumn: "1 / -1" }}>Исполнитель может переводить задачу в «В работе» и «На проверке»; закрытие и отмена — у ответственного/руководителя.</div>}
+          
+          <label className="lbl">Зависит от задачи</label>
+          <select 
+            className="inp sel" 
+            disabled={!canEditFields} 
+            value={f.dependencyId || ''} 
+            onChange={(e) => set("dependencyId", e.target.value || null)}
+          >
+            <option value="">— нет зависимости —</option>
+            {db.tasks
+              .filter(t => t.id !== f.id && t.projectId === f.projectId && t.status !== 'closed' && t.status !== 'cancelled')
+              .map(t => (
+                <option key={t.id} value={t.id}>{t.title}</option>
+              ))
+            }
+          </select>
         </div>
 
         {/* Блок повторения (только для новых задач, не для редактирования) */}
