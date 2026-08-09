@@ -19,6 +19,7 @@ export default function ProjectsKanban({ db, ur, openProject, closeProject, canc
   const scope = useMemo(() => computeScope(ur, db), [ur, db]);
   const [showOnlyMyProjects, setShowOnlyMyProjects] = useState(false);
   const [dragOverCol, setDragOverCol] = useState(null);
+  const [sortBy, setSortBy] = useState("name"); // name, nameDesc, created, budget, budgetDesc
   const canSeeAllProjects = hasRole(ur, "admin", "director", "economist", "kb_chief", "head", "project_lead", "project_manager");
   
   let list = scope.all 
@@ -31,6 +32,24 @@ export default function ProjectsKanban({ db, ur, openProject, closeProject, canc
     const myProjectIds = new Set(myTasks.map(t => t.projectId));
     list = list.filter(p => myProjectIds.has(p.id));
   }
+  
+  // Сортировка
+  list = [...list].sort((a, b) => {
+    switch (sortBy) {
+      case 'name':
+        return a.name.localeCompare(b.name, 'ru');
+      case 'nameDesc':
+        return b.name.localeCompare(a.name, 'ru');
+      case 'created':
+        return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+      case 'budget':
+        return (a.budget || 0) - (b.budget || 0);
+      case 'budgetDesc':
+        return (b.budget || 0) - (a.budget || 0);
+      default:
+        return 0;
+    }
+  });
 
   const canCloseProject = (project) => {
     const creatorId = project.creatorId || (project.history?.find(h => h.who !== 'system')?.who);
@@ -49,6 +68,13 @@ export default function ProjectsKanban({ db, ur, openProject, closeProject, canc
             <span style={{ fontSize: 13 }}>Показать проекты с моими задачами</span>
           </label>
         )}
+        <select className="inp sel sm" value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={{ marginLeft: 8 }}>
+          <option value="name">По названию (А-Я)</option>
+          <option value="nameDesc">По названию (Я-А)</option>
+          <option value="created">По дате создания</option>
+          <option value="budget">По бюджету (возр.)</option>
+          <option value="budgetDesc">По бюджету (убыв.)</option>
+        </select>
         {canCreateProject && (
           <button className="btn primary" onClick={() => openProject(null)}>
             <Ic d={ICONS.plus} size={15} /> Проект

@@ -12,6 +12,7 @@ export default function Kanban({ db, ur, openTask, onMove, onNew }) {
   const [q, setQ] = useState("");
   const [dragOverCol, setDragOverCol] = useState(null);
   const [showOnlyMy, setShowOnlyMy] = useState(false);
+  const [sortBy, setSortBy] = useState("deadline");
 
   const scope = useMemo(() => computeScope(ur, db), [ur, db]);
 
@@ -35,8 +36,41 @@ export default function Kanban({ db, ur, openTask, onMove, onNew }) {
     if (showOnlyMy) {
       list = list.filter(t => (t.assigneeIds || []).includes(ur.id));
     }
+    
+    // Сортировка
+    list = [...list].sort((a, b) => {
+      switch (sortBy) {
+        case 'deadline':
+          if (!a.deadline && !b.deadline) return 0;
+          if (!a.deadline) return 1;
+          if (!b.deadline) return -1;
+          return new Date(a.deadline) - new Date(b.deadline);
+        case 'deadlineDesc':
+          if (!a.deadline && !b.deadline) return 0;
+          if (!a.deadline) return 1;
+          if (!b.deadline) return -1;
+          return new Date(b.deadline) - new Date(a.deadline);
+        case 'created':
+          return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+        case 'alpha':
+          return a.title.localeCompare(b.title, 'ru');
+        case 'alphaDesc':
+          return b.title.localeCompare(a.title, 'ru');
+        case 'hours':
+          const aHours = a.plannedHours || 0;
+          const bHours = b.plannedHours || 0;
+          return aHours - bHours;
+        case 'hoursDesc':
+          const aH = a.plannedHours || 0;
+          const bH = b.plannedHours || 0;
+          return bH - aH;
+        default:
+          return 0;
+      }
+    });
+    
     return list;
-  }, [db, ur, scope, fProj, fExec, fPrio, fDept, q, showOnlyMy]);
+  }, [db, ur, scope, fProj, fExec, fPrio, fDept, q, showOnlyMy, sortBy]);
 
   const isOnlyExecutor = ur.roles.length === 1 && ur.roles[0] === 'executor';
 
@@ -73,6 +107,15 @@ export default function Kanban({ db, ur, openTask, onMove, onNew }) {
             <span style={{ fontSize: 13 }}>Только мои задачи</span>
           </label>
         )}
+        <select className="inp sel sm" value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={{ marginLeft: 8 }}>
+          <option value="deadline">По дедлайну (возр.)</option>
+          <option value="deadlineDesc">По дедлайну (убыв.)</option>
+          <option value="created">По дате создания</option>
+          <option value="alpha">По алфавиту (А-Я)</option>
+          <option value="alphaDesc">По алфавиту (Я-А)</option>
+          <option value="hours">По часам (возр.)</option>
+          <option value="hoursDesc">По часам (убыв.)</option>
+        </select>
         <div className="spacer" />
         {canCreateTask(ur) && (
           <button className="btn primary" onClick={onNew}>

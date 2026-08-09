@@ -34,23 +34,6 @@ __pycache__/
 *.a
 *.out
 
-# Coverage
-coverage/
-htmlcov/
-.coverage
-
-# MyPy
-.mypy_cache/
-
-# PyTest
-.pytest_cache/
-
-# Gradle
-.gradle/
-
-# Target (Rust, etc.)
-target/
-
 # Compressed files
 *.zip
 *.gz
@@ -74,4 +57,15 @@ target/
 *.tar.bz2
 *.tar.xz
 *.tar.zst
+
+# Coverage
+coverage/
+htmlcov/
+.coverage
+
+# Cache
+.mypy_cache/
+.pytest_cache/
+.gradle/
+target/
 ```
