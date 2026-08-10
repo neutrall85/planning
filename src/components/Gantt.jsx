@@ -239,8 +239,10 @@ export default function Gantt({ db, ur, openTask, openProject }) {
           <div className="modal-content" style={{ background: '#fff', padding: '24px', borderRadius: '8px', maxWidth: '400px', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }} onClick={e => e.stopPropagation()}>
             <h3 style={{ margin: '0 0 16px', color: '#dc2626' }}>⚠️ Внимание</h3>
             <p style={{ margin: '0 0 12px' }}>Исполнитель <strong>{vacWarning.employee?.last} {vacWarning.employee?.first}</strong> находится в отпуске, но даты отпуска не указаны корректно.</p>
-            {vacWarning.vac && vacWarning.vac.start && vacWarning.vac.end && (
-              <p style={{ margin: '0 0 12px', fontSize: '14px', color: '#64748b' }}>Даты отпуска: <strong>{fmtDMY(vacWarning.vac.start)} — {fmtDMY(vacWarning.vac.end)}</strong></p>
+            {vacWarning.vac ? (
+              <p style={{ margin: '0 0 12px', fontSize: '14px', color: '#64748b' }}>Даты отпуска: <strong>{vacWarning.vac.start ? fmtDMY(vacWarning.vac.start) : '—'} — {vacWarning.vac.end ? fmtDMY(vacWarning.vac.end) : '—'}</strong></p>
+            ) : (
+              <p style={{ margin: '0 0 12px', fontSize: '14px', color: '#64748b' }}>Даты отпуска: <strong>не указаны</strong></p>
             )}
             <p style={{ margin: '0 0 20px', fontSize: '14px', color: '#64748b' }}>Задача: <strong>{vacWarning.task.title}</strong></p>
             <button className="btn primary" onClick={() => setVacWarning(null)} style={{ width: '100%', padding: '10px 16px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}>Закрыть</button>
