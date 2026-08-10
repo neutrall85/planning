@@ -13,6 +13,7 @@ import {
   assigneeOptions, computeScope, canChangeTaskStatus,
 } from '../../utils/permissions';
 import { Ic, ICONS } from '../Icons';
+import { sanitizeHtml } from '../../utils/string';
 
 // Вспомогательные функции для генерации дат повторения
 function generateRepeatDates(startDate, deadline, repeatConfig, endDate, maxCount = 100) {

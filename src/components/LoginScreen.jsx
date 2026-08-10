@@ -20,7 +20,7 @@ function passIssues(p) {
   ];
 }
 
-export default function LoginScreen({ db, setDb, onLogin, toast }) {
+export default function LoginScreen({ db, setDb, onLogin, toast, store }) {
   const [mode, setMode] = useState("login");
   const [lg, setLg] = useState("");
   const [pw, setPw] = useState("");
@@ -149,14 +149,20 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
         
         logger.info(`Новая регистрация: ${newEmployee.email}`, { empId: newEmployee.id });
         
-        setDb((s) => ({
-          ...s,
-          employees: [...s.employees, newEmployee],
-          notifications: [
-            { id: uid(), userId: "sergey.adminov", text: `Новая регистрация: ${newEmployee.last} ${newEmployee.first}`, ts: Date.now(), read: false, targetType: null, targetId: null },
-            ...s.notifications
-          ]
-        }));
+        // Используем публичный API store вместо прямой мутации setDb
+        if (store && typeof store.registerEmployee === 'function') {
+          store.registerEmployee(sanitizedReg);
+        } else {
+          // Fallback для обратной совместимости
+          setDb((s) => ({
+            ...s,
+            employees: [...s.employees, newEmployee],
+            notifications: [
+              { id: uid(), userId: "sergey.adminov", text: `Новая регистрация: ${newEmployee.last} ${newEmployee.first}`, ts: Date.now(), read: false, targetType: null, targetId: null },
+              ...s.notifications
+            ]
+          }));
+        }
         toast("Регистрация успешна! Выполняется вход...");
         const loginOk = onLogin(sanitizedReg.email.trim().toLowerCase(), sanitizedReg.pass);
         if (!loginOk) {

@@ -55,10 +55,16 @@ export default function Requests({ db, setDb, ur, initialTab = 'hours', addAudit
     const employeeName = empName(v.empId);
     const period = `${fmtDMY(v.start)}—${fmtDMY(v.end)}`;
     
-    setDb((s) => {
-      const updated = { ...s, vacations: s.vacations.map((x) => (x.id === v.id ? { ...x, status: ok ? "approved" : "rejected" } : x)) };
-      return updated;
-    });
+    // Используем публичный API store вместо прямой мутации setDb
+    if (store && typeof store.approveVacation === 'function') {
+      store.approveVacation(v.id, ok);
+    } else {
+      // Fallback для обратной совместимости
+      setDb((s) => {
+        const updated = { ...s, vacations: s.vacations.map((x) => (x.id === v.id ? { ...x, status: ok ? "approved" : "rejected" } : x)) };
+        return updated;
+      });
+    }
     
     setTimeout(() => {
       if (ok) {
@@ -82,10 +88,16 @@ export default function Requests({ db, setDb, ur, initialTab = 'hours', addAudit
     const toName = empName(r.toId);
     const rolesStr = r.roles.join(', ');
     
-    setDb((s) => {
-      const updated = { ...s, roleDelegations: s.roleDelegations.map((x) => (x.id === r.id ? { ...x, status: ok ? "active" : "rejected" } : x)) };
-      return updated;
-    });
+    // Используем публичный API store вместо прямой мутации setDb
+    if (store && typeof store.approveRoleDelegation === 'function') {
+      store.approveRoleDelegation(r.id, ok);
+    } else {
+      // Fallback для обратной совместимости
+      setDb((s) => {
+        const updated = { ...s, roleDelegations: s.roleDelegations.map((x) => (x.id === r.id ? { ...x, status: ok ? "active" : "rejected" } : x)) };
+        return updated;
+      });
+    }
     
     setTimeout(() => {
       if (ok) {

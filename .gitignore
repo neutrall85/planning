@@ -4,36 +4,22 @@ dist/
 build/
 *.o
 *.obj
-*.exe
-*.dll
-*.so
-*.a
 *.out
 
 # Dependencies
 node_modules/
-vendor/
-
-# Cache and temporary files
+.venv/
+venv/
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.egg-info/
+
+# Logs and temporary files
+*.log
 *.tmp
 *.swp
 *.swo
-.DS_Store
-Thumbs.db
 
-# Logs
-*.log
-
-# Coverage
-coverage/
-htmlcov/
-.coverage
-
-# Environment
+# Environment variables
 .env
 .env.local
 *.env.*
@@ -41,12 +27,19 @@ htmlcov/
 # Editors
 .vscode/
 .idea/
-*.iml
-*.ipr
-*.iws
+*.swp
+*.swo
 
-# Distribution / packaging
-*.tar.gz
-*.whl
-*.egg-info/
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Coverage reports
+coverage/
+htmlcov/
+.coverage
+
+# Testing
+.mypy_cache/
+.pytest_cache/
 ```
