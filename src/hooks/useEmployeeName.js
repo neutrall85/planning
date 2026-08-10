@@ -1,12 +1,12 @@
 /**
  * Хук для получения имени сотрудника
- * Устраняет дублирование функции empName в разных компонентах
+ * Использует централизованную функцию из utils/string.js
  * @param {Object} data - объект данных хранилища
  * @param {string} id - ID сотрудника
  * @returns {string} Форматированное имя или "—"
  */
 import { useMemo } from 'react';
-import { getEmpNameFromData } from '../utils/string';
+import { getEmpNameFromData, getPrimaryDeptFromData } from '../utils/string';
 
 export const useEmployeeName = (data) => {
   // Мемоизируем функцию для предотвращения лишних ре-рендеров
@@ -25,11 +25,7 @@ export const useEmployeeName = (data) => {
  */
 export const usePrimaryDept = (data) => {
   const getPrimaryDept = useMemo(() => {
-    return (emp) => {
-      if (!emp || !data?.departments) return null;
-      const p = emp.departments?.find(x => x.primary) || emp.departments?.[0];
-      return p ? data.departments.find(d => d.id === p.deptId) : null;
-    };
+    return (emp) => getPrimaryDeptFromData(data, emp);
   }, [data]);
 
   return getPrimaryDept;
