@@ -138,7 +138,9 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
   const readOnly = !!(existing && existing.archived);
   
   // Проверяем, есть ли данные об отпуске, переданные из Gantt
-  const hasVacationWarning = vacationData && vacationData.vacation && vacationData.employee;
+  const hasVacationWarning = vacationData && vacationData.vacation && vacationData.employee && !vacationData.hasDelegate;
+  const vacationInfo = hasVacationWarning ? vacationData.vacation : null;
+  const employeeInfo = hasVacationWarning ? vacationData.employee : null;
   
   const currentProjectId = initialProjectId || (existing ? existing.projectId : '');
   const isProjectFromInitial = !!initialProjectId && !existing;
@@ -410,7 +412,8 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
       <div className="tabs sm">{[["form", "Данные"], ["time", `Учёт времени (${sp}/${f.plannedHours ?? "—"})`], ...(existing ? [["chat", `Обсуждение (${f.comments.length})`], ["hist", "История"]] : [])].map(([id, l]) => <button key={id} className={"tab" + (tab === id ? " on" : "")} onClick={() => setTab(id)}>{l}</button>)}</div>
 
       {tab === "form" && (<>
-        {vacWarn && <div className="warn-box"><Ic d={ICONS.beach} size={15} /> Один из исполнителей находится в отпуске с {fmtDMY(vacWarn.start)} по {fmtDMY(vacWarn.end)}. Даты пересекаются с периодом задачи.</div>}
+        {hasVacationWarning && vacationInfo && employeeInfo && (<div className="warn-box"><Ic d={ICONS.beach} size={15} />  Внимание! Исполнитель <strong>{employeeInfo.last} {employeeInfo.first}</strong> находится в отпуске с {fmtDMY(vacationInfo.start)} по {fmtDMY(vacationInfo.end)}. Даты пересекаются с периодом задачи.</div>)}
+        {vacWarn && !hasVacationWarning && <div className="warn-box"><Ic d={ICONS.beach} size={15} />  Один из исполнителей находится в отпуске с {fmtDMY(vacWarn.start)} по {fmtDMY(vacWarn.end)}. Даты пересекаются с периодом задачи.</div>}
         {remainProj !== null && remainProj - (+f.plannedHours || 0) < 0 && <div className="warn-box">Внимание: задача превысит остаток бюджета проекта ({remainProj} ч). Потребуется увеличение бюджета проекта.</div>}
         {isAdminProj && !readOnly && <div className="info-box">Административный проект: дедлайн и плановые часы задачи — по желанию.</div>}
         <div className="form-grid">

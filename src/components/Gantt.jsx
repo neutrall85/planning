@@ -193,10 +193,15 @@ export default function Gantt({ db, ur, openTask, openProject }) {
                     const left = t.sIdx * DW + 2;
                     const w = Math.max((t.eIdx - t.sIdx + 1) * DW - 4, DW - 8);
                     const sp = getTaskSpent(t);
-                    const vac = a ? vacOverlap(a.id, t.start, t.deadline) : null;
+                    
+                    // Проверяем, есть ли делегат у задачи
+                    const hasDelegate = t.delegateId && t.delegateUntil && new Date(t.delegateUntil) >= new Date(TODAY);
+                    
+                    // Показываем значок отпуска только если нет делегата
+                    const vac = (!hasDelegate && a) ? vacOverlap(a.id, t.start, t.deadline) : null;
                     const vacValid = vac && vac.start && vac.end && vac.start <= vac.end;
                     // Показываем значок отпуска, если отпуск есть и он ещё не закончился (end >= TODAY)
-                    const showVac = vac && (!vac.end || vac.end >= TODAY);
+                    const showVac = !hasDelegate && vac && (!vac.end || vac.end >= TODAY);
                     const tip = `${t.title}: ${fmtD(t.start)} — ${fmtD(t.deadline)}, план ${t.plannedHours ?? '—'} ч${showVac ? (vacValid ? `. Исполнитель в отпуске ${fmtDMY(vac.start)}–${fmtDMY(vac.end)}` : '. Внимание: исполнитель в отпуске, но даты отпуска не указаны корректно') : ''}`;
                     const prioColor = PRIORITIES[t.priority]?.color || PRIORITIES.mid.color;
                     
@@ -215,7 +220,7 @@ export default function Gantt({ db, ur, openTask, openProject }) {
                           <div className="gbar" style={{ left, width: w, background: prioColor + '33', border: `2px solid ${prioColor}`, cursor: 'pointer', opacity: t.status === 'cancelled' ? 0.45 : 1 }} onClick={() => {
                             if (showVac) {
                               // Передаем данные об отпуске в openTask через дополнительный параметр
-                              openTask(t.id, { vacation: vac, employee: a });
+                              openTask(t.id, { vacation: vac, employee: a, hasDelegate });
                             } else {
                               openTask(t.id);
                             }
