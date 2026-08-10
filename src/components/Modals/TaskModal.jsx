@@ -137,8 +137,13 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
   const existing = taskId ? db.tasks.find((t) => t.id === taskId) : null;
   const readOnly = !!(existing && existing.archived);
   
-  // Проверяем, есть ли данные об отпуске, переданные из Gantt
-  const hasVacationWarning = vacationData && vacationData.vacation && vacationData.employee && !vacationData.hasDelegate;
+  // Проверяем, есть ли данные об отпуске или делегировании, переданные из Gantt
+  const hasDelegate = vacationData && vacationData.hasDelegate;
+  const delegateInfo = hasDelegate && vacationData.delegateId 
+    ? db.employees.find(e => e.id === vacationData.delegateId) 
+    : null;
+  
+  const hasVacationWarning = vacationData && vacationData.vacation && vacationData.employee && !hasDelegate;
   const vacationInfo = hasVacationWarning ? vacationData.vacation : null;
   const employeeInfo = hasVacationWarning ? vacationData.employee : null;
   
@@ -412,6 +417,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
       <div className="tabs sm">{[["form", "Данные"], ["time", `Учёт времени (${sp}/${f.plannedHours ?? "—"})`], ...(existing ? [["chat", `Обсуждение (${f.comments.length})`], ["hist", "История"]] : [])].map(([id, l]) => <button key={id} className={"tab" + (tab === id ? " on" : "")} onClick={() => setTab(id)}>{l}</button>)}</div>
 
       {tab === "form" && (<>
+        {hasDelegate && delegateInfo && (<div className="info-box" style={{background: '#eff6ff', border: '1px solid #3b82f6', color: '#1e40af'}}><Ic d={ICONS.user} size={15} />  Задача делегирована <strong>{delegateInfo.last} {delegateInfo.first}</strong> на период отпуска до {fmtDMY(vacationData.delegateUntil)}.</div>)}
         {hasVacationWarning && vacationInfo && employeeInfo && (<div className="warn-box"><Ic d={ICONS.beach} size={15} />  Внимание! Исполнитель <strong>{employeeInfo.last} {employeeInfo.first}</strong> находится в отпуске с {fmtDMY(vacationInfo.start)} по {fmtDMY(vacationInfo.end)}. Даты пересекаются с периодом задачи.</div>)}
         {vacWarn && !hasVacationWarning && <div className="warn-box"><Ic d={ICONS.beach} size={15} />  Один из исполнителей находится в отпуске с {fmtDMY(vacWarn.start)} по {fmtDMY(vacWarn.end)}. Даты пересекаются с периодом задачи.</div>}
         {remainProj !== null && remainProj - (+f.plannedHours || 0) < 0 && <div className="warn-box">Внимание: задача превысит остаток бюджета проекта ({remainProj} ч). Потребуется увеличение бюджета проекта.</div>}
