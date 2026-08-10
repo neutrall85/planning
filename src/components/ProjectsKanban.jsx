@@ -9,10 +9,10 @@ const PROJECT_STATUS_ORDER = ['inactive', 'active', 'closed', 'cancelled'];
 
 // Конфигурация цветов для статусов проектов
 const PROJECT_STATUS_CONFIG = {
-  active: { label: 'Активный', color: '#10b981' },
+  active: { label: 'Активный', color: '#3b82f6' },
   inactive: { label: 'Неактивный', color: '#94a3b8' },
-  closed: { label: 'Закрыт', color: '#3b82f6' },
-  cancelled: { label: 'Отменён', color: '#ef4444' },
+  closed: { label: 'Закрыт', color: '#10b981' },
+  cancelled: { label: 'Отменён', color: '#94a3b8' },
 };
 
 export default function ProjectsKanban({ db, ur, openProject, closeProject, cancelProject, moveProject, showOnlyMyProjects: parentShowOnlyMyProjects, sortBy: parentSortBy }) {
