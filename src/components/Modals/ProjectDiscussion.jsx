@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { uid, fmtDT, initials } from '../../utils/date';
 import { has } from '../../utils/permissions';
 import { Ic, ICONS } from '../Icons';
-import { COMMENT_EDIT_WINDOW } from '../../utils/config';
+import { COMMENT_EDIT_WINDOW_MS } from '../../utils/config';
 import { useDataHelpers } from '../../hooks';
 
 function renderMentionText(text) {
@@ -74,7 +74,7 @@ export default function ProjectDiscussion({ project, currentUser, onAddComment, 
     if (has(currentUser, "admin", "director")) return true;
     return c.authorId === currentUser.id && !hasReplies;
   };
-  const canEdit = (c) => c.authorId === currentUser.id && Date.now() - c.ts < COMMENT_EDIT_WINDOW;
+  const canEdit = (c) => c.authorId === currentUser.id && Date.now() - c.ts < COMMENT_EDIT_WINDOW_MS;
 
   const del = (c) => {
     if (!window.confirm("Удалить комментарий и все ответы?")) return;
@@ -105,7 +105,7 @@ export default function ProjectDiscussion({ project, currentUser, onAddComment, 
               <span className="avatar xs">{author ? initials(author.first, author.last) : "??"}</span>
               <span className="cm-author">{author ? `${author.last} ${author.first}` : "—"}</span>
               <span className="mut sm">{fmtDT(c.ts)}</span>
-              {!readOnly && editingId !== c.id && Date.now() - c.ts < COMMENT_EDIT_WINDOW && c.authorId === currentUser.id && <span className="mut sm">· можно редактировать</span>}
+              {!readOnly && editingId !== c.id && Date.now() - c.ts < COMMENT_EDIT_WINDOW_MS && c.authorId === currentUser.id && <span className="mut sm">· можно редактировать</span>}
             </div>
             {editingId === c.id ? (
               <div className="cm-edit">
