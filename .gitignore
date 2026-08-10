@@ -1,25 +1,3 @@
 ```
-# Build artifacts
 dist/
-build/
-
-# Dependencies
-node_modules/
-
-# Compiled files
-*.pyc
-__pycache__/
-
-# Logs and temp files
-*.log
-*.tmp
-
-# Editors
-.vscode/
-.idea/
-
-# Environment
-.env
-.env.local
-.env.*
 ```

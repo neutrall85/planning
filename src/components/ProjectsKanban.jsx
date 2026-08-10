@@ -117,7 +117,10 @@ export default function ProjectsKanban({ db, ur, openProject, closeProject, canc
                         style={{ cursor: 'pointer', borderLeft: `4px solid ${PROJECT_CATEGORIES[p.category || 'NORM']?.color || '#10b981'}` }}
                       >
                         <div className="kcard-title">{p.name}</div>
-                        <div className="kcard-proj"><span className="pdot" style={{ background: p.color }} />{p.code}</div>
+                        <div className="kcard-proj">
+                          <span className="pdot" style={{ background: PROJECT_CATEGORIES[p.category || 'NORM']?.color || '#10b981' }} />
+                          {p.code}
+                        </div>
                         <div className="kcard-meta">
                           <span className="mut sm">{PROJECT_TYPES[p.ptype || 'prod']}</span>
                           <span className="mut sm" style={{ color: PROJECT_CATEGORIES[p.category || 'NORM']?.color || '#10b981', fontWeight: 600 }}>{PROJECT_CATEGORIES[p.category || 'NORM']?.label || 'NORM'}</span>

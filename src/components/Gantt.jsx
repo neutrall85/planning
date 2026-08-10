@@ -188,7 +188,7 @@ export default function Gantt({ db, ur, openTask, openProject }) {
                       onClick={() => openProject && openProject(g.project.id)}
                       title="Открыть проект"
                     >
-                      <span className="pdot" style={{ background: g.project.color }} />{g.project.code} · {g.project.name}
+                      <span className="pdot" style={{ background: category.color }} />{g.project.code} · {g.project.name}
                       <span className="mut sm" style={{ marginLeft: 8, color: category.color, fontWeight: 600 }}>{category.label}</span>
                     </div>
                     <div style={{ width }} />
