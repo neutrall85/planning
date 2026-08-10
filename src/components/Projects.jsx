@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { PROJECT_STATUSES, PROJECT_TYPES } from '../utils/constants';
+import { PROJECT_STATUSES, PROJECT_TYPES, PROJECT_CATEGORIES } from '../utils/constants';
 import { fmtDMY, initials, isTaskActive } from '../utils/date';
 import { Ic, ICONS } from './Icons';
 import { computeScope, hasRole } from '../utils/permissions';
@@ -46,6 +46,12 @@ export default function Projects({ db, ur, openProject, openHoursReq, closeProje
     return hasRole(ur, 'admin') || hasRole(ur, 'director') || (creatorId && creatorId === ur.id);
   };
 
+  // Функция получения цвета категории проекта
+  const getCategoryColor = (project) => {
+    const category = project.category || 'NORM';
+    return PROJECT_CATEGORIES[category]?.color || PROJECT_CATEGORIES.NORM.color;
+  };
+
   return (
     <div>
       <div className="pj-grid">
@@ -56,15 +62,17 @@ export default function Projects({ db, ur, openProject, openHoursReq, closeProje
           const usePct = p.budget ? Math.round((fact / Math.max(1, p.budget)) * 100) : 0;
           const overPlan = p.budget != null && plan > p.budget;
 
+          const categoryColor = getCategoryColor(p);
+          
           return (
             <div 
               key={p.id} 
               className="pj-card" 
               onClick={() => openProject(p.id)}
-              style={{ cursor: 'pointer' }}
+              style={{ cursor: 'pointer', borderLeft: `4px solid ${categoryColor}` }}
             >
               <div className="pj-top">
-                <span className="pj-code" style={{ background: p.color + '22', color: p.color }}>{p.code}</span>
+                <span className="pj-code" style={{ background: categoryColor + '22', color: categoryColor }}>{p.code}</span>
                 <span className={`pj-st ${p.status}`}>{PROJECT_STATUSES[p.status]}</span>
                 <span style={{ fontSize: '11px', color: '#64748b' }}>{PROJECT_TYPES[p.ptype || 'prod']}</span>
               </div>
@@ -81,7 +89,7 @@ export default function Projects({ db, ur, openProject, openHoursReq, closeProje
                     <span>Использовано: <b>{usePct}%</b></span>
                   </div>
                   <div className="pj-progress">
-                    <div className={`pj-progress-fill${usePct > 100 ? ' over' : ''}`} style={{ width: Math.min(100, usePct) + '%', background: p.color }} />
+                    <div className={`pj-progress-fill${usePct > 100 ? ' over' : ''}`} style={{ width: Math.min(100, usePct) + '%', background: categoryColor }} />
                   </div>
                 </div>
               )}
