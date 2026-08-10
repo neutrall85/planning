@@ -199,6 +199,11 @@ export default function Gantt({ db, ur, openTask, openProject }) {
                     const prioColor = PRIORITIES[t.priority]?.color || PRIORITIES.mid.color;
                     const statusColor = t.status === 'closed' ? '#10b981' : t.status === 'cancelled' ? '#64748b' : prioColor;
                     
+                    // Расчет процента выполнения (факт / план)
+                    const planned = t.plannedHours || 0;
+                    const spent = getTaskSpent(t);
+                    const pct = planned > 0 ? Math.min(100, Math.round((spent / planned) * 100)) : 0;
+                    
                     return (
                       <div key={t.id} className="gantt-row" style={{ position: 'relative' }}>
                         <div className="gantt-label" onClick={() => openTask(t.id)}>
@@ -213,6 +218,9 @@ export default function Gantt({ db, ur, openTask, openProject }) {
                               openTask(t.id);
                             }
                           }} title={tip}>
+                            {pct > 0 && (
+                              <div className="gbar-fill" style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${pct}%`, background: statusColor, opacity: 0.6 }} />
+                            )}
                             {vac && <span className="gbar-vac" title={vacValid ? "Исполнитель в отпуске в эти даты" : "Внимание: даты отпуска не указаны корректно"}>🏖</span>}
                           </div>
                         </div>
