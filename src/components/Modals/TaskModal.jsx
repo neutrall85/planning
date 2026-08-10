@@ -218,19 +218,19 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
       const assigneesToCheck = f.assigneeIds.filter(id => id !== originalAssignee.id);
       for (const id of assigneesToCheck) {
         const vac = vacOverlap(id, f.start || f.deadline, f.deadline);
-        // Проверяем, что отпуск ещё активен (не закончился)
-        if (vac && (!vac.end || new Date(vac.end) >= new Date())) {
+        // vacOverlap уже проверяет актуальность отпуска, дополнительная проверка не нужна
+        if (vac) {
           return vac;
         }
       }
       return null;
     }
     
-    // Стандартная проверка для недегелированных задач
+    // Стандартная проверка для неделегированных задач
     for (const id of f.assigneeIds) {
       const vac = vacOverlap(id, f.start || f.deadline, f.deadline);
-      // Проверяем, что отпуск ещё активен (не закончился)
-      if (vac && (!vac.end || new Date(vac.end) >= new Date())) {
+      // vacOverlap уже проверяет актуальность отпуска, дополнительная проверка не нужна
+      if (vac) {
         return vac;
       }
     }

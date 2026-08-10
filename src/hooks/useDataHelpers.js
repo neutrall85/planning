@@ -34,7 +34,13 @@ export const useDataHelpers = (data) => {
 
   const vacOverlap = (empId, from, to) => {
     if (!data || !data.vacations || !from || !to) return null;
-    return data.vacations.find(v => v.empId === empId && v.status === 'approved' && v.start <= to && v.end >= from) || null;
+    return data.vacations.find(v => 
+      v.empId === empId && 
+      v.status === 'approved' && 
+      v.start <= to && 
+      v.end >= from &&
+      (!v.end || new Date(v.end) >= new Date())
+    ) || null;
   };
 
   return { empName, primaryDept, getTaskSpent, getProjectStats, getEmployeeLoad, vacOverlap };

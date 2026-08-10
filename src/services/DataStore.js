@@ -6,8 +6,57 @@ export default class DataStore {
     this._data = this._buildMock();
     this._currentUser = null;
     this._listeners = [];
+    this._applyActiveDelegations();
+    this._checkExpiredDelegations();
     this._archiveOldTasks(3);
     this._scheduleDeadlineCheck();
+  }
+  
+  // Применение делегирования для активных отпусков при загрузке
+  _applyActiveDelegations() {
+    const now = new Date(TODAY);
+    this._data.vacations.forEach(vac => {
+      if (vac.status === 'approved' && vac.delegation.enabled) {
+        const vacStart = new Date(vac.start);
+        const vacEnd = new Date(vac.end);
+        // Применяем делегирование, если отпуск активен (начался или начинается сегодня, и ещё не закончился)
+        if (vacStart <= now && vacEnd >= now) {
+          this.applyDelegation(vac.id);
+        }
+      }
+    });
+  }
+  
+  // Автоматический возврат задач по окончании отпуска
+  _checkExpiredDelegations() {
+    const now = new Date(TODAY);
+    this._data.tasks.forEach(task => {
+      if (task.isDelegated && task.delegationEnd) {
+        const delegationEnd = new Date(task.delegationEnd);
+        if (delegationEnd < now) {
+          // Находим соответствующий отпуск для возврата
+          const vac = this._data.vacations.find(v => 
+            v.empId === task.delegatedFrom && 
+            v.delegation.subId === task.delegatedTo &&
+            v.end === task.delegationEnd
+          );
+          if (vac) {
+            this.revertDelegation(vac.id);
+          } else {
+            // Если отпуск не найден, просто сбрасываем поля делегирования
+            task.isDelegated = false;
+            task.delegatedFrom = null;
+            task.delegatedTo = null;
+            task.delegationStart = null;
+            task.delegationEnd = null;
+            task.assigneeIds = task.assigneeIds.filter(id => id !== task.delegatedTo);
+            if (!task.assigneeIds.includes(task.delegatedFrom)) {
+              task.assigneeIds.push(task.delegatedFrom);
+            }
+          }
+        }
+      }
+    });
   }
   
   // Планирование проверки дедлайнов в 7:00 по Москве ежедневно
@@ -421,6 +470,10 @@ export default class DataStore {
         this.addAudit('Изменение ролей', `${emp.last} ${emp.first}: ${old.roles.join(', ')} → ${emp.roles.join(', ')}`);
       }
       employees = this._data.employees.map(e => e.id === emp.id ? emp : e);
+      // Обновляем _currentUser, если это текущий пользователь
+      if (this._currentUser && this._currentUser.id === emp.id) {
+        this._currentUser = employees.find(e => e.id === emp.id);
+      }
     } else {
       employees = [...this._data.employees, emp];
       this.addAudit('Создание сотрудника', `${emp.last} ${emp.first}`);
