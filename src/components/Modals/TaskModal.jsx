@@ -208,6 +208,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
   
   // Улучшенная логика vacWarn: проверяем только тех исполнителей, которые не являются делегированными
   // Если задача делегирована, предупреждение для исходного исполнителя (delegatedFrom) не показываем
+  // Также проверяем, что отпуск ещё активен (не закончился на текущую дату)
   const vacWarn = useMemo(() => {
     if (readOnly || !f.assigneeIds || f.assigneeIds.length === 0 || !f.deadline) return null;
     
@@ -215,11 +216,25 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
     if (hasDelegate && originalAssignee) {
       // Проверяем только текущих исполнителей (замещающих), исключая delegatedFrom
       const assigneesToCheck = f.assigneeIds.filter(id => id !== originalAssignee.id);
-      return assigneesToCheck.some(id => vacOverlap(id, f.start || f.deadline, f.deadline));
+      for (const id of assigneesToCheck) {
+        const vac = vacOverlap(id, f.start || f.deadline, f.deadline);
+        // Проверяем, что отпуск ещё активен (не закончился)
+        if (vac && (!vac.end || new Date(vac.end) >= new Date())) {
+          return vac;
+        }
+      }
+      return null;
     }
     
     // Стандартная проверка для недегелированных задач
-    return f.assigneeIds.some(id => vacOverlap(id, f.start || f.deadline, f.deadline));
+    for (const id of f.assigneeIds) {
+      const vac = vacOverlap(id, f.start || f.deadline, f.deadline);
+      // Проверяем, что отпуск ещё активен (не закончился)
+      if (vac && (!vac.end || new Date(vac.end) >= new Date())) {
+        return vac;
+      }
+    }
+    return null;
   }, [readOnly, f.assigneeIds, f.start, f.deadline, hasDelegate, originalAssignee, vacOverlap]);
   
   const isExec = existing && (existing.assigneeIds || []).includes(ur.id);
