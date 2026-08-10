@@ -4,7 +4,7 @@
  */
 
 import { z } from 'zod';
-import { DOMAIN, PASSWORD_MIN_LENGTH } from '../config';
+import { COMPANY_DOMAIN, PASSWORD_MIN_LENGTH } from '../config';
 
 // ===== Базовые типы и утилиты =====
 
@@ -15,8 +15,8 @@ export const companyEmailSchema = z.string()
   .min(1, 'Email обязателен')
   .email('Некорректный формат email')
   .refine(
-    (email) => email.endsWith(`@${DOMAIN}`),
-    `Email должен быть домена @${DOMAIN}`
+    (email) => email.endsWith(`@${COMPANY_DOMAIN}`),
+    `Email должен быть домена @${COMPANY_DOMAIN}`
   );
 
 /**
@@ -266,8 +266,8 @@ export const registrationSchema = z.object({
     .min(1, 'Email обязателен')
     .email('Некорректный формат email')
     .refine(
-      (email) => email.endsWith(`@${DOMAIN}`),
-      `Email должен быть домена @${DOMAIN}`
+      (email) => email.endsWith(`@${COMPANY_DOMAIN}`),
+      `Email должен быть домена @${COMPANY_DOMAIN}`
     ),
   pass: passwordSchema,
   pass2: z.string(),
