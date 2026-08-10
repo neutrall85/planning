@@ -1,9 +1,17 @@
 import React, { useState } from 'react';
-import { PROJECT_TYPES, TASK_STATUSES } from '../utils/constants';
+import { PROJECT_TYPES, PROJECT_CATEGORIES, TASK_STATUSES } from '../utils/constants';
 import { fmtDMY, TODAY } from '../utils/date';
 import { canRestore } from '../utils/permissions';
 import { Ic, ICONS } from './Icons';
 import { useDataHelpers } from '../hooks';
+
+function getCategoryColor(project) {
+  if (!project || project.ptype === 'admin') return '#6b7280';
+  const categoryKey = Object.keys(PROJECT_CATEGORIES).find(
+    key => PROJECT_CATEGORIES[key].label === project.category
+  );
+  return PROJECT_CATEGORIES[categoryKey]?.color || PROJECT_CATEGORIES.NORM.color;
+}
 
 export default function Archive({ db, ur, openTask, openProject, restoreTask, restoreProject }) {
   const { getTaskSpent, empName } = useDataHelpers(db);
@@ -61,7 +69,7 @@ export default function Archive({ db, ur, openTask, openProject, restoreTask, re
           <tbody>
             {projList.map(p => (
               <tr key={p.id}>
-                <td><span className="pj-code" style={{ background: p.color + '22', color: p.color }}>{p.code}</span></td>
+                <td><span className="pj-code" style={{ background: getCategoryColor(p) + '22', color: getCategoryColor(p) }}>{p.code}</span></td>
                 <td><b>{p.name}</b></td>
                 <td>{PROJECT_TYPES[p.ptype || 'prod']}</td>
                 <td>{fmtDMY(p.archivedAt)}</td>

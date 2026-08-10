@@ -1,8 +1,16 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { TASK_STATUSES, TASK_STATUS_ORDER, VACATION_TYPES } from '../utils/constants';
+import { TASK_STATUSES, TASK_STATUS_ORDER, VACATION_TYPES, PROJECT_CATEGORIES } from '../utils/constants';
 import { TODAY, fmtDMY, fmtD, iso, addDays, initials, isTaskActive } from '../utils/date';
 import { useDataHelpers } from '../hooks';
 import { Ic, ICONS } from './Icons';
+
+function getCategoryColor(project) {
+  if (!project || project.ptype === 'admin') return '#6b7280';
+  const categoryKey = Object.keys(PROJECT_CATEGORIES).find(
+    key => PROJECT_CATEGORIES[key].label === project.category
+  );
+  return PROJECT_CATEGORIES[categoryKey]?.color || PROJECT_CATEGORIES.NORM.color;
+}
 
 function downloadCSV(name, rows) {
   const csv = '\uFEFF' + rows.map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(';')).join('\r\n');
@@ -154,7 +162,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
               <div className="rep-panel-title">Мои проекты</div>
               {myProjects.map(p => (
                 <div key={p.id} className="cab-proj">
-                  <span className="pdot" style={{ background: p.color }} />
+                  <span className="pdot" style={{ background: getCategoryColor(p) }} />
                   {p.code} — {p.name}
                   {p.ptype === 'admin' && <span className="adm-badge" style={{ marginLeft: 8 }}>адм</span>}
                 </div>
