@@ -194,8 +194,8 @@ export default function Gantt({ db, ur, openTask, openProject }) {
                     const w = Math.max((t.eIdx - t.sIdx + 1) * DW - 4, DW - 8);
                     const sp = getTaskSpent(t);
                     
-                    // Проверяем, есть ли делегат у задачи
-                    const hasDelegate = t.delegateId && t.delegateUntil && new Date(t.delegateUntil) >= new Date(TODAY);
+                    // Проверяем, есть ли делегирование у задачи (используем новые поля)
+                    const hasDelegate = t.isDelegated && t.delegationEnd && new Date(t.delegationEnd) >= new Date(TODAY);
                     
                     // Показываем значок отпуска только если нет делегата
                     const vac = (!hasDelegate && a) ? vacOverlap(a.id, t.start, t.deadline) : null;
@@ -220,7 +220,7 @@ export default function Gantt({ db, ur, openTask, openProject }) {
                           <div className="gbar" style={{ left, width: w, background: prioColor + '33', border: `2px solid ${prioColor}`, cursor: 'pointer', opacity: t.status === 'cancelled' ? 0.45 : 1 }} onClick={() => {
                             // Всегда передаем данные об отпуске и делегировании
                             const vacData = hasDelegate 
-                              ? { hasDelegate: true, delegateId: t.delegateId, delegateUntil: t.delegateUntil }
+                              ? { hasDelegate: true, delegatedFrom: t.delegatedFrom, delegatedTo: t.delegatedTo, delegationStart: t.delegationStart, delegationEnd: t.delegationEnd }
                               : (vac ? { vacation: vac, employee: a, hasDelegate: false } : null);
                             openTask(t.id, 'form', null, vacData);
                           }} title={tip}>

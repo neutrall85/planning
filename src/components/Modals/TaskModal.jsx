@@ -137,12 +137,34 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
   const existing = taskId ? db.tasks.find((t) => t.id === taskId) : null;
   const readOnly = !!(existing && existing.archived);
   
-  // Проверяем, есть ли данные об отпуске или делегировании, переданные из Gantt
-  const hasDelegate = vacationData && vacationData.hasDelegate;
-  const delegateInfo = hasDelegate && vacationData.delegateId 
-    ? db.employees.find(e => e.id === vacationData.delegateId) 
-    : null;
+  // Проверяем делегирование напрямую из данных задачи (приоритет) или из vacationData (для обратной совместимости)
+  const hasDelegateFromTask = existing && existing.isDelegated && existing.delegationEnd && new Date(existing.delegationEnd) >= new Date();
+  const hasDelegateFromProp = vacationData && vacationData.hasDelegate;
+  const hasDelegate = hasDelegateFromTask || hasDelegateFromProp;
   
+  // Получаем информацию о делегировании из задачи или из пропсов
+  const delegateInfoFromTask = hasDelegateFromTask && existing.delegatedTo
+    ? db.employees.find(e => e.id === existing.delegatedTo)
+    : null;
+  const delegateInfoFromProp = hasDelegateFromProp && vacationData.delegateId
+    ? db.employees.find(e => e.id === vacationData.delegateId)
+    : null;
+  const delegateInfo = delegateInfoFromTask || delegateInfoFromProp;
+  
+  // Получаем информацию об исходном исполнителе при делегировании
+  const originalAssigneeFromTask = hasDelegateFromTask && existing.delegatedFrom
+    ? db.employees.find(e => e.id === existing.delegatedFrom)
+    : null;
+  const originalAssigneeFromProp = hasDelegateFromProp && vacationData.delegatedFrom
+    ? db.employees.find(e => e.id === vacationData.delegatedFrom)
+    : null;
+  const originalAssignee = originalAssigneeFromTask || originalAssigneeFromProp;
+  
+  // Данные о периоде делегирования
+  const delegationStart = hasDelegateFromTask ? existing.delegationStart : (vacationData ? vacationData.delegationStart : null);
+  const delegationEnd = hasDelegateFromTask ? existing.delegationEnd : (vacationData ? vacationData.delegationEnd : null);
+  
+  // Предупреждение об отпуске показываем только если нет делегирования
   const hasVacationWarning = vacationData && vacationData.vacation && vacationData.employee && !hasDelegate;
   const vacationInfo = hasVacationWarning ? vacationData.vacation : null;
   const employeeInfo = hasVacationWarning ? vacationData.employee : null;
@@ -183,7 +205,23 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
   const isAdminProj = proj && proj.ptype === "admin";
   const sp = f.logs.reduce((s, l) => s + l.hours, 0);
   const remainProj = proj && proj.budget != null && !proj.archived ? proj.budget - (planSum(proj.id) - (existing ? (existing.plannedHours || 0) : 0)) : null;
-  const vacWarn = !readOnly && f.assigneeIds && f.assigneeIds.length > 0 && f.deadline ? f.assigneeIds.some(id => vacOverlap(id, f.start || f.deadline, f.deadline)) : null;
+  
+  // Улучшенная логика vacWarn: проверяем только тех исполнителей, которые не являются делегированными
+  // Если задача делегирована, предупреждение для исходного исполнителя (delegatedFrom) не показываем
+  const vacWarn = useMemo(() => {
+    if (readOnly || !f.assigneeIds || f.assigneeIds.length === 0 || !f.deadline) return null;
+    
+    // Если задача делегирована, исключаем originalAssignee из проверки
+    if (hasDelegate && originalAssignee) {
+      // Проверяем только текущих исполнителей (замещающих), исключая delegatedFrom
+      const assigneesToCheck = f.assigneeIds.filter(id => id !== originalAssignee.id);
+      return assigneesToCheck.some(id => vacOverlap(id, f.start || f.deadline, f.deadline));
+    }
+    
+    // Стандартная проверка для недегелированных задач
+    return f.assigneeIds.some(id => vacOverlap(id, f.start || f.deadline, f.deadline));
+  }, [readOnly, f.assigneeIds, f.start, f.deadline, hasDelegate, originalAssignee, vacOverlap]);
+  
   const isExec = existing && (existing.assigneeIds || []).includes(ur.id);
   const canLog = !readOnly && ((existing ? isExec : f.assigneeIds?.includes(ur.id)) || has(ur, "admin"));
 
@@ -417,9 +455,39 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
       <div className="tabs sm">{[["form", "Данные"], ["time", `Учёт времени (${sp}/${f.plannedHours ?? "—"})`], ...(existing ? [["chat", `Обсуждение (${f.comments.length})`], ["hist", "История"]] : [])].map(([id, l]) => <button key={id} className={"tab" + (tab === id ? " on" : "")} onClick={() => setTab(id)}>{l}</button>)}</div>
 
       {tab === "form" && (<>
-        {hasDelegate && delegateInfo && (<div className="info-box" style={{background: '#eff6ff', border: '1px solid #3b82f6', color: '#1e40af'}}><Ic d={ICONS.user} size={15} />  Задача делегирована <strong>{delegateInfo.last} {delegateInfo.first}</strong> на период отпуска до {fmtDMY(vacationData.delegateUntil)}.</div>)}
-        {hasVacationWarning && vacationInfo && employeeInfo && (<div className="warn-box"><Ic d={ICONS.beach} size={15} />  Внимание! Исполнитель <strong>{employeeInfo.last} {employeeInfo.first}</strong> находится в отпуске с {fmtDMY(vacationInfo.start)} по {fmtDMY(vacationInfo.end)}. Даты пересекаются с периодом задачи.</div>)}
-        {vacWarn && !hasVacationWarning && <div className="warn-box"><Ic d={ICONS.beach} size={15} />  Один из исполнителей находится в отпуске с {fmtDMY(vacWarn.start)} по {fmtDMY(vacWarn.end)}. Даты пересекаются с периодом задачи.</div>}
+
+        {/* Блок информации о делегировании - показываем, если задача делегирована */}
+        {hasDelegate && (
+          <div className="info-box" style={{background: '#eff6ff', border: '1px solid #3b82f6', color: '#1e40af'}}>
+            <Ic d={ICONS.user} size={15} />  
+            <strong>Задача делегирована</strong> на период отпуска:
+            <div style={{marginTop: '8px', marginLeft: '20px'}}>
+              {originalAssignee && (
+                <div>Исходный исполнитель: <strong>{originalAssignee.last} {originalAssignee.first}</strong></div>
+              )}
+              {delegateInfo && (
+                <div>Временный исполнитель: <strong>{delegateInfo.last} {delegateInfo.first}</strong></div>
+              )}
+              {delegationStart && delegationEnd && (
+                <div>Период делегирования: с {fmtDMY(delegationStart)} по {fmtDMY(delegationEnd)}</div>
+              )}
+            </div>
+          </div>
+        )}
+        {/* Предупреждение об отпуске из vacationData (только если нет делегирования) */}
+        {hasVacationWarning && vacationInfo && employeeInfo && (
+          <div className="warn-box">
+            <Ic d={ICONS.beach} size={15} />  
+            Внимание! Исполнитель <strong>{employeeInfo.last} {employeeInfo.first}</strong> находится в отпуске с {fmtDMY(vacationInfo.start)} по {fmtDMY(vacationInfo.end)}. Даты пересекаются с периодом задачи.
+          </div>
+        )}
+        {/* Предупреждение vacWarn - показываем только если нет делегирования и есть пересечение с отпуском */}
+        {vacWarn && !hasDelegate && !hasVacationWarning && (
+          <div className="warn-box">
+            <Ic d={ICONS.beach} size={15} />  
+            Один из исполнителей находится в отпуске с {vacWarn.start ? fmtDMY(vacWarn.start) : '—'} по {vacWarn.end ? fmtDMY(vacWarn.end) : '—'}. Даты пересекаются с периодом задачи.
+          </div>
+        )}
         {remainProj !== null && remainProj - (+f.plannedHours || 0) < 0 && <div className="warn-box">Внимание: задача превысит остаток бюджета проекта ({remainProj} ч). Потребуется увеличение бюджета проекта.</div>}
         {isAdminProj && !readOnly && <div className="info-box">Административный проект: дедлайн и плановые часы задачи — по желанию.</div>}
         <div className="form-grid">
