@@ -195,9 +195,10 @@ export default function Gantt({ db, ur, openTask, openProject }) {
                     const sp = getTaskSpent(t);
                     const vac = a ? vacOverlap(a.id, t.start, t.deadline) : null;
                     const vacValid = vac && vac.start && vac.end && vac.start <= vac.end;
-                    const tip = `${t.title}: ${fmtD(t.start)} — ${fmtD(t.deadline)}, план ${t.plannedHours ?? '—'} ч${vac ? (vacValid ? `. Исполнитель в отпуске ${fmtDMY(vac.start)}–${fmtDMY(vac.end)}` : '. Внимание: исполнитель в отпуске, но даты отпуска не указаны корректно') : ''}`;
+                    // Показываем значок отпуска, если отпуск есть и он ещё не закончился (end >= TODAY)
+                    const showVac = vac && (!vac.end || vac.end >= TODAY);
+                    const tip = `${t.title}: ${fmtD(t.start)} — ${fmtD(t.deadline)}, план ${t.plannedHours ?? '—'} ч${showVac ? (vacValid ? `. Исполнитель в отпуске ${fmtDMY(vac.start)}–${fmtDMY(vac.end)}` : '. Внимание: исполнитель в отпуске, но даты отпуска не указаны корректно') : ''}`;
                     const prioColor = PRIORITIES[t.priority]?.color || PRIORITIES.mid.color;
-                    const statusColor = t.status === 'closed' ? '#10b981' : t.status === 'cancelled' ? '#64748b' : prioColor;
                     
                     // Расчет процента выполнения (факт / план)
                     const planned = t.plannedHours || 0;
@@ -211,17 +212,17 @@ export default function Gantt({ db, ur, openTask, openProject }) {
                           <span className="gsub">{a ? a.last : ''} · {t.plannedHours ?? '—'} ч · {TASK_STATUSES[t.status].label}</span>
                         </div>
                         <div className="gantt-track" style={{ width }}>
-                          <div className="gbar" style={{ left, width: w, background: statusColor + '33', border: `2px solid ${statusColor}`, cursor: 'pointer', opacity: t.status === 'cancelled' ? 0.45 : 1 }} onClick={() => {
-                            if (vac && !vacValid) {
-                              setVacWarning({ task: t, employee: a });
+                          <div className="gbar" style={{ left, width: w, background: prioColor + '33', border: `2px solid ${prioColor}`, cursor: 'pointer', opacity: t.status === 'cancelled' ? 0.45 : 1 }} onClick={() => {
+                            if (showVac && !vacValid) {
+                              setVacWarning({ task: t, employee: a, vac });
                             } else {
                               openTask(t.id);
                             }
                           }} title={tip}>
                             {pct > 0 && (
-                              <div className="gbar-fill" style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${pct}%`, background: statusColor, opacity: 0.6 }} />
+                              <div className="gbar-fill" style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${pct}%`, background: prioColor, opacity: 0.6 }} />
                             )}
-                            {vac && <span className="gbar-vac" title={vacValid ? "Исполнитель в отпуске в эти даты" : "Внимание: даты отпуска не указаны корректно"}>🏖</span>}
+                            {showVac && <span className="gbar-vac" title={vacValid ? "Исполнитель в отпуске в эти даты" : "Внимание: даты отпуска не указаны корректно"}>🏖</span>}
                           </div>
                         </div>
                       </div>
@@ -238,6 +239,9 @@ export default function Gantt({ db, ur, openTask, openProject }) {
           <div className="modal-content" style={{ background: '#fff', padding: '24px', borderRadius: '8px', maxWidth: '400px', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }} onClick={e => e.stopPropagation()}>
             <h3 style={{ margin: '0 0 16px', color: '#dc2626' }}>⚠️ Внимание</h3>
             <p style={{ margin: '0 0 12px' }}>Исполнитель <strong>{vacWarning.employee?.last} {vacWarning.employee?.first}</strong> находится в отпуске, но даты отпуска не указаны корректно.</p>
+            {vacWarning.vac && vacWarning.vac.start && vacWarning.vac.end && (
+              <p style={{ margin: '0 0 12px', fontSize: '14px', color: '#64748b' }}>Даты отпуска: <strong>{fmtDMY(vacWarning.vac.start)} — {fmtDMY(vacWarning.vac.end)}</strong></p>
+            )}
             <p style={{ margin: '0 0 20px', fontSize: '14px', color: '#64748b' }}>Задача: <strong>{vacWarning.task.title}</strong></p>
             <button className="btn primary" onClick={() => setVacWarning(null)} style={{ width: '100%', padding: '10px 16px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}>Закрыть</button>
           </div>
@@ -246,8 +250,8 @@ export default function Gantt({ db, ur, openTask, openProject }) {
       <div className="gantt-legend" style={{ padding: '8px 16px', borderTop: '1px solid var(--line)' }}>
         <span><span className="lg-dot" style={{ background: '#e2e8f0' }} /> выходные</span>
         <span>🏖 — исполнитель в отпуске</span>
-        <span style={{ marginLeft: 16, fontWeight: 600 }}>Статусы задач:</span>
-        {Object.entries(TASK_STATUSES).map(([k, v]) => (
+        <span style={{ marginLeft: 16, fontWeight: 600 }}>Приоритеты задач:</span>
+        {Object.entries(PRIORITIES).map(([k, v]) => (
           <span key={k} style={{ marginLeft: 12 }}>
             <span className="lg-dot" style={{ background: v.color }} /> {v.label}
           </span>
