@@ -213,8 +213,9 @@ export default function Gantt({ db, ur, openTask, openProject }) {
                         </div>
                         <div className="gantt-track" style={{ width }}>
                           <div className="gbar" style={{ left, width: w, background: prioColor + '33', border: `2px solid ${prioColor}`, cursor: 'pointer', opacity: t.status === 'cancelled' ? 0.45 : 1 }} onClick={() => {
-                            if (showVac && !vacValid) {
-                              setVacWarning({ task: t, employee: a, vac });
+                            if (showVac) {
+                              // Передаем данные об отпуске в openTask через дополнительный параметр
+                              openTask(t.id, { vacation: vac, employee: a });
                             } else {
                               openTask(t.id);
                             }

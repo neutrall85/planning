@@ -132,10 +132,13 @@ function generateRepeatDates(startDate, deadline, repeatConfig, endDate, maxCoun
   return result;
 }
 
-export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum, onClose, onSave, onDelete, onHoursReq, toast, patchTask, notify, store, initialProjectId }) => {
+export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum, onClose, onSave, onDelete, onHoursReq, toast, patchTask, notify, store, initialProjectId, vacationData }) => {
   const { empName, getTaskSpent, vacOverlap, primaryDept } = useDataHelpers(db);
   const existing = taskId ? db.tasks.find((t) => t.id === taskId) : null;
   const readOnly = !!(existing && existing.archived);
+  
+  // Проверяем, есть ли данные об отпуске, переданные из Gantt
+  const hasVacationWarning = vacationData && vacationData.vacation && vacationData.employee;
   
   const currentProjectId = initialProjectId || (existing ? existing.projectId : '');
   const isProjectFromInitial = !!initialProjectId && !existing;
