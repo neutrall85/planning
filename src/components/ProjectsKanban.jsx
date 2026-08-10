@@ -3,6 +3,7 @@ import { PROJECT_STATUSES, PROJECT_TYPES, PROJECT_CATEGORIES } from '../utils/co
 import { fmtDMY, initials, isTaskActive } from '../utils/date';
 import { Ic, ICONS } from './Icons';
 import { computeScope, hasRole, canChangeProjectStatus } from '../utils/permissions';
+import { useToast } from './Toast';
 
 // Порядок статусов для канбан-доски
 const PROJECT_STATUS_ORDER = ['inactive', 'active', 'closed', 'cancelled'];
@@ -19,11 +20,8 @@ export default function ProjectsKanban({ db, ur, openProject, closeProject, canc
   const scope = useMemo(() => computeScope(ur, db), [ur, db]);
   const canSeeAllProjects = hasRole(ur, "admin", "director", "economist", "kb_chief", "head", "project_lead", "project_manager");
   
-  // Fallback на alert если toast не передан
-  const showToast = (msg) => {
-    if (toast?.error) toast.error(msg);
-    else alert(msg);
-  };
+  // Используем useToast для консистентности
+  const showToast = useToast(toast);
   
   // Используем пропсы от родителя, если переданы, иначе локальное состояние
   const showOnlyMyProjects = parentShowOnlyMyProjects !== undefined ? parentShowOnlyMyProjects : false;

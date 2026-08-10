@@ -3,7 +3,7 @@ import { useAuth, useStore } from '../hooks';
 import { hasRole, canCreateTask, canExport, canCreateProject, canChangeTaskStatus, canChangeProjectStatus } from '../utils/permissions';
 import { getEmpNameFromData, getPrimaryDeptFromData } from '../utils/string';
 import { ICONS, Ic } from './Icons';
-import { initials, TODAY, fmtDMY, fmtDT } from '../utils/date';
+import { initials, TODAY, fmtDMY, fmtDT, fmtFullDate } from '../utils/date';
 import { TASK_STATUSES, ROLES, PROJECT_STATUSES } from '../utils/constants';
 import Kanban from './Kanban';
 import TaskList from './TaskList';
@@ -216,7 +216,7 @@ export default function MainLayout({ store, data, user, toast }) {
         <header className="topbar">
           <div>
             <h1 className="page-title">{navItems.find(n => n.id === view)?.label || 'Личный кабинет'}</h1>
-            <div className="page-sub">Вторник, 4 августа 2026 · вы вошли как {user.last} {user.first}</div>
+            <div className="page-sub">{fmtFullDate()} · вы вошли как {user.last} {user.first}</div>
           </div>
           <div className="top-tools">
             <button className="btn ghost" onClick={() => setVacModalOpen(true)}><Ic d={ICONS.beach} size={15} /> Сотрудники в отпусках</button>

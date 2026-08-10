@@ -37,8 +37,13 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
     setBusy(true);
     setErr(null);
     setTimeout(() => {
-      const r = onLogin(loginVal, passVal);
-      if (r) fail(r);
+      try {
+        const r = onLogin(loginVal, passVal);
+        if (r) fail(r);
+      } catch (ex) {
+        console.error('Login error:', ex);
+        fail('Произошла ошибка при входе. Попробуйте позже.');
+      }
       setBusy(false);
     }, 30);
   };
