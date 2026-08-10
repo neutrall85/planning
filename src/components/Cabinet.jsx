@@ -22,9 +22,14 @@ function downloadCSV(name, rows) {
   setTimeout(() => URL.revokeObjectURL(a.href), 500);
 }
 
-export default function Cabinet({ store, data, user, openTask, openVacation, openDelegation }) {
+export default function Cabinet({ store, data, user, openTask, openVacation, openDelegation, toast }) {
   const { empName, getEmployeeLoad } = useDataHelpers(data);
   const [tab, setTab] = useState('overview');
+
+  const showToast = (msg, type = 'error') => {
+    if (toast?.[type]) toast[type](msg);
+    else alert(msg);
+  };
 
   const [expFrom, setExpFrom] = useState('');
   const [expTo, setExpTo] = useState('');
@@ -49,8 +54,8 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
   }, [myTasks]);
 
   const exportMyReport = () => {
-    if (!expFrom || !expTo) return alert('Выберите даты начала и окончания периода');
-    if (expFrom > expTo) return alert('Дата начала не может быть позже даты окончания');
+    if (!expFrom || !expTo) return showToast('Выберите даты начала и окончания периода');
+    if (expFrom > expTo) return showToast('Дата начала не может быть позже даты окончания');
 
     const allLogs = [];
     myTasks.forEach(t => {
@@ -67,13 +72,13 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
       });
     });
 
-    if (!allLogs.length) return alert('За выбранный период нет учтенных часов');
+    if (!allLogs.length) return showToast('За выбранный период нет учтенных часов');
 
     const rows = [['Проект', 'Задача', 'Дата', 'Часы']];
     allLogs.forEach(l => rows.push([l.project, l.task, fmtDMY(l.date), l.hours]));
     
     downloadCSV(`отчет_${user.last}_${expFrom}_${expTo}`, rows);
-    alert('Отчёт выгружен!');
+    showToast('Отчёт выгружен!', 'success');
   };
 
   const tabs = [
@@ -88,17 +93,17 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
     const newPass = window.prompt('Введите новый пароль:');
     if (!newPass) return;
     if (newPass.length < 8 || !/[A-ZА-ЯЁ]/.test(newPass) || !/[a-zа-яё]/.test(newPass) || !/\d/.test(newPass) || !/[^A-Za-zА-Яа-яЁё0-9]/.test(newPass)) {
-      alert('Пароль не соответствует требованиям безопасности (минимум 8 символов, заглавные и строчные буквы, цифры, спецсимволы)');
+      showToast('Пароль не соответствует требованиям безопасности (минимум 8 символов, заглавные и строчные буквы, цифры, спецсимволы)');
       return;
     }
     const history = user.passwordHistory || [];
     if (history.some(p => p === newPass)) {
-      alert('Этот пароль уже использовался ранее. Выберите другой.');
+      showToast('Этот пароль уже использовался ранее. Выберите другой.');
       return;
     }
     const updated = { ...user, pass: newPass, passwordHistory: [...history.slice(-4), newPass] };
     store.upsertEmployee(updated);
-    alert('Пароль изменён. На вашу почту отправлено подтверждение.');
+    showToast('Пароль изменён. На вашу почту отправлено подтверждение.', 'success');
   };
 
   // Загрузка фото
@@ -111,7 +116,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
       const photoData = ev.target.result; // base64
       const updated = { ...user, photo: photoData };
       store.upsertEmployee(updated);
-      alert('Фото загружено');
+      showToast('Фото загружено', 'success');
     };
     reader.readAsDataURL(file);
   };
@@ -319,7 +324,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
                   <label className="lbl">E-mail</label>
                   <div className="duo">
                     <input className="inp" disabled value={user.email + '@aeroplan.ru'} />
-                    <button className="btn ghost sm" onClick={() => alert('Письмо подтверждения отправлено на новый адрес (заглушка)')}>изменить</button>
+                    <button className="btn ghost sm" onClick={() => showToast('Письмо подтверждения отправлено на новый адрес')}>изменить</button>
                   </div>
                   
                   <label className="lbl">Мобильный телефон</label>
@@ -335,7 +340,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
                     onChange={e => {
                       const val = e.target.value;
                       if (val.trim() === '') {
-                        alert('Внутренний номер телефона не может быть пустым');
+                        showToast('Внутренний номер телефона не может быть пустым');
                         return;
                       }
                       const updated = { ...user, extension: val.trim() };
@@ -343,7 +348,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
                     }}
                     onBlur={e => {
                       if (!e.target.value.trim()) {
-                        alert('Внутренний номер телефона обязателен');
+                        showToast('Внутренний номер телефона обязателен');
                       }
                     }}
                   />

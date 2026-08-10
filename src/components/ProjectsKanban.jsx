@@ -15,9 +15,15 @@ const PROJECT_STATUS_CONFIG = {
   cancelled: { label: 'Отменён', color: '#94a3b8' },
 };
 
-export default function ProjectsKanban({ db, ur, openProject, closeProject, cancelProject, moveProject, showOnlyMyProjects: parentShowOnlyMyProjects, sortBy: parentSortBy }) {
+export default function ProjectsKanban({ db, ur, openProject, closeProject, cancelProject, moveProject, showOnlyMyProjects: parentShowOnlyMyProjects, sortBy: parentSortBy, toast }) {
   const scope = useMemo(() => computeScope(ur, db), [ur, db]);
   const canSeeAllProjects = hasRole(ur, "admin", "director", "economist", "kb_chief", "head", "project_lead", "project_manager");
+  
+  // Fallback на alert если toast не передан
+  const showToast = (msg) => {
+    if (toast?.error) toast.error(msg);
+    else alert(msg);
+  };
   
   // Используем пропсы от родителя, если переданы, иначе локальное состояние
   const showOnlyMyProjects = parentShowOnlyMyProjects !== undefined ? parentShowOnlyMyProjects : false;
@@ -80,7 +86,7 @@ export default function ProjectsKanban({ db, ur, openProject, closeProject, canc
                 if (id) {
                   const project = db.projects.find(p => p.id === id);
                   if (project && !canChangeProjectStatus(ur, project, status, db)) {
-                    alert('У вас нет прав на перевод проекта в статус ' + statusConfig.label);
+                    showToast('У вас нет прав на перевод проекта в статус ' + statusConfig.label);
                     return;
                   }
                   if (moveProject) {
