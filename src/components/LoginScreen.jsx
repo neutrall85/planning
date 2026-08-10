@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Ic, ICONS } from './Icons';
 import { validateRegistration, sanitizeObject } from '../utils/validation';
 import { logger } from '../utils/logging/logger';
-import { DOMAIN, SHAKE_ANIMATION_MS, PASSWORD_AUTO_HIDE_MS } from '../utils/config';
+import { COMPANY_DOMAIN, SHAKE_ANIMATION_MS, PASSWORD_AUTO_HIDE_MS } from '../utils/config';
 import { uid } from '../utils/date';
 
 /**
@@ -170,7 +170,7 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
       if (mode === "forgot") {
         if (!forgot.trim()) return fail("Укажите e-mail");
         logger.info(`Запрос восстановления пароля для: ${forgot.trim()}`);
-        toast("Ссылка для восстановления пароля отправлена на " + forgot.trim() + "@" + DOMAIN + " (действует 1 час). Заглушка.");
+        toast("Ссылка для восстановления пароля отправлена на " + forgot.trim() + "@" + COMPANY_DOMAIN + " (действует 1 час). Заглушка.");
         setMode("login");
       }
     } catch (ex) {
@@ -210,16 +210,16 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
           {mode !== "register" && (
             <>
               <h3>{mode === "forgot" ? "Восстановление пароля" : "Вход в систему"}</h3>
-              <div className="login-sub">{mode === "forgot" ? "Ссылка будет отправлена на зарегистрированный e-mail" : "Логин — e-mail без домена " + "@" + DOMAIN}</div>
+              <div className="login-sub">{mode === "forgot" ? "Ссылка будет отправлена на зарегистрированный e-mail" : "Логин — e-mail без домена " + "@" + COMPANY_DOMAIN}</div>
               {mode === "forgot" ? (
                 <>
                   <label className="lbl">E-mail</label>
-                  <div className="email-inp"><input className="inp" value={forgot} onChange={(e) => { setForgot(e.target.value); setErr(null); }} placeholder="ivanov" autoFocus /><span className="email-dom">{"@" + DOMAIN}</span></div>
+                  <div className="email-inp"><input className="inp" value={forgot} onChange={(e) => { setForgot(e.target.value); setErr(null); }} placeholder="ivanov" autoFocus /><span className="email-dom">{"@" + COMPANY_DOMAIN}</span></div>
                 </>
               ) : (
                 <>
                   <label className="lbl">Логин (e-mail)</label>
-                  <div className="email-inp"><input className="inp" value={lg} onChange={(e) => { setLg(e.target.value); setErr(null); }} placeholder="ivanov" autoFocus /><span className="email-dom">{"@" + DOMAIN}</span></div>
+                  <div className="email-inp"><input className="inp" value={lg} onChange={(e) => { setLg(e.target.value); setErr(null); }} placeholder="ivanov" autoFocus /><span className="email-dom">{"@" + COMPANY_DOMAIN}</span></div>
                   <label className="lbl">Пароль</label>
                   <div style={{ position: 'relative' }}>
                     <input
@@ -251,7 +251,7 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
                 <div><label className="lbl">Фамилия *</label><input className="inp" value={reg.last} onChange={(e) => setReg({ ...reg, last: e.target.value })} /></div>
               </div>
               <label className="lbl">E-mail *</label>
-              <div className="email-inp"><input className="inp" value={reg.email} onChange={(e) => setReg({ ...reg, email: e.target.value })} placeholder="ivanov" /><span className="email-dom">{"@" + DOMAIN}</span></div>
+              <div className="email-inp"><input className="inp" value={reg.email} onChange={(e) => setReg({ ...reg, email: e.target.value })} placeholder="ivanov" /><span className="email-dom">{"@" + COMPANY_DOMAIN}</span></div>
               <label className="lbl">Пароль *</label>
               <div style={{ position: 'relative' }}>
                 <input
