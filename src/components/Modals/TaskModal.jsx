@@ -412,7 +412,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
           <label className="lbl">Описание</label><textarea className="inp" rows="2" disabled={!canEditFields} value={f.desc} onChange={(e) => set("desc", e.target.value)} />
           <label className="lbl">Проект * <span className="mut">(активные)</span></label>
           {readOnly ? <input className="inp" disabled value={proj ? `${proj.code} — ${proj.name}` : ""} /> : (
-              <select className="inp sel" disabled={!canEditFields} value={f.projectId} onChange={(e) => set("projectId", e.target.value)}>
+              <select className="inp sel" disabled={!canEditFields || (existing && f.projectId)} value={f.projectId} onChange={(e) => set("projectId", e.target.value)}>
                 <option value="">— выберите проект —</option>
                 {projs.map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}{p.ptype === "admin" ? " (административный)" : ""}</option>)}
               </select>
@@ -505,17 +505,22 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
         {/* Блок повторения (только для новых задач, не для редактирования) */}
         {!existing && !readOnly && (
           <div className="tm-block" style={{ marginTop: '12px' }}>
-            <div className="rep-panel-title">Повторение</div>
+            <div className="rep-panel-title">Повторение {isAdminProj ? '' : '(только для административных проектов)'}</div>
             <div className="form-grid" style={{ gridTemplateColumns: '150px 1fr' }}>
               <label className="lbl">Тип повторения</label>
-              <select className="inp sel" value={f.repeatType} onChange={(e) => set("repeatType", e.target.value)}>
+              <select className="inp sel" disabled={!isAdminProj} value={f.repeatType} onChange={(e) => set("repeatType", e.target.value)}>
                 <option value="none">Нет</option>
-                <option value="daily">Ежедневно</option>
-                <option value="weekly_days">Еженедельно по дням</option>
-                <option value="workdays">Каждый рабочий день</option>
-                <option value="monthly">Ежемесячно</option>
-                <option value="yearly">Ежегодно</option>
-                <option value="custom">Произвольно (через N дней)</option>
+                {!isAdminProj && <option value="" disabled>— недоступно —</option>}
+                {isAdminProj && (
+                  <>
+                    <option value="daily">Ежедневно</option>
+                    <option value="weekly_days">Еженедельно по дням</option>
+                    <option value="workdays">Каждый рабочий день</option>
+                    <option value="monthly">Ежемесячно</option>
+                    <option value="yearly">Ежегодно</option>
+                    <option value="custom">Произвольно (через N дней)</option>
+                  </>
+                )}
               </select>
 
               {f.repeatType === 'custom' && (
