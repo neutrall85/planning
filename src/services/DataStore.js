@@ -7,12 +7,40 @@ export default class DataStore {
     this._currentUser = null;
     this._listeners = [];
     this._archiveOldTasks(3);
-    this._checkAllDeadlines();
+    this._scheduleDeadlineCheck();
   }
   
-  // Проверка дедлайнов всех задач при загрузке системы
+  // Планирование проверки дедлайнов в 7:00 по Москве ежедневно
+  _scheduleDeadlineCheck() {
+    const checkAtTime = () => {
+      const now = new Date();
+      const moscowTime = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Moscow' }));
+      const targetTime = new Date(moscowTime);
+      targetTime.setHours(7, 0, 0, 0);
+      
+      // Если уже прошло 7:00 сегодня, планируем на завтра
+      if (moscowTime.getHours() >= 7) {
+        targetTime.setDate(targetTime.getDate() + 1);
+      }
+      
+      const delay = targetTime.getTime() - now.getTime();
+      console.log(`Проверка дедлайнов запланирована через ${Math.round(delay / 1000 / 60)} мин. (в 7:00 МСК)`);
+      
+      setTimeout(() => {
+        this._checkAllDeadlines();
+        // Планируем следующую проверку через 24 часа
+        setInterval(() => this._checkAllDeadlines(), 24 * 60 * 60 * 1000);
+      }, delay);
+    };
+    
+    checkAtTime();
+  }
+  
+  // Проверка дедлайнов всех задач
   _checkAllDeadlines() {
     const now = new Date(TODAY);
+    console.log(`Выполняется проверка дедлайнов в ${now.toISOString()}`);
+    
     this._data.tasks.forEach(task => {
       if (!task.deadline || ['closed', 'cancelled'].includes(task.status)) return;
       
@@ -35,6 +63,7 @@ export default class DataStore {
             );
             if (!exists) {
               this.addNotification(id, notifText, { targetType: 'task', targetId: task.id });
+              console.log(`Уведомление отправлено пользователю ${emp.last}: ${notifText}`);
             }
           }
         });
