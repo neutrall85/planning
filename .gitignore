@@ -7,7 +7,7 @@ __pycache__/
 *.exe
 *.dll
 *.so
-*.a
+*.class
 *.out
 
 # Dependencies
@@ -23,18 +23,20 @@ dist/
 build/
 target/
 *.log
+*.tmp
+*.swp
+*.swo
+
+# Editors
+.vscode/
+.idea/
+
+# Coverage
 coverage/
 htmlcov/
 .coverage
 
-# Editors and IDEs
-.vscode/
-.idea/
-*.swp
-*.swo
-*.tmp
-
-# System files
+# OS
 .DS_Store
 Thumbs.db
 
