@@ -15,10 +15,11 @@ const DayCell = ({ d, big, byDay, db, openTask }) => {
           const p = db.projects.find(x => x.id === t.projectId);
           const assignees = (t.assigneeIds || []).map(id => db.employees.find(e => e.id === id)).filter(Boolean);
           const execNames = assignees.map(a => a.last).join(', ');
+          const prioColor = t.priority ? (t.priority === 'high' ? '#ef4444' : t.priority === 'low' ? '#22c55e' : '#f59e0b') : '#f59e0b';
           return (
-            <div key={t.id} className="cal-chip" style={{ borderColor: p?.color }} onClick={() => openTask(t.id)}>
+            <div key={t.id} className="cal-chip" style={{ borderColor: prioColor, background: prioColor + '1a' }} onClick={() => openTask(t.id)}>
               <div className="cal-task-title">
-                <span className="pdot" style={{ background: p?.color }} />
+                <span className="pdot" style={{ background: prioColor }} />
                 <span>{t.title}</span>
               </div>
               <div className="cal-executor">{execNames}</div>
