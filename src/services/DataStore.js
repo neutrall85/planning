@@ -355,7 +355,15 @@ export default class DataStore {
       if (t.deadline && t.deadline < start) return t;
       const newAssignees = t.assigneeIds.filter(id => id !== fromId);
       if (!newAssignees.includes(toId)) newAssignees.push(toId);
-      const updated = { ...t, assigneeIds: newAssignees };
+      const updated = { 
+        ...t, 
+        assigneeIds: newAssignees,
+        isDelegated: true,
+        delegatedFrom: fromId,
+        delegatedTo: toId,
+        delegationStart: start,
+        delegationEnd: end
+      };
       updated.history = [...updated.history, {
         ts: Date.now(),
         who: 'system',
@@ -380,7 +388,15 @@ export default class DataStore {
       if (!hasDelegation) return t;
       const newAssignees = t.assigneeIds.filter(id => id !== toId);
       if (!newAssignees.includes(fromId)) newAssignees.push(fromId);
-      const updated = { ...t, assigneeIds: newAssignees };
+      const updated = { 
+        ...t, 
+        assigneeIds: newAssignees,
+        isDelegated: false,
+        delegatedFrom: null,
+        delegatedTo: null,
+        delegationStart: null,
+        delegationEnd: null
+      };
       updated.history = [...updated.history, {
         ts: Date.now(),
         who: 'system',
