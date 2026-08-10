@@ -219,13 +219,9 @@ export default function Gantt({ db, ur, openTask, openProject }) {
                         <div className="gantt-track" style={{ width }}>
                           <div className="gbar" style={{ left, width: w, background: prioColor + '33', border: `2px solid ${prioColor}`, cursor: 'pointer', opacity: t.status === 'cancelled' ? 0.45 : 1 }} onClick={() => {
                             // Всегда передаем данные об отпуске и делегировании
-                            const vacData = {
-                              vacation: vac,
-                              employee: a,
-                              hasDelegate,
-                              delegateId: hasDelegate ? t.delegateId : null,
-                              delegateUntil: hasDelegate ? t.delegateUntil : null
-                            };
+                            const vacData = hasDelegate 
+                              ? { hasDelegate: true, delegateId: t.delegateId, delegateUntil: t.delegateUntil }
+                              : (vac ? { vacation: vac, employee: a, hasDelegate: false } : null);
                             openTask(t.id, 'form', null, vacData);
                           }} title={tip}>
                             {pct > 0 && (
