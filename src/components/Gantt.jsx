@@ -206,7 +206,6 @@ export default function Gantt({ db, ur, openTask, openProject }) {
                         </div>
                         <div className="gantt-track" style={{ width }}>
                           <div className="gbar" style={{ left, width: w, background: statusColor + '33', border: `2px solid ${statusColor}`, cursor: 'pointer', opacity: t.status === 'cancelled' ? 0.45 : 1 }} onClick={() => openTask(t.id)} title={tip}>
-                            <div className="gbar-fill" style={{ width: pct + '%', background: t.status === 'closed' ? '#10b981' : statusColor }} />
                             {vac && <span className="gbar-vac" title="Исполнитель в отпуске в эти даты">🏖</span>}
                           </div>
                         </div>
@@ -222,7 +221,6 @@ export default function Gantt({ db, ur, openTask, openProject }) {
       <div className="gantt-legend" style={{ padding: '8px 16px', borderTop: '1px solid var(--line)' }}>
         <span><span className="lg-dot" style={{ background: '#e2e8f0' }} /> выходные</span>
         <span>🏖 — исполнитель в отпуске</span>
-        <span>Заполнение полосы — факт / план</span>
         <span style={{ marginLeft: 16, fontWeight: 600 }}>Статусы задач:</span>
         {Object.entries(TASK_STATUSES).map(([k, v]) => (
           <span key={k} style={{ marginLeft: 12 }}>
