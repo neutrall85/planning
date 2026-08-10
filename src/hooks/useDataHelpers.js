@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { COMMENT_EDIT_WINDOW_MS, COMPANY_DOMAIN } from '../config';
 
 export const useDataHelpers = (data) => {
   const empName = (id) => {
@@ -37,5 +37,8 @@ export const useDataHelpers = (data) => {
     return data.vacations.find(v => v.empId === empId && v.status === 'approved' && v.start <= to && v.end >= from) || null;
   };
 
-  return { empName, primaryDept, getTaskSpent, getProjectStats, getEmployeeLoad, vacOverlap };
+  // Экспортируем константу для окна редактирования комментариев
+  const COMMENT_EDIT_WINDOW = COMMENT_EDIT_WINDOW_MS;
+
+  return { empName, primaryDept, getTaskSpent, getProjectStats, getEmployeeLoad, vacOverlap, COMMENT_EDIT_WINDOW };
 };

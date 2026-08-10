@@ -1,9 +1,9 @@
 import React, { useState, useRef } from 'react';
-import { DOMAIN } from '../utils/constants';
-import { uid } from '../utils/date';
 import { Ic, ICONS } from './Icons';
 import { validateRegistration, sanitizeObject } from '../utils/validation';
 import { logger } from '../utils/logging/logger';
+import { DOMAIN, SHAKE_ANIMATION_MS, PASSWORD_AUTO_HIDE_MS } from '../utils/config';
+import { uid } from '../utils/date';
 
 /**
  * Валидация пароля
