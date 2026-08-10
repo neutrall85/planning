@@ -21,8 +21,21 @@ export default function Gantt({ db, ur, openTask, openProject }) {
   const DW = 34;
 
   const shift = (dir) => {
-    const newAnchor = addDays(parseISO(anchor), range * dir);
-    setAnchor(iso(newAnchor));
+    const current = parseISO(anchor);
+    // Вычисляем первый день следующего/предыдущего периода на основе режима
+    let newDate;
+    if (mode === 'month') {
+      newDate = new Date(current.getFullYear(), current.getMonth() + dir, 1);
+    } else if (mode === 'quarter') {
+      const currentQuarter = Math.floor(current.getMonth() / 3);
+      const newQuarter = currentQuarter + dir;
+      newDate = new Date(current.getFullYear(), newQuarter * 3, 1);
+    } else if (mode === 'year') {
+      newDate = new Date(current.getFullYear() + dir, 0, 1);
+    } else {
+      newDate = addDays(current, range * dir);
+    }
+    setAnchor(iso(newDate));
   };
 
   const resetToday = () => {
@@ -109,31 +122,9 @@ export default function Gantt({ db, ur, openTask, openProject }) {
   const { days, months, groups } = ganttData;
   const todayIdx = days.indexOf(TODAY);
   const width = days.length * DW;
-  
-  // Функция для получения координат в зависимости от типа зависимости
-  const getDepCoords = (t, depTask, depItem) => {
-    if (!depTask || !depItem) return null;
-    
-    const tLeft = t.sIdx * DW + DW/2;
-    const tRight = t.eIdx * DW + DW/2;
-    const depLeft = depItem.sIdx * DW + DW/2;
-    const depRight = depItem.eIdx * DW + DW/2;
-    
-    switch (t.dependencyType) {
-      case 'SS': // Начало-Начало
-        return { fromX: depLeft, toX: tLeft, fromY: -25, toY: -10 };
-      case 'FF': // Окончание-Окончание
-        return { fromX: depRight, toX: tRight, fromY: -25, toY: -10 };
-      case 'SF': // Начало-Окончание
-        return { fromX: depLeft, toX: tRight, fromY: -25, toY: -10 };
-      case 'FS': // Окончание-Начало (по умолчанию)
-      default:
-        return { fromX: depRight, toX: tLeft, fromY: -25, toY: -10 };
-    }
-  };
 
   return (
-    <div className="gantt-panel">
+    <div className="gantt-panel" style={{ width: '100%', boxSizing: 'border-box' }}>
       <div className="cal-head" style={{ padding: '12px 16px', borderBottom: '1px solid var(--line)' }}>
         <div className="cal-nav">
           <button className="icon-btn" onClick={() => shift(-1)}><Ic d={ICONS.left} size={16} /></button>
@@ -153,7 +144,7 @@ export default function Gantt({ db, ur, openTask, openProject }) {
       </div>
       
       <div className="gantt-scroll">
-        <div className="gantt" style={{ width: width + 240 }}>
+        <div className="gantt" style={{ width: '100%', minWidth: width + 240 }}>
           <div className="gantt-top">
             <div className="gantt-corner">Проект / задача</div>
             <div className="gantt-axis" style={{ width }}>
@@ -187,14 +178,6 @@ export default function Gantt({ db, ur, openTask, openProject }) {
               {todayIdx >= 0 && <div className="gtoday" style={{ left: todayIdx * DW + DW/2 }} />}
             </div>
             {groups.map(g => {
-              // Находим все зависимости для задач этого проекта
-              const taskDeps = g.items.reduce((acc, t) => {
-                if (t.dependencyId) {
-                  acc[t.id] = db.tasks.find(dt => dt.id === t.dependencyId);
-                }
-                return acc;
-              }, {});
-              
               return (
                 <div key={g.project.id}>
                   <div className="gantt-group">
@@ -217,46 +200,9 @@ export default function Gantt({ db, ur, openTask, openProject }) {
                     const pct = Math.min(100, (sp / Math.max(1, t.plannedHours || 0)) * 100);
                     const vac = a ? vacOverlap(a.id, t.start, t.deadline) : null;
                     const tip = `${t.title}: ${fmtD(t.start)} — ${fmtD(t.deadline)}, план ${t.plannedHours ?? '—'} ч${vac ? `. Исполнитель в отпуске ${fmtDMY(vac.start)}–${fmtDMY(vac.end)}` : ''}`;
-                    // Проверяем, есть ли зависимость от другой задачи
-                    const depTask = taskDeps[t.id];
-                    let depLine = null;
-                    if (depTask) {
-                      const depItem = g.items.find(it => it.id === depTask.id);
-                      if (depItem) {
-                        const coords = getDepCoords(t, depTask, depItem);
-                        if (coords) {
-                          // Рисуем линию от зависимой задачи к текущей с учётом типа зависимости
-                          depLine = (
-                            <svg
-                              style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}
-                            >
-                              <path
-                                d={`M ${coords.fromX} ${coords.fromY} L ${coords.toX} ${coords.fromY} L ${coords.toX} ${coords.toY}`}
-                                fill="none"
-                                stroke="#94a3b8"
-                                strokeWidth="2"
-                                strokeDasharray="4 2"
-                                markerEnd="url(#arrowhead)"
-                              />
-                              {/* Добавляем метку типа зависимости */}
-                              <text
-                                x={(coords.fromX + coords.toX) / 2}
-                                y={coords.fromY - 5}
-                                fontSize="10"
-                                fill="#64748b"
-                                textAnchor="middle"
-                              >
-                                {t.dependencyType || 'FS'}
-                              </text>
-                            </svg>
-                          );
-                        }
-                      }
-                    }
                     
                     return (
                       <div key={t.id} className="gantt-row" style={{ position: 'relative' }}>
-                        {depLine}
                         <div className="gantt-label" onClick={() => openTask(t.id)}>
                           <span className={`gtitle${t.status === 'cancelled' ? ' dim' : ''}`}>{t.title}</span>
                           <span className="gsub">{a ? a.last : ''} · {t.plannedHours ?? '—'} ч · {TASK_STATUSES[t.status].label}</span>
