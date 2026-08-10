@@ -137,8 +137,6 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
   const existing = taskId ? db.tasks.find((t) => t.id === taskId) : null;
   const readOnly = !!(existing && existing.archived);
   
-  // Определяем, заблокировано ли поле проекта
-  const isProjectLocked = !!initialProjectId || (!!(existing && existing.projectId));
   const currentProjectId = initialProjectId || (existing ? existing.projectId : '');
   
   const canEditFields = !readOnly && (existing ? canEditTaskFields(ur, existing, db) : canCreateTask(ur));
@@ -416,16 +414,11 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
           <label className="lbl">Описание</label><textarea className="inp" rows="2" disabled={!canEditFields} value={f.desc} onChange={(e) => set("desc", e.target.value)} />
           <label className="lbl">Проект * <span className="mut">(активные)</span></label>
           {readOnly ? <input className="inp" disabled value={proj ? `${proj.code} — ${proj.name}` : ""} /> : (
-              <select className="inp sel" disabled={!canEditFields || isProjectLocked} value={f.projectId} onChange={(e) => set("projectId", e.target.value)}>
+              <select className="inp sel" disabled={!canEditFields} value={f.projectId} onChange={(e) => set("projectId", e.target.value)}>
                 <option value="">— выберите проект —</option>
                 {projs.map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}{p.ptype === "admin" ? " (административный)" : ""}</option>)}
               </select>
             )}
-          {isProjectLocked && !readOnly && (
-            <small style={{color: '#6b7280', fontSize: '0.8em', display: 'block', marginTop: '4px', gridColumn: '1 / -1'}}>
-              Категория не применяется к административным проектам
-            </small>
-          )}
           <label className="lbl">Приоритет *</label>
           <select className="inp sel" disabled={!canEditFields} value={f.priority} onChange={(e) => set("priority", e.target.value)}>
             {Object.entries(PRIORITIES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
