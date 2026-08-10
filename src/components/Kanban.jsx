@@ -4,17 +4,19 @@ import { TASK_STATUSES, TASK_STATUS_ORDER, PRIORITIES } from '../utils/constants
 import { TODAY, fmtD, daysDiff, initials, isTaskActive } from '../utils/date';
 import { computeScope, taskVisible, canCreateTask, canChangeTaskStatus, hasRole } from '../utils/permissions';
 
-export default function Kanban({ db, ur, openTask, onMove, onNew, showOnlyMyTasks: parentShowOnlyMyTasks, sortBy: parentSortBy }) {
+export default function Kanban({ db, ur, openTask, onMove, onNew, showOnlyMyTasks: parentShowOnlyMyTasks, sortBy: parentSortBy, hideFilters = false }) {
   const [fProj, setFProj] = useState("all");
   const [fExec, setFExec] = useState("all");
   const [fPrio, setFPrio] = useState("all");
   const [fDept, setFDept] = useState("all");
   const [q, setQ] = useState("");
   const [dragOverCol, setDragOverCol] = useState(null);
+  const [localShowOnlyMy, setLocalShowOnlyMy] = useState(false);
+  const [localSortBy, setLocalSortBy] = useState("deadline");
   
   // Используем пропсы от родителя, если переданы, иначе локальное состояние
-  const showOnlyMy = parentShowOnlyMyTasks !== undefined ? parentShowOnlyMyTasks : false;
-  const sortBy = parentSortBy !== undefined ? parentSortBy : "deadline";
+  const showOnlyMy = parentShowOnlyMyTasks !== undefined ? parentShowOnlyMyTasks : localShowOnlyMy;
+  const sortBy = parentSortBy !== undefined ? parentSortBy : localSortBy;
 
   const scope = useMemo(() => computeScope(ur, db), [ur, db]);
 
@@ -23,16 +25,18 @@ export default function Kanban({ db, ur, openTask, onMove, onNew, showOnlyMyTask
 
   const visible = useMemo(() => {
     let list = db.tasks.filter((t) => isTaskActive(t) && taskVisible(ur, scope, t, db));
-    if (fProj !== "all") list = list.filter(t => t.projectId === fProj);
-    if (fExec !== "all") list = list.filter(t => (t.assigneeIds || []).includes(fExec));
-    if (fPrio !== "all") list = list.filter(t => t.priority === fPrio);
-    if (fDept !== "all") list = list.filter(t => {
-      const assignees = (t.assigneeIds || []).map(id => db.employees.find(e => e.id === id)).filter(Boolean);
-      return assignees.some(a => a.departments.some(d => d.deptId === fDept));
-    });
-    if (q.trim()) {
-      const s = q.trim().toLowerCase();
-      list = list.filter(t => t.title.toLowerCase().includes(s) || (db.projects.find(p => p.id === t.projectId)?.name || "").toLowerCase().includes(s));
+    if (!hideFilters) {
+      if (fProj !== "all") list = list.filter(t => t.projectId === fProj);
+      if (fExec !== "all") list = list.filter(t => (t.assigneeIds || []).includes(fExec));
+      if (fPrio !== "all") list = list.filter(t => t.priority === fPrio);
+      if (fDept !== "all") list = list.filter(t => {
+        const assignees = (t.assigneeIds || []).map(id => db.employees.find(e => e.id === id)).filter(Boolean);
+        return assignees.some(a => a.departments.some(d => d.deptId === fDept));
+      });
+      if (q.trim()) {
+        const s = q.trim().toLowerCase();
+        list = list.filter(t => t.title.toLowerCase().includes(s) || (db.projects.find(p => p.id === t.projectId)?.name || "").toLowerCase().includes(s));
+      }
     }
     // Фильтр "Только мои задачи"
     if (showOnlyMy) {
@@ -72,13 +76,13 @@ export default function Kanban({ db, ur, openTask, onMove, onNew, showOnlyMyTask
     });
     
     return list;
-  }, [db, ur, scope, fProj, fExec, fPrio, fDept, q, showOnlyMy, sortBy]);
+  }, [db, ur, scope, fProj, fExec, fPrio, fDept, q, showOnlyMy, sortBy, hideFilters]);
 
   const isOnlyExecutor = ur.roles.length === 1 && ur.roles[0] === 'executor';
 
   return (
     <div>
-      {parentShowOnlyMyTasks === undefined && (
+      {!hideFilters && parentShowOnlyMyTasks === undefined && (
         <div className="toolbar">
           <div className="search-box"><Ic d={ICONS.search} size={15} /><input placeholder="Поиск задач…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
           <select className="inp sel sm" value={fProj} onChange={(e) => setFProj(e.target.value)}>
@@ -106,11 +110,11 @@ export default function Kanban({ db, ur, openTask, onMove, onNew, showOnlyMyTask
           )}
           {canSeeAll && (
             <label className="dept-pick" style={{ marginLeft: 8 }}>
-              <input type="checkbox" checked={showOnlyMy} onChange={(e) => setShowOnlyMy(e.target.checked)} />
+              <input type="checkbox" checked={showOnlyMy} onChange={(e) => setLocalShowOnlyMy(e.target.checked)} />
               <span style={{ fontSize: 13 }}>Только мои задачи</span>
             </label>
           )}
-          <select className="inp sel sm" value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={{ marginLeft: 8 }}>
+          <select className="inp sel sm" value={sortBy} onChange={(e) => setLocalSortBy(e.target.value)} style={{ marginLeft: 8 }}>
             <option value="deadline">По дедлайну (возр.)</option>
             <option value="deadlineDesc">По дедлайну (убыв.)</option>
             <option value="created">По дате создания</option>
