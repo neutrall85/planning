@@ -1,6 +1,7 @@
 /**
- * Централизованная система логирования для фронтенда
- * Поддерживает уровни логирования, форматирование и отправку на сервер
+ * Lightweight Logger for Production
+ * Simplified version: removed timer groups, history storage, and localStorage.
+ * Only logs ERROR to server (mocked) and filters by level.
  * @file
  */
 
@@ -10,34 +11,12 @@ export const LOG_LEVELS = {
   INFO: 1,
   WARN: 2,
   ERROR: 3,
-  NONE: 4,
 };
 
-// Текущий уровень логирования (можно менять в runtime)
-let currentLevel = LOG_LEVELS.DEBUG;
+// Текущий уровень логирования (по умолчанию INFO для production)
+let currentLevel = import.meta.env.PROD ? LOG_LEVELS.INFO : LOG_LEVELS.DEBUG;
 
-// История логов для отладки (ограничена по размеру)
-const MAX_LOG_HISTORY = 1000;
-const logHistory = [];
-
-// Форматирование временной метки
-const formatTimestamp = () => {
-  const now = new Date();
-  return now.toISOString();
-};
-
-// Форматирование уровня логирования
-const formatLevel = (level) => {
-  const levelNames = {
-    [LOG_LEVELS.DEBUG]: 'DEBUG',
-    [LOG_LEVELS.INFO]: 'INFO',
-    [LOG_LEVELS.WARN]: 'WARN',
-    [LOG_LEVELS.ERROR]: 'ERROR',
-  };
-  return levelNames[level] || 'UNKNOWN';
-};
-
-// Безопасное преобразование объекта в строку
+// Безопасное преобразование объекта в строку с скрытием чувствительных данных
 const safeStringify = (obj) => {
   try {
     if (obj === undefined) return 'undefined';
@@ -46,7 +25,6 @@ const safeStringify = (obj) => {
     if (typeof obj === 'number' || typeof obj === 'boolean') return String(obj);
     if (typeof obj === 'function') return '[Function]';
     
-    // Избегаем циклических ссылок
     const seen = new WeakSet();
     return JSON.stringify(obj, (key, value) => {
       if (typeof value === 'object' && value !== null) {
@@ -63,94 +41,44 @@ const safeStringify = (obj) => {
       return value;
     }, 2);
   } catch (e) {
-    return '[Stringify Error: ' + e.message + ']';
+    return '[Stringify Error]';
   }
-};
-
-// Получение информации о стеке вызовов
-const getCallerInfo = () => {
-  const error = new Error();
-  const stack = error.stack?.split('\n') || [];
-  // Пропускаем первые кадры стека (логгер и обертки)
-  const callerFrame = stack[3] || stack[2];
-  if (!callerFrame) return 'unknown';
-  
-  const match = callerFrame.match(/at\s+(.+?)\s+\((.+):(\d+):(\d+)\)/) || 
-                callerFrame.match(/at\s+(.+):(\d+):(\d+)/);
-  if (match) {
-    const fileName = match[2] || match[1];
-    const lineNum = match[3] || match[2];
-    return `${fileName}:${lineNum}`;
-  }
-  return 'unknown';
 };
 
 // Основной метод логирования
 const log = (level, message, ...args) => {
   if (level < currentLevel) return;
   
-  const timestamp = formatTimestamp();
-  const levelStr = formatLevel(level);
-  const location = getCallerInfo();
+  const levelStr = Object.keys(LOG_LEVELS).find(key => LOG_LEVELS[key] === level);
   const context = args.length > 0 ? args.map(safeStringify).join(' ') : '';
   
-  const logEntry = {
-    timestamp,
-    level: levelStr,
-    location,
-    message: String(message),
-    context: context || undefined,
-  };
-  
-  // Добавляем в историю
-  if (logHistory.length >= MAX_LOG_HISTORY) {
-    logHistory.shift();
-  }
-  logHistory.push(logEntry);
-  
-  // Вывод в консоль с цветным форматированием
-  const colorMap = {
-    [LOG_LEVELS.DEBUG]: '#8b5cf6',
-    [LOG_LEVELS.INFO]: '#2196F3',
-    [LOG_LEVELS.WARN]: '#f59e0b',
-    [LOG_LEVELS.ERROR]: '#ef4444',
-  };
-  
-  const color = colorMap[level] || '#666';
   const consoleMethod = level === LOG_LEVELS.ERROR ? 'error' : 
                        level === LOG_LEVELS.WARN ? 'warn' : 'log';
   
-  console[consoleMethod](
-    `%c[${timestamp}] ${levelStr} [${location}]`,
-    `color: ${color}; font-weight: bold;`,
-    message,
-    ...args
-  );
+  if (context) {
+    console[consoleMethod](`[${levelStr}] ${message}`, ...args);
+  } else {
+    console[consoleMethod](`[${levelStr}] ${message}`);
+  }
   
-  // Отправка на сервер (для ERROR и WARN уровней)
-  if (level >= LOG_LEVELS.WARN && typeof window !== 'undefined') {
-    sendToServer(logEntry).catch(err => {
-      console.error('[Logger] Failed to send log to server:', err);
+  // Отправка на сервер только для ERROR уровня
+  if (level === LOG_LEVELS.ERROR && typeof window !== 'undefined') {
+    sendToServer({ level: levelStr, message, context }).catch(() => {
+      // Silently fail - don't log errors while logging errors
     });
   }
 };
 
-// Отправка логов на сервер (заглушка, заменить на реальный API)
+// Отправка логов на сервер (заглушка для production)
 const sendToServer = async (logEntry) => {
-  // TODO: Заменить на реальный endpoint логирования
-  // Пример: await fetch('/api/logs', { method: 'POST', body: JSON.stringify(logEntry) });
-  
-  // Для демонстрации - сохраняем в localStorage при ошибках
-  if (logEntry.level === 'ERROR') {
-    try {
-      const storedLogs = JSON.parse(localStorage.getItem('app_error_logs') || '[]');
-      storedLogs.push(logEntry);
-      // Храним только последние 100 ошибок
-      while (storedLogs.length > 100) storedLogs.shift();
-      localStorage.setItem('app_error_logs', JSON.stringify(storedLogs));
-    } catch {
-      // Игнорируем ошибки сохранения
-    }
+  // В production использовать реальный сервис мониторинга (Sentry, LogRocket)
+  // localStorage больше не используется для хранения ошибок
+  if (import.meta.env.PROD) {
+    await fetch('/api/logs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(logEntry),
+    });
   }
 };
 
@@ -162,26 +90,12 @@ export const logger = {
    */
   setLevel: (level) => {
     currentLevel = level;
-    logger.info(`Log level set to ${formatLevel(level)}`);
   },
   
   /**
    * Получение текущего уровня логирования
    */
   getLevel: () => currentLevel,
-  
-  /**
-   * Получение истории логов
-   * @param {number} limit - максимальное количество записей
-   */
-  getHistory: (limit = 100) => logHistory.slice(-limit),
-  
-  /**
-   * Очистка истории логов
-   */
-  clearHistory: () => {
-    logHistory.length = 0;
-  },
   
   /**
    * Логирование отладочных сообщений
@@ -219,37 +133,6 @@ export const logger = {
       ...context,
       error: errorInfo,
     });
-  },
-  
-  /**
-   * Логирование времени выполнения операции
-   * @param {string} label - метка для идентификации
-   * @returns {Function} функция для остановки таймера
-   */
-  startTimer: (label) => {
-    const startTime = performance.now();
-    logger.debug(`[Timer Start] ${label}`);
-    
-    return () => {
-      const endTime = performance.now();
-      const duration = (endTime - startTime).toFixed(2);
-      logger.info(`[Timer End] ${label}: ${duration}ms`);
-      return duration;
-    };
-  },
-  
-  /**
-   * Группировка логов (обертка над console.group)
-   * @param {string} label - метка группы
-   * @param {Function} callback - функция, выполняемая в группе
-   */
-  group: (label, callback) => {
-    console.group(label);
-    try {
-      callback();
-    } finally {
-      console.groupEnd();
-    }
   },
 };
 

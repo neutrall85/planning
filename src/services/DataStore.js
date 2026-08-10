@@ -537,6 +537,117 @@ export default class DataStore {
     this._notify();
   }
 
+  /**
+   * Утверждение или отклонение запроса на изменение часов
+   * @param {string} requestId - ID запроса
+   * @param {boolean} approved - true для утверждения
+   */
+  approveHoursRequest(requestId, approved) {
+    const request = this._data.hoursRequests.find(r => r.id === requestId);
+    if (!request) return;
+
+    let updatedData = {
+      ...this._data,
+      hoursRequests: this._data.hoursRequests.map(r => 
+        r.id === requestId ? { ...r, status: approved ? 'approved' : 'rejected' } : r
+      )
+    };
+
+    if (approved) {
+      if (request.kind === 'task') {
+        updatedData.tasks = updatedData.tasks.map(t => 
+          t.id === request.targetId ? { ...t, plannedHours: request.newH } : t
+        );
+      } else {
+        updatedData.projects = updatedData.projects.map(p => 
+          p.id === request.targetId ? { ...p, budget: request.newH } : p
+        );
+      }
+    }
+
+    this._data = updatedData;
+    this._notify();
+  }
+
+  /**
+   * Утверждение или отклонение отпуска
+   * @param {string} vacationId - ID отпуска
+   * @param {boolean} approved - true для утверждения
+   */
+  approveVacation(vacationId, approved) {
+    this._data = {
+      ...this._data,
+      vacations: this._data.vacations.map(v => 
+        v.id === vacationId ? { ...v, status: approved ? 'approved' : 'rejected' } : v
+      )
+    };
+    this._notify();
+  }
+
+  /**
+   * Утверждение или отклонение делегирования ролей
+   * @param {string} delegationId - ID делегирования
+   * @param {boolean} approved - true для утверждения
+   */
+  approveRoleDelegation(delegationId, approved) {
+    this._data = {
+      ...this._data,
+      roleDelegations: this._data.roleDelegations.map(r => 
+        r.id === delegationId ? { ...r, status: approved ? 'active' : 'rejected' } : r
+      )
+    };
+    this._notify();
+  }
+
+  /**
+   * Одобрение или отклонение заявки на регистрацию
+   * @param {string} requestId - ID заявки
+   * @param {boolean} approved - true для одобрения
+   */
+  approveRegistration(requestId, approved) {
+    const request = this._data.regRequests.find(r => r.id === requestId);
+    if (!request) return;
+
+    let updatedData = {
+      ...this._data,
+      regRequests: this._data.regRequests.map(r => 
+        r.id === requestId ? { ...r, status: approved ? 'approved' : 'rejected' } : r
+      )
+    };
+
+    if (approved) {
+      const existing = updatedData.employees.find(e => e.email === request.email);
+      if (existing) {
+        const updated = { ...existing, roles: ['executor'] };
+        updatedData.employees = updatedData.employees.map(e => 
+          e.id === updated.id ? updated : e
+        );
+      } else {
+        const newEmp = {
+          id: 'e_' + Math.random().toString(36).slice(2, 6),
+          last: request.last,
+          first: request.first,
+          email: request.email,
+          pass: request.pass,
+          position: request.position || 'Сотрудник',
+          departments: [],
+          roles: ['executor'],
+          kbIds: [],
+          headDeptIds: [],
+          phone: '',
+          tab: String(1000 + Math.floor(Math.random() * 8999)),
+          notif: { deadlineEmail: true, overdueDigest: false, commentSub: true },
+          failed: 0,
+          lockUntil: 0
+        };
+        updatedData.employees = [...updatedData.employees, newEmp];
+      }
+    }
+
+    this._data = updatedData;
+    this._notify();
+  }
+
   upsertRoleDelegation(rd) {
     const idx = this._data.roleDelegations.findIndex(r => r.id === rd.id);
     let roleDelegations;

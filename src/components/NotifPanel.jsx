@@ -2,9 +2,11 @@ import React from 'react';
 import { fmtDT } from '../utils/date';
 import { Ic } from './Icons';
 
-export default function NotifPanel({ list, setDb, onNavigate, onClose }) {
+export default function NotifPanel({ list, store, onNavigate, onClose }) {
   const markAllRead = () => {
-    setDb((s) => ({ ...s, notifications: s.notifications.map((n) => ({ ...n, read: true })) }));
+    if (store && store.markAllNotificationsRead) {
+      store.markAllNotificationsRead();
+    }
     if (onClose) onClose();
   };
 

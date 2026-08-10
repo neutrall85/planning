@@ -1,17 +1,14 @@
 import { COMMENT_EDIT_WINDOW_MS, COMPANY_DOMAIN } from '../utils/config';
+import { getEmpNameFromData, getPrimaryDeptFromData } from '../utils/string';
 
+/**
+ * @deprecated Используйте useEmployeeHelpers из useEmployeeName.js
+ * Этот хук оставлен для обратной совместимости, но дублирует логику
+ */
 export const useDataHelpers = (data) => {
-  const empName = (id) => {
-    if (!data || !data.employees) return '—';
-    const e = data.employees.find(x => x.id === id);
-    return e ? `${e.last} ${e.first}` : '—';
-  };
-
-  const primaryDept = (emp) => {
-    if (!emp || !data || !data.departments) return null;
-    const p = emp.departments?.find(x => x.primary) || emp.departments?.[0];
-    return p ? data.departments.find(d => d.id === p.deptId) : null;
-  };
+  // Делегируем централизованным функциям из utils/string.js
+  const empName = (id) => getEmpNameFromData(data, id);
+  const primaryDept = (emp) => getPrimaryDeptFromData(data, emp);
 
   const getTaskSpent = (task) => {
     if (!task || !task.logs || !Array.isArray(task.logs)) return 0;

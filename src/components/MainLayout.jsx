@@ -228,7 +228,7 @@ export default function MainLayout({ store, data, user, toast }) {
               {notifOpen && (
                 <NotifPanel 
                   list={myNotifs} 
-                  setDb={(fn) => { store.setData(fn(store.data)); }} 
+                  store={store}
                   onNavigate={handleNotificationNavigate}
                   onClose={() => setNotifOpen(false)}
                 />

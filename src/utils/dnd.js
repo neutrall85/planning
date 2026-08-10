@@ -1,4 +1,8 @@
 // Утилиты для Drag-and-Drop
+
+/**
+ * Обработчик события dragover с позиционированием плейсхолдера
+ */
 export const handleDragOver = (e) => {
   e.preventDefault();
   const card = e.target.closest('.kanban-card, .project-card');
@@ -21,6 +25,9 @@ export const handleDragOver = (e) => {
   }
 };
 
+/**
+ * Создание визуального плейсхолдера для drag-and-drop
+ */
 const createPlaceholder = () => {
   const ph = document.createElement('div');
   ph.className = 'drag-placeholder';
@@ -32,6 +39,9 @@ const createPlaceholder = () => {
   return ph;
 };
 
+/**
+ * Обработчик события dragleave
+ */
 export const handleDragLeave = (e) => {
   const placeholder = document.querySelector('.drag-placeholder');
   if (placeholder && !e.target.closest('.kanban-column, .project-column, .kanban-card, .project-card')) {
@@ -39,6 +49,9 @@ export const handleDragLeave = (e) => {
   }
 };
 
+/**
+ * Получение данных о позиции drop
+ */
 export const getDropTarget = (e, columnId) => {
   const placeholder = document.querySelector('.drag-placeholder');
   if (!placeholder) return { columnId, index: -1 };
@@ -55,6 +68,9 @@ export const getDropTarget = (e, columnId) => {
   return { columnId: newColumnId, index: Math.min(index, items.length) };
 };
 
+/**
+ * Очистка плейсхолдера после завершения drag-and-drop
+ */
 export const cleanupPlaceholder = () => {
   const placeholder = document.querySelector('.drag-placeholder');
   if (placeholder) placeholder.remove();

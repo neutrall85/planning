@@ -112,24 +112,3 @@ const PROJECT_STATUS_ORDER = {
   'closed': 3,
   'cancelled': 4
 };
-
-/**
- * Общие утилиты для drag-and-drop
- */
-export const handleDragOver = (e) => {
-  e.preventDefault();
-  e.dataTransfer.dropEffect = 'move';
-};
-
-export const handleDragLeave = (e) => {
-  // Можно добавить визуальную обратную связь
-};
-
-export const getDropData = (e) => {
-  try {
-    const data = e.dataTransfer.getData('application/json');
-    return data ? JSON.parse(data) : null;
-  } catch {
-    return null;
-  }
-};
