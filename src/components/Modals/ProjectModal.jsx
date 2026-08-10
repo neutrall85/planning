@@ -240,7 +240,7 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
         <div className="tm-block" style={{ marginTop: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <div className="rep-panel-title">Задачи проекта ({taskList.length})</div>
-            <button className="btn primary sm" onClick={() => openTask(null, 'form')} disabled={existing.archived}>
+            <button className="btn primary sm" onClick={() => openTask(null, 'form', projectId)} disabled={existing.archived}>
               <Ic d={ICONS.plus} size={14} /> Создать задачу
             </button>
           </div>
