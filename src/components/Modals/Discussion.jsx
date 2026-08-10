@@ -4,9 +4,12 @@ import { has } from '../../utils/permissions';
 import { Ic, ICONS } from '../Icons';
 import { COMMENT_EDIT_WINDOW_MS } from '../../utils/config';
 import { useDataHelpers } from '../../hooks';
+import { sanitizeHtml } from '../../utils/string';
 
 function renderMentionText(text) {
-  return text.split("@").map((part, i) => {
+  // Санитизация текста для предотвращения XSS
+  const safeText = sanitizeHtml(text);
+  return safeText.split("@").map((part, i) => {
     if (i === 0) return <span key={i}>{part}</span>;
     const tokens = part.split(/(\s+)/);
     let mention = tokens[0];

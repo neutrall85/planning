@@ -648,6 +648,52 @@ export default class DataStore {
     this._notify();
   }
 
+  /**
+   * Регистрация нового сотрудника (публичный API вместо прямой мутации setDb)
+   * @param {Object} regData - данные регистрации {first, last, email, pass}
+   * @returns {Object|null} созданный сотрудник или null при ошибке
+   */
+  registerEmployee(regData) {
+    // Проверка на существующий email
+    const existing = this._data.employees.find(e => e.email.toLowerCase() === regData.email.toLowerCase());
+    if (existing) {
+      return null;
+    }
+
+    const newEmployee = {
+      id: 'e_' + uid(),
+      last: regData.last.trim(),
+      first: regData.first.trim(),
+      email: regData.email.trim().toLowerCase(),
+      pass: regData.pass, // В реальном приложении здесь должен быть хеш
+      position: 'Сотрудник',
+      departments: [],
+      roles: ['executor'],
+      kbIds: [],
+      headDeptIds: [],
+      phone: '',
+      extension: '',
+      tab: String(1000 + Math.floor(Math.random() * 8999)),
+      notif: { deadlineEmail: true, overdueDigest: false, commentSub: true },
+      failed: 0,
+      lockUntil: 0,
+      fired: false,
+      photo: null
+    };
+
+    this._data = {
+      ...this._data,
+      employees: [...this._data.employees, newEmployee],
+      notifications: [
+        { id: uid(), userId: 'sergey.adminov', text: `Новая регистрация: ${newEmployee.last} ${newEmployee.first}`, ts: Date.now(), read: false, targetType: null, targetId: null },
+        ...this._data.notifications
+      ]
+    };
+    this._notify();
+    
+    return newEmployee;
+  }
+
   upsertRoleDelegation(rd) {
     const idx = this._data.roleDelegations.findIndex(r => r.id === rd.id);
     let roleDelegations;
