@@ -1,11 +1,13 @@
 import { StoreProvider } from './context/StoreContext';
 import { useStore, useAuth } from './hooks';
+import { useToast } from './components/Toast';
 import LoginScreen from './components/LoginScreen';
 import MainLayout from './components/MainLayout';
 
 function AppContent() {
   const { store, data, login, logout } = useStore();
   const { user } = useAuth();
+  const { toast, ToastContainer } = useToast();
   
   // Безопасный метод для обновления данных через публичный API
   const handleSetDb = (fn) => {
@@ -15,9 +17,19 @@ function AppContent() {
   };
 
   if (!user) {
-    return <LoginScreen db={data} setDb={handleSetDb} onLogin={login} toast={(msg) => alert(msg)} />;
+    return (
+      <>
+        <LoginScreen db={data} setDb={handleSetDb} onLogin={login} toast={toast.error} />
+        <ToastContainer />
+      </>
+    );
   }
-  return <MainLayout store={store} data={data} user={user} />;
+  return (
+    <>
+      <MainLayout store={store} data={data} user={user} toast={toast} />
+      <ToastContainer />
+    </>
+  );
 }
 
 export default function App() {

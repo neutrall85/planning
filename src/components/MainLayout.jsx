@@ -18,15 +18,19 @@ import Archive from './Archive';
 import Requests from './Requests';
 import Journal from './Journal';
 import NotifPanel from './NotifPanel';
+import { useToast } from './Toast';
 import { TaskModal, ProjectModal, HoursRequestModal, RolesModal, DeptsModal, VacationModal, DelegationModal, VacNowModal } from './Modals';
 
-export default function MainLayout({ store, data, user }) {
+export default function MainLayout({ store, data, user, toast }) {
   const { logout } = useStore();
   const [view, setView] = useState('tasks');
   const [modal, setModal] = useState(null);
   const [notifOpen, setNotifOpen] = useState(false);
   const [vacModalOpen, setVacModalOpen] = useState(false);
   const notifRef = useRef(null);
+  
+  // Fallback на alert если toast не передан (для обратной совместимости)
+  const showToast = toast?.error || ((msg) => alert(msg));
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -89,7 +93,7 @@ export default function MainLayout({ store, data, user }) {
     const task = data.tasks.find(t => t.id === taskId);
     if (!task) return;
     if ((newStatus === 'closed' || newStatus === 'cancelled') && !canChangeTaskStatus(user, task, newStatus, data)) {
-      alert('У вас нет прав на закрытие или отмену этой задачи.');
+      showToast('У вас нет прав на закрытие или отмену этой задачи.');
       return;
     }
     const isClosing = (newStatus === 'closed' || newStatus === 'cancelled') && task.status !== newStatus;
@@ -441,7 +445,7 @@ export default function MainLayout({ store, data, user }) {
           setModal(null); 
         }} 
         onHoursReq={openHoursReq} 
-        toast={(msg) => alert(msg)} 
+        toast={showToast} 
         patchTask={store.upsertTask} 
         notify={(userId, text, target) => store.addNotification(userId, text, target)} 
         store={store} 
@@ -477,7 +481,7 @@ export default function MainLayout({ store, data, user }) {
           store.addAudit('Удаление проекта', { name: p.name }, 'project', p.id);
           setModal(null); 
         }} 
-        toast={(msg) => alert(msg)} 
+        toast={showToast} 
         store={store}
       />}
       {modal?.type === 'hours' && <HoursRequestModal db={data} ur={user} kind={modal.kind} targetId={modal.targetId} onClose={() => setModal(null)} onSubmit={(r) => { store.addHoursRequest(r); 
@@ -495,11 +499,11 @@ export default function MainLayout({ store, data, user }) {
         }, 'hoursRequest', r.id);
         setModal(null); 
       }} />}
-      {modal?.type === 'roles' && <RolesModal db={data} setDb={(fn) => { store.setData(fn(store.data)); }} empId={modal.empId} onClose={() => setModal(null)} toast={(msg) => alert(msg)} audit={store.addAudit} />}
-      {modal?.type === 'depts' && <DeptsModal db={data} setDb={(fn) => { store.setData(fn(store.data)); }} empId={modal.empId} onClose={() => setModal(null)} toast={(msg) => alert(msg)} audit={store.addAudit} />}
+      {modal?.type === 'roles' && <RolesModal db={data} setDb={(fn) => { store.setData(fn(store.data)); }} empId={modal.empId} onClose={() => setModal(null)} toast={showToast} audit={store.addAudit} />}
+      {modal?.type === 'depts' && <DeptsModal db={data} setDb={(fn) => { store.setData(fn(store.data)); }} empId={modal.empId} onClose={() => setModal(null)} toast={showToast} audit={store.addAudit} />}
       {modal?.type === 'vacation' && <VacationModal db={data} ur={user} vacationId={modal.vacationId} forEmpId={modal.forEmpId || null} onClose={() => setModal(null)} onSave={(v, isNew) => { store.upsertVacation(v); store.addAudit(isNew ? 'Создание отпуска' : 'Изменение отпуска', { employee: empName(v.empId), period: `${fmtDMY(v.start)}—${fmtDMY(v.end)}` }, 'vacation', v.id); setModal(null); }} />}
       {modal?.type === 'delegation' && <DelegationModal db={data} ur={user} onClose={() => setModal(null)} onSubmit={(rd) => { store.upsertRoleDelegation(rd); store.addNotification(rd.toId, `Вам предложено временное принятие ролей: ${rd.roles.map(r => ROLES[r].label).join(", ")}.`, { targetType: 'delegation', targetId: rd.id }); store.addAudit('Создание делегирования ролей', { from: empName(rd.fromId), to: empName(rd.toId), roles: rd.roles.join(', ') }, 'delegation', rd.id); setModal(null); }} />}
-      {vacModalOpen && <VacNowModal db={data} onClose={() => setVacModalOpen(false)} toast={(msg) => alert(msg)} />}
+      {vacModalOpen && <VacNowModal db={data} onClose={() => setVacModalOpen(false)} toast={showToast} />}
     </div>
   );
 }
