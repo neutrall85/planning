@@ -5,6 +5,7 @@ import { ICONS, Ic } from './Icons';
 import { initials, TODAY, fmtDMY, fmtDT } from '../utils/date';
 import { TASK_STATUSES, ROLES, PROJECT_STATUSES } from '../utils/constants';
 import Kanban from './Kanban';
+import TaskList from './TaskList';
 import Gantt from './Gantt';
 import Calendar from './Calendar';
 import Projects from './Projects';
@@ -55,7 +56,7 @@ export default function MainLayout({ store, data, user }) {
   };
 
   const navItems = [
-    { id: 'kanban', label: 'Канбан', icon: ICONS.kanban },
+    { id: 'tasks', label: 'Задачи', icon: ICONS.kanban },
     { id: 'gantt', label: 'Диаграмма Ганта', icon: ICONS.gantt },
     { id: 'calendar', label: 'Календарь', icon: ICONS.cal },
     { id: 'projects', label: 'Проекты', icon: ICONS.folder },
@@ -78,6 +79,9 @@ export default function MainLayout({ store, data, user }) {
   const openDelegation = () => setModal({ type: 'delegation' });
 
   const [requestsTab, setRequestsTab] = useState('hours');
+  const [tasksView, setTasksView] = useState('kanban');
+  const [showOnlyMyTasks, setShowOnlyMyTasks] = useState(false);
+  const [taskSortBy, setTaskSortBy] = useState("deadline");
   const [projectsView, setProjectsView] = useState('kanban');
   const [showOnlyMyProjects, setShowOnlyMyProjects] = useState(false);
   const [projectSortBy, setProjectSortBy] = useState("name");
@@ -231,7 +235,51 @@ export default function MainLayout({ store, data, user }) {
         </header>
 
         <div className="content">
-          {view === 'kanban' && <Kanban db={data} ur={user} openTask={openTask} onMove={handleMoveTask} onNew={() => openTask(null)} />}
+          {view === 'tasks' && (
+            <>
+              <div className="toolbar" style={{ marginBottom: 16, display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div className="view-switcher">
+                    <button 
+                      className={`view-btn ${tasksView === 'list' ? 'active' : ''}`} 
+                      onClick={() => setTasksView('list')}
+                    >
+                      Список
+                    </button>
+                    <button 
+                      className={`view-btn ${tasksView === 'kanban' ? 'active' : ''}`} 
+                      onClick={() => setTasksView('kanban')}
+                    >
+                      Канбан
+                    </button>
+                  </div>
+                  <label className="dept-pick" style={{ margin: 0 }}>
+                    <input type="checkbox" checked={showOnlyMyTasks} onChange={(e) => setShowOnlyMyTasks(e.target.checked)} />
+                    <span style={{ fontSize: 13 }}>Только мои задачи</span>
+                  </label>
+                  <select className="inp sel sm" value={taskSortBy} onChange={(e) => setTaskSortBy(e.target.value)} style={{ minWidth: 180 }}>
+                    <option value="deadline">По дедлайну (возр.)</option>
+                    <option value="deadlineDesc">По дедлайну (убыв.)</option>
+                    <option value="created">По дате создания</option>
+                    <option value="alpha">По алфавиту (А-Я)</option>
+                    <option value="alphaDesc">По алфавиту (Я-А)</option>
+                    <option value="hours">По часам (возр.)</option>
+                    <option value="hoursDesc">По часам (убыв.)</option>
+                  </select>
+                </div>
+                {canCreateTask(user) && (
+                  <button className="btn primary" onClick={() => openTask(null)}>
+                    <Ic d={ICONS.plus} size={15} /> Задача
+                  </button>
+                )}
+              </div>
+              {tasksView === 'kanban' ? (
+                <Kanban db={data} ur={user} openTask={openTask} onMove={handleMoveTask} onNew={() => openTask(null)} showOnlyMyTasks={showOnlyMyTasks} sortBy={taskSortBy} />
+              ) : (
+                <TaskList db={data} ur={user} openTask={openTask} onMove={handleMoveTask} onNew={() => openTask(null)} showOnlyMyTasks={showOnlyMyTasks} sortBy={taskSortBy} />
+              )}
+            </>
+          )}
           {view === 'gantt' && <Gantt db={data} ur={user} openTask={openTask} openProject={openProject} patchTask={store.upsertTask} />}
           {view === 'calendar' && <Calendar db={data} ur={user} openTask={openTask} />}
           {view === 'projects' && (
