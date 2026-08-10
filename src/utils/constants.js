@@ -1,4 +1,4 @@
-import { COMPANY_DOMAIN } from '../config';
+import { COMPANY_DOMAIN } from './config';
 
 export const ROLES = {
   admin:            { label: "Суперадминистратор", short: "СУП", color: "#ef4444" },
