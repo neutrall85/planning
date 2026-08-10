@@ -254,7 +254,7 @@ export default class DataStore {
     const existingNotif = this._data.notifications.find(n => 
       n.targetType === 'task' && 
       n.targetId === task.id && 
-      n.text.includes('дней до дедлайна') || n.text.includes('день до дедлайна')
+      (n.text.includes('дней до дедлайна') || n.text.includes('день до дедлайна'))
     );
     
     if (existingNotif) return;
