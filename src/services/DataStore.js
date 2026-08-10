@@ -86,7 +86,7 @@ export default class DataStore {
       const newTotal = otherTasksSum + (task.plannedHours || 0);
       if (newTotal > projectForBudget.budget) {
         throw new Error(
-          `Превышение бюджета проекта! Бюджет: ${projectForBudget.budget} ч, сумма остальных задач: ${otherTasksSum} ч, запрошено: ${task.plannedHours || 0} ч.`
+          `Превышение бюджета проекта! Бюджет: ${projectForBudget.budget} ч, сумма остальных задач: ${otherTasksSum} ч, запрошено: ${task.plannedHours || 0} ч. Требуется увеличение бюджета проекта.`
         );
       }
     }
