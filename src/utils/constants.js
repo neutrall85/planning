@@ -1,3 +1,5 @@
+import { COMPANY_DOMAIN } from '../config';
+
 export const ROLES = {
   admin:            { label: "Суперадминистратор", short: "СУП", color: "#ef4444" },
   director:         { label: "Генеральный директор", short: "ГД", color: "#f59e0b" },
@@ -56,5 +58,4 @@ export const PROJECT_CATEGORIES = {
 };
 
 export const PROJECT_TYPES = { prod: "Производственный", admin: "Административный" };
-// COMMENT_EDIT_WINDOW перенесён в config.js для централизации
-export const DOMAIN = "volga-dnepr.com";
+// DOMAIN перенесён в config.js как COMPANY_DOMAIN для централизации
