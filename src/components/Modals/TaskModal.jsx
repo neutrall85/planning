@@ -132,10 +132,14 @@ function generateRepeatDates(startDate, deadline, repeatConfig, endDate, maxCoun
   return result;
 }
 
-export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum, onClose, onSave, onDelete, onHoursReq, toast, patchTask, notify, store }) => {
+export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum, onClose, onSave, onDelete, onHoursReq, toast, patchTask, notify, store, initialProjectId }) => {
   const { empName, getTaskSpent, vacOverlap, primaryDept } = useDataHelpers(db);
   const existing = taskId ? db.tasks.find((t) => t.id === taskId) : null;
   const readOnly = !!(existing && existing.archived);
+  
+  // Определяем, заблокировано ли поле проекта
+  const isProjectLocked = !!initialProjectId || (!!(existing && existing.projectId));
+  const currentProjectId = initialProjectId || (existing ? existing.projectId : '');
   
   const canEditFields = !readOnly && (existing ? canEditTaskFields(ur, existing, db) : canCreateTask(ur));
   const canChangeStatus = !readOnly && existing && canChangeTaskStatus(ur, existing, null, db);
@@ -148,7 +152,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
   const asOpts = assigneeOptions(ur, db);
   
   const [f, setF] = useState(existing ? { ...existing, comments: existing.comments || [] } : {
-    id: "t_" + uid(), title: "", desc: "", projectId: "", assigneeIds: [], priority: "mid",
+    id: "t_" + uid(), title: "", desc: "", projectId: currentProjectId, assigneeIds: [], priority: "mid",
     plannedHours: 8, start: TODAY, deadline: iso(addDays(new Date(), 14)), status: "new", logs: [], comments: [], history: [], delegatedFrom: null, archived: false, archivedAt: null, closedAt: null,
     creatorId: ur.id,
     dependencyId: null, // Связанная задача (должна быть выполнена перед текущей)
@@ -412,11 +416,16 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
           <label className="lbl">Описание</label><textarea className="inp" rows="2" disabled={!canEditFields} value={f.desc} onChange={(e) => set("desc", e.target.value)} />
           <label className="lbl">Проект * <span className="mut">(активные)</span></label>
           {readOnly ? <input className="inp" disabled value={proj ? `${proj.code} — ${proj.name}` : ""} /> : (
-              <select className="inp sel" disabled={!canEditFields || (existing && f.projectId)} value={f.projectId} onChange={(e) => set("projectId", e.target.value)}>
+              <select className="inp sel" disabled={!canEditFields || isProjectLocked} value={f.projectId} onChange={(e) => set("projectId", e.target.value)}>
                 <option value="">— выберите проект —</option>
                 {projs.map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}{p.ptype === "admin" ? " (административный)" : ""}</option>)}
               </select>
             )}
+          {isProjectLocked && !readOnly && (
+            <small style={{color: '#6b7280', fontSize: '0.8em', display: 'block', marginTop: '4px', gridColumn: '1 / -1'}}>
+              Проект закреплен за контекстом создания
+            </small>
+          )}
           <label className="lbl">Приоритет *</label>
           <select className="inp sel" disabled={!canEditFields} value={f.priority} onChange={(e) => set("priority", e.target.value)}>
             {Object.entries(PRIORITIES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}

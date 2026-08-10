@@ -69,7 +69,7 @@ export default function MainLayout({ store, data, user }) {
   const myNotifs = data.notifications.filter(n => n.userId === user.id);
   const unread = myNotifs.filter(n => !n.read).length;
 
-  const openTask = (taskId = null, initialTab = 'form') => setModal({ type: 'task', taskId, initialTab });
+  const openTask = (taskId = null, initialTab = 'form', initialProjectId = null) => setModal({ type: 'task', taskId, initialTab, initialProjectId });
   const openProject = (projectId = null) => setModal({ type: 'project', projectId });
   const openHoursReq = (kind, targetId) => setModal({ type: 'hours', kind, targetId });
   const openRoles = (empId) => setModal({ type: 'roles', empId });
@@ -354,6 +354,7 @@ export default function MainLayout({ store, data, user }) {
         ur={user} 
         taskId={modal.taskId} 
         initialTab={modal.initialTab}
+        initialProjectId={modal.initialProjectId}
         planSum={planSum} 
         spent={spent}
         onClose={() => setModal(null)} 
