@@ -1,20 +1,24 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useStore } from './useStore';
 
 export const useAuth = () => {
   const { store } = useStore();
   const [user, setUser] = useState(store.getCurrentUser() || null);
+  
+  // Используем useCallback для стабильной ссылки на функцию
+  const checkUser = useCallback(() => {
+    const currentUser = store.getCurrentUser() || null;
+    setUser(currentUser);
+  }, [store]);
 
   useEffect(() => {
-    const checkUser = () => {
-      const currentUser = store.getCurrentUser() || null;
-      if (currentUser !== user) {
-        setUser(currentUser);
-      }
-    };
+    // Подписываемся при маунте
     const unsubscribe = store.subscribe(checkUser);
-    return unsubscribe;
-  }, [store, user]);
+    // Очищаем подписку при анмаунте или изменении store
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [store, checkUser]);
 
   const roles = user ? user.roles : [];
   const hasRole = (role) => roles.includes(role);

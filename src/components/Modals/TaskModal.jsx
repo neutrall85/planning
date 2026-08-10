@@ -348,7 +348,6 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
         const startDate = f.start;
         const deadline = f.deadline;
         const dates = generateRepeatDates(startDate, deadline, repeatConfig, f.repeatEndValue, 50);
-        console.log('Generated dates:', dates); // отладка
 
         // Создаём каждую задачу отдельно
         dates.forEach((d, index) => {

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth, useStore } from '../hooks';
 import { hasRole, canCreateTask, canExport, canCreateProject, canChangeTaskStatus, canChangeProjectStatus } from '../utils/permissions';
+import { getEmpNameFromData, getPrimaryDeptFromData } from '../utils/string';
 import { ICONS, Ic } from './Icons';
 import { initials, TODAY, fmtDMY, fmtDT } from '../utils/date';
 import { TASK_STATUSES, ROLES, PROJECT_STATUSES } from '../utils/constants';
@@ -49,11 +50,9 @@ export default function MainLayout({ store, data, user }) {
   const spent = (task) => task.logs.reduce((s, l) => s + l.hours, 0);
   const planSum = (projectId) => data.tasks.filter(t => t.projectId === projectId).reduce((s, t) => s + (t.plannedHours || 0), 0);
 
-  const empName = (id) => {
-    if (!id) return '—';
-    const e = data.employees.find(x => x.id === id);
-    return e ? `${e.last} ${e.first}` : '—';
-  };
+  // Используем централизованную функцию из utils/string.js вместо дублирования
+  const empName = (id) => getEmpNameFromData(data, id);
+  const primaryDept = (emp) => getPrimaryDeptFromData(data, emp);
 
   const navItems = [
     { id: 'tasks', label: 'Задачи', icon: ICONS.kanban },
@@ -225,7 +224,7 @@ export default function MainLayout({ store, data, user }) {
               {notifOpen && (
                 <NotifPanel 
                   list={myNotifs} 
-                  setDb={(fn) => { store._data = fn(store._data); store._notify(); }} 
+                  setDb={(fn) => { store.setData(fn(store.data)); }} 
                   onNavigate={handleNotificationNavigate}
                   onClose={() => setNotifOpen(false)}
                 />
@@ -349,13 +348,13 @@ export default function MainLayout({ store, data, user }) {
           {view === 'staff' && <Staff 
             db={data} 
             ur={user} 
-            setDb={(fn) => { store._data = fn(store._data); store._notify(); }} 
+            setDb={(fn) => { store.setData(fn(store.data)); }} 
             openRoles={openRoles} 
             openDepts={openDepts} 
             openVacation={openVacation} 
           />}
           {view === 'reports' && <Reports db={data} ur={user} />}
-          {view === 'archive' && <Archive db={data} ur={user} openTask={openTask} openProject={openProject} setArchiveMonths={(m) => { store._data.settings.archiveMonths = m; store._notify(); }} 
+          {view === 'archive' && <Archive db={data} ur={user} openTask={openTask} openProject={openProject} setArchiveMonths={(m) => { store.setData({ ...store.data, settings: { ...store.data.settings, archiveMonths: m } }); }} 
             restoreTask={(id) => { 
               const t = data.tasks.find(x => x.id === id); 
               store.upsertTask({
@@ -388,7 +387,7 @@ export default function MainLayout({ store, data, user }) {
           />}
           {view === 'requests' && <Requests 
             db={data} 
-            setDb={(fn) => { store._data = fn(store._data); store._notify(); }} 
+            setDb={(fn) => { store.setData(fn(store.data)); }} 
             ur={user} 
             initialTab={requestsTab} 
             addAudit={store.addAudit.bind(store)} 
@@ -496,8 +495,8 @@ export default function MainLayout({ store, data, user }) {
         }, 'hoursRequest', r.id);
         setModal(null); 
       }} />}
-      {modal?.type === 'roles' && <RolesModal db={data} setDb={(fn) => { store._data = fn(store._data); store._notify(); }} empId={modal.empId} onClose={() => setModal(null)} toast={(msg) => alert(msg)} audit={store.addAudit} />}
-      {modal?.type === 'depts' && <DeptsModal db={data} setDb={(fn) => { store._data = fn(store._data); store._notify(); }} empId={modal.empId} onClose={() => setModal(null)} toast={(msg) => alert(msg)} audit={store.addAudit} />}
+      {modal?.type === 'roles' && <RolesModal db={data} setDb={(fn) => { store.setData(fn(store.data)); }} empId={modal.empId} onClose={() => setModal(null)} toast={(msg) => alert(msg)} audit={store.addAudit} />}
+      {modal?.type === 'depts' && <DeptsModal db={data} setDb={(fn) => { store.setData(fn(store.data)); }} empId={modal.empId} onClose={() => setModal(null)} toast={(msg) => alert(msg)} audit={store.addAudit} />}
       {modal?.type === 'vacation' && <VacationModal db={data} ur={user} vacationId={modal.vacationId} forEmpId={modal.forEmpId || null} onClose={() => setModal(null)} onSave={(v, isNew) => { store.upsertVacation(v); store.addAudit(isNew ? 'Создание отпуска' : 'Изменение отпуска', { employee: empName(v.empId), period: `${fmtDMY(v.start)}—${fmtDMY(v.end)}` }, 'vacation', v.id); setModal(null); }} />}
       {modal?.type === 'delegation' && <DelegationModal db={data} ur={user} onClose={() => setModal(null)} onSubmit={(rd) => { store.upsertRoleDelegation(rd); store.addNotification(rd.toId, `Вам предложено временное принятие ролей: ${rd.roles.map(r => ROLES[r].label).join(", ")}.`, { targetType: 'delegation', targetId: rd.id }); store.addAudit('Создание делегирования ролей', { from: empName(rd.fromId), to: empName(rd.toId), roles: rd.roles.join(', ') }, 'delegation', rd.id); setModal(null); }} />}
       {vacModalOpen && <VacNowModal db={data} onClose={() => setVacModalOpen(false)} toast={(msg) => alert(msg)} />}
