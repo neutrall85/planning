@@ -661,6 +661,48 @@ export default class DataStore {
     this._notify();
   }
 
+  /**
+   * Обновление сотрудника (публичный API вместо прямой мутации setDb)
+   * @param {Object} emp - данные сотрудника
+   */
+  updateEmployee(emp) {
+    const idx = this._data.employees.findIndex(e => e.id === emp.id);
+    if (idx < 0) {
+      throw new Error(`Сотрудник с ID ${emp.id} не найден`);
+    }
+    this.upsertEmployee(emp);
+  }
+
+  /**
+   * Создание КБ (публичный API вместо прямой мутации setDb)
+   * @param {string} name - название КБ
+   * @param {string} full - полное название
+   */
+  createKb(name, full = name) {
+    const kb = { id: 'kb_' + Math.random().toString(36).slice(2, 6), name, full };
+    this.upsertKb(kb);
+    return kb;
+  }
+
+  /**
+   * Создание отдела (публичный API вместо прямой мутации setDb)
+   * @param {string} name - название отдела
+   * @param {string|null} kbId - ID КБ или null
+   */
+  createDepartment(name, kbId = null) {
+    const dept = { id: 'd_' + Math.random().toString(36).slice(2, 6), name, kbId };
+    this.upsertDepartment(dept);
+    return dept;
+  }
+
+  /**
+   * Удаление отпуска (публичный API вместо прямой мутации setDb)
+   * @param {string} vacationId - ID отпуска
+   */
+  deleteVacationById(vacationId) {
+    this.deleteVacation(vacationId);
+  }
+
   empName(id) {
     const e = this._data.employees.find(x => x.id === id);
     return e ? `${e.last} ${e.first}` : '—';

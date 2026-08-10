@@ -351,8 +351,8 @@ export default function MainLayout({ store, data, user, toast }) {
           {view === 'cabinet' && <Cabinet store={store} data={data} user={user} openTask={openTask} openVacation={openVacation} openDelegation={openDelegation} />}
           {view === 'staff' && <Staff 
             db={data} 
+            store={store}
             ur={user} 
-            setDb={(fn) => { store.setData(fn(store.data)); }} 
             openRoles={openRoles} 
             openDepts={openDepts} 
             openVacation={openVacation} 
@@ -391,7 +391,7 @@ export default function MainLayout({ store, data, user, toast }) {
           />}
           {view === 'requests' && <Requests 
             db={data} 
-            setDb={(fn) => { store.setData(fn(store.data)); }} 
+            store={store}
             ur={user} 
             initialTab={requestsTab} 
             addAudit={store.addAudit.bind(store)} 
@@ -499,8 +499,8 @@ export default function MainLayout({ store, data, user, toast }) {
         }, 'hoursRequest', r.id);
         setModal(null); 
       }} />}
-      {modal?.type === 'roles' && <RolesModal db={data} setDb={(fn) => { store.setData(fn(store.data)); }} empId={modal.empId} onClose={() => setModal(null)} toast={showToast} audit={store.addAudit} />}
-      {modal?.type === 'depts' && <DeptsModal db={data} setDb={(fn) => { store.setData(fn(store.data)); }} empId={modal.empId} onClose={() => setModal(null)} toast={showToast} audit={store.addAudit} />}
+      {modal?.type === 'roles' && <RolesModal db={data} store={store} empId={modal.empId} onClose={() => setModal(null)} toast={showToast} audit={store.addAudit} />}
+      {modal?.type === 'depts' && <DeptsModal db={data} store={store} empId={modal.empId} onClose={() => setModal(null)} toast={showToast} audit={store.addAudit} />}
       {modal?.type === 'vacation' && <VacationModal db={data} ur={user} vacationId={modal.vacationId} forEmpId={modal.forEmpId || null} onClose={() => setModal(null)} onSave={(v, isNew) => { store.upsertVacation(v); store.addAudit(isNew ? 'Создание отпуска' : 'Изменение отпуска', { employee: empName(v.empId), period: `${fmtDMY(v.start)}—${fmtDMY(v.end)}` }, 'vacation', v.id); setModal(null); }} />}
       {modal?.type === 'delegation' && <DelegationModal db={data} ur={user} onClose={() => setModal(null)} onSubmit={(rd) => { store.upsertRoleDelegation(rd); store.addNotification(rd.toId, `Вам предложено временное принятие ролей: ${rd.roles.map(r => ROLES[r].label).join(", ")}.`, { targetType: 'delegation', targetId: rd.id }); store.addAudit('Создание делегирования ролей', { from: empName(rd.fromId), to: empName(rd.toId), roles: rd.roles.join(', ') }, 'delegation', rd.id); setModal(null); }} />}
       {vacModalOpen && <VacNowModal db={data} onClose={() => setVacModalOpen(false)} toast={showToast} />}

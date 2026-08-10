@@ -2,14 +2,15 @@ import React, { useState } from 'react';
 import { Modal } from '../Modal';
 import { ROLES } from '../../utils/constants';
 
-export const RolesModal = ({ db, setDb, empId, onClose, toast, audit }) => {
+export const RolesModal = ({ db, store, empId, onClose, toast, audit }) => {
   const emp = db.employees.find((e) => e.id === empId);
   const [roles, setRoles] = useState(emp.roles);
   const [kbIds, setKbIds] = useState(emp.kbIds || []);
   const [headDeptIds, setHeadDeptIds] = useState(emp.headDeptIds || []);
   const toggle = (r) => setRoles((s) => (s.includes(r) ? s.filter((x) => x !== r) : [...s, r]));
   const save = () => {
-    setDb((s) => ({ ...s, employees: s.employees.map((e) => (e.id === empId ? { ...e, roles, kbIds: roles.includes("kb_chief") ? kbIds : [], headDeptIds: roles.includes("head") ? headDeptIds : [] } : e)) }));
+    const updatedEmp = { ...emp, roles, kbIds: roles.includes("kb_chief") ? kbIds : [], headDeptIds: roles.includes("head") ? headDeptIds : [] };
+    store.updateEmployee(updatedEmp);
     audit("Назначение ролей", `${emp.last} ${emp.first}: ${roles.map((r) => ROLES[r].short).join(", ")}`);
     toast("Роли сохранены");
     onClose();
