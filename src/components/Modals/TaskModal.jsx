@@ -423,7 +423,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
             )}
           {isProjectLocked && !readOnly && (
             <small style={{color: '#6b7280', fontSize: '0.8em', display: 'block', marginTop: '4px', gridColumn: '1 / -1'}}>
-              Проект выбран при создании задачи
+              Проект зафиксирован
             </small>
           )}
           <label className="lbl">Приоритет *</label>
