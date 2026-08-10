@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Modal } from '../Modal';
 
-export const DeptsModal = ({ db, setDb, empId, onClose, toast, audit }) => {
+export const DeptsModal = ({ db, store, empId, onClose, toast, audit }) => {
   const emp = db.employees.find((e) => e.id === empId);
   const [sel, setSel] = useState(emp.departments);
   const toggle = (deptId) => {
@@ -18,7 +18,8 @@ export const DeptsModal = ({ db, setDb, empId, onClose, toast, audit }) => {
     if (!sel.length) return toast("Выберите хотя бы одно подразделение", "err");
     if (!sel.some((x) => x.primary)) return toast("Укажите основное подразделение", "err");
     const before = emp.departments.map((x) => x.deptId).join(",");
-    setDb((s) => ({ ...s, employees: s.employees.map((e) => (e.id === empId ? { ...e, departments: sel } : e)) }));
+    const updatedEmp = { ...emp, departments: sel };
+    store.updateEmployee(updatedEmp);
     audit("Изменение подразделений сотрудника", `${emp.last} ${emp.first}: [${before}] → [${sel.map((x) => x.deptId).join(",")}]`);
     toast("Подразделения обновлены");
     onClose();

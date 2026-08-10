@@ -9,7 +9,7 @@ import { Modal } from "./Modal";
 // CreateEmployeeModal – оставляем без изменений (не показан, но он есть в проекте)
 // ...
 
-export default function Staff({ db, setDb, ur, openRoles, openDepts, openVacation }) {
+export default function Staff({ db, store, ur, openRoles, openDepts, openVacation }) {
   const { getEmployeeLoad, empName, primaryDept } = useDataHelpers(db);
   const norm = 160;
   const [showFired, setShowFired] = useState(false);
@@ -68,11 +68,8 @@ export default function Staff({ db, setDb, ur, openRoles, openDepts, openVacatio
         {canFireEmployee(ur) && (
           <button className={`btn ghost sm${isFired ? '' : ' danger'}`} onClick={() => {
             const updated = { ...e, fired: !e.fired };
-            setDb((s) => ({ ...s, employees: s.employees.map(emp => emp.id === e.id ? updated : emp) }));
-            setDb((prev) => ({
-              ...prev,
-              audit: [{ id: uid(), ts: Date.now(), userId: ur.id, action: e.fired ? 'Восстановление сотрудника' : 'Увольнение сотрудника', details: `${e.last} ${e.first}` }, ...prev.audit]
-            }));
+            store.updateEmployee(updated);
+            store.addAudit(e.fired ? 'Восстановление сотрудника' : 'Увольнение сотрудника', `${e.last} ${e.first}`);
           }}>
             <Ic d={isFired ? ICONS.restore : ICONS.x} size={13} /> {isFired ? 'Восстановить' : 'Уволить'}
           </button>
@@ -118,12 +115,12 @@ export default function Staff({ db, setDb, ur, openRoles, openDepts, openVacatio
             <button className="btn ghost sm" onClick={() => {
               const name = window.prompt('Название нового КБ:');
               if (name) {
-                setDb((s) => ({ ...s, kbs: [...s.kbs, { id: 'kb_' + Math.random().toString(36).slice(2,6), name, full: name }] }));
+                store.createKb(name, name);
               }
             }}><Ic d={ICONS.plus} size={13} /> КБ</button>
             <button className="btn ghost sm" onClick={() => {
               const name = window.prompt('Название нового отдела:');
-              if (name) setDb((s) => ({ ...s, departments: [...s.departments, { id: 'd_' + Math.random().toString(36).slice(2,6), name, kbId: null }] }));
+              if (name) store.createDepartment(name, null);
             }}><Ic d={ICONS.plus} size={13} /> Отдел</button>
             {hasRole(ur, 'admin') && (
               <button className="btn primary sm" onClick={() => setShowCreateModal(true)}>
@@ -137,10 +134,10 @@ export default function Staff({ db, setDb, ur, openRoles, openDepts, openVacatio
       {showCreateModal && (
         <CreateEmployeeModal
           db={db}
-          setDb={setDb}
+          store={store}
           onClose={() => setShowCreateModal(false)}
           toast={(msg, type) => alert(msg)}
-          audit={(action, details) => setDb(prev => ({ ...prev, audit: [{ id: uid(), ts: Date.now(), userId: ur.id, action, details }, ...prev.audit] }))}
+          audit={(action, details) => store.addAudit(action, details)}
         />
       )}
 
@@ -209,7 +206,7 @@ export default function Staff({ db, setDb, ur, openRoles, openDepts, openVacatio
                       </span></td>
                       <td>
                         <button className="icon-btn" onClick={() => openVacation(v.id, null)}><Ic d={ICONS.edit} size={14} /></button>
-                        <button className="icon-btn danger" onClick={() => { setDb((s) => ({ ...s, vacations: s.vacations.filter(x => x.id !== v.id) })); }}><Ic d={ICONS.trash} size={14} /></button>
+                        <button className="icon-btn danger" onClick={() => { store.deleteVacationById(v.id); }}><Ic d={ICONS.trash} size={14} /></button>
                       </td>
                     </tr>
                   );
