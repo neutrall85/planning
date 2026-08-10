@@ -13,7 +13,7 @@ export const ROLES = {
 export const TASK_STATUSES = {
   new:      { label: "Новая", color: "#8b5cf6" },
   inwork:   { label: "В работе", color: "#0ea5e9" },
-  review:   { label: "На проверке", color: "#f59e0b" },
+  review:   { label: "На проверке", color: "#fbbf24" },
   closed:   { label: "Закрыта", color: "#10b981" },
   cancelled:{ label: "Отменена", color: "#64748b" },
 };
