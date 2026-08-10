@@ -1035,10 +1035,13 @@ input, select, textarea {
   box-shadow: var(--sh);
   overflow: hidden;
   animation: fadeUp .3s ease;
+  width: 100%;
+  box-sizing: border-box;
 }
 .gantt-scroll {
   overflow: auto;
   max-height: calc(100vh - 220px);
+  width: 100%;
 }
 .gantt-top {
   display: flex;
