@@ -138,6 +138,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
   const readOnly = !!(existing && existing.archived);
   
   const currentProjectId = initialProjectId || (existing ? existing.projectId : '');
+  const isProjectFromInitial = !!initialProjectId && !existing;
   
   const canEditFields = !readOnly && (existing ? canEditTaskFields(ur, existing, db) : canCreateTask(ur));
   const canChangeStatus = !readOnly && existing && canChangeTaskStatus(ur, existing, null, db);
@@ -414,7 +415,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
           <label className="lbl">Описание</label><textarea className="inp" rows="2" disabled={!canEditFields} value={f.desc} onChange={(e) => set("desc", e.target.value)} />
           <label className="lbl">Проект * <span className="mut">(активные)</span></label>
           {readOnly ? <input className="inp" disabled value={proj ? `${proj.code} — ${proj.name}` : ""} /> : (
-              <select className="inp sel" disabled={!canEditFields} value={f.projectId} onChange={(e) => set("projectId", e.target.value)}>
+              <select className="inp sel" disabled={!canEditFields || isProjectFromInitial} value={f.projectId} onChange={(e) => set("projectId", e.target.value)}>
                 <option value="">— выберите проект —</option>
                 {projs.map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}{p.ptype === "admin" ? " (административный)" : ""}</option>)}
               </select>
