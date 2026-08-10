@@ -21,7 +21,7 @@ import { TaskModal, ProjectModal, HoursRequestModal, RolesModal, DeptsModal, Vac
 
 export default function MainLayout({ store, data, user }) {
   const { logout } = useStore();
-  const [view, setView] = useState('kanban');
+  const [view, setView] = useState('tasks');
   const [modal, setModal] = useState(null);
   const [notifOpen, setNotifOpen] = useState(false);
   const [vacModalOpen, setVacModalOpen] = useState(false);

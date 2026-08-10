@@ -7,6 +7,39 @@ export default class DataStore {
     this._currentUser = null;
     this._listeners = [];
     this._archiveOldTasks(3);
+    this._checkAllDeadlines();
+  }
+  
+  // Проверка дедлайнов всех задач при загрузке системы
+  _checkAllDeadlines() {
+    const now = new Date(TODAY);
+    this._data.tasks.forEach(task => {
+      if (!task.deadline || ['closed', 'cancelled'].includes(task.status)) return;
+      
+      const deadlineDate = new Date(task.deadline);
+      const daysUntilDeadline = Math.ceil((deadlineDate - now) / (1000 * 60 * 60 * 24));
+      
+      if (daysUntilDeadline === 3 || daysUntilDeadline === 1) {
+        const assigneeIds = task.assigneeIds || [];
+        assigneeIds.forEach(id => {
+          const emp = this._data.employees.find(e => e.id === id);
+          if (emp) {
+            const daysText = daysUntilDeadline === 1 ? '1 день' : '3 дня';
+            const notifText = `До дедлайна задачи "${task.title}" остался ${daysText}! Дедлайн: ${task.deadline}`;
+            // Проверяем, не было ли уже такого уведомления
+            const exists = this._data.notifications.some(n => 
+              n.userId === id && 
+              n.targetType === 'task' && 
+              n.targetId === task.id && 
+              n.text === notifText
+            );
+            if (!exists) {
+              this.addNotification(id, notifText, { targetType: 'task', targetId: task.id });
+            }
+          }
+        });
+      }
+    });
   }
 
   subscribe(callback) {
@@ -126,6 +159,9 @@ export default class DataStore {
         this.addAudit('Изменение задачи', auditMessage, 'task', task.id);
       }
       tasks = this._data.tasks.map(t => t.id === task.id ? task : t);
+      
+      // УВЕДОМЛЕНИЯ О ДЕДЛАЙНЕ (при обновлении задачи)
+      this._checkDeadlineNotifications(task, old);
     } else {
       if (!task.createdAt) {
         task.createdAt = new Date().toISOString();
@@ -137,10 +173,46 @@ export default class DataStore {
           this.addNotification(id, `Вам назначена задача "${task.title}"`, { targetType: 'task', targetId: task.id });
         }
       });
+      
+      // УВЕДОМЛЕНИЯ О ДЕДЛАЙНЕ (при создании задачи)
+      this._checkDeadlineNotifications(task, null);
     }
     this._data = { ...this._data, tasks };
     this._notify();
     this._archiveOldTasks(3);
+  }
+
+  // Проверка дедлайнов и отправка уведомлений за 3 дня и 1 день
+  _checkDeadlineNotifications(task, oldTask) {
+    if (!task.deadline || ['closed', 'cancelled'].includes(task.status)) return;
+    
+    const now = new Date(TODAY);
+    const deadlineDate = new Date(task.deadline);
+    const daysUntilDeadline = Math.ceil((deadlineDate - now) / (1000 * 60 * 60 * 24));
+    
+    // Проверяем, нужно ли отправлять уведомление (3 дня или 1 день до дедлайна)
+    const shouldNotifyThreeDays = daysUntilDeadline === 3;
+    const shouldNotifyOneDay = daysUntilDeadline === 1;
+    
+    if (!shouldNotifyThreeDays && !shouldNotifyOneDay) return;
+    
+    // Проверяем, не было ли уже отправлено такое уведомление
+    const existingNotif = this._data.notifications.find(n => 
+      n.targetType === 'task' && 
+      n.targetId === task.id && 
+      n.text.includes('дней до дедлайна') || n.text.includes('день до дедлайна')
+    );
+    
+    if (existingNotif) return;
+    
+    const assigneeIds = task.assigneeIds || [];
+    assigneeIds.forEach(id => {
+      const emp = this._data.employees.find(e => e.id === id);
+      if (emp) {
+        const daysText = daysUntilDeadline === 1 ? '1 день' : '3 дня';
+        this.addNotification(id, `До дедлайна задачи "${task.title}" остался ${daysText}! Дедлайн: ${task.deadline}`, { targetType: 'task', targetId: task.id });
+      }
+    });
   }
 
   deleteTask(id) {
