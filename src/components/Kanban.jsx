@@ -4,15 +4,17 @@ import { TASK_STATUSES, TASK_STATUS_ORDER, PRIORITIES } from '../utils/constants
 import { TODAY, fmtD, daysDiff, initials, isTaskActive } from '../utils/date';
 import { computeScope, taskVisible, canCreateTask, canChangeTaskStatus, hasRole } from '../utils/permissions';
 
-export default function Kanban({ db, ur, openTask, onMove, onNew }) {
+export default function Kanban({ db, ur, openTask, onMove, onNew, showOnlyMyTasks: parentShowOnlyMyTasks, sortBy: parentSortBy }) {
   const [fProj, setFProj] = useState("all");
   const [fExec, setFExec] = useState("all");
   const [fPrio, setFPrio] = useState("all");
   const [fDept, setFDept] = useState("all");
   const [q, setQ] = useState("");
   const [dragOverCol, setDragOverCol] = useState(null);
-  const [showOnlyMy, setShowOnlyMy] = useState(false);
-  const [sortBy, setSortBy] = useState("deadline");
+  
+  // Используем пропсы от родителя, если переданы, иначе локальное состояние
+  const showOnlyMy = parentShowOnlyMyTasks !== undefined ? parentShowOnlyMyTasks : false;
+  const sortBy = parentSortBy !== undefined ? parentSortBy : "deadline";
 
   const scope = useMemo(() => computeScope(ur, db), [ur, db]);
 
@@ -76,53 +78,55 @@ export default function Kanban({ db, ur, openTask, onMove, onNew }) {
 
   return (
     <div>
-      <div className="toolbar">
-        <div className="search-box"><Ic d={ICONS.search} size={15} /><input placeholder="Поиск задач…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
-        <select className="inp sel sm" value={fProj} onChange={(e) => setFProj(e.target.value)}>
-          <option value="all">Все проекты</option>
-          {db.projects.filter(p => !p.archived && (scope.all || scope.projIds.has(p.id))).map(p => <option key={p.id} value={p.id}>{p.code}</option>)}
-        </select>
-        {!isOnlyExecutor && (
-          <select className="inp sel sm" value={fExec} onChange={(e) => setFExec(e.target.value)}>
-            <option value="all">Все исполнители</option>
-            {[...new Set(visible.flatMap(t => t.assigneeIds || []))].map(id => {
-              const e = db.employees.find(x => x.id === id);
-              return e ? <option key={id} value={id}>{e.last} {e.first}</option> : null;
-            })}
+      {parentShowOnlyMyTasks === undefined && (
+        <div className="toolbar">
+          <div className="search-box"><Ic d={ICONS.search} size={15} /><input placeholder="Поиск задач…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+          <select className="inp sel sm" value={fProj} onChange={(e) => setFProj(e.target.value)}>
+            <option value="all">Все проекты</option>
+            {db.projects.filter(p => !p.archived && (scope.all || scope.projIds.has(p.id))).map(p => <option key={p.id} value={p.id}>{p.code}</option>)}
           </select>
-        )}
-        <select className="inp sel sm" value={fPrio} onChange={(e) => setFPrio(e.target.value)}>
-          <option value="all">Любой приоритет</option>
-          {Object.entries(PRIORITIES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-        </select>
-        {!isOnlyExecutor && (
-          <select className="inp sel sm" value={fDept} onChange={(e) => setFDept(e.target.value)}>
-            <option value="all">Все подразделения</option>
-            {db.departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+          {!isOnlyExecutor && (
+            <select className="inp sel sm" value={fExec} onChange={(e) => setFExec(e.target.value)}>
+              <option value="all">Все исполнители</option>
+              {[...new Set(visible.flatMap(t => t.assigneeIds || []))].map(id => {
+                const e = db.employees.find(x => x.id === id);
+                return e ? <option key={id} value={id}>{e.last} {e.first}</option> : null;
+              })}
+            </select>
+          )}
+          <select className="inp sel sm" value={fPrio} onChange={(e) => setFPrio(e.target.value)}>
+            <option value="all">Любой приоритет</option>
+            {Object.entries(PRIORITIES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
           </select>
-        )}
-        {canSeeAll && (
-          <label className="dept-pick" style={{ marginLeft: 8 }}>
-            <input type="checkbox" checked={showOnlyMy} onChange={(e) => setShowOnlyMy(e.target.checked)} />
-            <span style={{ fontSize: 13 }}>Только мои задачи</span>
-          </label>
-        )}
-        <select className="inp sel sm" value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={{ marginLeft: 8 }}>
-          <option value="deadline">По дедлайну (возр.)</option>
-          <option value="deadlineDesc">По дедлайну (убыв.)</option>
-          <option value="created">По дате создания</option>
-          <option value="alpha">По алфавиту (А-Я)</option>
-          <option value="alphaDesc">По алфавиту (Я-А)</option>
-          <option value="hours">По часам (возр.)</option>
-          <option value="hoursDesc">По часам (убыв.)</option>
-        </select>
-        <div className="spacer" />
-        {canCreateTask(ur) && (
-          <button className="btn primary" onClick={onNew}>
-            <Ic d={ICONS.plus} size={15} /> Задача
-          </button>
-        )}
-      </div>
+          {!isOnlyExecutor && (
+            <select className="inp sel sm" value={fDept} onChange={(e) => setFDept(e.target.value)}>
+              <option value="all">Все подразделения</option>
+              {db.departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+          )}
+          {canSeeAll && (
+            <label className="dept-pick" style={{ marginLeft: 8 }}>
+              <input type="checkbox" checked={showOnlyMy} onChange={(e) => setShowOnlyMy(e.target.checked)} />
+              <span style={{ fontSize: 13 }}>Только мои задачи</span>
+            </label>
+          )}
+          <select className="inp sel sm" value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={{ marginLeft: 8 }}>
+            <option value="deadline">По дедлайну (возр.)</option>
+            <option value="deadlineDesc">По дедлайну (убыв.)</option>
+            <option value="created">По дате создания</option>
+            <option value="alpha">По алфавиту (А-Я)</option>
+            <option value="alphaDesc">По алфавиту (Я-А)</option>
+            <option value="hours">По часам (возр.)</option>
+            <option value="hoursDesc">По часам (убыв.)</option>
+          </select>
+          <div className="spacer" />
+          {canCreateTask(ur) && (
+            <button className="btn primary" onClick={onNew}>
+              <Ic d={ICONS.plus} size={15} /> Задача
+            </button>
+          )}
+        </div>
+      )}
       
       <div className="kanban k5">
         {TASK_STATUS_ORDER.map((st) => {
