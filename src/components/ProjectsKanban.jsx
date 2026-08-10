@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { PROJECT_STATUSES, PROJECT_TYPES } from '../utils/constants';
+import { PROJECT_STATUSES, PROJECT_TYPES, PROJECT_CATEGORIES } from '../utils/constants';
 import { fmtDMY, initials, isTaskActive } from '../utils/date';
 import { Ic, ICONS } from './Icons';
 import { computeScope, hasRole, canChangeProjectStatus } from '../utils/permissions';
@@ -114,12 +114,13 @@ export default function ProjectsKanban({ db, ur, openProject, closeProject, canc
                         onClick={() => openProject(p.id)}
                         draggable={canDrag}
                         onDragStart={(e) => e.dataTransfer.setData("text/plain", p.id)}
-                        style={{ cursor: 'pointer' }}
+                        style={{ cursor: 'pointer', borderLeft: `4px solid ${PROJECT_CATEGORIES[p.category || 'NORM']?.color || '#10b981'}` }}
                       >
                         <div className="kcard-title">{p.name}</div>
                         <div className="kcard-proj"><span className="pdot" style={{ background: p.color }} />{p.code}</div>
                         <div className="kcard-meta">
                           <span className="mut sm">{PROJECT_TYPES[p.ptype || 'prod']}</span>
+                          <span className="mut sm" style={{ color: PROJECT_CATEGORIES[p.category || 'NORM']?.color || '#10b981', fontWeight: 600 }}>{PROJECT_CATEGORIES[p.category || 'NORM']?.label || 'NORM'}</span>
                           {p.budget != null && (
                             <span className="khours">
                               <Ic d={ICONS.clock} size={13} /> {fact}/{p.budget} ч ({usePct}%)

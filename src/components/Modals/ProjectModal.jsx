@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Modal } from '../Modal';
 import { useDataHelpers } from '../../hooks';
 import {
-  PROJECT_STATUSES, PROJECT_TYPES, TASK_STATUSES,
+  PROJECT_STATUSES, PROJECT_TYPES, PROJECT_CATEGORIES, TASK_STATUSES,
 } from '../../utils/constants';
 import {
   TODAY, iso, addDays, uid, fmtDT, fmtDMY,
@@ -37,6 +37,7 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
     budget: 100,
     color: ["#0ea5e9", "#8b5cf6", "#f43f5e", "#f59e0b", "#10b981", "#ec4899"][Math.floor(Math.random() * 6)],
     ptype: "prod",
+    category: "NORM",
     longterm: false,
     archived: false,
     archivedAt: null,
@@ -220,6 +221,12 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
           <select className="inp sel" disabled={!canChangeStatus} value={f.status || 'active'} onChange={(e) => set("status", e.target.value)}>
             {(existing ? statusOptions : creationStatusOptions).map((opt) => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+          <label className="lbl">Категория</label>
+          <select className="inp sel" disabled={!canEditFields} value={f.category || 'NORM'} onChange={(e) => set("category", e.target.value)}>
+            {Object.entries(PROJECT_CATEGORIES).map(([k, v]) => (
+              <option key={k} value={k} style={{ color: v.color }}>{v.label}</option>
             ))}
           </select>
           {isAdminType && (<> 
