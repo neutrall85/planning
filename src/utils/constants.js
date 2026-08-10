@@ -26,9 +26,6 @@ export const PRIORITIES = {
   crit: { label: "Критический", color: "#dc2626" },
 };
 
-// Алиас для совместимости с кодом, использующим PRIORITIES.mid
-PRIORITIES.medium = PRIORITIES.mid;
-
 // Типы зависимостей между задачами
 export const DEPENDENCY_TYPES = {
   FS: { label: "Окончание-Начало (FS)", desc: "Задача начнётся после завершения предыдущей" },
