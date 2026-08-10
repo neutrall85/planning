@@ -124,7 +124,7 @@ export default function Gantt({ db, ur, openTask, openProject }) {
   const width = days.length * DW;
 
   return (
-    <div className="gantt-panel" style={{ width: '100%', boxSizing: 'border-box' }}>
+    <div className="gantt-panel">
       <div className="cal-head" style={{ padding: '12px 16px', borderBottom: '1px solid var(--line)' }}>
         <div className="cal-nav">
           <button className="icon-btn" onClick={() => shift(-1)}><Ic d={ICONS.left} size={16} /></button>
@@ -144,7 +144,7 @@ export default function Gantt({ db, ur, openTask, openProject }) {
       </div>
       
       <div className="gantt-scroll">
-        <div className="gantt" style={{ width: '100%', minWidth: width + 240 }}>
+        <div className="gantt">
           <div className="gantt-top">
             <div className="gantt-corner">Проект / задача</div>
             <div className="gantt-axis" style={{ width }}>
