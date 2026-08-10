@@ -20,7 +20,7 @@ export const TASK_STATUSES = {
 export const TASK_STATUS_ORDER = ["new", "inwork", "review", "closed", "cancelled"];
 
 export const PRIORITIES = {
-  low:  { label: "Низкий", color: "#94a3b8" },
+  low:  { label: "Низкий", color: "#3b82f6" },
   mid:  { label: "Средний", color: "#f59e0b" },
   high: { label: "Высокий", color: "#f97316" },
   crit: { label: "Критический", color: "#dc2626" },

@@ -203,6 +203,7 @@ export default function Gantt({ db, ur, openTask, openProject }) {
                     const vac = a ? vacOverlap(a.id, t.start, t.deadline) : null;
                     const tip = `${t.title}: ${fmtD(t.start)} — ${fmtD(t.deadline)}, план ${t.plannedHours ?? '—'} ч${vac ? `. Исполнитель в отпуске ${fmtDMY(vac.start)}–${fmtDMY(vac.end)}` : ''}`;
                     const prioColor = PRIORITIES[t.priority]?.color || PRIORITIES.mid.color;
+                    const statusColor = t.status === 'closed' ? '#10b981' : t.status === 'cancelled' ? '#64748b' : prioColor;
                     
                     return (
                       <div key={t.id} className="gantt-row" style={{ position: 'relative' }}>
@@ -211,8 +212,8 @@ export default function Gantt({ db, ur, openTask, openProject }) {
                           <span className="gsub">{a ? a.last : ''} · {t.plannedHours ?? '—'} ч · {TASK_STATUSES[t.status].label}</span>
                         </div>
                         <div className="gantt-track" style={{ width }}>
-                          <div className="gbar" style={{ left, width: w, background: prioColor + '33', border: `2px solid ${prioColor}`, cursor: 'pointer', opacity: t.status === 'cancelled' ? 0.45 : 1 }} onClick={() => openTask(t.id)} title={tip}>
-                            <div className="gbar-fill" style={{ width: pct + '%', background: t.status === 'closed' ? '#10b981' : prioColor }} />
+                          <div className="gbar" style={{ left, width: w, background: statusColor + '33', border: `2px solid ${statusColor}`, cursor: 'pointer', opacity: t.status === 'cancelled' ? 0.45 : 1 }} onClick={() => openTask(t.id)} title={tip}>
+                            <div className="gbar-fill" style={{ width: pct + '%', background: t.status === 'closed' ? '#10b981' : statusColor }} />
                             {vac && <span className="gbar-vac" title="Исполнитель в отпуске в эти даты">🏖</span>}
                           </div>
                         </div>
