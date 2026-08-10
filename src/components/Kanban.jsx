@@ -156,6 +156,7 @@ export default function Kanban({ db, ur, openTask, onMove, onNew }) {
                   const overdue = t.deadline && !["closed", "cancelled"].includes(t.status) && t.deadline < TODAY;
                   const soon = t.deadline && !overdue && !["closed", "cancelled"].includes(t.status) && daysDiff(TODAY, t.deadline) <= 3;
                   const canDrag = (!["closed", "cancelled"].includes(t.status) && canChangeTaskStatus(ur, t, st, db));
+                  const prioColor = PRIORITIES[t.priority]?.color || PRIORITIES.mid.color;
                   return (
                     <div 
                       key={t.id} 
@@ -164,7 +165,7 @@ export default function Kanban({ db, ur, openTask, onMove, onNew }) {
                       onDragStart={(e) => e.dataTransfer.setData("text/plain", t.id)} 
                       onClick={() => openTask(t.id)}
                     >
-                      <div className="kcard-prio" style={{ background: PRIORITIES[t.priority].color }} />
+                      <div className="kcard-prio" style={{ background: prioColor }} />
                       <div className="kcard-title">{t.title}</div>
                       <div className="kcard-proj"><span className="pdot" style={{ background: p?.color }} />{p?.code}</div>
                       <div className="kcard-meta">
@@ -192,6 +193,16 @@ export default function Kanban({ db, ur, openTask, onMove, onNew }) {
             </div>
           );
         })}
+      </div>
+      
+      {/* Легенда приоритетов */}
+      <div className="gantt-legend" style={{ padding: '8px 16px', borderTop: '1px solid var(--line)', marginTop: 16 }}>
+        <span style={{ fontWeight: 600 }}>Приоритеты задач:</span>
+        {Object.entries(PRIORITIES).map(([k, v]) => (
+          <span key={k} style={{ marginLeft: 12 }}>
+            <span className="lg-dot" style={{ background: v.color }} /> {v.label}
+          </span>
+        ))}
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { TODAY, iso, addDays, parseISO, fmtD, fmtDMY, isTaskActive } from '../utils/date';
-import { TASK_STATUSES, DEPENDENCY_TYPES } from '../utils/constants';
+import { TASK_STATUSES, DEPENDENCY_TYPES, PROJECT_CATEGORIES, PRIORITIES } from '../utils/constants';
 import { useDataHelpers } from '../hooks';
 import { computeScope, taskVisible } from '../utils/permissions';
 import { Ic, ICONS } from './Icons';
@@ -178,6 +178,7 @@ export default function Gantt({ db, ur, openTask, openProject }) {
               {todayIdx >= 0 && <div className="gtoday" style={{ left: todayIdx * DW + DW/2 }} />}
             </div>
             {groups.map(g => {
+              const category = PROJECT_CATEGORIES[g.project.category || 'NORM'] || PROJECT_CATEGORIES.NORM;
               return (
                 <div key={g.project.id}>
                   <div className="gantt-group">
@@ -188,6 +189,7 @@ export default function Gantt({ db, ur, openTask, openProject }) {
                       title="Открыть проект"
                     >
                       <span className="pdot" style={{ background: g.project.color }} />{g.project.code} · {g.project.name}
+                      <span className="mut sm" style={{ marginLeft: 8, color: category.color, fontWeight: 600 }}>{category.label}</span>
                     </div>
                     <div style={{ width }} />
                   </div>
@@ -200,6 +202,7 @@ export default function Gantt({ db, ur, openTask, openProject }) {
                     const pct = Math.min(100, (sp / Math.max(1, t.plannedHours || 0)) * 100);
                     const vac = a ? vacOverlap(a.id, t.start, t.deadline) : null;
                     const tip = `${t.title}: ${fmtD(t.start)} — ${fmtD(t.deadline)}, план ${t.plannedHours ?? '—'} ч${vac ? `. Исполнитель в отпуске ${fmtDMY(vac.start)}–${fmtDMY(vac.end)}` : ''}`;
+                    const prioColor = PRIORITIES[t.priority]?.color || PRIORITIES.mid.color;
                     
                     return (
                       <div key={t.id} className="gantt-row" style={{ position: 'relative' }}>
@@ -208,7 +211,7 @@ export default function Gantt({ db, ur, openTask, openProject }) {
                           <span className="gsub">{a ? a.last : ''} · {t.plannedHours ?? '—'} ч · {TASK_STATUSES[t.status].label}</span>
                         </div>
                         <div className="gantt-track" style={{ width }}>
-                          <div className="gbar" style={{ left, width: w, background: g.project.color + '33', border: `1px solid ${g.project.color}66`, cursor: 'pointer', opacity: t.status === 'cancelled' ? 0.45 : 1 }} onClick={() => openTask(t.id)} title={tip}>
+                          <div className="gbar" style={{ left, width: w, background: g.project.color + '33', border: `2px solid ${prioColor}`, cursor: 'pointer', opacity: t.status === 'cancelled' ? 0.45 : 1 }} onClick={() => openTask(t.id)} title={tip}>
                             <div className="gbar-fill" style={{ width: pct + '%', background: t.status === 'closed' ? '#10b981' : g.project.color }} />
                             {vac && <span className="gbar-vac" title="Исполнитель в отпуске в эти даты">🏖</span>}
                           </div>
@@ -227,6 +230,18 @@ export default function Gantt({ db, ur, openTask, openProject }) {
         <span><span className="lg-dot" style={{ background: '#e2e8f0' }} /> выходные</span>
         <span>🏖 — исполнитель в отпуске</span>
         <span>Заполнение полосы — факт / план</span>
+        <span style={{ marginLeft: 16, fontWeight: 600 }}>Категории проектов:</span>
+        {Object.entries(PROJECT_CATEGORIES).map(([k, v]) => (
+          <span key={k} style={{ marginLeft: 12 }}>
+            <span className="lg-dot" style={{ background: v.color }} /> {v.label}
+          </span>
+        ))}
+        <span style={{ marginLeft: 16, fontWeight: 600 }}>Приоритеты задач:</span>
+        {Object.entries(PRIORITIES).map(([k, v]) => (
+          <span key={k} style={{ marginLeft: 12 }}>
+            <span className="lg-dot" style={{ background: v.color }} /> {v.label}
+          </span>
+        ))}
       </div>
     </div>
   );

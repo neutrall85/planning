@@ -26,6 +26,9 @@ export const PRIORITIES = {
   crit: { label: "Критический", color: "#dc2626" },
 };
 
+// Алиас для совместимости с кодом, использующим PRIORITIES.mid
+PRIORITIES.medium = PRIORITIES.mid;
+
 // Типы зависимостей между задачами
 export const DEPENDENCY_TYPES = {
   FS: { label: "Окончание-Начало (FS)", desc: "Задача начнётся после завершения предыдущей" },
@@ -46,6 +49,13 @@ export const PROJECT_STATUSES = {
   inactive:  "Неактивный",
   closed:    "Закрыт",
   cancelled: "Отменён"
+};
+
+// Категории приоритетов проектов
+export const PROJECT_CATEGORIES = {
+  AOG:   { label: "AOG (Aviation Grounded)", color: "#dc2626", desc: "Критическая - самолет на земле" },
+  CRIT:  { label: "CRIT (Critical)", color: "#f97316", desc: "Высокий приоритет - критические задачи" },
+  NORM:  { label: "NORM (Routine)", color: "#10b981", desc: "Плановые работы" },
 };
 
 export const PROJECT_TYPES = { prod: "Производственный", admin: "Административный" };
