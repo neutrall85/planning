@@ -330,7 +330,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
       const newTotal = currentPlanSum + (+f.plannedHours || 0);
       if (newTotal > projForBudget.budget) {
         toast(
-          `Превышение бюджета проекта! Бюджет: ${projForBudget.budget} ч, текущая сумма задач: ${currentPlanSum} ч, запрошено: ${f.plannedHours || 0} ч. Уменьшите плановые часы.`,
+          `Превышение бюджета проекта! Бюджет: ${projForBudget.budget} ч, текущая сумма задач: ${currentPlanSum} ч, запрошено: ${f.plannedHours || 0} ч. Требуется увеличение бюджета проекта.`,
           "err"
         );
         return;
@@ -409,7 +409,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
 
       {tab === "form" && (<>
         {vacWarn && <div className="warn-box"><Ic d={ICONS.beach} size={15} /> Один из исполнителей находится в отпуске с {fmtDMY(vacWarn.start)} по {fmtDMY(vacWarn.end)}. Даты пересекаются с периодом задачи.</div>}
-        {remainProj !== null && remainProj - (+f.plannedHours || 0) < 0 && <div className="warn-box">Внимание: задача превысит остаток бюджета проекта ({remainProj} ч). Потребуется утверждение ГД.</div>}
+        {remainProj !== null && remainProj - (+f.plannedHours || 0) < 0 && <div className="warn-box">Внимание: задача превысит остаток бюджета проекта ({remainProj} ч). Потребуется увеличение бюджета проекта.</div>}
         {isAdminProj && !readOnly && <div className="info-box">Административный проект: дедлайн и плановые часы задачи — по желанию.</div>}
         <div className="form-grid">
           <label className="lbl">Название *</label><input className="inp" disabled={!canEditFields} value={f.title} onChange={(e) => set("title", e.target.value)} />
@@ -423,7 +423,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
             )}
           {isProjectLocked && !readOnly && (
             <small style={{color: '#6b7280', fontSize: '0.8em', display: 'block', marginTop: '4px', gridColumn: '1 / -1'}}>
-              Проект закреплен за контекстом создания
+              Проект выбран при создании задачи
             </small>
           )}
           <label className="lbl">Приоритет *</label>
