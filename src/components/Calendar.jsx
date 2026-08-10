@@ -88,7 +88,6 @@ export default function Calendar({ db, ur, openTask }) {
           <button className="icon-btn" onClick={() => shift(1)}><Ic d={ICONS.right} size={16} /></button>
         </div>
         <div className="cal-right">
-          <button className="btn ghost sm" onClick={() => setAnchor(new Date())}>Сегодня</button>
           <div className="seg">{['day','week','month'].map(m => <button key={m} className={`seg-btn${mode===m?' on':''}`} onClick={() => setMode(m)}>{['День','Неделя','Месяц'][['day','week','month'].indexOf(m)]}</button>)}</div>
           {canSeeAll && (
             <label className="dept-pick" style={{ marginLeft: 8 }}>

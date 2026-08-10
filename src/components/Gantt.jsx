@@ -38,11 +38,6 @@ export default function Gantt({ db, ur, openTask, openProject }) {
     setAnchor(iso(newDate));
   };
 
-  const resetToday = () => {
-    const d = new Date();
-    setAnchor(iso(new Date(d.getFullYear(), d.getMonth(), 1)));
-  };
-
   const ganttData = useMemo(() => {
     if (!tasks.length) return null;
     const days = [];
@@ -106,7 +101,6 @@ export default function Gantt({ db, ur, openTask, openProject }) {
             <button className="icon-btn" onClick={() => shift(1)}><Ic d={ICONS.right} size={16} /></button>
           </div>
           <div className="cal-right">
-            <button className="btn ghost sm" onClick={resetToday}>Сегодня</button>
             <div className="seg">
               {[['month','Месяц'], ['quarter','Квартал'], ['year','Год']].map(([m,l]) => (
                 <button key={m} className={`seg-btn${mode === m ? ' on' : ''}`} onClick={() => setMode(m)}>{l}</button>
@@ -134,7 +128,6 @@ export default function Gantt({ db, ur, openTask, openProject }) {
           <button className="icon-btn" onClick={() => shift(1)}><Ic d={ICONS.right} size={16} /></button>
         </div>
         <div className="cal-right">
-          <button className="btn ghost sm" onClick={resetToday}>Сегодня</button>
           <div className="seg">
             {[['month','Месяц'], ['quarter','Квартал'], ['year','Год']].map(([m,l]) => (
               <button key={m} className={`seg-btn${mode === m ? ' on' : ''}`} onClick={() => setMode(m)}>{l}</button>
@@ -227,18 +220,11 @@ export default function Gantt({ db, ur, openTask, openProject }) {
         </div>
       </div>
       <div className="gantt-legend" style={{ padding: '8px 16px', borderTop: '1px solid var(--line)' }}>
-        <span><span className="lg-dot" style={{ background: '#ef4444' }} /> сегодня</span>
         <span><span className="lg-dot" style={{ background: '#e2e8f0' }} /> выходные</span>
         <span>🏖 — исполнитель в отпуске</span>
         <span>Заполнение полосы — факт / план</span>
-        <span style={{ marginLeft: 16, fontWeight: 600 }}>Категории проектов:</span>
-        {Object.entries(PROJECT_CATEGORIES).map(([k, v]) => (
-          <span key={k} style={{ marginLeft: 12 }}>
-            <span className="lg-dot" style={{ background: v.color }} /> {v.label}
-          </span>
-        ))}
-        <span style={{ marginLeft: 16, fontWeight: 600 }}>Приоритеты задач:</span>
-        {Object.entries(PRIORITIES).map(([k, v]) => (
+        <span style={{ marginLeft: 16, fontWeight: 600 }}>Статусы задач:</span>
+        {Object.entries(TASK_STATUSES).map(([k, v]) => (
           <span key={k} style={{ marginLeft: 12 }}>
             <span className="lg-dot" style={{ background: v.color }} /> {v.label}
           </span>
