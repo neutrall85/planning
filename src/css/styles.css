@@ -1036,12 +1036,20 @@ input, select, textarea {
   overflow: hidden;
   animation: fadeUp .3s ease;
   width: 100%;
+  max-width: 100%;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
 }
 .gantt-scroll {
   overflow: auto;
   max-height: calc(100vh - 220px);
   width: 100%;
+  flex: 1;
+}
+.gantt {
+  width: 100%;
+  min-width: fit-content;
 }
 .gantt-top {
   display: flex;
