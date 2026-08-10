@@ -1,4 +1,10 @@
-```javascript
-// No build artifacts, dependencies, or temp files detected in changes
-// Only source files (.jsx) were modified
+```
+# Dependencies
+node_modules/
+
+# Build artifacts
+dist/
+
+# TypeScript
+*.tsbuildinfo
 ```
