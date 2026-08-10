@@ -3,6 +3,7 @@ import { TASK_STATUSES, TASK_STATUS_ORDER, VACATION_TYPES, PROJECT_CATEGORIES } 
 import { TODAY, fmtDMY, fmtD, iso, addDays, initials, isTaskActive } from '../utils/date';
 import { useDataHelpers } from '../hooks';
 import { Ic, ICONS } from './Icons';
+import { useToast } from './Toast';
 
 function getCategoryColor(project) {
   if (!project || project.ptype === 'admin') return '#6b7280';
@@ -26,10 +27,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
   const { empName, getEmployeeLoad } = useDataHelpers(data);
   const [tab, setTab] = useState('overview');
 
-  const showToast = (msg, type = 'error') => {
-    if (toast?.[type]) toast[type](msg);
-    else alert(msg);
-  };
+  const showToast = useToast(toast);
 
   const [expFrom, setExpFrom] = useState('');
   const [expTo, setExpTo] = useState('');

@@ -9,6 +9,7 @@ export const TODAY = iso(new Date());
 export const daysDiff = (a,b) => Math.floor((parseISO(b)-parseISO(a))/86400000);
 export const MS_SHORT = ["янв","фев","мар","апр","мая","июн","июл","авг","сен","окт","ноя","дек"];
 export const MS_FULL = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
+export const WD_FULL = ["Воскресенье","Понедельник","Вторник","Среда","Четверг","Пятница","Суббота"];
 export const fmtD = (s) => { 
   if (!s) return "—";
   const d = new Date(s);
@@ -25,6 +26,15 @@ export const fmtDT = (ts) => {
   const d = new Date(ts);
   if (isNaN(d.getTime())) return "—";
   return `${fmtDMY(iso(d))} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+};
+export const fmtFullDate = (dateStr) => {
+  const d = dateStr ? new Date(dateStr) : new Date();
+  if (isNaN(d.getTime())) return "—";
+  const dayName = WD_FULL[d.getDay()];
+  const day = d.getDate();
+  const month = MS_FULL[d.getMonth()].toLowerCase();
+  const year = d.getFullYear();
+  return `${dayName}, ${day} ${month} ${year}`;
 };
 export const uid = () => Math.random().toString(36).slice(2,10);
 export const initials = (f,l) => `${(f||"?")[0]}${(l||"?")[0]}`;
