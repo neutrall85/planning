@@ -1,13 +1,17 @@
 import { TODAY, iso, addDays, addMonths, uid, fmtDMY } from '../utils/date';
 import { TASK_STATUSES, TASK_STATUS_ORDER, PRIORITIES, VACATION_TYPES, PROJECT_STATUSES, PROJECT_TYPES, DEPENDENCY_TYPES } from '../utils/constants';
+import { ARCHIVE_AFTER_MONTHS, DEADLINE_CHECK_INTERVAL_MS, DEADLINE_CHECK_HOUR_MOSCOW, MAX_LOGIN_ATTEMPTS, ACCOUNT_LOCKOUT_DURATION_MS } from '../utils/config';
+import { empName as getEmpName, sanitizeHtml } from '../utils/string';
 
 export default class DataStore {
   constructor() {
     this._data = this._buildMock();
     this._currentUser = null;
     this._listeners = [];
-    this._archiveOldTasks(3);
+    this._archiveOldTasks(ARCHIVE_AFTER_MONTHS);
     this._scheduleDeadlineCheck();
+    // Храним reference на interval для очистки
+    this._deadlineIntervalId = null;
   }
   
   // Планирование проверки дедлайнов в 7:00 по Москве ежедневно
@@ -16,30 +20,36 @@ export default class DataStore {
       const now = new Date();
       const moscowTime = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Moscow' }));
       const targetTime = new Date(moscowTime);
-      targetTime.setHours(7, 0, 0, 0);
+      targetTime.setHours(DEADLINE_CHECK_HOUR_MOSCOW, 0, 0, 0);
       
       // Если уже прошло 7:00 сегодня, планируем на завтра
-      if (moscowTime.getHours() >= 7) {
+      if (moscowTime.getHours() >= DEADLINE_CHECK_HOUR_MOSCOW) {
         targetTime.setDate(targetTime.getDate() + 1);
       }
       
       const delay = targetTime.getTime() - now.getTime();
-      console.log(`Проверка дедлайнов запланирована через ${Math.round(delay / 1000 / 60)} мин. (в 7:00 МСК)`);
       
       setTimeout(() => {
         this._checkAllDeadlines();
-        // Планируем следующую проверку через 24 часа
-        setInterval(() => this._checkAllDeadlines(), 24 * 60 * 60 * 1000);
+        // Планируем следующую проверку через 24 часа и сохраняем ID интервала
+        this._deadlineIntervalId = setInterval(() => this._checkAllDeadlines(), DEADLINE_CHECK_INTERVAL_MS);
       }, delay);
     };
     
     checkAtTime();
   }
   
-  // Проверка дедлайнов всех задач
+  // Очистка интервала проверки дедлайнов (для предотвращения утечек памяти)
+  _cleanupDeadlineCheck() {
+    if (this._deadlineIntervalId) {
+      clearInterval(this._deadlineIntervalId);
+      this._deadlineIntervalId = null;
+    }
+  }
+  
+  // Проверка дедлайнов всех задач с санитизацией текста уведомления
   _checkAllDeadlines() {
     const now = new Date(TODAY);
-    console.log(`Выполняется проверка дедлайнов в ${now.toISOString()}`);
     
     this._data.tasks.forEach(task => {
       if (!task.deadline || ['closed', 'cancelled'].includes(task.status)) return;
@@ -53,7 +63,9 @@ export default class DataStore {
           const emp = this._data.employees.find(e => e.id === id);
           if (emp) {
             const daysText = daysUntilDeadline === 1 ? '1 день' : '3 дня';
-            const notifText = `До дедлайна задачи "${task.title}" остался ${daysText}! Дедлайн: ${task.deadline}`;
+            // Санитизация названия задачи для предотвращения XSS
+            const safeTitle = sanitizeHtml(task.title);
+            const notifText = `До дедлайна задачи "${safeTitle}" остался ${daysText}! Дедлайн: ${task.deadline}`;
             // Проверяем, не было ли уже такого уведомления
             const exists = this._data.notifications.some(n => 
               n.userId === id && 
@@ -63,7 +75,6 @@ export default class DataStore {
             );
             if (!exists) {
               this.addNotification(id, notifText, { targetType: 'task', targetId: task.id });
-              console.log(`Уведомление отправлено пользователю ${emp.last}: ${notifText}`);
             }
           }
         });
@@ -79,14 +90,28 @@ export default class DataStore {
     this._listeners.forEach(cb => cb(this._data));
   }
 
+  // Публичные методы для безопасного доступа к данным (вместо прямой мутации _data)
   get data() { return this._data; }
+  
+  /**
+   * Безопасное обновление данных через публичный API
+   * @param {Object} newData - новые данные
+   */
+  setData(newData) {
+    if (!newData || typeof newData !== 'object') {
+      throw new Error('Invalid data provided to setData');
+    }
+    this._data = newData;
+    this._notify();
+  }
+  
   getCurrentUser() { return this._currentUser; }
 
   login(email, password) {
     const found = this._data.employees.find(e => e.email.toLowerCase() === email.trim().toLowerCase());
     if (found && found.lockUntil && Date.now() < found.lockUntil) {
       const remainingMinutes = Math.ceil((found.lockUntil - Date.now()) / 60000);
-      return `Учётная запись заблокирована на ${remainingMinutes} мин. после 5 неудачных попыток входа`;
+      return `Учётная запись заблокирована на ${remainingMinutes} мин. после ${MAX_LOGIN_ATTEMPTS} неудачных попыток входа`;
     }
     if (found && found.pass === password && !found.fired) {
       if (found.failed > 0) {
@@ -100,10 +125,10 @@ export default class DataStore {
     }
     if (found) {
       found.failed = (found.failed || 0) + 1;
-      if (found.failed >= 5) {
-        found.lockUntil = Date.now() + 15 * 60 * 1000;
+      if (found.failed >= MAX_LOGIN_ATTEMPTS) {
+        found.lockUntil = Date.now() + ACCOUNT_LOCKOUT_DURATION_MS;
         this.upsertEmployee(found);
-        return 'Учётная запись заблокирована на 15 мин. после 5 неудачных попыток входа';
+        return `Учётная запись заблокирована на ${ACCOUNT_LOCKOUT_DURATION_MS / 60000} мин. после ${MAX_LOGIN_ATTEMPTS} неудачных попыток входа`;
       }
       this.upsertEmployee(found);
     }
@@ -115,7 +140,7 @@ export default class DataStore {
     this._notify();
   }
 
-  _archiveOldTasks(months = 3) {
+  _archiveOldTasks(months = ARCHIVE_AFTER_MONTHS) {
     const cutoff = addMonths(new Date(), -months);
     const cutoffIso = iso(cutoff);
     let changed = false;
@@ -208,7 +233,7 @@ export default class DataStore {
     }
     this._data = { ...this._data, tasks };
     this._notify();
-    this._archiveOldTasks(3);
+    this._archiveOldTasks(ARCHIVE_AFTER_MONTHS);
   }
 
   // Проверка дедлайнов и отправка уведомлений за 3 дня и 1 день
@@ -293,7 +318,7 @@ export default class DataStore {
     }
     this._data = { ...this._data, projects };
     this._notify();
-    this._archiveOldTasks(3);
+    this._archiveOldTasks(ARCHIVE_AFTER_MONTHS);
   }
 
   deleteProject(id) {

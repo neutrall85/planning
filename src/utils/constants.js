@@ -5,7 +5,7 @@ export const ROLES = {
   kb_chief:         { label: "Главный конструктор КБ", short: "ГК", color: "#0ea5e9" },
   head:             { label: "Руководитель отдела", short: "РО", color: "#3b82f6" },
   project_lead:     { label: "Ответственный по проекту", short: "ОП", color: "#ec4899" },
-  project_manager:  { label: "Менеджер проектов", short: "МП", color: "#f97316" }, // новая роль
+  project_manager:  { label: "Менеджер проектов", short: "МП", color: "#f97316" },
   hr:               { label: "HR-менеджер", short: "HR", color: "#14b8a6" },
   executor:         { label: "Исполнитель", short: "ИСП", color: "#64748b" },
 };
@@ -56,5 +56,5 @@ export const PROJECT_CATEGORIES = {
 };
 
 export const PROJECT_TYPES = { prod: "Производственный", admin: "Административный" };
-export const COMMENT_EDIT_WINDOW = 15 * 60000; // 15 минут
+// COMMENT_EDIT_WINDOW перенесён в config.js для централизации
 export const DOMAIN = "volga-dnepr.com";

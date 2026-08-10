@@ -219,12 +219,23 @@ export function taskVisible(u, scope, t, db) {
   return false;
 }
 
+// Экспортируем утилиты из string.js для централизации
+export { empName as getEmpName, primaryDept as getPrimaryDept } from './string';
+
+// Для обратной совместимости оставляем старые имена, но делегируем в string.js
+/**
+ * @deprecated Используйте getEmpNameFromData из string.js
+ */
 export function empName(db, id) {
-  const e = db.employees.find(x => x.id === id);
+  const e = db.employees?.find(x => x.id === id);
   return e ? `${e.last} ${e.first}` : "—";
 }
+
+/**
+ * @deprecated Используйте getPrimaryDeptFromData из string.js
+ */
 export function primaryDept(db, e) {
   if (!e) return null;
-  const p = e.departments.find(x => x.primary) || e.departments[0];
-  return p ? db.departments.find(d => d.id === p.deptId) : null;
+  const p = e.departments?.find(x => x.primary) || e.departments?.[0];
+  return p ? db.departments?.find(d => d.id === p.deptId) : null;
 }

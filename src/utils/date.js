@@ -5,7 +5,8 @@ export const addMonths = (d, n) => { const x = new Date(d); x.setMonth(x.getMont
 export const addYears = (d, n) => { const x = new Date(d); x.setFullYear(x.getFullYear() + n); return x; };
 export const parseISO = (s) => { const [y,m,d] = String(s).split("-").map(Number); return new Date(y,m-1,d); };
 export const TODAY = iso(new Date());
-export const daysDiff = (a,b) => Math.round((parseISO(b)-parseISO(a))/86400000);
+// Исправлено: используем Math.floor для избежания ошибок плавающей точки
+export const daysDiff = (a,b) => Math.floor((parseISO(b)-parseISO(a))/86400000);
 export const MS_SHORT = ["янв","фев","мар","апр","мая","июн","июл","авг","сен","окт","ноя","дек"];
 export const MS_FULL = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
 export const fmtD = (s) => { 

@@ -6,9 +6,16 @@ import MainLayout from './components/MainLayout';
 function AppContent() {
   const { store, data, login, logout } = useStore();
   const { user } = useAuth();
+  
+  // Безопасный метод для обновления данных через публичный API
+  const handleSetDb = (fn) => {
+    const newData = fn(store.data);
+    // Используем публичные методы вместо прямой мутации
+    store.setData(newData);
+  };
 
   if (!user) {
-    return <LoginScreen db={data} setDb={(fn) => { store._data = fn(store._data); store._notify(); }} onLogin={login} toast={(msg) => alert(msg)} />;
+    return <LoginScreen db={data} setDb={handleSetDb} onLogin={login} toast={(msg) => alert(msg)} />;
   }
   return <MainLayout store={store} data={data} user={user} />;
 }
