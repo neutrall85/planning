@@ -2,7 +2,14 @@ import React, { useState, useRef } from 'react';
 import { DOMAIN } from '../utils/constants';
 import { uid } from '../utils/date';
 import { Ic, ICONS } from './Icons';
+import { validateRegistration, sanitizeObject } from '../utils/validation';
+import { logger } from '../utils/logging/logger';
 
+/**
+ * Валидация пароля
+ * @param {string} p - пароль для проверки
+ * @returns {Array<{ok: boolean, t: string}>} массив проверок
+ */
 function passIssues(p) {
   return [
     { ok: p.length >= 8, t: "Минимум 8 символов" },
@@ -85,19 +92,46 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
   const submit = (e) => {
     if (e && e.preventDefault) e.preventDefault();
     try {
-      if (mode === "login") { doLogin(lg, pw); return; }
+      if (mode === "login") { 
+        // Валидация входных данных перед отправкой
+        if (!lg.trim() || !pw.trim()) {
+          return fail("Заполните все поля");
+        }
+        doLogin(lg, pw); 
+        return; 
+      }
       if (mode === "register") {
-        if (!reg.first.trim() || !reg.last.trim() || !reg.email.trim()) return fail("Заполните все обязательные поля");
-        if (db.employees.some((x) => x.email.toLowerCase() === reg.email.trim().toLowerCase()) || db.regRequests.some((x) => x.email.toLowerCase() === reg.email.trim().toLowerCase())) return fail("Такой e-mail уже зарегистрирован");
-        if (passIssues(reg.pass).some((i) => !i.ok)) return fail("Пароль не соответствует требованиям безопасности");
-        if (reg.pass !== reg.pass2) return fail("Пароли не совпадают");
+        // Санитизация входных данных
+        const sanitizedReg = sanitizeObject(reg);
+        
+        // Глубокая валидация через Zod схему
+        const validation = validateRegistration({
+          first: sanitizedReg.first,
+          last: sanitizedReg.last,
+          email: sanitizedReg.email,
+          pass: sanitizedReg.pass,
+          pass2: sanitizedReg.pass2,
+        });
+        
+        if (!validation.success) {
+          logger.warn('Валидация регистрации не пройдена', validation.errors);
+          const firstError = validation.errors[0];
+          return fail(firstError.message || "Ошибка валидации");
+        }
+        
+        // Проверка на существующий email
+        if (db.employees.some((x) => x.email.toLowerCase() === sanitizedReg.email.trim().toLowerCase()) || 
+            db.regRequests.some((x) => x.email.toLowerCase() === sanitizedReg.email.trim().toLowerCase())) {
+          logger.info(`Попытка регистрации с существующим email: ${sanitizedReg.email}`);
+          return fail("Такой e-mail уже зарегистрирован");
+        }
 
         const newEmployee = {
           id: "e_" + uid(),
-          last: reg.last.trim(),
-          first: reg.first.trim(),
-          email: reg.email.trim().toLowerCase(),
-          pass: reg.pass,
+          last: sanitizedReg.last.trim(),
+          first: sanitizedReg.first.trim(),
+          email: sanitizedReg.email.trim().toLowerCase(),
+          pass: sanitizedReg.pass,
           position: "Сотрудник",
           departments: [],
           roles: ["executor"],
@@ -112,6 +146,9 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
           fired: false,
           photo: null
         };
+        
+        logger.info(`Новая регистрация: ${newEmployee.email}`, { empId: newEmployee.id });
+        
         setDb((s) => ({
           ...s,
           employees: [...s.employees, newEmployee],
@@ -121,8 +158,9 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
           ]
         }));
         toast("Регистрация успешна! Выполняется вход...");
-        const loginOk = onLogin(reg.email.trim().toLowerCase(), reg.pass);
+        const loginOk = onLogin(sanitizedReg.email.trim().toLowerCase(), sanitizedReg.pass);
         if (!loginOk) {
+          logger.error('Ошибка автоматического входа после регистрации', { email: sanitizedReg.email });
           fail("Ошибка автоматического входа после регистрации.");
         }
         setReg({ first: "", last: "", email: "", pass: "", pass2: "" });
@@ -131,10 +169,12 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
       }
       if (mode === "forgot") {
         if (!forgot.trim()) return fail("Укажите e-mail");
+        logger.info(`Запрос восстановления пароля для: ${forgot.trim()}`);
         toast("Ссылка для восстановления пароля отправлена на " + forgot.trim() + "@" + DOMAIN + " (действует 1 час). Заглушка.");
         setMode("login");
       }
     } catch (ex) {
+      logger.errorWithStack(ex, 'Ошибка в форме входа/регистрации', { mode, lg, reg: { ...reg, pass: '[REDACTED]', pass2: '[REDACTED]' } });
       fail("Внутренняя ошибка: " + (ex && ex.message ? ex.message : ex));
     }
   };

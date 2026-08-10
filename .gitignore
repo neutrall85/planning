@@ -1,9 +1,13 @@
+```
 ```gitignore
 # Dependencies
 node_modules/
 
 # Build artifacts
 dist/
+
+# TypeScript
+*.tsbuildinfo
 build/
 target/
 
