@@ -3,6 +3,7 @@ import { Ic, ICONS } from './Icons';
 import { TASK_STATUSES, TASK_STATUS_ORDER, PRIORITIES } from '../utils/constants';
 import { TODAY, fmtD, daysDiff, initials, isTaskActive } from '../utils/date';
 import { computeScope, taskVisible, canCreateTask, canChangeTaskStatus, hasRole } from '../utils/permissions';
+import EmployeeTooltip from './EmployeeTooltip';
 
 export default function Kanban({ db, ur, openTask, onMove, onNew, showOnlyMyTasks: parentShowOnlyMyTasks, sortBy: parentSortBy, hideFilters = false }) {
   const [fProj, setFProj] = useState("all");
@@ -13,6 +14,9 @@ export default function Kanban({ db, ur, openTask, onMove, onNew, showOnlyMyTask
   const [dragOverCol, setDragOverCol] = useState(null);
   const [localShowOnlyMy, setLocalShowOnlyMy] = useState(false);
   const [localSortBy, setLocalSortBy] = useState("deadline");
+  
+  // Состояние для tooltip
+  const [tooltip, setTooltip] = useState({ visible: false, employee: null, x: 0, y: 0 });
   
   // Используем пропсы от родителя, если переданы, иначе локальное состояние
   const showOnlyMy = parentShowOnlyMyTasks !== undefined ? parentShowOnlyMyTasks : localShowOnlyMy;
@@ -180,7 +184,14 @@ export default function Kanban({ db, ur, openTask, onMove, onNew, showOnlyMyTask
                         {assignees.length > 0 && (
                           <span className="kassignee">
                             {assignees.slice(0, 2).map(a => (
-                              <span key={a.id} className="avatar xs" style={{ marginRight: -4 }}>
+                              <span 
+                                key={a.id} 
+                                className="avatar xs" 
+                                style={{ marginRight: -4, cursor: 'pointer' }}
+                                onMouseEnter={(e) => setTooltip({ visible: true, employee: a, x: e.clientX, y: e.clientY })}
+                                onMouseLeave={() => setTooltip({ ...tooltip, visible: false })}
+                                onMouseMove={(e) => setTooltip({ ...tooltip, x: e.clientX, y: e.clientY })}
+                              >
                                 {a.photo ? (
                                   <img src={a.photo} alt="Аватар" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
                                 ) : (
@@ -212,6 +223,9 @@ export default function Kanban({ db, ur, openTask, onMove, onNew, showOnlyMyTask
           </span>
         ))}
       </div>
+
+      {/* Tooltip сотрудника */}
+      <EmployeeTooltip {...tooltip} />
     </div>
   );
 }

@@ -1,13 +1,16 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { TASK_STATUSES, PRIORITIES } from '../utils/constants';
 import { fmtD, initials, isTaskActive, daysDiff, TODAY } from '../utils/date';
 import { Ic, ICONS } from './Icons';
 import { computeScope, taskVisible, hasRole } from '../utils/permissions';
+import EmployeeTooltip from './EmployeeTooltip';
 
 export default function TaskList({ db, ur, openTask, onMove, onNew, showOnlyMyTasks: parentShowOnlyMyTasks, sortBy: parentSortBy }) {
   const scope = useMemo(() => computeScope(ur, db), [ur, db]);
   const canSeeAll = hasRole(ur, "admin", "director", "economist", "kb_chief", "head", "project_lead", "project_manager");
   const isOnlyExecutor = ur.roles.length === 1 && ur.roles[0] === 'executor';
+  
+  const [tooltip, setTooltip] = useState({ visible: false, employee: null, x: 0, y: 0 });
   
   const showOnlyMyTasks = parentShowOnlyMyTasks !== undefined ? parentShowOnlyMyTasks : false;
   const sortBy = parentSortBy !== undefined ? parentSortBy : "deadline";
@@ -111,7 +114,15 @@ export default function TaskList({ db, ur, openTask, onMove, onNew, showOnlyMyTa
                   <td>
                     <div className="pj-avatars" style={{ display: 'flex', gap: -4 }}>
                       {assignees.slice(0, 3).map(a => (
-                        <span key={a.id} className="avatar xs" title={`${a.last} ${a.first}`}>
+                        <span 
+                          key={a.id} 
+                          className="avatar xs" 
+                          title={`${a.last} ${a.first}`}
+                          style={{ cursor: 'pointer' }}
+                          onMouseEnter={(e) => setTooltip({ visible: true, employee: a, x: e.clientX, y: e.clientY })}
+                          onMouseLeave={() => setTooltip({ ...tooltip, visible: false })}
+                          onMouseMove={(e) => setTooltip({ ...tooltip, x: e.clientX, y: e.clientY })}
+                        >
                           {a.photo ? (
                             <img src={a.photo} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
                           ) : (
@@ -140,6 +151,9 @@ export default function TaskList({ db, ur, openTask, onMove, onNew, showOnlyMyTa
           )}
         </tbody>
       </table>
+
+      {/* Tooltip сотрудника */}
+      <EmployeeTooltip {...tooltip} />
     </div>
   );
 }
