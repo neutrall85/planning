@@ -201,15 +201,15 @@ export default function LoginScreen({ db, onLogin, toast, store }) {
   return (
     <div className="login-wrap">
       <div className="login-hero">
-        <div className="logo lg"><div className="logo-mark">АП</div><div><div className="logo-name">АэроПлан</div><div className="logo-sub">планирование и учёт времени</div></div></div>
-        <h2>Единая среда планирования КБ</h2>
-        <p>Канбан, диаграмма Ганта и календарь. Проекты двух типов, обсуждения задач с @упоминаниями, отпуска с делегированием, HR-администрирование, архивация и журнал аудита.</p>
+        <div className="logo lg"><div className="logo-mark">АП</div><div><div className="logo-name">АвиаПлан</div><div className="logo-sub">планирование и учёт времени</div></div></div>
+        <h2>Единая среда планирования организации</h2>
+        <p>Канбан, диаграмма Ганта и календарь. Проекты двух типов, обсуждения задач с @упоминаниями, отпуска с делегированием, HR-администрирование, архивация и журнал.</p>
         <ul className="hero-list">
-          <li>8 ролей, включая HR-менеджера; временное делегирование полномочий</li>
-          <li>Архив закрытых задач и проектов (по умолчанию 6 месяцев, настройка 3–24)</li>
+          <li>9 ролей, включая HR-менеджера; временное делегирование полномочий</li>
+          <li>Архив закрытых задач и проектов</li>
           <li>Комментарии с ветками ответов и @упоминаниями участников</li>
         </ul>
-        <div className="hero-stack">React · Java (Spring Boot) · PostgreSQL · Ubuntu LTS · REST/JSON · OpenAPI · ООП/KISS/DRY</div>
+        <div className="hero-stack">React · Node.js · PostgreSQL · Ubuntu LTS · REST/JSON · OpenAPI · ООП/KISS/DRY</div>
       </div>
       <div className="login-panel">
         <form className={"login-card" + (shake ? " shake" : "")} onSubmit={submit}>

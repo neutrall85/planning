@@ -67,7 +67,7 @@ export default function MainLayout({ store, data, user, toast }) {
     ...(canExport(user) || hasRole(user, 'kb_chief', 'head', 'project_lead', 'hr') ? [{ id: 'reports', label: 'Отчёты', icon: ICONS.chart }] : []),
     { id: 'archive', label: 'Архив', icon: ICONS.archive },
     { id: 'requests', label: 'Запросы и заявки', icon: ICONS.inbox },
-    ...(hasRole(user, 'admin', 'director') ? [{ id: 'journal', label: 'Журнал аудита', icon: ICONS.book }] : []),
+    ...(hasRole(user, 'admin', 'director') ? [{ id: 'journal', label: 'Журнал', icon: ICONS.book }] : []),
   ];
 
   const myNotifs = data.notifications.filter(n => n.userId === user.id);
@@ -184,7 +184,7 @@ export default function MainLayout({ store, data, user, toast }) {
       <aside className="sidebar">
         <div className="logo">
           <div className="logo-mark">АП</div>
-          <div><div className="logo-name">АЭРОПЛАН</div><div className="logo-sub">планирование и учёт времени</div></div>
+          <div><div className="logo-name">АвиаПлан</div><div className="logo-sub">планирование и учёт времени</div></div>
         </div>
         <div className="user-card" onClick={() => setView('cabinet')} style={{ cursor: 'pointer', marginBottom: '16px' }}>
           <div className="avatar">
