@@ -1,24 +1,4 @@
 ```
 # Build artifacts
 dist/
-build/
-
-# Dependencies
-node_modules/
-venv/
-.venv/
-__pycache__/
-*.pyc
-
-# Editors
-.vscode/
-.idea/
-
-# Logs
-*.log
-
-# Environment
-.env
-.env.local
-*.env.*
 ```
