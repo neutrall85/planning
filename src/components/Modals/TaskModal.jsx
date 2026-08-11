@@ -187,7 +187,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
     ...existing, 
     comments: existing.comments || [],
     start: existing.start ? iso(parseISO(existing.start)) : TODAY,
-    deadline: existing.deadline ? iso(parseISO(existing.deadline)) : iso(addDays(new Date(), 14)),
+    deadline: existing.deadline ? iso(parseISO(existing.deadline)) : null,
   } : {
     id: "t_" + uid(), title: "", desc: "", projectId: currentProjectId, assigneeIds: [], priority: "mid",
     plannedHours: 8, start: TODAY, deadline: iso(addDays(new Date(), 14)), status: "new", logs: [], comments: [], history: [], delegatedFrom: null, archived: false, archivedAt: null, closedAt: null,
