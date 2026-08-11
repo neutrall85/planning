@@ -440,13 +440,16 @@ export default class DataStore {
     let employees;
     if (idx >= 0) {
       const old = this._data.employees[idx];
+      // Сохраняем все поля старого объекта и обновляем переданными
+      const merged = { ...old, ...emp };
+      
       if (JSON.stringify(old.departments) !== JSON.stringify(emp.departments)) {
         this.addAudit('Изменение подразделений', `${emp.last} ${emp.first}: ${old.departments.map(d => d.deptId).join(',')} → ${emp.departments.map(d => d.deptId).join(',')}`);
       }
       if (JSON.stringify(old.roles) !== JSON.stringify(emp.roles)) {
         this.addAudit('Изменение ролей', `${emp.last} ${emp.first}: ${old.roles.join(', ')} → ${emp.roles.join(', ')}`);
       }
-      employees = this._data.employees.map(e => e.id === emp.id ? emp : e);
+      employees = this._data.employees.map(e => e.id === emp.id ? merged : e);
     } else {
       employees = [...this._data.employees, emp];
       this.addAudit('Создание сотрудника', `${emp.last} ${emp.first}`);
