@@ -34,6 +34,7 @@ export const fmtDMY = (s) => {
   return `${pad2(d.getDate())}.${pad2(d.getMonth()+1)}.${d.getFullYear()}`;
 };
 export const fmtDT = (ts) => {
+  if (!ts) return "—";
   const d = new Date(ts);
   if (isNaN(d.getTime())) return "—";
   return `${fmtDMY(iso(d))} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
