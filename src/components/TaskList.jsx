@@ -65,7 +65,7 @@ export default function TaskList({ db, ur, openTask, onMove, onNew, showOnlyMyTa
             <th>Приоритет</th>
             <th>Исполнители</th>
             <th>План / факт</th>
-            <th>Дедлайн</th>
+            <th>Срок выполнения</th>
           </tr>
         </thead>
         <tbody>

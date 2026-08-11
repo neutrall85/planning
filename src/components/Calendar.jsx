@@ -135,7 +135,7 @@ export default function Calendar({ db, ur, openTask }) {
           )}
         </div>
       </div>
-      <div className="cal-note">Только задачи с дедлайнами.</div>
+      <div className="cal-note">Только задачи со сроками.</div>
       {body}
       {/* Tooltip сотрудника */}
       <EmployeeTooltip {...tooltip} />

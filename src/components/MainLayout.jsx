@@ -184,7 +184,7 @@ export default function MainLayout({ store, data, user, toast }) {
       <aside className="sidebar">
         <div className="logo">
           <div className="logo-mark">АП</div>
-          <div><div className="logo-name">АвиаПлан</div><div className="logo-sub">планирование и учёт времени</div></div>
+          <div><div className="logo-name">АвиаПлан.Инжиниринг</div><div className="logo-sub">планирование и учёт времени</div></div>
         </div>
         <div className="user-card" onClick={() => setView('cabinet')} style={{ cursor: 'pointer', marginBottom: '16px' }}>
           <div className="avatar">
@@ -261,8 +261,8 @@ export default function MainLayout({ store, data, user, toast }) {
                     <span style={{ fontSize: 13 }}>Только мои задачи</span>
                   </label>
                   <select className="inp sel sm" value={taskSortBy} onChange={(e) => setTaskSortBy(e.target.value)} style={{ minWidth: 180 }}>
-                    <option value="deadline">По дедлайну (возр.)</option>
-                    <option value="deadlineDesc">По дедлайну (убыв.)</option>
+                    <option value="deadline">По дате выполнения (возр.)</option>
+                    <option value="deadlineDesc">По дате выполнения (убыв.)</option>
                     <option value="created">По дате создания</option>
                     <option value="alpha">По алфавиту (А-Я)</option>
                     <option value="alphaDesc">По алфавиту (Я-А)</option>

@@ -387,7 +387,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
     if (!f.assigneeIds || f.assigneeIds.length === 0) return toast("Выберите хотя бы одного исполнителя", "err");
     if (!isAdminProj) {
       if (!f.plannedHours || +f.plannedHours <= 0) return toast("Для производственного проекта плановые часы обязательны", "err");
-      if (!f.deadline) return toast("Для производственного проекта дедлайн обязателен", "err");
+      if (!f.deadline) return toast("Для производственного проекта срок выполнения обязателен", "err");
     }
 
     // Проверка бюджета
@@ -509,7 +509,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
           </div>
         )}
         {remainProj !== null && remainProj - (+f.plannedHours || 0) < 0 && <div className="warn-box">Внимание: задача превысит остаток бюджета проекта ({remainProj} ч). Потребуется увеличение бюджета проекта.</div>}
-        {isAdminProj && !readOnly && <div className="info-box">Административный проект: дедлайн и плановые часы задачи — по желанию.</div>}
+        {isAdminProj && !readOnly && <div className="info-box">Административный проект: срок выполнения и плановые часы задачи — по желанию.</div>}
         <div className="form-grid">
           <label className="lbl">Название *</label><input className="inp" disabled={!canEditFields} value={f.title} onChange={(e) => set("title", e.target.value)} />
           <label className="lbl">Описание</label><textarea className="inp" rows="2" disabled={!canEditFields} value={f.desc} onChange={(e) => set("desc", e.target.value)} />
@@ -564,11 +564,11 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
           )}
 
           <label className="lbl">Начало работы</label><input className="inp" type="date" disabled={!canEditFields} value={f.start} onChange={(e) => set("start", e.target.value)} />
-          <label className="lbl">Дедлайн {!isAdminProj && "*"}</label><input className="inp" type="date" disabled={!canEditFields} value={f.deadline || ""} onChange={(e) => set("deadline", e.target.value)} />
+          <label className="lbl">Срок выполнения {!isAdminProj && "*"}</label><input className="inp" type="date" disabled={!canEditFields} value={f.deadline || ""} onChange={(e) => set("deadline", e.target.value)} />
           <label className="lbl">Плановые часы {!isAdminProj && "*"}</label>
           <div className="duo">
             <input className="inp" type="number" min="0.5" step="0.5" disabled={!canEditPlannedHours} value={f.plannedHours ?? ""} onChange={(e) => set("plannedHours", e.target.value)} />
-            {(!canEditFields && !readOnly) ? null : (has(ur, "project_lead", "head", "kb_chief", "director", "admin") && existing && !isAdminProj) ? <button className="btn ghost sm" type="button" onClick={() => onHoursReq("task", existing.id)}><Ic d={ICONS.clock} size={13} /> Запросить изменение часов</button> : <span className="duo-note">{isAdminProj ? "опционально" : "отдельно от дедлайна"}</span>}
+            {(!canEditFields && !readOnly) ? null : (has(ur, "project_lead", "head", "kb_chief", "director", "admin") && existing && !isAdminProj) ? <button className="btn ghost sm" type="button" onClick={() => onHoursReq("task", existing.id)}><Ic d={ICONS.clock} size={13} /> Запросить изменение часов</button> : <span className="duo-note">{isAdminProj ? "опционально" : "отдельно от срока выполнения"}</span>}
           </div>
           <label className="lbl">Статус *</label>
           <select className="inp sel" disabled={!canChangeStatus && !isAuthor && !isExec} value={f.status} onChange={(e) => set("status", e.target.value)}>

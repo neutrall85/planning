@@ -119,8 +119,8 @@ export default function Kanban({ db, ur, openTask, onMove, onNew, showOnlyMyTask
             </label>
           )}
           <select className="inp sel sm" value={sortBy} onChange={(e) => setLocalSortBy(e.target.value)} style={{ marginLeft: 8 }}>
-            <option value="deadline">По дедлайну (возр.)</option>
-            <option value="deadlineDesc">По дедлайну (убыв.)</option>
+            <option value="deadline">По дате выполнения (возр.)</option>
+            <option value="deadlineDesc">По дате выполнения (убыв.)</option>
             <option value="created">По дате создания</option>
             <option value="alpha">По алфавиту (А-Я)</option>
             <option value="alphaDesc">По алфавиту (Я-А)</option>
@@ -204,7 +204,7 @@ export default function Kanban({ db, ur, openTask, onMove, onNew, showOnlyMyTask
                         )}
                         <span className="khours"><Ic d={ICONS.clock} size={13} /> {sp}/{t.plannedHours ?? "—"} ч</span>
                       </div>
-                      <div className="kcard-foot"><span className={"kdl" + (overdue ? " late" : soon ? " soon" : "")}>{t.deadline ? (overdue ? `просрочено ${-daysDiff(TODAY, t.deadline)} дн` : `до ${fmtD(t.deadline)}`) : "без дедлайна"}</span></div>
+                      <div className="kcard-foot"><span className={"kdl" + (overdue ? " late" : soon ? " soon" : "")}>{t.deadline ? (overdue ? `просрочено ${-daysDiff(TODAY, t.deadline)} дн` : `до ${fmtD(t.deadline)}`) : "без срока"}</span></div>
                     </div>
                   );
                 })}

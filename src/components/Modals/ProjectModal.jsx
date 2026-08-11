@@ -269,7 +269,7 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
                   <th>Факт (ч)</th>
                   <th>Остаток</th>
                   <th>Создал</th>
-                  <th>Дедлайн</th>
+                  <th>Срок выполнения</th>
                 </tr>
               </thead>
               <tbody>

@@ -230,7 +230,7 @@ export default class BusinessLogicService {
   formatDeadlineNotification(task, daysUntilDeadline) {
     const safeTitle = this.sanitizeText(task.title);
     const daysText = daysUntilDeadline === 1 ? '1 день' : '3 дня';
-    return `До дедлайна задачи "${safeTitle}" остался ${daysText}! Дедлайн: ${task.deadline}`;
+    return `До срока выполнения задачи "${safeTitle}" остался ${daysText}! Срок выполнения: ${task.deadline}`;
   }
 
   /**
@@ -331,7 +331,7 @@ export default class BusinessLogicService {
     }
 
     if (task.deadline && isNaN(new Date(task.deadline).getTime())) {
-      errors.push('Некорректная дата дедлайна');
+      errors.push('Некорректная дата срока выполнения');
     }
 
     return {

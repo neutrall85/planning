@@ -59,7 +59,7 @@ export default class DataStore {
           if (emp) {
             const daysText = daysUntilDeadline === 1 ? '1 день' : '3 дня';
             const safeTitle = sanitizeHtml(task.title);
-            const notifText = `До дедлайна задачи "${safeTitle}" остался ${daysText}! Дедлайн: ${task.deadline}`;
+            const notifText = `До срока выполнения задачи "${safeTitle}" остался ${daysText}! Срок выполнения: ${task.deadline}`;
             const exists = this._data.notifications.some(n =>
               n.userId === id &&
               n.targetType === 'task' &&
@@ -236,7 +236,7 @@ export default class DataStore {
     const existingNotif = this._data.notifications.find(n =>
       n.targetType === 'task' &&
       n.targetId === task.id &&
-      (n.text.includes('дней до дедлайна') || n.text.includes('день до дедлайна'))
+      (n.text.includes('дней до срока выполнения') || n.text.includes('день до срока выполнения'))
     );
 
     if (existingNotif) return;
@@ -246,7 +246,7 @@ export default class DataStore {
       const emp = this._data.employees.find(e => e.id === id);
       if (emp) {
         const daysText = daysUntilDeadline === 1 ? '1 день' : '3 дня';
-        this.addNotification(id, `До дедлайна задачи "${task.title}" остался ${daysText}! Дедлайн: ${task.deadline}`, { targetType: 'task', targetId: task.id });
+        this.addNotification(id, `До срока выполнения задачи "${task.title}" остался ${daysText}! Срок выполнения: ${task.deadline}`, { targetType: 'task', targetId: task.id });
       }
     });
   }

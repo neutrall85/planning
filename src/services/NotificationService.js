@@ -174,7 +174,7 @@ export default class NotificationService {
    */
   createDeadlineNotification(userId, task, daysUntilDeadline) {
     const daysText = daysUntilDeadline === 1 ? '1 день' : '3 дня';
-    const text = `До дедлайна задачи "${task.title}" остался ${daysText}! Дедлайн: ${task.deadline}`;
+    const text = `До дедлайна задачи "${task.title}" остался ${daysText}! Срок выполнения: ${task.deadline}`;
     const target = { targetType: 'task', targetId: task.id };
 
     if (this.exists(userId, text, target)) {
