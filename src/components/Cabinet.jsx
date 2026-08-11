@@ -329,7 +329,10 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
                   <input
                     className="inp"
                     value={user.phone || ''}
-                    onChange={e => store.upsertEmployee({ ...user, phone: e.target.value })}
+                    onChange={e => {
+                      const updated = { ...user, phone: e.target.value };
+                      store.upsertEmployee(updated);
+                    }}
                     placeholder="+7 (___) ___-__-__"
                   />
 
@@ -337,12 +340,15 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
                   <input
                     className="inp"
                     value={user.extension || ''}
-                    onChange={e => store.upsertEmployee({ ...user, extension: e.target.value.trim() })}
+                    onChange={e => {
+                      const updated = { ...user, extension: e.target.value.trim() };
+                      store.upsertEmployee(updated);
+                    }}
                     placeholder="1234"
                   />
                   
                   <label className="lbl">Табельный №</label>
-                  <input className="inp" value={user.tab} onChange={e => {
+                  <input className="inp" value={user.tab || ''} onChange={e => {
                     const updated = { ...user, tab: e.target.value };
                     store.upsertEmployee(updated);
                   }} />

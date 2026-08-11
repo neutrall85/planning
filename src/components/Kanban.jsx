@@ -189,8 +189,8 @@ export default function Kanban({ db, ur, openTask, onMove, onNew, showOnlyMyTask
                                 className="avatar xs" 
                                 style={{ marginRight: -4, cursor: 'pointer' }}
                                 onMouseEnter={(e) => setTooltip({ visible: true, employee: a, x: e.clientX, y: e.clientY })}
-                                onMouseLeave={() => setTooltip({ ...tooltip, visible: false })}
-                                onMouseMove={(e) => setTooltip({ ...tooltip, x: e.clientX, y: e.clientY })}
+                                onMouseLeave={() => setTooltip(prev => ({ ...prev, visible: false }))}
+                                onMouseMove={(e) => setTooltip(prev => ({ ...prev, x: e.clientX, y: e.clientY }))}
                               >
                                 {a.photo ? (
                                   <img src={a.photo} alt="Аватар" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
