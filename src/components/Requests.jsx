@@ -5,7 +5,7 @@ import { hasRole, canApproveVacation } from "../utils/permissions";
 import { Ic, ICONS } from "./Icons";
 import { useDataHelpers } from "../hooks";
 
-export default function Requests({ db, setDb, ur, initialTab = 'hours', addAudit }) {
+export default function Requests({ db, store, ur, initialTab = 'hours', addAudit }) {
   const { empName } = useDataHelpers(db);
   const [tab, setTab] = useState(initialTab);
 
@@ -24,29 +24,31 @@ export default function Requests({ db, setDb, ur, initialTab = 'hours', addAudit
           ? db.tasks.find(t => t.id === r.targetId)?.title 
           : db.projects.find(p => p.id === r.targetId)?.name);
     
-    setDb((s) => {
-      const st = { ...s, hoursRequests: s.hoursRequests.map((x) => (x.id === r.id ? { ...x, status: ok ? "approved" : "rejected" } : x)) };
-      if (ok) {
-        if (r.kind === "task") st.tasks = st.tasks.map((t) => (t.id === r.targetId ? { ...t, plannedHours: r.newH } : t));
-        else st.projects = st.projects.map((p) => (p.id === r.targetId ? { ...p, budget: r.newH } : p));
+    // Используем публичный API store вместо прямой мутации setDb
+    if (ok) {
+      if (r.kind === "task") {
+        const task = db.tasks.find(t => t.id === r.targetId);
+        if (task) store.upsertTask({ ...task, plannedHours: r.newH });
+      } else {
+        const project = db.projects.find(p => p.id === r.targetId);
+        if (project) store.upsertProject({ ...project, budget: r.newH });
       }
-      return st;
-    });
+    }
+    // Обновляем статус запроса через публичный метод
+    if (store && typeof store.updateHoursRequest === 'function') {
+      store.updateHoursRequest(r.id, ok ? "approved" : "rejected");
+    } else {
+      store.setData({
+        ...db,
+        hoursRequests: db.hoursRequests.map((x) => (x.id === r.id ? { ...x, status: ok ? "approved" : "rejected" } : x))
+      });
+    }
     
-    // Вызываем addAudit ПОСЛЕ обновления состояния
     setTimeout(() => {
       if (ok) {
-        addAudit('Утверждение запроса часов', { 
-          task: targetTitle, 
-          previousHours: r.oldH, 
-          newHours: r.newH 
-        }, 'hoursRequest', r.id);
+        addAudit('Утверждение запроса часов', { task: targetTitle, previousHours: r.oldH, newHours: r.newH }, 'hoursRequest', r.id);
       } else {
-        addAudit('Отклонение запроса часов', { 
-          task: targetTitle,
-          requestedHours: r.newH,
-          reason: r.reason
-        }, 'hoursRequest', r.id);
+        addAudit('Отклонение запроса часов', { task: targetTitle, requestedHours: r.newH, reason: r.reason }, 'hoursRequest', r.id);
       }
     }, 0);
   };
@@ -55,30 +57,14 @@ export default function Requests({ db, setDb, ur, initialTab = 'hours', addAudit
     const employeeName = empName(v.empId);
     const period = `${fmtDMY(v.start)}—${fmtDMY(v.end)}`;
     
-    // Используем публичный API store вместо прямой мутации setDb
-    if (store && typeof store.approveVacation === 'function') {
-      store.approveVacation(v.id, ok);
-    } else {
-      // Fallback для обратной совместимости
-      setDb((s) => {
-        const updated = { ...s, vacations: s.vacations.map((x) => (x.id === v.id ? { ...x, status: ok ? "approved" : "rejected" } : x)) };
-        return updated;
-      });
-    }
+    // Используем публичный API store
+    store.approveVacation(v.id, ok);
     
     setTimeout(() => {
       if (ok) {
-        addAudit('Утверждение отпуска', { 
-          employee: employeeName, 
-          period,
-          type: VACATION_TYPES[v.type]?.label || v.type
-        }, 'vacation', v.id);
+        addAudit('Утверждение отпуска', { employee: employeeName, period, type: VACATION_TYPES[v.type]?.label || v.type }, 'vacation', v.id);
       } else {
-        addAudit('Отклонение отпуска', { 
-          employee: employeeName, 
-          period,
-          type: VACATION_TYPES[v.type]?.label || v.type
-        }, 'vacation', v.id);
+        addAudit('Отклонение отпуска', { employee: employeeName, period, type: VACATION_TYPES[v.type]?.label || v.type }, 'vacation', v.id);
       }
     }, 0);
   };
@@ -88,32 +74,14 @@ export default function Requests({ db, setDb, ur, initialTab = 'hours', addAudit
     const toName = empName(r.toId);
     const rolesStr = r.roles.join(', ');
     
-    // Используем публичный API store вместо прямой мутации setDb
-    if (store && typeof store.approveRoleDelegation === 'function') {
-      store.approveRoleDelegation(r.id, ok);
-    } else {
-      // Fallback для обратной совместимости
-      setDb((s) => {
-        const updated = { ...s, roleDelegations: s.roleDelegations.map((x) => (x.id === r.id ? { ...x, status: ok ? "active" : "rejected" } : x)) };
-        return updated;
-      });
-    }
+    // Используем публичный API store
+    store.approveRoleDelegation(r.id, ok);
     
     setTimeout(() => {
       if (ok) {
-        addAudit('Принятие делегирования', { 
-          from: fromName, 
-          to: toName, 
-          roles: rolesStr,
-          start: fmtDMY(r.start),
-          end: fmtDMY(r.end)
-        }, 'delegation', r.id);
+        addAudit('Принятие делегирования', { from: fromName, to: toName, roles: rolesStr, start: fmtDMY(r.start), end: fmtDMY(r.end) }, 'delegation', r.id);
       } else {
-        addAudit('Отклонение делегирования', { 
-          from: fromName, 
-          to: toName, 
-          roles: rolesStr 
-        }, 'delegation', r.id);
+        addAudit('Отклонение делегирования', { from: fromName, to: toName, roles: rolesStr }, 'delegation', r.id);
       }
     }, 0);
   };
@@ -121,60 +89,16 @@ export default function Requests({ db, setDb, ur, initialTab = 'hours', addAudit
   const decideReg = (r, ok) => {
     const empNameStr = `${r.last} ${r.first}`;
     
+    // Используем публичный API store
+    store.approveRegistration(r.id, ok);
+    
     if (ok) {
-      setDb((s) => {
-        const existing = s.employees.find(e => e.email === r.email);
-        if (existing) {
-          const updated = { ...existing, roles: ['executor'] };
-          return { 
-            ...s, 
-            employees: s.employees.map(e => e.id === updated.id ? updated : e),
-            regRequests: s.regRequests.map(x => x.id === r.id ? { ...x, status: "approved" } : x)
-          };
-        } else {
-          const newEmp = { 
-            id: "e_" + Math.random().toString(36).slice(2,6),
-            last: r.last,
-            first: r.first,
-            email: r.email,
-            pass: r.pass,
-            position: "Сотрудник",
-            departments: [],
-            roles: ["executor"],
-            kbIds: [],
-            headDeptIds: [],
-            phone: "",
-            tab: String(1000 + Math.floor(Math.random() * 8999)),
-            notif: { deadlineEmail: true, overdueDigest: false, commentSub: true },
-            failed: 0,
-            lockUntil: 0
-          };
-          return { 
-            ...s, 
-            employees: [...s.employees, newEmp],
-            regRequests: s.regRequests.map(x => x.id === r.id ? { ...x, status: "approved" } : x)
-          };
-        }
-      });
-      
       setTimeout(() => {
-        addAudit('Одобрение регистрации', { 
-          email: r.email, 
-          employee: empNameStr,
-          position: r.position || 'Сотрудник'
-        }, 'registration', r.id);
+        addAudit('Одобрение регистрации', { email: r.email, employee: empNameStr, position: r.position || 'Сотрудник' }, 'registration', r.id);
       }, 0);
     } else {
-      setDb((s) => {
-        return { ...s, regRequests: s.regRequests.map((x) => (x.id === r.id ? { ...x, status: "rejected" } : x)) };
-      });
-      
       setTimeout(() => {
-        addAudit('Отклонение регистрации', { 
-          email: r.email, 
-          employee: empNameStr,
-          reason: r.rejectionReason || 'Не указана'
-        }, 'registration', r.id);
+        addAudit('Отклонение регистрации', { email: r.email, employee: empNameStr, reason: r.rejectionReason || 'Не указана' }, 'registration', r.id);
       }, 0);
     }
   };

@@ -17,27 +17,11 @@ function AppContent() {
   const { store, data, login } = useStore();
   const { user } = useAuth();
   const { toast, ToastContainer } = useToast();
-  
-  // Безопасный метод для обновления данных через публичный API с логированием
-  const handleSetDb = (fn) => {
-    const stopTimer = logger.startTimer('handleSetDb');
-    try {
-      const newData = fn(store.data);
-      // Используем публичные методы вместо прямой мутации
-      store.setData(newData);
-      logger.debug('Database updated successfully');
-    } catch (error) {
-      logger.errorWithStack(error, 'Failed to update database');
-      throw error;
-    } finally {
-      stopTimer();
-    }
-  };
 
   if (!user) {
     return (
       <>
-        <LoginScreen db={data} setDb={handleSetDb} onLogin={login} toast={toast.error} />
+        <LoginScreen db={data} onLogin={login} toast={toast.error} store={store} />
         <ToastContainer />
       </>
     );
