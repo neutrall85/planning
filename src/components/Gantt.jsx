@@ -70,17 +70,21 @@ export default function Gantt({ db, ur, openTask, openProject }) {
       const items = tasks
         .filter(t => t.projectId === g.project.id)
         .map(t => {
-          let sIdx = days.indexOf(t.start);
-          let eIdx = days.indexOf(t.deadline);
+          // Нормализуем даты к формату YYYY-MM-DD для корректного сравнения
+          const taskStart = t.start ? iso(parseISO(t.start)) : null;
+          const taskDeadline = t.deadline ? iso(parseISO(t.deadline)) : null;
+          
+          let sIdx = days.indexOf(taskStart);
+          let eIdx = days.indexOf(taskDeadline);
           if (sIdx === -1 && eIdx === -1) {
-            if (t.start < viewStart && t.deadline > viewEnd) {
+            if (taskStart < viewStart && taskDeadline > viewEnd) {
               sIdx = 0; eIdx = days.length - 1;
             } else {
               return null;
             }
           }
-          if (sIdx === -1 && t.start < viewStart) sIdx = 0;
-          if (eIdx === -1 && t.deadline > viewEnd) eIdx = days.length - 1;
+          if (sIdx === -1 && taskStart < viewStart) sIdx = 0;
+          if (eIdx === -1 && taskDeadline > viewEnd) eIdx = days.length - 1;
           if (sIdx === -1 || eIdx === -1) return null;
           if (sIdx > eIdx) return null;
           return { ...t, sIdx, eIdx };
