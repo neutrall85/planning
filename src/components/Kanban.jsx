@@ -1,37 +1,47 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Ic, ICONS } from './Icons';
 import { TASK_STATUSES, TASK_STATUS_ORDER, PRIORITIES } from '../utils/constants';
 import { TODAY, fmtD, daysDiff, initials, isTaskActive } from '../utils/date';
 import { computeScope, taskVisible, canCreateTask, canChangeTaskStatus, hasRole } from '../utils/permissions';
 import EmployeeTooltip from './EmployeeTooltip';
 
-export default function Kanban({ db, ur, openTask, onMove, onNew, showOnlyMyTasks: parentShowOnlyMyTasks, sortBy: parentSortBy, hideFilters = false }) {
+export default function Kanban({
+  db,
+  ur,
+  openTask,
+  onMove,
+  onNew,
+  showOnlyMyTasks: parentShowOnlyMyTasks,
+  sortBy: parentSortBy,
+  hideFilters = false,
+  assigneeFilter,
+  onAssigneeFilterChange,
+  onAssigneeOptionsChange, // новый пропс
+}) {
   const [fProj, setFProj] = useState("all");
-  const [fExec, setFExec] = useState("all");
   const [fPrio, setFPrio] = useState("all");
   const [fDept, setFDept] = useState("all");
   const [q, setQ] = useState("");
   const [dragOverCol, setDragOverCol] = useState(null);
   const [localShowOnlyMy, setLocalShowOnlyMy] = useState(false);
   const [localSortBy, setLocalSortBy] = useState("deadline");
-  
-  // Состояние для tooltip
+
   const [tooltip, setTooltip] = useState({ visible: false, employee: null, x: 0, y: 0 });
-  
-  // Используем пропсы от родителя, если переданы, иначе локальное состояние
+
   const showOnlyMy = parentShowOnlyMyTasks !== undefined ? parentShowOnlyMyTasks : localShowOnlyMy;
   const sortBy = parentSortBy !== undefined ? parentSortBy : localSortBy;
 
   const scope = useMemo(() => computeScope(ur, db), [ur, db]);
-
-  // Определяем, показывать ли чекбокс "Только мои задачи" – только если пользователь видит не только свои задачи
   const canSeeAll = hasRole(ur, "admin", "director", "economist", "kb_chief", "head", "project_lead", "project_manager");
+  const isOnlyExecutor = ur.roles.length === 1 && ur.roles[0] === 'executor';
 
   const visible = useMemo(() => {
     let list = db.tasks.filter((t) => isTaskActive(t) && taskVisible(ur, scope, t, db));
     if (!hideFilters) {
       if (fProj !== "all") list = list.filter(t => t.projectId === fProj);
-      if (fExec !== "all") list = list.filter(t => (t.assigneeIds || []).includes(fExec));
+      if (assigneeFilter && assigneeFilter !== "all") {
+        list = list.filter(t => (t.assigneeIds || []).includes(assigneeFilter));
+      }
       if (fPrio !== "all") list = list.filter(t => t.priority === fPrio);
       if (fDept !== "all") list = list.filter(t => {
         const assignees = (t.assigneeIds || []).map(id => db.employees.find(e => e.id === id)).filter(Boolean);
@@ -42,12 +52,10 @@ export default function Kanban({ db, ur, openTask, onMove, onNew, showOnlyMyTask
         list = list.filter(t => t.title.toLowerCase().includes(s) || (db.projects.find(p => p.id === t.projectId)?.name || "").toLowerCase().includes(s));
       }
     }
-    // Фильтр "Только мои задачи"
     if (showOnlyMy) {
       list = list.filter(t => (t.assigneeIds || []).includes(ur.id));
     }
-    
-    // Сортировка
+
     list = [...list].sort((a, b) => {
       switch (sortBy) {
         case 'deadline':
@@ -67,22 +75,26 @@ export default function Kanban({ db, ur, openTask, onMove, onNew, showOnlyMyTask
         case 'alphaDesc':
           return b.title.localeCompare(a.title, 'ru');
         case 'hours':
-          const aHours = a.plannedHours || 0;
-          const bHours = b.plannedHours || 0;
-          return aHours - bHours;
+          return (a.plannedHours || 0) - (b.plannedHours || 0);
         case 'hoursDesc':
-          const aH = a.plannedHours || 0;
-          const bH = b.plannedHours || 0;
-          return bH - aH;
+          return (b.plannedHours || 0) - (a.plannedHours || 0);
         default:
           return 0;
       }
     });
-    
-    return list;
-  }, [db, ur, scope, fProj, fExec, fPrio, fDept, q, showOnlyMy, sortBy, hideFilters]);
 
-  const isOnlyExecutor = ur.roles.length === 1 && ur.roles[0] === 'executor';
+    return list;
+  }, [db, ur, scope, fProj, assigneeFilter, fPrio, fDept, q, showOnlyMy, sortBy, hideFilters]);
+
+  // Вычисляем список исполнителей и передаём в MainLayout
+  useEffect(() => {
+    if (onAssigneeOptionsChange) {
+      const ids = new Set();
+      visible.forEach(t => (t.assigneeIds || []).forEach(id => ids.add(id)));
+      const options = [...ids].map(id => db.employees.find(e => e.id === id)).filter(Boolean);
+      onAssigneeOptionsChange(options);
+    }
+  }, [visible, db, onAssigneeOptionsChange]);
 
   return (
     <div>
@@ -93,15 +105,6 @@ export default function Kanban({ db, ur, openTask, onMove, onNew, showOnlyMyTask
             <option value="all">Все проекты</option>
             {db.projects.filter(p => !p.archived && (scope.all || scope.projIds.has(p.id))).map(p => <option key={p.id} value={p.id}>{p.code}</option>)}
           </select>
-          {!isOnlyExecutor && (
-            <select className="inp sel sm" value={fExec} onChange={(e) => setFExec(e.target.value)}>
-              <option value="all">Все исполнители</option>
-              {[...new Set(visible.flatMap(t => t.assigneeIds || []))].map(id => {
-                const e = db.employees.find(x => x.id === id);
-                return e ? <option key={id} value={id}>{e.last} {e.first}</option> : null;
-              })}
-            </select>
-          )}
           <select className="inp sel sm" value={fPrio} onChange={(e) => setFPrio(e.target.value)}>
             <option value="all">Любой приоритет</option>
             {Object.entries(PRIORITIES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
@@ -135,7 +138,7 @@ export default function Kanban({ db, ur, openTask, onMove, onNew, showOnlyMyTask
           )}
         </div>
       )}
-      
+
       <div className="kanban k5">
         {TASK_STATUS_ORDER.map((st) => {
           const list = visible.filter((t) => t.status === st);
@@ -213,8 +216,7 @@ export default function Kanban({ db, ur, openTask, onMove, onNew, showOnlyMyTask
           );
         })}
       </div>
-      
-      {/* Легенда приоритетов */}
+
       <div className="gantt-legend" style={{ padding: '8px 16px', borderTop: '1px solid var(--line)', marginTop: 16 }}>
         <span style={{ fontWeight: 600 }}>Приоритеты задач:</span>
         {Object.entries(PRIORITIES).map(([k, v]) => (
@@ -224,7 +226,6 @@ export default function Kanban({ db, ur, openTask, onMove, onNew, showOnlyMyTask
         ))}
       </div>
 
-      {/* Tooltip сотрудника */}
       <EmployeeTooltip {...tooltip} />
     </div>
   );

@@ -15,7 +15,6 @@ import {
 import { Ic, ICONS } from '../Icons';
 import { sanitizeHtml } from '../../utils/string';
 
-// Вспомогательные функции для генерации дат повторения
 function generateRepeatDates(startDate, deadline, repeatConfig, endDate, maxCount = 100) {
   const { type, interval, days, endType, endValue } = repeatConfig;
   const result = [];
@@ -23,7 +22,6 @@ function generateRepeatDates(startDate, deadline, repeatConfig, endDate, maxCoun
   let currentDeadline = deadline ? new Date(deadline) : null;
   let count = 0;
 
-  // Если тип 'none' – возвращаем только одну дату
   if (type === 'none') {
     return [{ start: iso(currentStart), deadline: deadline ? iso(currentDeadline) : null }];
   }
@@ -31,21 +29,18 @@ function generateRepeatDates(startDate, deadline, repeatConfig, endDate, maxCoun
   const endDateObj = endType === 'date' ? new Date(endValue) : null;
   const maxCountLimit = endType === 'count' ? parseInt(endValue, 10) : null;
 
-  // Сохраняем разницу между дедлайном и стартом (если дедлайн есть)
   let diffDays = 0;
   if (currentDeadline) {
     diffDays = Math.round((currentDeadline - currentStart) / (1000 * 60 * 60 * 24));
   }
 
   while (count < maxCount) {
-    // Для первой итерации добавляем исходную дату
     result.push({
       start: iso(currentStart),
       deadline: currentDeadline ? iso(currentDeadline) : null
     });
     count++;
 
-    // Проверяем условие завершения
     let shouldStop = false;
     if (endType === 'date' && endDateObj && currentStart >= endDateObj) {
       shouldStop = true;
@@ -56,7 +51,6 @@ function generateRepeatDates(startDate, deadline, repeatConfig, endDate, maxCoun
     if (shouldStop) break;
     if (count >= maxCount) break;
 
-    // Вычисляем следующую дату
     let nextStart = new Date(currentStart);
     let nextDeadline = currentDeadline ? new Date(currentDeadline) : null;
 
@@ -66,9 +60,8 @@ function generateRepeatDates(startDate, deadline, repeatConfig, endDate, maxCoun
         if (nextDeadline) nextDeadline = addDays(currentDeadline, interval || 1);
         break;
       case 'weekly_days': {
-        // Ищем следующий день недели из списка days (1-7, где 1-пн, 7-вс)
         const dayNumbers = days.map(d => parseInt(d, 10));
-        const currentDay = currentStart.getDay() || 7; // 0->7
+        const currentDay = currentStart.getDay() || 7;
         let found = false;
         for (let i = 1; i <= 7; i++) {
           const nextDay = new Date(currentStart);
@@ -77,7 +70,6 @@ function generateRepeatDates(startDate, deadline, repeatConfig, endDate, maxCoun
           if (dayNumbers.includes(dayOfWeek)) {
             nextStart = nextDay;
             if (nextDeadline) {
-              // Сдвигаем дедлайн на ту же разницу
               nextDeadline = addDays(nextDeadline, i);
             }
             found = true;
@@ -85,7 +77,6 @@ function generateRepeatDates(startDate, deadline, repeatConfig, endDate, maxCoun
           }
         }
         if (!found) {
-          // fallback
           const nextWeek = addDays(currentStart, 7);
           nextStart = nextWeek;
           if (nextDeadline) nextDeadline = addDays(currentDeadline, 7);
@@ -123,7 +114,6 @@ function generateRepeatDates(startDate, deadline, repeatConfig, endDate, maxCoun
         break;
     }
 
-    // Если следующая дата <= текущей (защита от бесконечного цикла), прерываем
     if (nextStart <= currentStart) break;
 
     currentStart = nextStart;
@@ -138,12 +128,10 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
   const existing = taskId ? db.tasks.find((t) => t.id === taskId) : null;
   const readOnly = !!(existing && existing.archived);
   
-  // Проверяем делегирование напрямую из данных задачи (приоритет) или из vacationData (для обратной совместимости)
   const hasDelegateFromTask = existing && existing.isDelegated && existing.delegationEnd && new Date(existing.delegationEnd) >= new Date();
   const hasDelegateFromProp = vacationData && vacationData.hasDelegate;
   const hasDelegate = hasDelegateFromTask || hasDelegateFromProp;
   
-  // Получаем информацию о делегировании из задачи или из пропсов
   const delegateInfoFromTask = hasDelegateFromTask && existing.delegatedTo
     ? db.employees.find(e => e.id === existing.delegatedTo)
     : null;
@@ -152,7 +140,6 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
     : null;
   const delegateInfo = delegateInfoFromTask || delegateInfoFromProp;
   
-  // Получаем информацию об исходном исполнителе при делегировании
   const originalAssigneeFromTask = hasDelegateFromTask && existing.delegatedFrom
     ? db.employees.find(e => e.id === existing.delegatedFrom)
     : null;
@@ -161,11 +148,9 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
     : null;
   const originalAssignee = originalAssigneeFromTask || originalAssigneeFromProp;
   
-  // Данные о периоде делегирования
   const delegationStart = hasDelegateFromTask ? existing.delegationStart : (vacationData ? vacationData.delegationStart : null);
   const delegationEnd = hasDelegateFromTask ? existing.delegationEnd : (vacationData ? vacationData.delegationEnd : null);
   
-  // Предупреждение об отпуске показываем только если нет делегирования
   const hasVacationWarning = vacationData && vacationData.vacation && vacationData.employee && !hasDelegate;
   const vacationInfo = hasVacationWarning ? vacationData.vacation : null;
   const employeeInfo = hasVacationWarning ? vacationData.employee : null;
@@ -192,17 +177,17 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
     id: "t_" + uid(), title: "", desc: "", projectId: currentProjectId, assigneeIds: [], priority: "mid",
     plannedHours: 8, start: TODAY, deadline: iso(addDays(new Date(), 14)), status: "new", logs: [], comments: [], history: [], delegatedFrom: null, archived: false, archivedAt: null, closedAt: null,
     creatorId: ur.id,
-    dependencyId: null, // Связанная задача (должна быть выполнена перед текущей)
-    dependencyType: 'FS', // Тип зависимости: FS, SS, FF, SF
-    // Поля для повторения (только для новых задач)
+    dependencyId: null,
+    dependencyType: 'FS',
     repeatType: 'none',
     repeatInterval: 1,
-    repeatDays: [], // массив номеров дней недели 1-7 (пн-вс)
-    repeatEndType: 'date', // 'date' или 'count'
+    repeatDays: [],
+    repeatEndType: 'date',
     repeatEndValue: '',
   });
   const [logH, setLogH] = useState("");
   const [logNote, setLogNote] = useState("");
+  const [logDate, setLogDate] = useState(TODAY);
   const [tab, setTab] = useState(initialTab);
   const [confirmVac, setConfirmVac] = useState(null);
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
@@ -212,19 +197,13 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
   const sp = f.logs.reduce((s, l) => s + l.hours, 0);
   const remainProj = proj && proj.budget != null && !proj.archived ? proj.budget - (planSum(proj.id) - (existing ? (existing.plannedHours || 0) : 0)) : null;
   
-  // Улучшенная логика vacWarn: проверяем только тех исполнителей, которые не являются делегированными
-  // Если задача делегирована, предупреждение для исходного исполнителя (delegatedFrom) не показываем
-  // Также проверяем, что отпуск ещё активен (не закончился на текущую дату)
   const vacWarn = useMemo(() => {
     if (readOnly || !f.assigneeIds || f.assigneeIds.length === 0 || !f.deadline) return null;
     
-    // Если задача делегирована, исключаем originalAssignee из проверки
     if (hasDelegate && originalAssignee) {
-      // Проверяем только текущих исполнителей (замещающих), исключая delegatedFrom
       const assigneesToCheck = f.assigneeIds.filter(id => id !== originalAssignee.id);
       for (const id of assigneesToCheck) {
         const vac = vacOverlap(id, f.start || f.deadline, f.deadline);
-        // Проверяем, что отпуск ещё активен (не закончился)
         if (vac && (!vac.end || new Date(vac.end) >= new Date())) {
           return vac;
         }
@@ -232,10 +211,8 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
       return null;
     }
     
-    // Стандартная проверка для недегелированных задач
     for (const id of f.assigneeIds) {
       const vac = vacOverlap(id, f.start || f.deadline, f.deadline);
-      // Проверяем, что отпуск ещё активен (не закончился)
       if (vac && (!vac.end || new Date(vac.end) >= new Date())) {
         return vac;
       }
@@ -272,7 +249,6 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
       history.push({ ts: Date.now(), who: ur.id, text: `Статус: ${TASK_STATUSES[existing.status].label} → ${TASK_STATUSES[statusToSave].label}` });
     }
     
-    // Обработка зависимостей и синхронизация дат
     let finalStart = f.start;
     let finalDeadline = f.deadline;
     
@@ -280,25 +256,23 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
       const depTask = db.tasks.find(t => t.id === f.dependencyId);
       if (depTask) {
         switch (f.dependencyType) {
-          case 'SS': // Начало-Начало: синхронизируем начало с зависимой задачей
+          case 'SS':
             finalStart = depTask.start;
-            // Если есть дедлайн, сохраняем разницу между старым дедлайном и стартом
             if (f.deadline && depTask.start) {
               const diffDays = Math.round((new Date(f.deadline) - new Date(f.start || TODAY)) / (1000 * 60 * 60 * 24));
               finalDeadline = iso(addDays(parseISO(depTask.start), diffDays));
             }
             break;
-          case 'FF': // Окончание-Окончание: синхронизируем дедлайн с зависимой задачей
+          case 'FF':
             if (depTask.deadline) {
               finalDeadline = depTask.deadline;
-              // Сохраняем длительность задачи
               if (f.start && f.deadline) {
                 const duration = Math.round((new Date(f.deadline) - new Date(f.start)) / (1000 * 60 * 60 * 24));
                 finalStart = iso(addDays(parseISO(depTask.deadline), -duration));
               }
             }
             break;
-          case 'SF': // Начало-Окончание: задача завершается после начала зависимой
+          case 'SF':
             if (depTask.start) {
               finalDeadline = depTask.start;
               if (f.start && f.deadline) {
@@ -307,7 +281,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
               }
             }
             break;
-          case 'FS': // Окончание-Начало: задача начинается после завершения зависимой
+          case 'FS':
           default:
             if (depTask.deadline) {
               finalStart = depTask.deadline;
@@ -333,7 +307,6 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
       creatorId: existing ? existing.creatorId : ur.id
     };
 
-    // Убираем поля повторения из сохраняемой задачи (чтобы не засорять)
     delete taskToSave.repeatType;
     delete taskToSave.repeatInterval;
     delete taskToSave.repeatDays;
@@ -341,9 +314,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
     delete taskToSave.repeatEndValue;
 
     try {
-      // Если повторение задано и это создание новой задачи (не редактирование)
       if (!existing && f.repeatType !== 'none') {
-        // Генерируем серию задач
         const repeatConfig = {
           type: f.repeatType,
           interval: parseInt(f.repeatInterval, 10) || 1,
@@ -355,7 +326,6 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
         const deadline = f.deadline;
         const dates = generateRepeatDates(startDate, deadline, repeatConfig, f.repeatEndValue, 50);
 
-        // Создаём каждую задачу отдельно
         dates.forEach((d, index) => {
           const taskCopy = {
             ...taskToSave,
@@ -363,15 +333,12 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
             start: d.start,
             deadline: d.deadline,
           };
-          // Для первой задачи используем оригинальный id, чтобы не дублировать
           if (index === 0) {
-            // Сохраняем первую задачу с оригинальным id
             onSave({ ...taskCopy, id: taskToSave.id }, true);
           } else {
             onSave(taskCopy, true);
           }
         });
-        // Закрываем модалку после создания всех задач
         onClose();
       } else {
         onSave(taskToSave, !existing);
@@ -390,7 +357,6 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
       if (!f.deadline) return toast("Для производственного проекта срок выполнения обязателен", "err");
     }
 
-    // Проверка бюджета
     const projForBudget = db.projects.find(p => p.id === f.projectId);
     if (projForBudget && projForBudget.budget != null && !projForBudget.archived && !isAdminProj) {
       const currentPlanSum = planSum(projForBudget.id);
@@ -404,7 +370,6 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
       }
     }
 
-    // Валидация повторения
     if (f.repeatType !== 'none') {
       if (f.repeatType === 'weekly_days' && (!f.repeatDays || f.repeatDays.length === 0)) {
         return toast("Выберите хотя бы один день недели", "err");
@@ -415,7 +380,6 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
       if (f.repeatEndType === 'count' && (!f.repeatEndValue || parseInt(f.repeatEndValue, 10) <= 0)) {
         return toast("Укажите количество повторений", "err");
       }
-      // Проверка, что дата окончания больше даты начала
       if (f.repeatEndType === 'date' && f.repeatEndValue && f.repeatEndValue <= f.start) {
         return toast("Дата окончания должна быть позже даты начала", "err");
       }
@@ -432,9 +396,20 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
     const h = parseFloat(String(logH).replace(",", "."));
     if (!h || h <= 0) return toast("Введите корректное количество часов", "err");
     if (f.plannedHours && sp + h > f.plannedHours) return toast(`Нельзя внести больше плановых: доступно ещё ${Math.max(0, f.plannedHours - sp)} ч`, "err");
-    const newLogs = [...f.logs, { id: uid(), userId: ur.id, date: TODAY, hours: h, note: logNote.trim() }];
+    if (logDate > TODAY) return toast("Дата не может быть в будущем", "err");
+    
+    const newLogs = [...f.logs, { id: uid(), userId: ur.id, date: logDate, hours: h, note: logNote.trim() }];
     setF((s) => ({ ...s, logs: newLogs }));
-    setLogH(""); setLogNote("");
+    
+    const newSp = sp + h;
+    const projectCode = db.projects.find(p => p.id === f.projectId)?.code || '—';
+    const assigneesStr = (f.assigneeIds || []).map(id => empName(id)).join(', ');
+    const auditDetails = `Задача "${f.title}" в проекте ${projectCode}, плановые часы: ${f.plannedHours ?? '—'}, фактические часы: ${newSp} (внесено ${h})${logNote.trim() ? `, комментарий: ${logNote.trim()}` : ''}, исполнители: ${assigneesStr || 'не назначены'}`;
+    store.addAudit('Внесение часов', auditDetails, 'task', f.id);
+    
+    setLogH("");
+    setLogNote("");
+    setLogDate(TODAY);
     toast("Часы учтены");
   };
 
@@ -476,7 +451,6 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
 
       {tab === "form" && (<>
 
-        {/* Блок информации о делегировании - показываем, если задача делегирована */}
         {hasDelegate && (
           <div className="info-box" style={{background: '#eff6ff', border: '1px solid #3b82f6', color: '#1e40af'}}>
             <Ic d={ICONS.user} size={15} />  
@@ -494,14 +468,12 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
             </div>
           </div>
         )}
-        {/* Предупреждение об отпуске из vacationData (только если нет делегирования) */}
         {hasVacationWarning && vacationInfo && employeeInfo && (
           <div className="warn-box">
             <Ic d={ICONS.beach} size={15} />  
             Внимание! Исполнитель <strong>{employeeInfo.last} {employeeInfo.first}</strong> находится в отпуске с {fmtDMY(vacationInfo.start)} по {fmtDMY(vacationInfo.end)}. Даты пересекаются с периодом задачи.
           </div>
         )}
-        {/* Предупреждение vacWarn - показываем только если нет делегирования и есть пересечение с отпуском */}
         {vacWarn && !hasDelegate && !hasVacationWarning && (
           <div className="warn-box">
             <Ic d={ICONS.beach} size={15} />  
@@ -605,7 +577,6 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
           </select>
         </div>
 
-        {/* Блок повторения (только для новых задач, не для редактирования) */}
         {!existing && !readOnly && (
           <div className="tm-block" style={{ marginTop: '12px' }}>
             <div className="rep-panel-title">Повторение {isAdminProj ? '' : '(только для административных проектов)'}</div>
@@ -637,7 +608,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
                   <label className="lbl">Дни недели</label>
                   <div className="duo" style={{ flexWrap: 'wrap', gap: '6px' }}>
                     {['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map((day, idx) => {
-                      const dayNum = idx + 1; // 1-7
+                      const dayNum = idx + 1;
                       const checked = f.repeatDays.includes(String(dayNum));
                       return (
                         <label key={dayNum} className="dept-pick" style={{ margin: 0 }}>
@@ -706,6 +677,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
           )}
           {canLog ? (
             <div className="tm-add">
+              <input className="inp" style={{ width: 130 }} type="date" value={logDate} onChange={(e) => setLogDate(e.target.value)} />
               <input className="inp" style={{ width: 90 }} type="number" min="0.5" step="0.5" placeholder="часы" value={logH} onChange={(e) => setLogH(e.target.value)} />
               <input className="inp" placeholder="комментарий" value={logNote} onChange={(e) => setLogNote(e.target.value)} />
               <button className="btn ghost" onClick={addLog}><Ic d={ICONS.clock} size={14} /> Внести часы</button>

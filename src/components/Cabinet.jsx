@@ -24,7 +24,7 @@ function downloadCSV(name, rows) {
   setTimeout(() => URL.revokeObjectURL(a.href), 500);
 }
 
-export default function Cabinet({ store, data, user, openTask, openVacation, openDelegation, toast }) {
+export default function Cabinet({ store, data, user, openTask, openVacation, openDelegation, openEmployeeEdit, toast }) {
   const { empName, getEmployeeLoad } = useDataHelpers(data);
   const [tab, setTab] = useState('overview');
 
@@ -41,7 +41,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
   const myVacs = data.vacations.filter(v => v.empId === user.id);
   const myDeleg = data.roleDelegations.filter(r => r.fromId === user.id || r.toId === user.id);
 
-  const range = 14;
+  const range = 20;
   const days = [];
   for (let i = range - 1; i >= 0; i--) days.push(iso(addDays(new Date(), -i)));
 
@@ -138,7 +138,56 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
       </div>
 
       {tab === 'overview' && (
-        <div className="cab-grid">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          {/* Блок: Затраченные часы (последние 20 дней) */}
+          <div className="rep-panel">
+            <div className="rep-panel-title">Затраченные часы по задачам (за прошедшие 20 дней)</div>
+            <div className="toolbar" style={{ marginBottom: 12, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+              <span className="mut sm">Экспорт:</span>
+              <input className="inp" type="date" style={{ width: 150 }} value={expFrom} onChange={e => setExpFrom(e.target.value)} />
+              <span className="mut sm">—</span>
+              <input className="inp" type="date" style={{ width: 150 }} value={expTo} onChange={e => setExpTo(e.target.value)} />
+              <button className="btn primary sm" onClick={exportMyReport}>
+                <Ic d={ICONS.download} size={13} /> Выгрузить в Excel (CSV)
+              </button>
+            </div>
+            <div style={{ width: '100%', overflowX: 'auto' }}>
+              <table className="tbl" style={{ width: '100%', minWidth: '700px', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th style={{ minWidth: '200px', textAlign: 'left', borderBottom: '1px solid var(--line)' }}>Задача</th>
+                    {days.map(d => (
+                      <th key={d} style={{ textAlign: 'center', minWidth: '60px', borderBottom: '1px solid var(--line)', fontSize: '11px', color: 'var(--mut)' }}>
+                        {fmtD(d)}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {taskTableData.map(({ task, logMap }) => (
+                    <tr key={task.id} style={{ cursor: 'pointer' }} onClick={() => openTask(task.id)}>
+                      <td style={{ textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #f1f5f9' }}>
+                        {task.title}
+                        <span className="mut sm" style={{ marginLeft: 8, fontWeight: 400 }}>
+                          ({data.projects.find(p => p.id === task.projectId)?.code || '—'})
+                        </span>
+                      </td>
+                      {days.map(d => (
+                        <td key={d} style={{ textAlign: 'center', borderBottom: '1px solid #f1f5f9' }}>
+                          {logMap[d] ? <b>{logMap[d]} ч</b> : ''}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                  {taskTableData.length === 0 && (
+                    <tr><td colSpan={days.length + 1} className="mut" style={{ textAlign: 'center', padding: 20 }}>Нет учтённых часов</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Блок: Мои задачи по статусам */}
           <div className="rep-panel">
             <div className="rep-panel-title">Мои задачи по статусам</div>
             {TASK_STATUS_ORDER.map(st => {
@@ -164,66 +213,17 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
             {myTasks.length === 0 && <div className="mut">Задач пока нет</div>}
           </div>
 
-          <div className="stack-col">
-            <div className="rep-panel">
-              <div className="rep-panel-title">Мои проекты</div>
-              {myProjects.map(p => (
-                <div key={p.id} className="cab-proj">
-                  <span className="pdot" style={{ background: getCategoryColor(p) }} />
-                  {p.code} — {p.name}
-                  {p.ptype === 'admin' && <span className="adm-badge" style={{ marginLeft: 8 }}>адм</span>}
-                </div>
-              ))}
-              {myProjects.length === 0 && <div className="mut">Нет участия в проектах</div>}
-            </div>
-
-            <div className="rep-panel">
-              <div className="rep-panel-title">Затраченные часы по задачам (последние 14 дней)</div>
-              <div className="toolbar" style={{ marginBottom: 12, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                <span className="mut sm">Экспорт:</span>
-                <input className="inp" type="date" style={{ width: 150 }} value={expFrom} onChange={e => setExpFrom(e.target.value)} />
-                <span className="mut sm">—</span>
-                <input className="inp" type="date" style={{ width: 150 }} value={expTo} onChange={e => setExpTo(e.target.value)} />
-                <button className="btn primary sm" onClick={exportMyReport}>
-                  <Ic d={ICONS.download} size={13} /> Выгрузить в Excel (CSV)
-                </button>
+          {/* Блок: Мои проекты */}
+          <div className="rep-panel">
+            <div className="rep-panel-title">Мои проекты</div>
+            {myProjects.map(p => (
+              <div key={p.id} className="cab-proj">
+                <span className="pdot" style={{ background: getCategoryColor(p) }} />
+                {p.code} — {p.name}
+                {p.ptype === 'admin' && <span className="adm-badge" style={{ marginLeft: 8 }}>адм</span>}
               </div>
-
-              <div style={{ width: '100%', overflowX: 'auto' }}>
-                <table className="tbl" style={{ width: '100%', minWidth: '700px', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr>
-                      <th style={{ minWidth: '200px', textAlign: 'left', borderBottom: '1px solid var(--line)' }}>Задача</th>
-                      {days.map(d => (
-                        <th key={d} style={{ textAlign: 'center', minWidth: '60px', borderBottom: '1px solid var(--line)', fontSize: '11px', color: 'var(--mut)' }}>
-                          {fmtD(d)}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {taskTableData.map(({ task, logMap }) => (
-                      <tr key={task.id} style={{ cursor: 'pointer' }} onClick={() => openTask(task.id)}>
-                        <td style={{ textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #f1f5f9' }}>
-                          {task.title}
-                          <span className="mut sm" style={{ marginLeft: 8, fontWeight: 400 }}>
-                             ({data.projects.find(p => p.id === task.projectId)?.code || '—'})
-                          </span>
-                        </td>
-                        {days.map(d => (
-                          <td key={d} style={{ textAlign: 'center', borderBottom: '1px solid #f1f5f9' }}>
-                            {logMap[d] ? <b>{logMap[d]} ч</b> : ''}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                    {taskTableData.length === 0 && (
-                      <tr><td colSpan={days.length + 1} className="mut" style={{ textAlign: 'center', padding: 20 }}>Нет учтённых часов</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            ))}
+            {myProjects.length === 0 && <div className="mut">Нет участия в проектах</div>}
           </div>
         </div>
       )}
@@ -338,7 +338,12 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
                   <label className="lbl">E-mail</label>
                   <div className="duo">
                     <input className="inp" disabled value={user.email + '@volga-dnepr.com'} />
-                    <button className="btn ghost sm" onClick={() => showToast('Письмо подтверждения отправлено на новый адрес')}>изменить</button>
+                    <button 
+                      className="btn ghost sm" 
+                      onClick={() => openEmployeeEdit(user.id)}
+                    >
+                      изменить
+                    </button>
                   </div>
                   
                   <label className="lbl">Мобильный телефон</label>

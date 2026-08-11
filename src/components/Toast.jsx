@@ -1,13 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
-/**
- * Простой Toast-компонент для замены alert()
- */
 export const Toast = ({ message, type = 'info', onClose, duration = 3000 }) => {
+  const onCloseRef = useRef(onClose);
   useEffect(() => {
-    const timer = setTimeout(onClose, duration);
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => onCloseRef.current(), duration);
     return () => clearTimeout(timer);
-  }, [onClose, duration]);
+  }, [duration]);
 
   const colors = {
     info: '#2196F3',
@@ -52,9 +54,6 @@ export const Toast = ({ message, type = 'info', onClose, duration = 3000 }) => {
   );
 };
 
-/**
- * Hook для управления toast-уведомлениями
- */
 export const useToast = () => {
   const [toasts, setToasts] = useState([]);
 
@@ -69,10 +68,10 @@ export const useToast = () => {
   };
 
   const toast = {
-    info: (msg, duration) => addToast(msg, 'info', duration),
-    success: (msg, duration) => addToast(msg, 'success', duration),
-    warning: (msg, duration) => addToast(msg, 'warning', duration),
-    error: (msg, duration) => addToast(msg, 'error', duration)
+    info: (msg, duration) => addToast(msg, 'info', duration || 3000),
+    success: (msg, duration) => addToast(msg, 'success', duration || 3000),
+    warning: (msg, duration) => addToast(msg, 'warning', duration || 3000),
+    error: (msg, duration) => addToast(msg, 'error', duration || 3000)
   };
 
   const ToastContainer = () => (

@@ -5,7 +5,7 @@ import { Ic, ICONS } from './Icons';
 import { computeScope, hasRole } from '../utils/permissions';
 import EmployeeTooltip from './EmployeeTooltip';
 
-export default function Projects({ db, ur, openProject, openHoursReq, closeProject, cancelProject, showOnlyMyProjects: parentShowOnlyMyProjects, sortBy: parentSortBy }) {
+export default function Projects({ db, ur, openProject, openHoursReq, showOnlyMyProjects: parentShowOnlyMyProjects, sortBy: parentSortBy }) {
   const scope = useMemo(() => computeScope(ur, db), [ur, db]);
   const canSeeAllProjects = hasRole(ur, "admin", "director", "economist", "kb_chief", "head", "project_lead", "project_manager");
   
@@ -44,11 +44,6 @@ export default function Projects({ db, ur, openProject, openHoursReq, closeProje
         return 0;
     }
   });
-
-  const canCloseProject = (project) => {
-    const creatorId = project.creatorId || (project.history?.find(h => h.who !== 'system')?.who);
-    return hasRole(ur, 'admin') || hasRole(ur, 'director') || (creatorId && creatorId === ur.id);
-  };
 
   // Функция получения цвета категории проекта
   const getCategoryColor = (project) => {

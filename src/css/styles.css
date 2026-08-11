@@ -580,13 +580,16 @@ input, select, textarea {
   border-radius: 10px;
   padding: 0 10px;
   color: var(--mut);
+  flex: 1;          /* чтобы занимал всё доступное место */
+  min-width: 200px; /* уже есть, оставляем */
 }
 .search-box input {
   border: none;
   background: transparent;
   outline: none;
   padding: 8px 0;
-  width: 170px;
+  width: 100%;     /* вместо 170px — растягивается */
+  min-width: 100px;
 }
 .link {
   border: none;
@@ -847,13 +850,13 @@ input, select, textarea {
 /* --- kanban --- */
 .kanban {
   display: grid;
-  grid-template-columns: repeat(4, minmax(240px, 1fr));
-  gap: 14px;
-  min-height: 68vh;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  width: 100%;
   animation: fadeUp .3s ease;
 }
 .kanban.k5 {
-  grid-template-columns: repeat(5, minmax(215px, 1fr));
+  grid-template-columns: repeat(5, 1fr);  /* то же самое для 5 колонок */
 }
 .kcol {
   background: #e9eef5;
@@ -862,6 +865,7 @@ input, select, textarea {
   display: flex;
   flex-direction: column;
   transition: .15s;
+  min-width: 0; /* чтобы дочерние элементы не вылезали */
 }
 .kcol.over {
   border-color: var(--acc2);
@@ -904,11 +908,12 @@ input, select, textarea {
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 12px;
-  padding: 11px 11px 11px 15px;
+  padding: 12px 14px 12px 16px;
   box-shadow: 0 1px 3px rgba(15,23,42,.05);
   cursor: pointer;
   transition: .15s;
-  overflow: hidden;
+  overflow: visible; /* чтобы текст не обрезался */
+  word-break: break-word;
 }
 .kcard:hover {
   transform: translateY(-2px);
@@ -2060,8 +2065,10 @@ input, select, textarea {
   max-height: 92vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 .modal-head {
+  flex-shrink: 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -2073,10 +2080,12 @@ input, select, textarea {
   font-weight: 800;
 }
 .modal-body {
+  flex: 1;
   padding: 16px 20px;
-  overflow: auto;
+  overflow-y: auto;
 }
 .modal-foot {
+  flex-shrink: 0;
   display: flex;
   gap: 10px;
   align-items: center;
@@ -2374,4 +2383,9 @@ input, select, textarea {
   color: var(--acc);
   font-weight: 600;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+@media (max-width: 1530px) {
+  .cab-grid {
+    grid-template-columns: 1fr;
+  }
 }
