@@ -15,7 +15,6 @@ const DayCell = ({ d, big, byDay, db, openTask, onAvatarEnter, onAvatarLeave, on
         {tasks.slice(0, big ? 12 : 3).map(t => {
           const p = db.projects.find(x => x.id === t.projectId);
           const assignees = (t.assigneeIds || []).map(id => db.employees.find(e => e.id === id)).filter(Boolean);
-          const execNames = assignees.map(a => a.last).join(', ');
           const prioColor = t.priority ? (t.priority === 'high' ? '#ef4444' : t.priority === 'crit' ? '#dc2626' : t.priority === 'low' ? '#3b82f6' : '#f59e0b') : '#f59e0b';
           const statusColor = t.status === 'closed' ? '#10b981' : t.status === 'cancelled' ? '#64748b' : prioColor;
           return (
@@ -25,9 +24,8 @@ const DayCell = ({ d, big, byDay, db, openTask, onAvatarEnter, onAvatarLeave, on
                 <span>{t.title}</span>
               </div>
               <div className="cal-executor">
-                {execNames}
-                {/* Аватарки исполнителей для tooltip */}
-                <div style={{ display: 'flex', gap: -4, marginTop: 4 }}>
+                {/* Только аватарки исполнителей для tooltip */}
+                <div style={{ display: 'flex', gap: -4 }}>
                   {assignees.slice(0, 3).map(a => (
                     <span
                       key={a.id}
