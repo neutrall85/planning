@@ -5,7 +5,7 @@ import {
   PROJECT_STATUSES, PROJECT_TYPES, PROJECT_CATEGORIES, TASK_STATUSES,
 } from '../../utils/constants';
 import {
-  TODAY, iso, addDays, uid, fmtDT, fmtDMY,
+  TODAY, iso, addDays, uid, fmtDT, fmtDMY, parseISO,
 } from '../../utils/date';
 import {
   hasRole, computeScope, canEditProjectFields, canChangeProjectStatus, canCreateProject,
