@@ -28,6 +28,10 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
     ...existing, 
     start: existing.start ? iso(parseISO(existing.start)) : TODAY,
     end: existing.end ? iso(parseISO(existing.end)) : iso(addDays(new Date(), 30)),
+    aircraftType: existing.aircraftType || "",
+    projectType: existing.projectType || "",
+    budget: existing.budget || "",
+    managerId: existing.managerId || "",
   } : {
     id: "p_" + uid(),
     code: "",
@@ -79,10 +83,10 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
     if (!f.code.trim()) return toast("Укажите код проекта", "err");
     if (!f.start) return toast("Укажите дату начала", "err");
     if (!f.customer?.trim()) return toast("Укажите заказчика", "err");
-    if (!f.aircraftType) return toast("Выберите тип ВС", "err");
-    if (!f.projectType) return toast("Выберите тип проекта", "err");
-
+    
     if (!isAdminType) {
+      if (!f.aircraftType) return toast("Выберите тип ВС", "err");
+      if (!f.projectType) return toast("Выберите тип проекта", "err");
       if (!f.managerId) return toast("Для производственного проекта ответственный обязателен", "err");
       if (!f.end) return toast("Для производственного проекта дата окончания обязательна", "err");
       if (!f.budget || +f.budget <= 0) return toast("Для производственного проекта бюджет обязателен", "err");
@@ -198,16 +202,18 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
           <label className="lbl">Описание</label><textarea className="inp" rows="2" disabled={!canEditFields} value={f.desc} onChange={(e) => set("desc", e.target.value)} />
           <label className="lbl">Заказчик *</label>
           <input className="inp" disabled={!canEditFields} value={f.customer} onChange={(e) => set("customer", e.target.value)} placeholder="Наименование заказчика" />
-          <label className="lbl">Тип ВС *</label>
-          <select className="inp sel" disabled={!canEditFields} value={f.aircraftType} onChange={(e) => set("aircraftType", e.target.value)}>
-            <option value="">— выберите —</option>
-            {AIRCRAFT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
-          <label className="lbl">Тип проекта *</label>
-          <select className="inp sel" disabled={!canEditFields} value={f.projectType} onChange={(e) => set("projectType", e.target.value)}>
-            <option value="">— выберите —</option>
-            {PROJECT_TYPE_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
+          {!isAdminType && (<>
+            <label className="lbl">Тип ВС *</label>
+            <select className="inp sel" disabled={!canEditFields} value={f.aircraftType} onChange={(e) => set("aircraftType", e.target.value)}>
+              <option value="">— выберите —</option>
+              {AIRCRAFT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+            <label className="lbl">Тип проекта *</label>
+            <select className="inp sel" disabled={!canEditFields} value={f.projectType} onChange={(e) => set("projectType", e.target.value)}>
+              <option value="">— выберите —</option>
+              {PROJECT_TYPE_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </>)}
           <label className="lbl">Подразделение</label>
           <select className="inp sel" disabled={!canEditFields} value={f.kbId || ""} onChange={(e) => set("kbId", e.target.value)}>
             <option value="">Общеорганизационный</option>
