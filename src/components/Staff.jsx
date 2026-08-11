@@ -239,7 +239,8 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
                             </button>
                           </>
                         )}
-                        {!isPending && (
+                        {/* Удаление: только админ или владелец запроса со статусом pending */}
+                        {(hasRole(ur, 'admin') || (v.empId === ur.id && isPending)) && (
                           <button className="icon-btn danger" onClick={() => { store.deleteVacationById(v.id); }}><Ic d={ICONS.trash} size={14} /></button>
                         )}
                       </td>
