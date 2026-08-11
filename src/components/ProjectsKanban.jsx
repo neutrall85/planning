@@ -139,7 +139,14 @@ export default function ProjectsKanban({ db, ur, openProject, closeProject, canc
                             {uniqueAssignees.slice(0, 4).map(id => {
                               const a = db.employees.find(e => e.id === id);
                               return a ? (
-                                <span key={id} className="avatar xs" title={`${a.last} ${a.first}`}>
+                                <span 
+                                  key={id} 
+                                  className="avatar xs" 
+                                  title={`${a.last} ${a.first}`}
+                                  onMouseEnter={(e) => setTooltip(prev => ({ ...prev, visible: true, employee: a, x: e.clientX, y: e.clientY }))}
+                                  onMouseLeave={() => setTooltip(prev => ({ ...prev, visible: false }))}
+                                  onMouseMove={(e) => setTooltip(prev => ({ ...prev, x: e.clientX, y: e.clientY }))}
+                                >
                                   {a.photo ? (
                                     <img src={a.photo} alt="Аватар" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
                                   ) : (

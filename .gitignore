@@ -10,11 +10,6 @@ node_modules/
 *.log
 *.tmp
 
-# Environment
-.env
-.env.local
-.env.*
-
 # Editors
 .vscode/
 .idea/

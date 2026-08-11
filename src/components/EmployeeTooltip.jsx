@@ -1,5 +1,4 @@
 import React from 'react';
-import { fmtD } from '../utils/date';
 
 /**
  * Всплывающее окно с информацией о сотруднике
@@ -8,7 +7,7 @@ import { fmtD } from '../utils/date';
  * @param {string} employee.last - Фамилия  
  * @param {string} employee.phone - Мобильный телефон
  * @param {string} employee.extension - Внутренний номер
- * @param {string} employee.email - Email
+ * @param {string} employee.email - Email (может быть с доменом или без)
  * @param {boolean} visible - Видимость tooltip
  * @param {number} x - Позиция X
  * @param {number} y - Позиция Y
