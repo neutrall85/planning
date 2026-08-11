@@ -28,6 +28,10 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
     ...existing, 
     start: existing.start ? iso(parseISO(existing.start)) : TODAY,
     end: existing.end ? iso(parseISO(existing.end)) : iso(addDays(new Date(), 30)),
+    aircraftType: existing.aircraftType || "",
+    projectType: existing.projectType || "",
+    budget: existing.budget || "",
+    managerId: existing.managerId || "",
   } : {
     id: "p_" + uid(),
     code: "",
