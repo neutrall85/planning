@@ -15,6 +15,7 @@ export const ICONS = {
   plus: "M12 5v14M5 12h14",
   out: "M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3M16 8l4 4-4 4M20 12H9",
   x: "M6 6l12 12M18 6L6 18",
+  check: "M5 13l4 4L19 7",
   left: "M15 6l-6 6 6 6",
   right: "M9 6l6 6-6 6",
   search: "M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3",
