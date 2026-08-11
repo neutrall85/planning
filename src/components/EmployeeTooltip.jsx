@@ -18,7 +18,7 @@ export default function EmployeeTooltip({ employee, visible, x, y }) {
 
   const fullName = `${employee.last} ${employee.first}`;
   const internalPhone = employee.extension ? ` ${employee.extension}` : '';
-  const email = employee.email ? `${employee.email}@aeroplan.ru` : '';
+  const email = employee.email ? `${employee.email}@volga-dnepr.com` : '';
 
   return (
     <div 

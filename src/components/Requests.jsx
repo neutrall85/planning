@@ -191,7 +191,7 @@ export default function Requests({ db, store, ur, initialTab = 'hours', addAudit
             <tbody>
               {db.regRequests.map(r => (
                 <tr key={r.id}>
-                  <td><b>{r.last} {r.first}</b></td><td>{r.email}@aeroplan.ru</td>
+                  <td><b>{r.last} {r.first}</b></td><td>{r.email}@volga-dnepr.com</td>
                   <td>{r.status === "pending" ? (<><button className="btn primary sm" onClick={() => decideReg(r, true)}>Одобрить</button> <button className="btn danger sm" onClick={() => decideReg(r, false)}>Отклонить</button></>) : <span className={"st-chip " + (r.status === "approved" ? "approved" : "rejected")}>{r.status}</span>}</td>
                 </tr>
               ))}
