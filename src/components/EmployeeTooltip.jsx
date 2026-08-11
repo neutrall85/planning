@@ -16,12 +16,8 @@ export default function EmployeeTooltip({ employee, visible, x, y }) {
   if (!visible || !employee) return null;
 
   const fullName = `${employee.last} ${employee.first}`;
-  const internalPhone = employee.extension ? `доб. ${employee.extension}` : '';
-  // Email может быть уже с доменом или без
-  let email = employee.email || '';
-  if (email && !email.includes('@')) {
-    email = `${email}@aeroplan.ru`;
-  }
+  const internalPhone = employee.extension ? ` ${employee.extension}` : '';
+  const email = employee.email ? `${employee.email}@volga-dnepr.com` : '';
 
   return (
     <div 

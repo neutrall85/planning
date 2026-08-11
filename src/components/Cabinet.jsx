@@ -337,7 +337,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
                   
                   <label className="lbl">E-mail</label>
                   <div className="duo">
-                    <input className="inp" disabled value={user.email + '@aeroplan.ru'} />
+                    <input className="inp" disabled value={user.email + '@volga-dnepr.com'} />
                     <button className="btn ghost sm" onClick={() => showToast('Письмо подтверждения отправлено на новый адрес')}>изменить</button>
                   </div>
                   
