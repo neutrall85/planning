@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { iso, addDays, fmtDMY, isTaskActive, initials } from '../utils/date';
+import { iso, addDays, fmtDMY, isTaskActive, initials, parseISO } from '../utils/date';
 import { taskVisible, computeScope, hasRole } from '../utils/permissions';
 import { Ic, ICONS } from './Icons';
 import EmployeeTooltip from './EmployeeTooltip';
@@ -86,7 +86,12 @@ export default function Calendar({ db, ur, openTask }) {
 
   const byDay = useMemo(() => {
     const m = {};
-    allTasks.forEach(t => { (m[t.deadline] = m[t.deadline] || []).push(t); });
+    allTasks.forEach(t => { 
+      const deadlineIso = t.deadline ? iso(parseISO(t.deadline)) : null;
+      if (deadlineIso) {
+        (m[deadlineIso] = m[deadlineIso] || []).push(t); 
+      }
+    });
     return m;
   }, [allTasks]);
 
