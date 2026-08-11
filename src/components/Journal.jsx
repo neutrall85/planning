@@ -169,12 +169,17 @@ export default function Journal({ db }) {
     let lastMonth = null;
     
     groupedEntries.forEach(group => {
-      const monthDate = new Date(group.date.split('.').reverse().join('-') + '-01');
-      const monthLabel = monthDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
+      // group.date имеет формат MM.YYYY, преобразуем правильно
+      const [monthStr, yearStr] = group.date.split('.');
+      const monthDate = new Date(parseInt(yearStr), parseInt(monthStr) - 1, 1);
+      const monthLabel = !isNaN(monthDate.getTime()) 
+        ? monthDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })
+        : `${monthStr}.${yearStr}`;
       
       group.entries.forEach((entry, idx) => {
         const isFirstInDay = idx === 0;
-        const dayLabel = isFirstInDay ? new Date(entry.ts).toLocaleDateString('ru-RU', { 
+        const entryDate = new Date(entry.ts);
+        const dayLabel = isFirstInDay && !isNaN(entryDate.getTime()) ? entryDate.toLocaleDateString('ru-RU', { 
           weekday: 'long', 
           day: 'numeric' 
         }) : null;
