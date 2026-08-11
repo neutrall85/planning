@@ -68,7 +68,7 @@ export default function ProjectsKanban({ db, ur, openProject, closeProject, canc
 
   return (
     <div className="w-full" style={{ maxWidth: '100%' }}>
-      <div className="flex gap-6 p-6 w-full overflow-x-auto" style={{ minWidth: '100%' }}>
+      <div className="flex gap-6 p-6 w-full overflow-x-auto">
         {PROJECT_STATUS_ORDER.map((status) => {
           const projects = list.filter(p => p.status === status);
           const statusConfig = PROJECT_STATUS_CONFIG[status];
@@ -76,7 +76,7 @@ export default function ProjectsKanban({ db, ur, openProject, closeProject, canc
           return (
             <div 
               key={status} 
-              className="flex-shrink-0 w-[320px] lg:w-[380px] xl:flex-grow bg-gray-50 rounded-lg shadow-sm border border-gray-200"
+              className="flex-shrink-0 w-[320px] bg-gray-50 rounded-lg shadow-sm border border-gray-200"
               onDragOver={(e) => { e.preventDefault(); setDragOverCol(status); }}
               onDragLeave={() => setDragOverCol(null)}
               onDrop={(e) => { 
