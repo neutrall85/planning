@@ -239,7 +239,9 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
                             </button>
                           </>
                         )}
-                        <button className="icon-btn danger" onClick={() => { store.deleteVacationById(v.id); }}><Ic d={ICONS.trash} size={14} /></button>
+                        {!isPending && (
+                          <button className="icon-btn danger" onClick={() => { store.deleteVacationById(v.id); }}><Ic d={ICONS.trash} size={14} /></button>
+                        )}
                       </td>
                     </tr>
                   );

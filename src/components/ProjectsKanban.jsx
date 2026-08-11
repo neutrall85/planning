@@ -67,8 +67,8 @@ export default function ProjectsKanban({ db, ur, openProject, closeProject, canc
   const canCreateProject = hasRole(ur, 'admin', 'director', 'kb_chief', 'project_manager');
 
   return (
-    <div style={{ width: '100%' }}>
-      <div className="kanban k5" style={{ width: '100%' }}>
+    <div className="kanban-container" style={{ width: '100%', maxWidth: '100%' }}>
+      <div className="kanban k5" style={{ width: '100%', maxWidth: '100%' }}>
         {PROJECT_STATUS_ORDER.map((status) => {
           const projects = list.filter(p => p.status === status);
           const statusConfig = PROJECT_STATUS_CONFIG[status];
