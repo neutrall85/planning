@@ -88,7 +88,7 @@ export default function Projects({ db, ur, openProject, openHoursReq, closeProje
                 <div className="pj-budget">
                   <div className="pj-budget-row">
                     <span>Бюджет: <b>{p.budget} ч</b></span>
-                    <span>План: <b className={overPlan ? 'red' : ''}>{plan} ч</b></span>
+                    <span>План задач: <b className={overPlan ? 'red' : ''}>{plan} ч</b></span>
                     <span>Факт: <b>{fact} ч</b></span>
                     <span>Использовано: <b>{usePct}%</b></span>
                   </div>
