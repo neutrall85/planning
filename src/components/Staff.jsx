@@ -190,11 +190,13 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
           </div>
           <div style={{ padding: 14 }}>
             <table className="tbl">
-              <thead><tr><th>Сотрудник</th><th>Период</th><th>Тип</th><th>Делегирование</th><th>Статус</th><th></th></tr></thead>
+              <thead><tr><th>Сотрудник</th><th>Период</th><th>Тип</th><th>Делегирование</th><th>Статус</th><th>Обоснование</th><th></th></tr></thead>
               <tbody>
                 {allVacs.map(v => {
                   const e = db.employees.find(x => x.id === v.empId);
                   if (e && e.fired) return null;
+                  const isPending = v.status === 'pending';
+                  const canApprove = hasRole(ur, 'director', 'hr', 'admin');
                   return (
                     <tr key={v.id}>
                       <td><b>{empName(v.empId)}</b><div className="mut sm">{primaryDept(db.employees.find(e => e.id === v.empId))?.name || ''}</div></td>
@@ -204,14 +206,45 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
                       <td><span className={`st-chip ${v.status}`}>
                         {{ pending: 'На утверждении', approved: 'Утверждён', rejected: 'Отклонён' }[v.status]}
                       </span></td>
+                      <td className="mut sm" style={{ maxWidth: '200px' }}>
+                        {v.justification || '—'}
+                      </td>
                       <td>
                         <button className="icon-btn" onClick={() => openVacation(v.id, null)}><Ic d={ICONS.edit} size={14} /></button>
+                        {isPending && canApprove && !hasRole(ur, 'admin') && (
+                          <>
+                            <button 
+                              className="icon-btn success" 
+                              title="Утвердить"
+                              onClick={() => {
+                                const justification = window.prompt('Введите обоснование утверждения (необязательно):', '');
+                                store.approveVacation(v.id, true, justification || '');
+                              }}
+                            >
+                              <Ic d={ICONS.check} size={14} />
+                            </button>
+                            <button 
+                              className="icon-btn danger" 
+                              title="Отклонить"
+                              onClick={() => {
+                                const justification = window.prompt('Введите обоснование отклонения (обязательно):');
+                                if (justification && justification.trim()) {
+                                  store.approveVacation(v.id, false, justification.trim());
+                                } else if (justification !== null) {
+                                  alert('Обоснование отклонения обязательно');
+                                }
+                              }}
+                            >
+                              <Ic d={ICONS.x} size={14} />
+                            </button>
+                          </>
+                        )}
                         <button className="icon-btn danger" onClick={() => { store.deleteVacationById(v.id); }}><Ic d={ICONS.trash} size={14} /></button>
                       </td>
                     </tr>
                   );
                 })}
-                {allVacs.length === 0 && <tr><td colSpan="6" className="mut">Отпусков нет</td></tr>}
+                {allVacs.length === 0 && <tr><td colSpan="7" className="mut">Отпусков нет</td></tr>}
               </tbody>
             </table>
           </div>

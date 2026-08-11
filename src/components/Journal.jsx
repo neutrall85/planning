@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { fmtDT, fmtDMY } from '../utils/date';
+import { fmtDT, fmtDMY, initials } from '../utils/date';
 import { useDataHelpers } from '../hooks';
 import { Ic, ICONS } from './Icons';
+import EmployeeTooltip from './EmployeeTooltip';
 
 const ACTIONS = [
   { value: 'all', label: 'Все действия' },
@@ -44,6 +45,7 @@ export default function Journal({ db }) {
     search: '',
   });
   const [page, setPage] = useState(1);
+  const [tooltip, setTooltip] = useState({ visible: false, employee: null, x: 0, y: 0 });
   const pageSize = 20;
 
   const allEntries = useMemo(() => {
@@ -125,9 +127,11 @@ export default function Journal({ db }) {
     try {
       const obj = typeof entry.details === 'string' ? JSON.parse(entry.details) : entry.details;
       if (typeof obj === 'object') {
+        const { justification, ...rest } = obj;
         return (
           <div style={{ fontSize: '12px', color: 'var(--mut)', marginTop: '2px' }}>
-            {Object.entries(obj).map(([key, val]) => (
+            {justification && <div style={{ marginBottom: '4px' }}><b>Обоснование:</b> {justification}</div>}
+            {Object.entries(rest).map(([key, val]) => (
               <div key={key}><b>{key}:</b> {String(val)}</div>
             ))}
           </div>
@@ -346,23 +350,49 @@ export default function Journal({ db }) {
                           {fmtDT(entry.ts)}
                         </td>
                         <td>
-                          <div style={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
                             gap: '8px',
                             fontWeight: 600,
                             fontSize: '13px',
                           }}>
-                            <div className="avatar xs" style={{ 
-                              background: entry.userId === 'system' 
-                                ? 'linear-gradient(135deg, #64748b, #475569)' 
-                                : 'linear-gradient(135deg, #1e3a8a, #0ea5e9)',
-                              width: '24px',
-                              height: '24px',
-                              fontSize: '9px',
-                            }}>
-                              {entry.userId === 'system' ? 'S' : (empName(entry.userId) || entry.userId).charAt(0).toUpperCase()}
-                            </div>
+                            {entry.userId === 'system' ? (
+                              <div className="avatar xs" style={{
+                                background: 'linear-gradient(135deg, #64748b, #475569)',
+                                width: '24px',
+                                height: '24px',
+                                fontSize: '9px',
+                              }}>
+                                S
+                              </div>
+                            ) : (() => {
+                              const emp = db.employees.find(e => e.id === entry.userId);
+                              return emp ? (
+                                <span
+                                  className="avatar xs"
+                                  onMouseEnter={(e) => setTooltip(prev => ({ ...prev, visible: true, employee: emp, x: e.clientX, y: e.clientY }))}
+                                  onMouseLeave={() => setTooltip(prev => ({ ...prev, visible: false }))}
+                                  onMouseMove={(e) => setTooltip(prev => ({ ...prev, x: e.clientX, y: e.clientY }))}
+                                  style={{ cursor: 'pointer' }}
+                                >
+                                  {emp.photo ? (
+                                    <img src={emp.photo} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                                  ) : (
+                                    initials(emp.first, emp.last)
+                                  )}
+                                </span>
+                              ) : (
+                                <div className="avatar xs" style={{
+                                  background: 'linear-gradient(135deg, #1e3a8a, #0ea5e9)',
+                                  width: '24px',
+                                  height: '24px',
+                                  fontSize: '9px',
+                                }}>
+                                  {(empName(entry.userId) || entry.userId).charAt(0).toUpperCase()}
+                                </div>
+                              );
+                            })()}
                             {entry.userId === 'system' ? 'Система' : empName(entry.userId) || entry.userId}
                           </div>
                         </td>
@@ -439,4 +469,5 @@ export default function Journal({ db }) {
       </div>
     </div>
   );
-}
+}      {/* Tooltip сотрудника */}
+      <EmployeeTooltip {...tooltip} />

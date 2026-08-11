@@ -555,13 +555,46 @@ export default class DataStore {
     this._notify();
   }
 
-  approveVacation(vacationId, approved) {
+  approveVacation(vacationId, approved, justification = '') {
+    const vac = this._data.vacations.find(v => v.id === vacationId);
+    if (!vac) return;
+    
+    const oldStatus = vac.status;
+    const newStatus = approved ? 'approved' : 'rejected';
+    
     this._data = {
       ...this._data,
       vacations: this._data.vacations.map(v =>
-        v.id === vacationId ? { ...v, status: approved ? 'approved' : 'rejected' } : v
+        v.id === vacationId ? { ...v, status: newStatus } : v
       )
     };
+    
+    // Добавляем запись в аудит с обоснованием
+    const empName = this.empName(vac.empId);
+    const actionName = approved ? 'Утверждение отпуска' : 'Отклонение отпуска';
+    const detailsObj = {
+      employee: empName,
+      period: `${fmtDMY(vac.start)} — ${fmtDMY(vac.end)}`,
+      type: VACATION_TYPES[vac.type],
+      oldStatus: oldStatus,
+      newStatus: newStatus
+    };
+    if (justification && justification.trim()) {
+      detailsObj.justification = justification.trim();
+    }
+    this.addAudit(actionName, detailsObj);
+    
+    // Уведомляем сотрудника
+    const msg = approved 
+      ? `Ваш отпуск с ${fmtDMY(vac.start)} по ${fmtDMY(vac.end)} утверждён`
+      : `Ваш отпуск с ${fmtDMY(vac.start)} по ${fmtDMY(vac.end)} отклонён`;
+    this.addNotification(vac.empId, msg, { targetType: 'vacation', targetId: vacationId });
+    
+    // Если утверждён и время наступило — применяем делегирование
+    if (approved && vac.delegation.enabled && vac.start <= TODAY) {
+      this.applyDelegation(vacationId);
+    }
+    
     this._notify();
   }
 
