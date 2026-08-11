@@ -1,8 +1,1 @@
-```
-# Build artifacts
-dist/
-build/
-
-# Dependencies
-node_modules/
-```
+Nothing should be ignored based on the provided file changes. The only modified file is 'src/components/Requests.jsx', which is a source code file and should not be added to .gitignore.
