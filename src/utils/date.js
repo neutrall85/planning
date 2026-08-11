@@ -11,7 +11,13 @@ export const parseISO = (s) => {
 };
 export const TODAY = iso(new Date());
 // Исправлено: используем Math.floor для избежания ошибок плавающей точки
-export const daysDiff = (a,b) => Math.floor((parseISO(b)-parseISO(a))/86400000);
+// Добавлена проверка на валидность дат для предотвращения NaN
+export const daysDiff = (a,b) => {
+  const dateA = parseISO(a);
+  const dateB = parseISO(b);
+  if (isNaN(dateA.getTime()) || isNaN(dateB.getTime())) return 0;
+  return Math.floor((dateB - dateA) / 86400000);
+};
 export const MS_SHORT = ["янв","фев","мар","апр","мая","июн","июл","авг","сен","окт","ноя","дек"];
 export const MS_FULL = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
 export const WD_FULL = ["Воскресенье","Понедельник","Вторник","Среда","Четверг","Пятница","Суббота"];
