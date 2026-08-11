@@ -3,7 +3,12 @@ export const iso = (d) => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.g
 export const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate()+n); return x; };
 export const addMonths = (d, n) => { const x = new Date(d); x.setMonth(x.getMonth() + n); return x; };
 export const addYears = (d, n) => { const x = new Date(d); x.setFullYear(x.getFullYear() + n); return x; };
-export const parseISO = (s) => { const [y,m,d] = String(s).split("-").map(Number); return new Date(y,m-1,d); };
+export const parseISO = (s) => { 
+  // Поддерживаем как полные ISO-строки (YYYY-MM-DDTHH:mm:ss.sssZ), так и даты (YYYY-MM-DD)
+  const dateStr = String(s).split('T')[0];
+  const [y,m,d] = dateStr.split("-").map(Number); 
+  return new Date(y,m-1,d); 
+};
 export const TODAY = iso(new Date());
 // Исправлено: используем Math.floor для избежания ошибок плавающей точки
 export const daysDiff = (a,b) => Math.floor((parseISO(b)-parseISO(a))/86400000);

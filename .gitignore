@@ -1,33 +1,4 @@
 ```
 # Build artifacts
 dist/
-dist/**
-# Dependencies
-node_modules/
-# Compiled files
-*.js.map
-*.min.js
-# Cache directories
-.cache/
-.nyc_output/
-# Logs
-*.log
-# Environment
-.env
-.env.local
-.env.*
-# Editors
-.vscode/
-.idea/
-*.swp
-*.swo
-# Coverage
-coverage/
-htmlcov/
-.coverage
-# Temporary files
-*.tmp
-*.temp
-Thumbs.db
-.DS_Store
 ```
