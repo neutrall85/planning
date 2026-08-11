@@ -133,17 +133,6 @@ export default function Projects({ db, ur, openProject, openHoursReq, closeProje
                       <Ic d={ICONS.edit} size={15} />
                     </button>
                   )}
-                  {canCloseProject(p) && p.status !== 'closed' && p.status !== 'cancelled' && (
-                    <button className="icon-btn danger" title="Закрыть/Отменить проект" onClick={() => {
-                      const action = window.confirm(`Закрыть проект "${p.name}"? Все задачи проекта будут переведены в статус "Закрыта".`) 
-                        ? 'close' 
-                        : (window.confirm(`Отменить проект "${p.name}"? Все задачи проекта будут переведены в статус "Отменена".`) ? 'cancel' : null);
-                      if (action === 'close') closeProject(p);
-                      else if (action === 'cancel') cancelProject(p);
-                    }}>
-                      <Ic d={ICONS.x} size={15} />
-                    </button>
-                  )}
                 </div>
               </div>
             </div>
