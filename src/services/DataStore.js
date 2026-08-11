@@ -11,67 +11,59 @@ export default class DataStore {
     this._listeners = [];
     this._archiveOldTasks(ARCHIVE_AFTER_MONTHS);
     this._scheduleDeadlineCheck();
-    // Храним reference на interval для очистки
     this._deadlineIntervalId = null;
   }
-  
-  // Планирование проверки дедлайнов в 7:00 по Москве ежедневно
+
   _scheduleDeadlineCheck() {
     const checkAtTime = () => {
       const now = new Date();
       const moscowTime = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Moscow' }));
       const targetTime = new Date(moscowTime);
       targetTime.setHours(DEADLINE_CHECK_HOUR_MOSCOW, 0, 0, 0);
-      
-      // Если уже прошло 7:00 сегодня, планируем на завтра
+
       if (moscowTime.getHours() >= DEADLINE_CHECK_HOUR_MOSCOW) {
         targetTime.setDate(targetTime.getDate() + 1);
       }
-      
+
       const delay = targetTime.getTime() - now.getTime();
-      
+
       setTimeout(() => {
         this._checkAllDeadlines();
-        // Планируем следующую проверку через 24 часа и сохраняем ID интервала
         this._deadlineIntervalId = setInterval(() => this._checkAllDeadlines(), DEADLINE_CHECK_INTERVAL_MS);
       }, delay);
     };
-    
+
     checkAtTime();
   }
-  
-  // Очистка интервала проверки дедлайнов (для предотвращения утечек памяти)
+
   _cleanupDeadlineCheck() {
     if (this._deadlineIntervalId) {
       clearInterval(this._deadlineIntervalId);
       this._deadlineIntervalId = null;
     }
   }
-  
-  // Проверка дедлайнов всех задач с санитизацией текста уведомления
+
   _checkAllDeadlines() {
     const now = new Date(TODAY);
-    
+
     this._data.tasks.forEach(task => {
       if (!task.deadline || ['closed', 'cancelled'].includes(task.status)) return;
-      
+
       const deadlineDate = new Date(task.deadline);
       const daysUntilDeadline = Math.ceil((deadlineDate - now) / (1000 * 60 * 60 * 24));
-      
+
       if (daysUntilDeadline === 3 || daysUntilDeadline === 1) {
         const assigneeIds = task.assigneeIds || [];
         assigneeIds.forEach(id => {
           const emp = this._data.employees.find(e => e.id === id);
           if (emp) {
             const daysText = daysUntilDeadline === 1 ? '1 день' : '3 дня';
-            // Санитизация названия задачи для предотвращения XSS
             const safeTitle = sanitizeHtml(task.title);
             const notifText = `До дедлайна задачи "${safeTitle}" остался ${daysText}! Дедлайн: ${task.deadline}`;
-            // Проверяем, не было ли уже такого уведомления
-            const exists = this._data.notifications.some(n => 
-              n.userId === id && 
-              n.targetType === 'task' && 
-              n.targetId === task.id && 
+            const exists = this._data.notifications.some(n =>
+              n.userId === id &&
+              n.targetType === 'task' &&
+              n.targetId === task.id &&
               n.text === notifText
             );
             if (!exists) {
@@ -87,17 +79,13 @@ export default class DataStore {
     this._listeners.push(callback);
     return () => { this._listeners = this._listeners.filter(cb => cb !== callback); };
   }
+
   _notify() {
     this._listeners.forEach(cb => cb(this._data));
   }
 
-  // Публичные методы для безопасного доступа к данным (вместо прямой мутации _data)
   get data() { return this._data; }
-  
-  /**
-   * Безопасное обновление данных через публичный API
-   * @param {Object} newData - новые данные
-   */
+
   setData(newData) {
     if (!newData || typeof newData !== 'object') {
       throw new Error('Invalid data provided to setData');
@@ -105,7 +93,7 @@ export default class DataStore {
     this._data = newData;
     this._notify();
   }
-  
+
   getCurrentUser() { return this._currentUser; }
 
   login(email, password) {
@@ -159,13 +147,13 @@ export default class DataStore {
     }
   }
 
-  // === ЗАДАЧИ (с проверкой бюджета) ===
+  // === ЗАДАЧИ ===
   upsertTask(task) {
     const idx = this._data.tasks.findIndex(t => t.id === task.id);
     let tasks;
     let auditMessage = '';
 
-    // ПРОВЕРКА БЮДЖЕТА (только для производственных проектов)
+    // Проверка бюджета
     const projectForBudget = this._data.projects.find(p => p.id === task.projectId);
     if (projectForBudget && projectForBudget.budget != null && projectForBudget.ptype !== 'admin' && !projectForBudget.archived) {
       const otherTasksSum = this._data.tasks
@@ -200,7 +188,6 @@ export default class DataStore {
           }
         }
       }
-      // Логирование изменений зависимостей
       if (old.dependencyId !== task.dependencyId || old.dependencyType !== task.dependencyType) {
         const oldDep = old.dependencyId ? this._data.tasks.find(t => t.id === old.dependencyId) : null;
         const newDep = task.dependencyId ? this._data.tasks.find(t => t.id === task.dependencyId) : null;
@@ -214,8 +201,7 @@ export default class DataStore {
         this.addAudit('Изменение задачи', auditMessage, 'task', task.id);
       }
       tasks = this._data.tasks.map(t => t.id === task.id ? task : t);
-      
-      // УВЕДОМЛЕНИЯ О ДЕДЛАЙНЕ (при обновлении задачи)
+
       this._checkDeadlineNotifications(task, old);
     } else {
       if (!task.createdAt) {
@@ -228,8 +214,6 @@ export default class DataStore {
           this.addNotification(id, `Вам назначена задача "${task.title}"`, { targetType: 'task', targetId: task.id });
         }
       });
-      
-      // УВЕДОМЛЕНИЯ О ДЕДЛАЙНЕ (при создании задачи)
       this._checkDeadlineNotifications(task, null);
     }
     this._data = { ...this._data, tasks };
@@ -237,29 +221,26 @@ export default class DataStore {
     this._archiveOldTasks(ARCHIVE_AFTER_MONTHS);
   }
 
-  // Проверка дедлайнов и отправка уведомлений за 3 дня и 1 день
   _checkDeadlineNotifications(task, oldTask) {
     if (!task.deadline || ['closed', 'cancelled'].includes(task.status)) return;
-    
+
     const now = new Date(TODAY);
     const deadlineDate = new Date(task.deadline);
     const daysUntilDeadline = Math.ceil((deadlineDate - now) / (1000 * 60 * 60 * 24));
-    
-    // Проверяем, нужно ли отправлять уведомление (3 дня или 1 день до дедлайна)
+
     const shouldNotifyThreeDays = daysUntilDeadline === 3;
     const shouldNotifyOneDay = daysUntilDeadline === 1;
-    
+
     if (!shouldNotifyThreeDays && !shouldNotifyOneDay) return;
-    
-    // Проверяем, не было ли уже отправлено такое уведомление
-    const existingNotif = this._data.notifications.find(n => 
-      n.targetType === 'task' && 
-      n.targetId === task.id && 
+
+    const existingNotif = this._data.notifications.find(n =>
+      n.targetType === 'task' &&
+      n.targetId === task.id &&
       (n.text.includes('дней до дедлайна') || n.text.includes('день до дедлайна'))
     );
-    
+
     if (existingNotif) return;
-    
+
     const assigneeIds = task.assigneeIds || [];
     assigneeIds.forEach(id => {
       const emp = this._data.employees.find(e => e.id === id);
@@ -381,8 +362,8 @@ export default class DataStore {
       if (t.deadline && t.deadline < start) return t;
       const newAssignees = t.assigneeIds.filter(id => id !== fromId);
       if (!newAssignees.includes(toId)) newAssignees.push(toId);
-      const updated = { 
-        ...t, 
+      const updated = {
+        ...t,
         assigneeIds: newAssignees,
         isDelegated: true,
         delegatedFrom: fromId,
@@ -414,8 +395,8 @@ export default class DataStore {
       if (!hasDelegation) return t;
       const newAssignees = t.assigneeIds.filter(id => id !== toId);
       if (!newAssignees.includes(fromId)) newAssignees.push(fromId);
-      const updated = { 
-        ...t, 
+      const updated = {
+        ...t,
         assigneeIds: newAssignees,
         isDelegated: false,
         delegatedFrom: null,
@@ -440,16 +421,22 @@ export default class DataStore {
     let employees;
     if (idx >= 0) {
       const old = this._data.employees[idx];
-      // Сохраняем все поля старого объекта и обновляем переданными
+      // Слияние: сохраняем все поля старого и обновляем переданными
       const merged = { ...old, ...emp };
-      
+
       if (JSON.stringify(old.departments) !== JSON.stringify(emp.departments)) {
         this.addAudit('Изменение подразделений', `${emp.last} ${emp.first}: ${old.departments.map(d => d.deptId).join(',')} → ${emp.departments.map(d => d.deptId).join(',')}`);
       }
       if (JSON.stringify(old.roles) !== JSON.stringify(emp.roles)) {
         this.addAudit('Изменение ролей', `${emp.last} ${emp.first}: ${old.roles.join(', ')} → ${emp.roles.join(', ')}`);
       }
+
       employees = this._data.employees.map(e => e.id === emp.id ? merged : e);
+
+      // Если обновляемый сотрудник — текущий пользователь, обновляем _currentUser
+      if (this._currentUser && this._currentUser.id === emp.id) {
+        this._currentUser = merged;
+      }
     } else {
       employees = [...this._data.employees, emp];
       this.addAudit('Создание сотрудника', `${emp.last} ${emp.first}`);
@@ -541,29 +528,24 @@ export default class DataStore {
     this._notify();
   }
 
-  /**
-   * Утверждение или отклонение запроса на изменение часов
-   * @param {string} requestId - ID запроса
-   * @param {boolean} approved - true для утверждения
-   */
   approveHoursRequest(requestId, approved) {
     const request = this._data.hoursRequests.find(r => r.id === requestId);
     if (!request) return;
 
     let updatedData = {
       ...this._data,
-      hoursRequests: this._data.hoursRequests.map(r => 
+      hoursRequests: this._data.hoursRequests.map(r =>
         r.id === requestId ? { ...r, status: approved ? 'approved' : 'rejected' } : r
       )
     };
 
     if (approved) {
       if (request.kind === 'task') {
-        updatedData.tasks = updatedData.tasks.map(t => 
+        updatedData.tasks = updatedData.tasks.map(t =>
           t.id === request.targetId ? { ...t, plannedHours: request.newH } : t
         );
       } else {
-        updatedData.projects = updatedData.projects.map(p => 
+        updatedData.projects = updatedData.projects.map(p =>
           p.id === request.targetId ? { ...p, budget: request.newH } : p
         );
       }
@@ -573,48 +555,33 @@ export default class DataStore {
     this._notify();
   }
 
-  /**
-   * Утверждение или отклонение отпуска
-   * @param {string} vacationId - ID отпуска
-   * @param {boolean} approved - true для утверждения
-   */
   approveVacation(vacationId, approved) {
     this._data = {
       ...this._data,
-      vacations: this._data.vacations.map(v => 
+      vacations: this._data.vacations.map(v =>
         v.id === vacationId ? { ...v, status: approved ? 'approved' : 'rejected' } : v
       )
     };
     this._notify();
   }
 
-  /**
-   * Утверждение или отклонение делегирования ролей
-   * @param {string} delegationId - ID делегирования
-   * @param {boolean} approved - true для утверждения
-   */
   approveRoleDelegation(delegationId, approved) {
     this._data = {
       ...this._data,
-      roleDelegations: this._data.roleDelegations.map(r => 
+      roleDelegations: this._data.roleDelegations.map(r =>
         r.id === delegationId ? { ...r, status: approved ? 'active' : 'rejected' } : r
       )
     };
     this._notify();
   }
 
-  /**
-   * Одобрение или отклонение заявки на регистрацию
-   * @param {string} requestId - ID заявки
-   * @param {boolean} approved - true для одобрения
-   */
   approveRegistration(requestId, approved) {
     const request = this._data.regRequests.find(r => r.id === requestId);
     if (!request) return;
 
     let updatedData = {
       ...this._data,
-      regRequests: this._data.regRequests.map(r => 
+      regRequests: this._data.regRequests.map(r =>
         r.id === requestId ? { ...r, status: approved ? 'approved' : 'rejected' } : r
       )
     };
@@ -623,7 +590,7 @@ export default class DataStore {
       const existing = updatedData.employees.find(e => e.email === request.email);
       if (existing) {
         const updated = { ...existing, roles: ['executor'] };
-        updatedData.employees = updatedData.employees.map(e => 
+        updatedData.employees = updatedData.employees.map(e =>
           e.id === updated.id ? updated : e
         );
       } else {
@@ -652,13 +619,7 @@ export default class DataStore {
     this._notify();
   }
 
-  /**
-   * Регистрация нового сотрудника (публичный API вместо прямой мутации setDb)
-   * @param {Object} regData - данные регистрации {first, last, email, pass}
-   * @returns {Object|null} созданный сотрудник или null при ошибке
-   */
   registerEmployee(regData) {
-    // Проверка на существующий email
     const existing = this._data.employees.find(e => e.email.toLowerCase() === regData.email.toLowerCase());
     if (existing) {
       return null;
@@ -669,7 +630,7 @@ export default class DataStore {
       last: regData.last.trim(),
       first: regData.first.trim(),
       email: regData.email.trim().toLowerCase(),
-      pass: regData.pass, // В реальном приложении здесь должен быть хеш
+      pass: regData.pass,
       position: 'Сотрудник',
       departments: [],
       roles: ['executor'],
@@ -694,7 +655,7 @@ export default class DataStore {
       ]
     };
     this._notify();
-    
+
     return newEmployee;
   }
 
@@ -711,10 +672,6 @@ export default class DataStore {
     this._notify();
   }
 
-  /**
-   * Обновление сотрудника (публичный API вместо прямой мутации setDb)
-   * @param {Object} emp - данные сотрудника
-   */
   updateEmployee(emp) {
     const idx = this._data.employees.findIndex(e => e.id === emp.id);
     if (idx < 0) {
@@ -723,32 +680,18 @@ export default class DataStore {
     this.upsertEmployee(emp);
   }
 
-  /**
-   * Создание КБ (публичный API вместо прямой мутации setDb)
-   * @param {string} name - название КБ
-   * @param {string} full - полное название
-   */
   createKb(name, full = name) {
     const kb = { id: 'kb_' + Math.random().toString(36).slice(2, 6), name, full };
     this.upsertKb(kb);
     return kb;
   }
 
-  /**
-   * Создание отдела (публичный API вместо прямой мутации setDb)
-   * @param {string} name - название отдела
-   * @param {string|null} kbId - ID КБ или null
-   */
   createDepartment(name, kbId = null) {
     const dept = { id: 'd_' + Math.random().toString(36).slice(2, 6), name, kbId };
     this.upsertDepartment(dept);
     return dept;
   }
 
-  /**
-   * Удаление отпуска (публичный API вместо прямой мутации setDb)
-   * @param {string} vacationId - ID отпуска
-   */
   deleteVacationById(vacationId) {
     this.deleteVacation(vacationId);
   }
