@@ -67,8 +67,8 @@ export default function ProjectsKanban({ db, ur, openProject, closeProject, canc
   const canCreateProject = hasRole(ur, 'admin', 'director', 'kb_chief', 'project_manager');
 
   return (
-    <div className="kanban-container" style={{ width: '100%', maxWidth: '100%' }}>
-      <div className="kanban k5" style={{ width: '100%', maxWidth: '100%' }}>
+    <div className="w-full" style={{ maxWidth: '100%' }}>
+      <div className="flex gap-6 p-6 w-full overflow-x-auto" style={{ minWidth: '100%' }}>
         {PROJECT_STATUS_ORDER.map((status) => {
           const projects = list.filter(p => p.status === status);
           const statusConfig = PROJECT_STATUS_CONFIG[status];
@@ -76,7 +76,7 @@ export default function ProjectsKanban({ db, ur, openProject, closeProject, canc
           return (
             <div 
               key={status} 
-              className={`kcol${dragOverCol === status ? ' over' : ''}`}
+              className="flex-shrink-0 w-[320px] lg:w-[380px] xl:flex-grow bg-gray-50 rounded-lg shadow-sm border border-gray-200"
               onDragOver={(e) => { e.preventDefault(); setDragOverCol(status); }}
               onDragLeave={() => setDragOverCol(null)}
               onDrop={(e) => { 
@@ -95,12 +95,14 @@ export default function ProjectsKanban({ db, ur, openProject, closeProject, canc
                 }
               }}
             >
-              <div className="kcol-head">
-                <span className="kdot" style={{ background: statusConfig.color }} />
-                {statusConfig.label}
-                <span className="kcount">{projects.length}</span>
+              <div className="kcol-head p-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-gray-50 rounded-t-lg">
+                <div className="flex items-center gap-2">
+                  <span className="kdot w-3 h-3 rounded-full" style={{ background: statusConfig.color }} />
+                  <span className="font-semibold text-gray-800">{statusConfig.label}</span>
+                </div>
+                <span className="kcount bg-gray-200 text-gray-700 px-2 py-1 rounded-full text-xs font-medium">{projects.length}</span>
               </div>
-              <div className="kcol-body">
+              <div className="kcol-body p-3 space-y-3 min-h-[200px]">
                 {projects.length === 0 ? (
                   <div className="kempty">Нет проектов</div>
                 ) : (
@@ -116,41 +118,41 @@ export default function ProjectsKanban({ db, ur, openProject, closeProject, canc
                     return (
                       <div 
                         key={p.id} 
-                        className="kcard"
+                        className="kcard bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer"
                         onClick={() => openProject(p.id)}
                         draggable={canDrag}
                         onDragStart={(e) => e.dataTransfer.setData("text/plain", p.id)}
-                        style={{ cursor: 'pointer', borderLeft: `4px solid ${PROJECT_CATEGORIES[p.category || 'NORM']?.color || '#10b981'}` }}
+                        style={{ borderLeft: `4px solid ${PROJECT_CATEGORIES[p.category || 'NORM']?.color || '#10b981'}` }}
                       >
-                        <div className="kcard-title">{p.name}</div>
-                        <div className="kcard-proj">
-                          <span className="pdot" style={{ background: PROJECT_CATEGORIES[p.category || 'NORM']?.color || '#10b981' }} />
-                          {p.code}
+                        <div className="kcard-title font-semibold text-gray-900 mb-2 break-words line-clamp-2">{p.name}</div>
+                        <div className="kcard-proj flex items-center gap-2 mb-2">
+                          <span className="pdot w-2 h-2 rounded-full" style={{ background: PROJECT_CATEGORIES[p.category || 'NORM']?.color || '#10b981' }} />
+                          <span className="text-sm text-gray-600 font-mono">{p.code}</span>
                         </div>
-                        <div className="kcard-meta">
-                          <span className="mut sm">{PROJECT_TYPES[p.ptype || 'prod']}</span>
-                          <span className="mut sm" style={{ color: PROJECT_CATEGORIES[p.category || 'NORM']?.color || '#10b981', fontWeight: 600 }}>{PROJECT_CATEGORIES[p.category || 'NORM']?.label || 'NORM'}</span>
+                        <div className="kcard-meta flex flex-wrap gap-2 mb-3 text-xs">
+                          <span className="mut sm bg-gray-100 px-2 py-1 rounded">{PROJECT_TYPES[p.ptype || 'prod']}</span>
+                          <span className="mut sm px-2 py-1 rounded" style={{ color: PROJECT_CATEGORIES[p.category || 'NORM']?.color || '#10b981', fontWeight: 600, backgroundColor: `${PROJECT_CATEGORIES[p.category || 'NORM']?.color || '#10b981'}20` }}>{PROJECT_CATEGORIES[p.category || 'NORM']?.label || 'NORM'}</span>
                           {p.budget != null && (
-                            <span className="khours">
-                              <Ic d={ICONS.clock} size={13} /> {fact}/{p.budget} ч ({usePct}%)
+                            <span className="khours flex items-center gap-1 bg-gray-100 px-2 py-1 rounded">
+                              <Ic d={ICONS.clock} size={13} /> <span>{fact}/{p.budget} ч ({usePct}%)</span>
                             </span>
                           )}
                         </div>
-                        <div className="kcard-foot">
-                          <div className="pj-avatars" style={{ flex: 1 }}>
+                        <div className="kcard-foot flex items-center justify-between">
+                          <div className="pj-avatars flex items-center gap-1" style={{ flex: 1 }}>
                             {uniqueAssignees.slice(0, 4).map(id => {
                               const a = db.employees.find(e => e.id === id);
                               return a ? (
                                 <span 
                                   key={id} 
-                                  className="avatar xs" 
+                                  className="avatar xs w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-700 overflow-hidden ring-2 ring-white"
                                   title={`${a.last} ${a.first}`}
                                   onMouseEnter={(e) => setTooltip(prev => ({ ...prev, visible: true, employee: a, x: e.clientX, y: e.clientY }))}
                                   onMouseLeave={() => setTooltip(prev => ({ ...prev, visible: false }))}
                                   onMouseMove={(e) => setTooltip(prev => ({ ...prev, x: e.clientX, y: e.clientY }))}
                                 >
                                   {a.photo ? (
-                                    <img src={a.photo} alt="Аватар" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                                    <img src={a.photo} alt="Аватар" className="w-full h-full object-cover" />
                                   ) : (
                                     initials(a.first, a.last)
                                   )}
@@ -158,13 +160,13 @@ export default function ProjectsKanban({ db, ur, openProject, closeProject, canc
                               ) : null;
                             })}
                             {uniqueAssignees.length > 4 && (
-                              <span className="mut sm">+{uniqueAssignees.length - 4}</span>
+                              <span className="mut sm text-gray-500 text-xs">+{uniqueAssignees.length - 4}</span>
                             )}
                           </div>
-                          <div className="pj-actions" onClick={(e) => e.stopPropagation()}>
+                          <div className="pj-actions flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                             {canCloseProject(p) && p.status !== 'closed' && p.status !== 'cancelled' && (
                               <button 
-                                className="icon-btn danger" 
+                                className="icon-btn danger w-8 h-8 rounded-full hover:bg-red-50 flex items-center justify-center transition-colors"
                                 title="Закрыть/Отменить проект" 
                                 onClick={() => {
                                   const action = window.confirm(`Закрыть проект "${p.name}"? Все задачи проекта будут переведены в статус "Закрыта".`) 
@@ -174,7 +176,7 @@ export default function ProjectsKanban({ db, ur, openProject, closeProject, canc
                                   else if (action === 'cancel') cancelProject(p);
                                 }}
                               >
-                                <Ic d={ICONS.x} size={15} />
+                                <Ic d={ICONS.x} size={15} className="text-red-600" />
                               </button>
                             )}
                           </div>
