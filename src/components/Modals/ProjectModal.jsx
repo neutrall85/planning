@@ -24,7 +24,11 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
   const scope = computeScope(ur, db);
   const isExec = !scope.all && !hasRole(ur, 'director', 'economist', 'kb_chief', 'head', 'project_lead');
 
-  const [f, setF] = useState(existing ? { ...existing } : {
+  const [f, setF] = useState(existing ? { 
+    ...existing, 
+    start: existing.start ? iso(parseISO(existing.start)) : TODAY,
+    end: existing.end ? iso(parseISO(existing.end)) : iso(addDays(new Date(), 30)),
+  } : {
     id: "p_" + uid(),
     code: "",
     name: "",
@@ -46,9 +50,9 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
     customer: "",
     aircraftType: "",
     projectType: "",
-    comments: existing?.comments || [],
-    history: existing?.history || [{ ts: Date.now(), who: ur.id, text: "Проект создан" }],
-    files: existing?.files || [],
+    comments: [],
+    history: [{ ts: Date.now(), who: ur.id, text: "Проект создан" }],
+    files: [],
   });
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
   const isAdminType = f.ptype === "admin";

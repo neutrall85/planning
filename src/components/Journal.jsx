@@ -467,7 +467,8 @@ export default function Journal({ db }) {
           </div>
         )}
       </div>
+      {/* Tooltip сотрудника */}
+      <EmployeeTooltip {...tooltip} />
     </div>
   );
-}      {/* Tooltip сотрудника */}
-      <EmployeeTooltip {...tooltip} />
+}

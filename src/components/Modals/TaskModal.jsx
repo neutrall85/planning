@@ -183,7 +183,12 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
   const projs = (scope.all ? db.projects : db.projects.filter((p) => scope.projIds.has(p.id))).filter((p) => p.status === "active" && !p.archived);
   const asOpts = assigneeOptions(ur, db);
   
-  const [f, setF] = useState(existing ? { ...existing, comments: existing.comments || [] } : {
+  const [f, setF] = useState(existing ? { 
+    ...existing, 
+    comments: existing.comments || [],
+    start: existing.start ? iso(parseISO(existing.start)) : TODAY,
+    deadline: existing.deadline ? iso(parseISO(existing.deadline)) : iso(addDays(new Date(), 14)),
+  } : {
     id: "t_" + uid(), title: "", desc: "", projectId: currentProjectId, assigneeIds: [], priority: "mid",
     plannedHours: 8, start: TODAY, deadline: iso(addDays(new Date(), 14)), status: "new", logs: [], comments: [], history: [], delegatedFrom: null, archived: false, archivedAt: null, closedAt: null,
     creatorId: ur.id,
