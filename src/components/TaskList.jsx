@@ -119,9 +119,9 @@ export default function TaskList({ db, ur, openTask, onMove, onNew, showOnlyMyTa
                           className="avatar xs" 
                           title={`${a.last} ${a.first}`}
                           style={{ cursor: 'pointer' }}
-                          onMouseEnter={(e) => setTooltip({ visible: true, employee: a, x: e.clientX, y: e.clientY })}
-                          onMouseLeave={() => setTooltip({ ...tooltip, visible: false })}
-                          onMouseMove={(e) => setTooltip({ ...tooltip, x: e.clientX, y: e.clientY })}
+                          onMouseEnter={(e) => setTooltip(prev => ({ ...prev, visible: true, employee: a, x: e.clientX, y: e.clientY }))}
+                          onMouseLeave={() => setTooltip(prev => ({ ...prev, visible: false }))}
+                          onMouseMove={(e) => setTooltip(prev => ({ ...prev, x: e.clientX, y: e.clientY }))}
                         >
                           {a.photo ? (
                             <img src={a.photo} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />

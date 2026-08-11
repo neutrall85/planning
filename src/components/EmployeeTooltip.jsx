@@ -1,5 +1,4 @@
 import React from 'react';
-import { fmtD } from '../utils/date';
 
 /**
  * Всплывающее окно с информацией о сотруднике
@@ -8,7 +7,7 @@ import { fmtD } from '../utils/date';
  * @param {string} employee.last - Фамилия  
  * @param {string} employee.phone - Мобильный телефон
  * @param {string} employee.extension - Внутренний номер
- * @param {string} employee.email - Email
+ * @param {string} employee.email - Email (может быть с доменом или без)
  * @param {boolean} visible - Видимость tooltip
  * @param {number} x - Позиция X
  * @param {number} y - Позиция Y
@@ -18,7 +17,11 @@ export default function EmployeeTooltip({ employee, visible, x, y }) {
 
   const fullName = `${employee.last} ${employee.first}`;
   const internalPhone = employee.extension ? `доб. ${employee.extension}` : '';
-  const email = employee.email ? `${employee.email}@aeroplan.ru` : '';
+  // Email может быть уже с доменом или без
+  let email = employee.email || '';
+  if (email && !email.includes('@')) {
+    email = `${email}@aeroplan.ru`;
+  }
 
   return (
     <div 

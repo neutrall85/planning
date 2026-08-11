@@ -1,9 +1,10 @@
-import { useState, useMemo } from 'react';
-import { iso, addDays, fmtDMY, isTaskActive } from '../utils/date';
+import React, { useState, useMemo } from 'react';
+import { iso, addDays, fmtDMY, isTaskActive, initials } from '../utils/date';
 import { taskVisible, computeScope, hasRole } from '../utils/permissions';
 import { Ic, ICONS } from './Icons';
+import EmployeeTooltip from './EmployeeTooltip';
 
-const DayCell = ({ d, big, byDay, db, openTask }) => {
+const DayCell = ({ d, big, byDay, db, openTask, onAvatarEnter, onAvatarLeave, onAvatarMove }) => {
   const dayIso = iso(d);
   const tasks = byDay[dayIso] || [];
 
@@ -23,7 +24,29 @@ const DayCell = ({ d, big, byDay, db, openTask }) => {
                 <span className="pdot" style={{ background: statusColor }} />
                 <span>{t.title}</span>
               </div>
-              <div className="cal-executor">{execNames}</div>
+              <div className="cal-executor">
+                {execNames}
+                {/* Аватарки исполнителей для tooltip */}
+                <div style={{ display: 'flex', gap: -4, marginTop: 4 }}>
+                  {assignees.slice(0, 3).map(a => (
+                    <span
+                      key={a.id}
+                      className="avatar xs"
+                      title={`${a.last} ${a.first}`}
+                      style={{ cursor: 'pointer' }}
+                      onMouseEnter={(e) => onAvatarEnter && onAvatarEnter(e, a)}
+                      onMouseLeave={onAvatarLeave}
+                      onMouseMove={(e) => onAvatarMove && onAvatarMove(e)}
+                    >
+                      {a.photo ? (
+                        <img src={a.photo} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                      ) : (
+                        initials(a.first, a.last)
+                      )}
+                    </span>
+                  ))}
+                </div>
+              </div>
             </div>
           );
         })}
@@ -37,9 +60,21 @@ export default function Calendar({ db, ur, openTask }) {
   const [mode, setMode] = useState('month');
   const [anchor, setAnchor] = useState(new Date());
   const [showOnlyMy, setShowOnlyMy] = useState(false);
+  const [tooltip, setTooltip] = useState({ visible: false, employee: null, x: 0, y: 0 });
 
   // Определяем, показывать ли чекбокс – только если пользователь видит не только свои задачи
   const canSeeAll = hasRole(ur, "admin", "director", "economist", "kb_chief", "head", "project_lead", "project_manager");
+
+  // Обработчики для tooltip
+  const handleAvatarEnter = (e, employee) => {
+    setTooltip(prev => ({ ...prev, visible: true, employee, x: e.clientX, y: e.clientY }));
+  };
+  const handleAvatarLeave = () => {
+    setTooltip(prev => ({ ...prev, visible: false }));
+  };
+  const handleAvatarMove = (e) => {
+    setTooltip(prev => ({ ...prev, x: e.clientX, y: e.clientY }));
+  };
 
   // Сначала получаем все задачи, которые видны пользователю
   let allTasks = db.tasks.filter(t => isTaskActive(t) && taskVisible(ur, scope, t, db) && t.deadline && !['closed','cancelled'].includes(t.status));
@@ -70,13 +105,13 @@ export default function Calendar({ db, ur, openTask }) {
     const cells = []; for (let i=0; i<42; i++) cells.push(addDays(first, i-offset));
     body = (<>
       <div className="cal-grid-head">{['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map(w => <div key={w} className="cal-wd">{w}</div>)}</div>
-      <div className="cal-grid">{cells.map(d => <div key={iso(d)} className={d.getMonth()===anchor.getMonth()?'':'outwrap'}><DayCell d={d} big={false} byDay={byDay} db={db} openTask={openTask} /></div>)}</div>
+      <div className="cal-grid">{cells.map(d => <div key={iso(d)} className={d.getMonth()===anchor.getMonth()?'':'outwrap'}><DayCell d={d} big={false} byDay={byDay} db={db} openTask={openTask} onAvatarEnter={handleAvatarEnter} onAvatarLeave={handleAvatarLeave} onAvatarMove={handleAvatarMove} /></div>)}</div>
     </>);
   } else if (mode === 'week') {
     const mon = addDays(anchor, -((anchor.getDay()+6)%7));
-    body = <div className="cal-week">{[0,1,2,3,4,5,6].map(i => <DayCell key={i} d={addDays(mon, i)} big byDay={byDay} db={db} openTask={openTask} />)}</div>;
+    body = <div className="cal-week">{[0,1,2,3,4,5,6].map(i => <DayCell key={i} d={addDays(mon, i)} big byDay={byDay} db={db} openTask={openTask} onAvatarEnter={handleAvatarEnter} onAvatarLeave={handleAvatarLeave} onAvatarMove={handleAvatarMove} />)}</div>;
   } else {
-    body = <div className="cal-week one"><DayCell d={anchor} big byDay={byDay} db={db} openTask={openTask} /></div>;
+    body = <div className="cal-week one"><DayCell d={anchor} big byDay={byDay} db={db} openTask={openTask} onAvatarEnter={handleAvatarEnter} onAvatarLeave={handleAvatarLeave} onAvatarMove={handleAvatarMove} /></div>;
   }
 
   return (
@@ -99,6 +134,8 @@ export default function Calendar({ db, ur, openTask }) {
       </div>
       <div className="cal-note">Только задачи с дедлайнами.</div>
       {body}
+      {/* Tooltip сотрудника */}
+      <EmployeeTooltip {...tooltip} />
     </div>
   );
 }

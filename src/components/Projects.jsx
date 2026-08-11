@@ -3,10 +3,14 @@ import { PROJECT_STATUSES, PROJECT_TYPES, PROJECT_CATEGORIES } from '../utils/co
 import { fmtDMY, initials, isTaskActive } from '../utils/date';
 import { Ic, ICONS } from './Icons';
 import { computeScope, hasRole } from '../utils/permissions';
+import EmployeeTooltip from './EmployeeTooltip';
 
 export default function Projects({ db, ur, openProject, openHoursReq, closeProject, cancelProject, showOnlyMyProjects: parentShowOnlyMyProjects, sortBy: parentSortBy }) {
   const scope = useMemo(() => computeScope(ur, db), [ur, db]);
   const canSeeAllProjects = hasRole(ur, "admin", "director", "economist", "kb_chief", "head", "project_lead", "project_manager");
+  
+  // Состояние для tooltip
+  const [tooltip, setTooltip] = useState({ visible: false, employee: null, x: 0, y: 0 });
   
   // Используем пропсы от родителя, если переданы, иначе локальное состояние
   const showOnlyMyProjects = parentShowOnlyMyProjects !== undefined ? parentShowOnlyMyProjects : false;
@@ -100,11 +104,19 @@ export default function Projects({ db, ur, openProject, openHoursReq, closeProje
                       const a = db.employees.find(e => e.id === id);
                       return a && (
                         <span
-                          key={`${t.id}-${a.id}`}  // <--- УНИКАЛЬНЫЙ КЛЮЧ
+                          key={`${t.id}-${a.id}`}
                           className="avatar xs"
                           title={`${a.last} ${a.first}`}
+                          style={{ cursor: 'pointer' }}
+                          onMouseEnter={(e) => setTooltip(prev => ({ ...prev, visible: true, employee: a, x: e.clientX, y: e.clientY }))}
+                          onMouseLeave={() => setTooltip(prev => ({ ...prev, visible: false }))}
+                          onMouseMove={(e) => setTooltip(prev => ({ ...prev, x: e.clientX, y: e.clientY }))}
                         >
-                          {initials(a.first, a.last)}
+                          {a.photo ? (
+                            <img src={a.photo} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                          ) : (
+                            initials(a.first, a.last)
+                          )}
                         </span>
                       );
                     })
@@ -138,6 +150,8 @@ export default function Projects({ db, ur, openProject, openHoursReq, closeProje
           );
         })}
       </div>
+      {/* Tooltip сотрудника */}
+      <EmployeeTooltip {...tooltip} />
     </div>
   );
 }
