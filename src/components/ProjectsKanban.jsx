@@ -4,6 +4,7 @@ import { fmtDMY, initials, isTaskActive } from '../utils/date';
 import { Ic, ICONS } from './Icons';
 import { computeScope, hasRole, canChangeProjectStatus } from '../utils/permissions';
 import { useToast } from './Toast';
+import EmployeeTooltip from './EmployeeTooltip'; // <-- добавлен импорт
 
 // Порядок статусов для канбан-доски
 const PROJECT_STATUS_ORDER = ['inactive', 'active', 'closed', 'cancelled'];
@@ -20,10 +21,11 @@ export default function ProjectsKanban({ db, ur, openProject, closeProject, canc
   const scope = useMemo(() => computeScope(ur, db), [ur, db]);
   const canSeeAllProjects = hasRole(ur, "admin", "director", "economist", "kb_chief", "head", "project_lead", "project_manager");
   
-  // Используем useToast для консистентности
   const showToast = useToast(toast);
   
-  // Используем пропсы от родителя, если переданы, иначе локальное состояние
+  // Состояние для tooltip
+  const [tooltip, setTooltip] = useState({ visible: false, employee: null, x: 0, y: 0 }); // <-- добавлено
+
   const showOnlyMyProjects = parentShowOnlyMyProjects !== undefined ? parentShowOnlyMyProjects : false;
   const sortBy = parentSortBy !== undefined ? parentSortBy : "name";
   const [dragOverCol, setDragOverCol] = useState(null);
@@ -186,6 +188,8 @@ export default function ProjectsKanban({ db, ur, openProject, closeProject, canc
           );
         })}
       </div>
+      {/* Tooltip сотрудника */}
+      <EmployeeTooltip {...tooltip} />
     </div>
   );
 }
