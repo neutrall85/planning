@@ -23,11 +23,15 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
   const { empName, getTaskSpent } = useDataHelpers(db);
   const scope = computeScope(ur, db);
   const isExec = !scope.all && !hasRole(ur, 'director', 'economist', 'kb_chief', 'head', 'project_lead');
+  
+  // Определяем тип проекта ДО инициализации состояния
+  const initialProjectType = existing?.ptype || "prod";
+  const isAdminTypeInitial = initialProjectType === "admin";
 
   const [f, setF] = useState(existing ? { 
     ...existing, 
     start: existing.start ? iso(parseISO(existing.start)) : TODAY,
-    end: existing.end ? iso(parseISO(existing.end)) : iso(addDays(new Date(), 30)),
+    end: existing.end ? iso(parseISO(existing.end)) : "",
     aircraftType: existing.aircraftType || "",
     projectType: existing.projectType || "",
     budget: existing.budget || "",
@@ -40,9 +44,9 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
     kbId: "",
     managerId: "",
     start: TODAY,
-    end: iso(addDays(new Date(), 30)),
+    end: "",
     status: "active",
-    budget: 100,
+    budget: "",
     color: ["#0ea5e9", "#8b5cf6", "#f43f5e", "#f59e0b", "#10b981", "#ec4899"][Math.floor(Math.random() * 6)],
     ptype: "prod",
     category: "NORM",
