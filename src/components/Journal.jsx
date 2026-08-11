@@ -169,9 +169,11 @@ export default function Journal({ db }) {
     let lastMonth = null;
     
     groupedEntries.forEach(group => {
-      // group.date имеет формат MM.YYYY, преобразуем правильно
-      const [monthStr, yearStr] = group.date.split('.');
-      const monthDate = new Date(parseInt(yearStr), parseInt(monthStr) - 1, 1);
+      // group.date имеет формат DD.MM.YYYY, преобразуем правильно
+      const parts = group.date.split('.');
+      if (parts.length !== 3) return;
+      const [dayStr, monthStr, yearStr] = parts.map(Number);
+      const monthDate = new Date(yearStr, monthStr - 1, 1);
       const monthLabel = !isNaN(monthDate.getTime()) 
         ? monthDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })
         : `${monthStr}.${yearStr}`;
