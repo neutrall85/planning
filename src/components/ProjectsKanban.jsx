@@ -163,23 +163,6 @@ export default function ProjectsKanban({ db, ur, openProject, closeProject, canc
                               <span className="mut sm text-gray-500 text-xs">+{uniqueAssignees.length - 4}</span>
                             )}
                           </div>
-                          <div className="pj-actions flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                            {canCloseProject(p) && p.status !== 'closed' && p.status !== 'cancelled' && (
-                              <button 
-                                className="icon-btn danger w-8 h-8 rounded-full hover:bg-red-50 flex items-center justify-center transition-colors"
-                                title="Закрыть/Отменить проект" 
-                                onClick={() => {
-                                  const action = window.confirm(`Закрыть проект "${p.name}"? Все задачи проекта будут переведены в статус "Закрыта".`) 
-                                    ? 'close' 
-                                    : (window.confirm(`Отменить проект "${p.name}"? Все задачи проекта будут переведены в статус "Отменена".`) ? 'cancel' : null);
-                                  if (action === 'close') closeProject(p);
-                                  else if (action === 'cancel') cancelProject(p);
-                                }}
-                              >
-                                <Ic d={ICONS.x} size={15} className="text-red-600" />
-                              </button>
-                            )}
-                          </div>
                         </div>
                       </div>
                     );
