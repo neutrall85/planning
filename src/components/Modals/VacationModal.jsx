@@ -2,14 +2,19 @@ import React, { useState } from 'react';
 import { Modal } from '../Modal';
 import { useDataHelpers } from '../../hooks';
 import { VACATION_TYPES, TASK_STATUSES } from '../../utils/constants';
-import { TODAY, iso, addDays, uid, fmtDMY } from '../../utils/date';
+import { TODAY, iso, addDays, uid, fmtDMY, parseISO } from '../../utils/date';
 import { canManageAllVacations } from '../../utils/permissions';
 
 export const VacationModal = ({ db, ur, vacationId, forEmpId, onClose, onSave }) => {
   const existing = vacationId ? db.vacations.find((v) => v.id === vacationId) : null;
   const canPick = canManageAllVacations(ur);
   const { empName, primaryDept } = useDataHelpers(db);
-  const [f, setF] = useState(existing ? { ...existing, delegation: { ...existing.delegation } } : {
+  const [f, setF] = useState(existing ? { 
+    ...existing, 
+    delegation: { ...existing.delegation },
+    start: existing.start ? iso(parseISO(existing.start)) : TODAY,
+    end: existing.end ? iso(parseISO(existing.end)) : iso(addDays(new Date(), 7)),
+  } : {
     id: "v_" + uid(), empId: forEmpId || ur.id, start: TODAY, end: iso(addDays(new Date(), 7)), type: "annual", comment: "",
     status: canManageAllVacations(ur) && forEmpId ? "approved" : "pending",
     delegation: { enabled: false, subId: "", statuses: [], state: null },
