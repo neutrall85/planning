@@ -4,6 +4,7 @@ import { TODAY, fmtDMY, fmtD, iso, addDays, initials, isTaskActive } from '../ut
 import { useDataHelpers } from '../hooks';
 import { Ic, ICONS } from './Icons';
 import { useToast } from './Toast';
+import EmployeeTooltip from './EmployeeTooltip';
 
 function getCategoryColor(project) {
   if (!project || project.ptype === 'admin') return '#6b7280';
@@ -31,6 +32,9 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
 
   const [expFrom, setExpFrom] = useState('');
   const [expTo, setExpTo] = useState('');
+  
+  // Состояние для tooltip
+  const [tooltip, setTooltip] = useState({ visible: false, employee: null, x: 0, y: 0 });
 
   const myTasks = data.tasks.filter(t => isTaskActive(t) && (t.assigneeIds || []).includes(user.id) && !user.fired);
   const myProjects = [...new Set(myTasks.map(t => t.projectId))].map(id => data.projects.find(p => p.id === id)).filter(Boolean);
@@ -301,9 +305,21 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
               {/* Левая колонка – фото и кнопки */}
               <div style={{ flex: '0 0 140px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
                 {user.photo ? (
-                  <img src={user.photo} alt="Аватар" style={{ width: 120, height: 120, borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--line)' }} />
+                  <img 
+                    src={user.photo} 
+                    alt="Аватар" 
+                    style={{ width: 120, height: 120, borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--line)', cursor: 'pointer' }}
+                    onMouseEnter={(e) => setTooltip({ visible: true, employee: user, x: e.clientX, y: e.clientY })}
+                    onMouseLeave={() => setTooltip(prev => ({ ...prev, visible: false }))}
+                    onMouseMove={(e) => setTooltip(prev => ({ ...prev, x: e.clientX, y: e.clientY }))}
+                  />
                 ) : (
-                  <div style={{ width: 120, height: 120, borderRadius: '50%', background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 12 }}>Нет фото</div>
+                  <div 
+                    style={{ width: 120, height: 120, borderRadius: '50%', background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 12, cursor: 'pointer' }}
+                    onMouseEnter={(e) => setTooltip({ visible: true, employee: user, x: e.clientX, y: e.clientY })}
+                    onMouseLeave={() => setTooltip(prev => ({ ...prev, visible: false }))}
+                    onMouseMove={(e) => setTooltip(prev => ({ ...prev, x: e.clientX, y: e.clientY }))}
+                  >Нет фото</div>
                 )}
                 <input type="file" accept="image/*" ref={fileInputRef} style={{ display: 'none' }} onChange={handlePhotoUpload} />
                 <button className="btn primary sm" onClick={() => fileInputRef.current?.click()}>Загрузить фото</button>
@@ -398,6 +414,9 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
           </div>
         </div>
       )}
+
+      {/* Tooltip сотрудника */}
+      <EmployeeTooltip {...tooltip} />
     </div>
   );
 }
