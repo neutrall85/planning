@@ -326,33 +326,29 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
                   </div>
                   
                   <label className="lbl">Мобильный телефон</label>
-                  <input className="inp" value={user.phone} onChange={e => {
-                    const updated = { ...user, phone: e.target.value };
-                    store.upsertEmployee(updated);
-                  }} />
+                  <input
+                    className="inp"
+                    value={user.phone || ''}
+                    onChange={e => {
+                      const updated = { ...user, phone: e.target.value };
+                      store.upsertEmployee(updated);
+                    }}
+                    placeholder="+7 (___) ___-__-__"
+                  />
 
-                  <label className="lbl">Внутренний номер телефона *</label>
+                  <label className="lbl">Внутренний номер телефона</label>
                   <input
                     className="inp"
                     value={user.extension || ''}
                     onChange={e => {
-                      const val = e.target.value;
-                      if (val.trim() === '') {
-                        showToast('Внутренний номер телефона не может быть пустым');
-                        return;
-                      }
-                      const updated = { ...user, extension: val.trim() };
+                      const updated = { ...user, extension: e.target.value.trim() };
                       store.upsertEmployee(updated);
                     }}
-                    onBlur={e => {
-                      if (!e.target.value.trim()) {
-                        showToast('Внутренний номер телефона обязателен');
-                      }
-                    }}
+                    placeholder="1234"
                   />
                   
                   <label className="lbl">Табельный №</label>
-                  <input className="inp" value={user.tab} onChange={e => {
+                  <input className="inp" value={user.tab || ''} onChange={e => {
                     const updated = { ...user, tab: e.target.value };
                     store.upsertEmployee(updated);
                   }} />
