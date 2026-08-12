@@ -276,7 +276,27 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
                   <td><span className={`st-chip ${r.status}`}>
                     {{ pending: 'Ожидает принятия', active: 'Активно', rejected: 'Отклонено', revoked: 'Отозвано', expired: 'Истекло' }[r.status]}
                   </span></td>
-                  <td>{r.status === 'active' && r.fromId === user.id && <button className="btn ghost sm" onClick={() => { /* revoke */ }}>Отозвать</button>}</td>
+                  <td>
+                    {r.status === 'active' && r.fromId === user.id && (
+                      <button 
+                        className="btn ghost sm" 
+                        onClick={() => {
+                          if (window.confirm('Отозвать делегирование ролей?')) {
+                            store.revokeRoleDelegation(r.id);
+                            toast('Делегирование отозвано', 'success');
+                          }
+                        }}
+                      >
+                        Отозвать
+                      </button>
+                    )}
+                    {r.status === 'pending' && r.toId === user.id && (
+                      <>
+                        <button className="btn primary sm" onClick={() => { store.approveRoleDelegation(r.id, true); toast('Делегирование принято', 'success'); }}>Принять</button>
+                        <button className="btn danger sm" onClick={() => { store.approveRoleDelegation(r.id, false); }}>Отклонить</button>
+                      </>
+                    )}
+                  </td>
                 </tr>
               ))}
               {myDeleg.length === 0 && <tr><td colSpan="6" className="mut">Делегирований нет</td></tr>}

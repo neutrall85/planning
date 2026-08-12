@@ -169,13 +169,37 @@ export default function Requests({ db, store, ur, initialTab = 'hours', addAudit
         <div className="rep-panel">
           <div className="rep-panel-title">Передача ролей</div>
           <table className="tbl">
-            <thead><tr><th>От</th><th>Кому</th><th>Роли</th><th>Статус / действие</th></tr></thead>
+            <thead><tr><th>От</th><th>Кому</th><th>Роли</th><th>Период</th><th>Статус / действие</th></tr></thead>
             <tbody>
               {db.roleDelegations.map(r => (
                 <tr key={r.id}>
-                  <td>{empName(r.fromId)}</td><td>{empName(r.toId)}</td>
+                  <td>{empName(r.fromId)}</td>
+                  <td>{empName(r.toId)}</td>
                   <td>{r.roles.map(x => ROLES[x].label).join(", ")}</td>
-                  <td>{r.status === "pending" && r.toId === ur.id ? (<><button className="btn primary sm" onClick={() => decideRD(r, true)}>Принять</button> <button className="btn danger sm" onClick={() => decideRD(r, false)}>Отклонить</button></>) : <span className={"st-chip " + r.status}>{r.status}</span>}</td>
+                  <td>{fmtDMY(r.start)} — {r.end ? fmtDMY(r.end) : 'до отмены'}</td>
+                  <td>
+                    {r.status === "pending" && r.toId === ur.id ? (
+                      <>
+                        <button className="btn primary sm" onClick={() => decideRD(r, true)}>Принять</button>
+                        <button className="btn danger sm" onClick={() => decideRD(r, false)}>Отклонить</button>
+                      </>
+                    ) : r.status === "active" && r.fromId === ur.id ? (
+                      <button 
+                        className="btn ghost sm"
+                        onClick={() => {
+                          if (window.confirm('Отозвать делегирование ролей?')) {
+                            store.revokeRoleDelegation(r.id);
+                          }
+                        }}
+                      >
+                        Отозвать
+                      </button>
+                    ) : (
+                      <span className={"st-chip " + r.status}>
+                        {{ pending: 'Ожидает принятия', active: 'Активно', rejected: 'Отклонено', revoked: 'Отозвано', expired: 'Истекло' }[r.status]}
+                      </span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
