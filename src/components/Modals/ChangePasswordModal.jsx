@@ -114,13 +114,7 @@ export const ChangePasswordModal = ({ user, store, onClose, toast }) => {
         passwordHistory: [...(user.passwordHistory || []).slice(-4), formData.newPassword],
       };
       
-      store.upsertEmployee(updated);
-      
-      // Обновляем _currentUser в store, чтобы сессия не разрывалась
-      if (store.getCurrentUser && store.getCurrentUser().id === user.id) {
-        store._currentUser = updated;
-        store._notify();
-      }
+      store.updateEmployee(updated);
       
       toast.success('Пароль успешно изменён.');
       onClose();

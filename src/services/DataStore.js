@@ -760,6 +760,12 @@ export default class DataStore {
       throw new Error(`Сотрудник с ID ${emp.id} не найден`);
     }
     this.upsertEmployee(emp);
+    // Явно обновляем _currentUser и уведомляем подписчиков, если это текущий пользователь
+    if (this._currentUser && this._currentUser.id === emp.id) {
+      const updated = this._data.employees.find(e => e.id === emp.id);
+      this._currentUser = updated;
+      this._notify();
+    }
   }
 
   createKb(name, full = name) {
