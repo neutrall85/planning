@@ -329,40 +329,24 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
                   </div>
                   
                   <label className="lbl">Мобильный телефон</label>
-                  <div className="duo">
-                    <input
-                      className="inp"
-                      disabled
-                      value={user.phone || ''}
-                      placeholder="+7 (___) ___-__-__"
-                    />
-                    <button 
-                      className="btn ghost sm" 
-                      onClick={() => openEmployeeEdit(user.id)}
-                    >
-                      изменить
-                    </button>
-                  </div>
+                  <input
+                    className="inp"
+                    disabled
+                    value={user.phone || ''}
+                    placeholder="+7 (___) ___-__-__"
+                  />
 
                   <label className="lbl">Внутренний номер телефона</label>
-                  <div className="duo">
-                    <input
-                      className="inp"
-                      disabled
-                      value={user.extension || ''}
-                      placeholder="1234"
-                    />
-                    <button 
-                      className="btn ghost sm" 
-                      onClick={() => openEmployeeEdit(user.id)}
-                    >
-                      изменить
-                    </button>
-                  </div>
+                  <input
+                    className="inp"
+                    disabled
+                    value={user.extension || ''}
+                    placeholder="1234"
+                  />
                   
                   <label className="lbl">Табельный №</label>
                   <input className="inp" disabled value={user.tab || ''} />
-                  <div className="mut sm" style={{ marginTop: -8, marginBottom: 8 }}>Изменение контактных данных доступно через кнопку «изменить» слева.</div>
+                  <div className="mut sm" style={{ marginTop: -8, marginBottom: 8 }}>Изменение контактных данных доступно через кнопку «изменить» справа от email.</div>
                   
                   <label className="lbl">Подразделения</label>
                   <div className="depts-readonly">
