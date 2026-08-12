@@ -1729,6 +1729,25 @@ input, select, textarea {
   font-size: 10px;
   color: var(--mut);
 }
+.dept-chip {
+  font-size: 10px;
+  background: #f1f5f9;
+  color: #475569;
+  border-radius: 4px;
+  padding: 2px 6px;
+  margin-right: 4px;
+}
+.dept-chip-secondary {
+  background: #e2e8f0;
+  color: #94a3b8;
+  font-style: italic;
+}
+.st-depts-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
 
 /* --- reports --- */
 .rep {

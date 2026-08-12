@@ -2,6 +2,7 @@
 # Build artifacts
 dist/
 build/
+*.css
 *.js
 
 # Dependencies
@@ -9,9 +10,40 @@ node_modules/
 
 # Editors
 .vscode/
+.idea/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Logs
+*.log
 
 # Environment
 .env
 .env.local
 *.env.*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Coverage
+coverage/
+htmlcov/
+.coverage
+
+# Testing
+.mypy_cache/
+.pytest_cache/
+
+# Java/Maven
+target/
+.gradle/
+
+# Virtual environments
+.venv/
+venv/
 ```
