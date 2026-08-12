@@ -318,15 +318,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
                   <input className="inp" disabled value={user.first} />
                   
                   <label className="lbl">E-mail</label>
-                  <div className="duo">
-                    <input className="inp" disabled value={user.email + '@volga-dnepr.com'} />
-                    <button 
-                      className="btn ghost sm" 
-                      onClick={() => openEmployeeEdit(user.id)}
-                    >
-                      изменить
-                    </button>
-                  </div>
+                  <input className="inp" disabled value={user.email + '@volga-dnepr.com'} />
                   
                   <label className="lbl">Мобильный телефон</label>
                   <input
@@ -346,7 +338,6 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
                   
                   <label className="lbl">Табельный №</label>
                   <input className="inp" disabled value={user.tab || ''} />
-                  <div className="mut sm" style={{ marginTop: -8, marginBottom: 8 }}>Изменение контактных данных доступно через кнопку «изменить» справа от email.</div>
                   
                   <label className="lbl">Подразделения</label>
                   <div className="depts-readonly">
@@ -359,9 +350,11 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
                   </div>
                   
                   <label className="lbl">Пароль</label>
-                  <div className="duo">
-                    <input className="inp" disabled value="••••••••" />
-                    <button className="btn ghost sm" onClick={openChangePassword}>сменить</button>
+                  <input className="inp" disabled value="••••••••" />
+                  
+                  <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                    <button className="btn ghost sm" onClick={() => openEmployeeEdit(user.id)}>Изменить данные</button>
+                    <button className="btn ghost sm" onClick={openChangePassword}>Сменить пароль</button>
                   </div>
                 </div>
               </div>
