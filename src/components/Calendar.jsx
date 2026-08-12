@@ -31,9 +31,9 @@ const DayCell = ({ d, big, byDay, db, openTask, onAvatarEnter, onAvatarLeave, on
                       key={a.id}
                       className="avatar xs"
                       style={{ cursor: 'pointer' }}
-                      onMouseEnter={(e) => onAvatarEnter && onAvatarEnter(e, a)}
-                      onMouseLeave={onAvatarLeave}
-                      onMouseMove={(e) => onAvatarMove && onAvatarMove(e)}
+                      onMouseEnter={(e) => { e.stopPropagation(); onAvatarEnter && onAvatarEnter(e, a); }}
+                      onMouseLeave={(e) => { e.stopPropagation(); onAvatarLeave && onAvatarLeave(e); }}
+                      onMouseMove={(e) => { e.stopPropagation(); onAvatarMove && onAvatarMove(e); }}
                     >
                       {a.photo ? (
                         <img src={a.photo} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
