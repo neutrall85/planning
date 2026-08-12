@@ -22,8 +22,7 @@ export const DeptsModal = ({ db, store, empId, onClose, toast, audit }) => {
   };
   
   const save = () => {
-    if (!sel.length) return toast.error?.("Выберите хотя бы одно подразделение") || alert("Выберите хотя бы одно подразделение");
-    if (!sel.some((x) => x.primary)) return toast.error?.("Укажите основное подразделение") || alert("Укажите основное подразделение");
+    if (!sel.some((x) => x.primary) && sel.length > 0) return toast.error?.("Укажите основное подразделение") || alert("Укажите основное подразделение");
     const before = emp.departments.map((x) => `${x.deptId}${x.rate ? `(${x.rate})` : ''}`).join(",");
     const updatedEmp = { ...emp, departments: sel };
     store.updateEmployee(updatedEmp);
