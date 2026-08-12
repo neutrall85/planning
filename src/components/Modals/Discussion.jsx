@@ -116,7 +116,7 @@ export default function Discussion({
         return taskParticipants(db, entity.id, comments).filter((e) => e.id !== ur.id);
       }
     },
-    [db, entityType, entity.id, ur.id, comments.length, db.tasks?.length]
+    [db, db.tasks, entityType, entity.id, ur.id, comments.length]
   );
 
   useEffect(() => {
