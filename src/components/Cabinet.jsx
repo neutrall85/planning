@@ -380,7 +380,9 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
                   <input className="inp" disabled value="••••••••" />
                   
                   <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                    <button className="btn ghost sm" onClick={() => openEmployeeEdit(user.id)}>Изменить данные</button>
+                    {!hasRole(user, 'admin') && (
+                      <button className="btn ghost sm" onClick={() => openEmployeeEdit(user.id)}>Изменить данные</button>
+                    )}
                     <button className="btn ghost sm" onClick={openChangePassword}>Сменить пароль</button>
                   </div>
                 </div>
