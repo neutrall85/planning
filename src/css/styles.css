@@ -65,6 +65,21 @@ input[type="number"] {
   appearance: textfield;
 }
 
+/* Поле ставки в стиле проекта */
+.rate-input {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 6px 8px;
+  outline: none;
+  background: #fff;
+  transition: .15s;
+  text-align: center;
+}
+.rate-input:focus {
+  border-color: var(--acc2);
+  box-shadow: 0 0 0 3px rgba(14,165,233,.15);
+}
+
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
