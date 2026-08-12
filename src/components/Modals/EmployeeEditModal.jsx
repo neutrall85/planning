@@ -5,6 +5,7 @@ import { useDataHelpers } from '../../hooks';
 
 export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
   const isAdmin = ur.roles.includes('admin');
+  const canEditAll = isAdmin; // Только суперадмин может менять всё
   const [selectedEmpId, setSelectedEmpId] = useState(empId);
 
   const getLocalPart = (email) => {
@@ -12,7 +13,7 @@ export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
     return email.split('@')[0];
   };
 
-  const currentEmp = isAdmin
+  const currentEmp = canEditAll
     ? db.employees.find(e => e.id === selectedEmpId)
     : db.employees.find(e => e.id === empId);
 
@@ -43,6 +44,34 @@ export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
   const set = (k, v) => setF(prev => ({ ...prev, [k]: v }));
 
   const save = () => {
+    if (!canEditAll) {
+      // Обычные пользователи могут менять только phone и extension
+      const updated = {
+        ...currentEmp,
+        phone: f.phone || '',
+        extension: f.extension || '',
+      };
+      const changes = [];
+      if ((currentEmp.phone || '') !== (f.phone || '')) changes.push(`Телефон: "${currentEmp.phone || ''}" → "${f.phone || ''}"`);
+      if ((currentEmp.extension || '') !== (f.extension || '')) changes.push(`Внутр. номер: "${currentEmp.extension || ''}" → "${f.extension || ''}"`);
+
+      if (changes.length === 0) {
+        toast.info('Нет изменений');
+        return;
+      }
+
+      store.updateEmployee(updated);
+      store.addAudit('Изменение данных сотрудника', {
+        employee: `${updated.last} ${updated.first}`,
+        changes: changes.join('; '),
+      }, 'employee', updated.id);
+
+      toast.success('Данные обновлены');
+      onClose();
+      return;
+    }
+
+    // Суперадмин может менять всё
     if (!f.last.trim() || !f.first.trim()) {
       toast.error('Имя и фамилия обязательны');
       return;
@@ -123,10 +152,10 @@ export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
 
       <div className="form-grid">
         <label className="lbl">Фамилия *</label>
-        <input className="inp" value={f.last} onChange={e => set('last', e.target.value)} />
+        <input className="inp" value={f.last} onChange={e => set('last', e.target.value)} disabled={!canEditAll} />
 
         <label className="lbl">Имя *</label>
-        <input className="inp" value={f.first} onChange={e => set('first', e.target.value)} />
+        <input className="inp" value={f.first} onChange={e => set('first', e.target.value)} disabled={!canEditAll} />
 
         <label className="lbl">Логин (часть email) *</label>
         <div className="duo">
@@ -135,12 +164,13 @@ export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
             value={f.email}
             onChange={e => set('email', e.target.value)}
             placeholder="user"
+            disabled={!canEditAll}
           />
           <span className="mut sm">@{COMPANY_DOMAIN}</span>
         </div>
 
         <label className="lbl">Должность</label>
-        <input className="inp" value={f.position} onChange={e => set('position', e.target.value)} />
+        <input className="inp" value={f.position} onChange={e => set('position', e.target.value)} disabled={!canEditAll} />
 
         <label className="lbl">Мобильный телефон</label>
         <input className="inp" value={f.phone} onChange={e => set('phone', e.target.value)} placeholder="+7 (___) ___-__-__" />
@@ -149,7 +179,7 @@ export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
         <input className="inp" value={f.extension} onChange={e => set('extension', e.target.value)} placeholder="1234" />
 
         <label className="lbl">Табельный №</label>
-        <input className="inp" value={f.tab} onChange={e => set('tab', e.target.value)} />
+        <input className="inp" value={f.tab} onChange={e => set('tab', e.target.value)} disabled={!canEditAll} />
       </div>
 
       <div className="modal-foot">
