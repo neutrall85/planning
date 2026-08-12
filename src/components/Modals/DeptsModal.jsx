@@ -22,13 +22,13 @@ export const DeptsModal = ({ db, store, empId, onClose, toast, audit }) => {
   };
   
   const save = () => {
-    if (!sel.length) return toast("Выберите хотя бы одно подразделение", "err");
-    if (!sel.some((x) => x.primary)) return toast("Укажите основное подразделение", "err");
+    if (!sel.length) return toast.error?.("Выберите хотя бы одно подразделение") || alert("Выберите хотя бы одно подразделение");
+    if (!sel.some((x) => x.primary)) return toast.error?.("Укажите основное подразделение") || alert("Укажите основное подразделение");
     const before = emp.departments.map((x) => `${x.deptId}${x.rate ? `(${x.rate})` : ''}`).join(",");
     const updatedEmp = { ...emp, departments: sel };
     store.updateEmployee(updatedEmp);
     audit("Изменение подразделений сотрудника", `${emp.last} ${emp.first}: [${before}] → [${sel.map((x) => `${x.deptId}${x.rate ? `(${x.rate})` : ''}`).join(",")}]`);
-    toast("Подразделения обновлены");
+    toast.success?.("Подразделения обновлены") || alert("Подразделения обновлены");
     onClose();
   };
   
