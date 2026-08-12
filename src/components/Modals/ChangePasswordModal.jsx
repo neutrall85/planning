@@ -116,7 +116,13 @@ export const ChangePasswordModal = ({ user, store, onClose, toast }) => {
       
       store.upsertEmployee(updated);
       
-      toast.success('Пароль успешно изменён. На вашу почту отправлено подтверждение.');
+      // Обновляем _currentUser в store, чтобы сессия не разрывалась
+      if (store.getCurrentUser && store.getCurrentUser().id === user.id) {
+        store._currentUser = updated;
+        store._notify();
+      }
+      
+      toast.success('Пароль успешно изменён.');
       onClose();
     } catch (error) {
       toast.error('Ошибка при смене пароля. Попробуйте позже.');
