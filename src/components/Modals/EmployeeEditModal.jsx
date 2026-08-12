@@ -159,10 +159,7 @@ export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
         <input className="inp" value={f.first} onChange={e => set('first', e.target.value)} disabled={!canEditAll} />
 
         <label className="lbl">E-mail</label>
-        <div className="duo">
-          <input className="inp" disabled value={f.email} />
-          <span className="mut sm">@{COMPANY_DOMAIN}</span>
-        </div>
+        <input className="inp" disabled value={f.email} />
 
         <label className="lbl">Должность</label>
         <input className="inp" value={f.position} onChange={e => set('position', e.target.value)} disabled={!canEditAll} />
@@ -179,7 +176,6 @@ export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
           value={f.phone}
           onChange={e => set('phone', e.target.value)}
           placeholder="+7 (___) ___-__-__"
-          disabled={!canEditAll}
         />
 
         <label className="lbl">Внутренний номер</label>
@@ -188,7 +184,6 @@ export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
           value={f.extension}
           onChange={e => set('extension', e.target.value)}
           placeholder="1234"
-          disabled={!canEditAll}
         />
 
         <label className="lbl">Табельный №</label>
