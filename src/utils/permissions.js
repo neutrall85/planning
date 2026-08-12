@@ -157,6 +157,7 @@ export const assigneeOptions = (user, data) => {
   if (hasRole(user, "admin", "director", "economist", "project_lead", "project_manager")) {
     list = allEmployees;
   } else if (hasRole(user, "kb_chief") && (user.kbIds || []).length) {
+    // Главный конструктор не состоит в отделах, выбираем сотрудников из отделов своего КБ
     const deptIds = data.departments.filter(d => d.kbId && user.kbIds.includes(d.kbId)).map(d => d.id);
     list = allEmployees.filter(e => e.id === user.id || e.departments.some(x => deptIds.includes(x.deptId)) || hasRole(e, "director"));
   } else if (hasRole(user, "head")) {
@@ -176,6 +177,7 @@ export const canApproveVacation = (user, vacation, data) => {
   if (!emp || emp.id === user.id) return false;
   const primaryDeptId = emp.departments.find(x => x.primary)?.deptId;
   if (hasRole(user, "head") && primaryDeptId && (user.headDeptIds || []).includes(primaryDeptId)) return true;
+  // Главный конструктор утверждает отпуска сотрудников отделов своего КБ
   if (hasRole(user, "kb_chief")) {
     const dept = data.departments.find(d => d.id === primaryDeptId);
     if (dept && dept.kbId && (user.kbIds || []).includes(dept.kbId)) return true;
@@ -193,9 +195,13 @@ export function computeScope(u, db) {
   const empIds = new Set([u.id]);
   const projIds = new Set();
   if (hasRole(u, "kb_chief") && (u.kbIds || []).length) {
-    const dIds = db.departments.filter(d => d.kbId && u.kbIds.includes(d.kbId)).map(d => d.id);
-    db.employees.filter(e => !e.fired).forEach(e => { if (e.departments.some(x => dIds.includes(x.deptId))) empIds.add(e.id); });
+    // Главный конструктор видит проекты только своего КБ
     db.projects.forEach(p => { if (p.kbId && u.kbIds.includes(p.kbId)) projIds.add(p.id); });
+    // Главный конструктор состоит в отделе КБ, видим сотрудников своего КБ
+    const deptIds = db.departments.filter(d => d.kbId && u.kbIds.includes(d.kbId)).map(d => d.id);
+    db.employees.filter(e => !e.fired).forEach(e => { 
+      if (e.departments.some(x => deptIds.includes(x.deptId))) empIds.add(e.id); 
+    });
   }
   if (hasRole(u, "head") && (u.headDeptIds || []).length) {
     db.employees.filter(e => !e.fired).forEach(e => { if (e.departments.some(x => u.headDeptIds.includes(x.deptId))) empIds.add(e.id); });
