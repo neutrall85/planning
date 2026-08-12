@@ -94,9 +94,6 @@ export default function Discussion({
   readOnly = false,
   canComment = true,
 }) {
-  // Если entity не передан, ничего не рендерим
-  if (!entity) return null;
-
   const [text, setText] = useState("");
   const [replyTo, setReplyTo] = useState(null);
   const [editingId, setEditingId] = useState(null);
@@ -105,18 +102,19 @@ export default function Discussion({
   const [mentionPos, setMentionPos] = useState({ top: 0, left: 0 });
   const textareaRef = useRef(null);
 
-  const comments = entity.comments || [];
+  const comments = entity?.comments || [];
   const { primaryDept } = useDataHelpers(db);
   
   const candidates = useMemo(
     () => {
+      if (!entity) return [];
       if (entityType === 'project') {
         return projectParticipants(db, entity.id, comments).filter((e) => e.id !== ur.id);
       } else {
         return taskParticipants(db, entity.id, comments).filter((e) => e.id !== ur.id);
       }
     },
-    [db, db.tasks, entityType, entity.id, ur.id, comments.length]
+    [db, entityType, entity?.id, ur.id, comments.length]
   );
 
   useEffect(() => {
@@ -128,6 +126,9 @@ export default function Discussion({
       });
     }
   }, [mentionQ]);
+
+  // Если entity не передан, ничего не рендерим
+  if (!entity) return null;
 
   const onType = (val) => {
     setText(val);
