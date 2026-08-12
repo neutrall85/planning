@@ -6,7 +6,6 @@ import { useDataHelpers } from '../../hooks';
 export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
   const isAdmin = ur.roles.includes('admin');
   const canEditAll = isAdmin; // Только суперадмин может менять всё
-  const [selectedEmpId, setSelectedEmpId] = useState(empId);
   const [isEditing, setIsEditing] = useState(false); // Режим редактирования для обычных пользователей
 
   const getLocalPart = (email) => {
@@ -14,9 +13,7 @@ export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
     return email.split('@')[0];
   };
 
-  const currentEmp = canEditAll
-    ? db.employees.find(e => e.id === selectedEmpId)
-    : db.employees.find(e => e.id === empId);
+  const currentEmp = db.employees.find(e => e.id === empId);
 
   const [f, setF] = useState({
     last: currentEmp?.last || '',
@@ -40,7 +37,7 @@ export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
         position: currentEmp.position || '',
       });
     }
-  }, [selectedEmpId, currentEmp]);
+  }, [currentEmp]);
 
   const set = (k, v) => setF(prev => ({ ...prev, [k]: v }));
 
@@ -128,20 +125,6 @@ export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
 
   return (
     <Modal title={`Редактирование сотрудника${isAdmin ? ' (админ)' : ''}`} onClose={onClose} width={560}>
-      {isAdmin && (
-        <div className="form-grid" style={{ marginBottom: 12 }}>
-          <label className="lbl">Выберите сотрудника</label>
-          <select
-            className="inp sel"
-            value={selectedEmpId}
-            onChange={e => setSelectedEmpId(e.target.value)}
-          >
-            {db.employees.filter(e => !e.fired).map(e => (
-              <option key={e.id} value={e.id}>{e.last} {e.first} ({e.email})</option>
-            ))}
-          </select>
-        </div>
-      )}
 
       <div className="form-grid">
         <label className="lbl">Фамилия *</label>
