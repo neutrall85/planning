@@ -107,6 +107,7 @@ export default function Discussion({
 
   const comments = entity.comments || [];
   const { primaryDept } = useDataHelpers(db);
+  
   const candidates = useMemo(
     () => {
       if (entityType === 'project') {
@@ -115,7 +116,7 @@ export default function Discussion({
         return taskParticipants(db, entity.id, comments).filter((e) => e.id !== ur.id);
       }
     },
-    [db, entityType, entity.id, ur.id, comments]
+    [db, db.tasks, entityType, entity.id, ur.id, comments.length]
   );
 
   useEffect(() => {
