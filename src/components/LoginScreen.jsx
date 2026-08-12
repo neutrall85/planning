@@ -201,7 +201,7 @@ export default function LoginScreen({ db, onLogin, toast, store }) {
   return (
     <div className="login-wrap">
       <div className="login-hero">
-        <div className="logo lg"><div className="logo-mark">АП</div><div><div className="logo-name">АвиаПлан.Инжиниринг</div><div className="logo-sub">планирование и учёт времени</div></div></div>
+        <div className="logo lg"><div className="logo-mark">АП</div><div><div className="logo-name">План/Факт VDE</div><div className="logo-sub">планирование и учёт времени</div></div></div>
         <h2>Единая среда планирования организации</h2>
         <p>Канбан, диаграмма Ганта и календарь. Проекты двух типов, обсуждения задач с @упоминаниями, отпуска с делегированием, HR-администрирование, архивация и журнал.</p>
         <ul className="hero-list">
