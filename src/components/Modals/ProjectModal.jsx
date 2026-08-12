@@ -11,7 +11,7 @@ import {
   hasRole, computeScope, canEditProjectFields, canChangeProjectStatus, canCreateProject,
 } from '../../utils/permissions';
 import { Ic, ICONS } from '../Icons';
-import ProjectDiscussion from './ProjectDiscussion';
+import Discussion from './Discussion';
 
 const AIRCRAFT_TYPES = [
   'Су-57', 'МиГ-35', 'Ту-160', 'Ил-76', 'Ка-52', 'Другой'
@@ -311,14 +311,19 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
       )}
 
       {tab === 'discussion' && (
-        <ProjectDiscussion
-          project={f}
-          currentUser={ur}
-          onAddComment={handleAddComment}
-          canComment={canCommentFinal}
+        <Discussion
           db={db}
+          ur={ur}
+          entity={f}
+          entityType="project"
+          onUpdate={(updatedProject) => {
+            setF(updatedProject);
+            if (store) store.upsertProject(updatedProject);
+          }}
+          notify={(userId, text, target) => store.addNotification(userId, text, target)}
           toast={toast}
           readOnly={existing?.archived}
+          canComment={canCommentFinal}
         />
       )}
 

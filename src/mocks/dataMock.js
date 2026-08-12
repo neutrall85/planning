@@ -540,7 +540,6 @@ export function buildMockData() {
     { id: uid(), userId: "aleksey.gendirov", text: "Запрос на изменение плановых часов по задаче «Отчёт по прочности фюзеляжа» ожидает решения.", ts: now - 3600000 * 5, read: false, targetType: 'hours', targetId: 'hr1' },
     { id: uid(), userId: "e_fedorov", text: "Тихонов Е. подал заявку на отпуск с делегированием задач — требуется утверждение.", ts: now - 3600000 * 8, read: false, targetType: 'vacation', targetId: 'v2' },
     { id: uid(), userId: "e_anokhin", text: "Вам переданы задачи Сомовой Е. на период отпуска.", ts: now - 3600000 * 30, read: false, targetType: 'task', targetId: 't08' },
-    { id: uid(), userId: "nikolay.managerov", text: "Новая заявка на регистрацию: Новиков Олег.", ts: now - 3600000 * 26, read: false, targetType: 'registration', targetId: 'rg1' },
   ];
 
   // Аудит

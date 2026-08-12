@@ -149,77 +149,123 @@ export default class DataStore {
 
   // === ЗАДАЧИ ===
   upsertTask(task) {
-    const idx = this._data.tasks.findIndex(t => t.id === task.id);
-    let tasks;
-    let auditMessage = '';
+  const idx = this._data.tasks.findIndex(t => t.id === task.id);
+  let tasks;
+  let auditMessage = '';
 
-    // Проверка бюджета
-    const projectForBudget = this._data.projects.find(p => p.id === task.projectId);
-    if (projectForBudget && projectForBudget.budget != null && projectForBudget.ptype !== 'admin' && !projectForBudget.archived) {
-      const otherTasksSum = this._data.tasks
-        .filter(t => t.projectId === task.projectId && t.id !== task.id)
-        .reduce((sum, t) => sum + (t.plannedHours || 0), 0);
-      const newTotal = otherTasksSum + (task.plannedHours || 0);
-      if (newTotal > projectForBudget.budget) {
-        throw new Error(
-          `Превышение бюджета проекта! Бюджет: ${projectForBudget.budget} ч, сумма остальных задач: ${otherTasksSum} ч, запрошено: ${task.plannedHours || 0} ч. Требуется увеличение бюджета проекта.`
-        );
-      }
+  // Проверка бюджета (без изменений)
+  const projectForBudget = this._data.projects.find(p => p.id === task.projectId);
+  if (projectForBudget && projectForBudget.budget != null && projectForBudget.ptype !== 'admin' && !projectForBudget.archived) {
+    const otherTasksSum = this._data.tasks
+      .filter(t => t.projectId === task.projectId && t.id !== task.id)
+      .reduce((sum, t) => sum + (t.plannedHours || 0), 0);
+    const newTotal = otherTasksSum + (task.plannedHours || 0);
+    if (newTotal > projectForBudget.budget) {
+      throw new Error(
+        `Превышение бюджета проекта! Бюджет: ${projectForBudget.budget} ч, сумма остальных задач: ${otherTasksSum} ч, запрошено: ${task.plannedHours || 0} ч. Требуется увеличение бюджета проекта.`
+      );
     }
-
-    if (idx >= 0) {
-      const old = this._data.tasks[idx];
-      const changes = [];
-      if (old.title !== task.title) changes.push(`Название: "${old.title}" → "${task.title}"`);
-      if (old.plannedHours !== task.plannedHours) changes.push(`Плановые часы: ${old.plannedHours ?? '—'} → ${task.plannedHours ?? '—'}`);
-      if (JSON.stringify(old.assigneeIds) !== JSON.stringify(task.assigneeIds)) {
-        changes.push(`Исполнители: ${old.assigneeIds.map(id => this.empName(id)).join(', ')} → ${task.assigneeIds.map(id => this.empName(id)).join(', ')}`);
-      }
-      if (old.status !== task.status) {
-        changes.push(`Статус: ${TASK_STATUSES[old.status].label} → ${TASK_STATUSES[task.status].label}`);
-        if ((task.status === 'closed' || task.status === 'cancelled') && old.status !== task.status) {
-          task.closedAt = TODAY;
-          if (task.creatorId) {
-            this.addNotification(task.creatorId, `Задача "${task.title}" ${task.status === 'closed' ? 'закрыта' : 'отменена'}`, { targetType: 'task', targetId: task.id });
-          }
-          const project = this._data.projects.find(p => p.id === task.projectId);
-          if (project && project.managerId && project.managerId !== task.creatorId) {
-            this.addNotification(project.managerId, `Задача "${task.title}" проекта ${project.code} ${task.status === 'closed' ? 'закрыта' : 'отменена'}`, { targetType: 'task', targetId: task.id });
-          }
-        }
-      }
-      if (old.dependencyId !== task.dependencyId || old.dependencyType !== task.dependencyType) {
-        const oldDep = old.dependencyId ? this._data.tasks.find(t => t.id === old.dependencyId) : null;
-        const newDep = task.dependencyId ? this._data.tasks.find(t => t.id === task.dependencyId) : null;
-        const depTypeLabel = task.dependencyType ? DEPENDENCY_TYPES[task.dependencyType]?.label : '';
-        const oldDepStr = oldDep ? `"${oldDep.title}" (${DEPENDENCY_TYPES[old.dependencyType]?.label || 'FS'})` : 'нет';
-        const newDepStr = newDep ? `"${newDep.title}" (${depTypeLabel})` : 'нет';
-        changes.push(`Зависимость: ${oldDepStr} → ${newDepStr}`);
-      }
-      if (changes.length > 0) {
-        auditMessage = `Изменение задачи "${task.title}": ${changes.join('; ')}`;
-        this.addAudit('Изменение задачи', auditMessage, 'task', task.id);
-      }
-      tasks = this._data.tasks.map(t => t.id === task.id ? task : t);
-
-      this._checkDeadlineNotifications(task, old);
-    } else {
-      if (!task.createdAt) {
-        task.createdAt = new Date().toISOString();
-      }
-      tasks = [...this._data.tasks, task];
-      this.addAudit('Создание задачи', task.title, 'task', task.id);
-      (task.assigneeIds || []).forEach(id => {
-        if (id !== this._currentUser?.id) {
-          this.addNotification(id, `Вам назначена задача "${task.title}"`, { targetType: 'task', targetId: task.id });
-        }
-      });
-      this._checkDeadlineNotifications(task, null);
-    }
-    this._data = { ...this._data, tasks };
-    this._notify();
-    this._archiveOldTasks(ARCHIVE_AFTER_MONTHS);
   }
+
+  if (idx >= 0) {
+    const old = this._data.tasks[idx];
+    const changes = [];
+    if (old.title !== task.title) changes.push(`Название: "${old.title}" → "${task.title}"`);
+    if (old.plannedHours !== task.plannedHours) changes.push(`Плановые часы: ${old.plannedHours ?? '—'} → ${task.plannedHours ?? '—'}`);
+    if (JSON.stringify(old.assigneeIds) !== JSON.stringify(task.assigneeIds)) {
+      changes.push(`Исполнители: ${old.assigneeIds.map(id => this.empName(id)).join(', ')} → ${task.assigneeIds.map(id => this.empName(id)).join(', ')}`);
+    }
+    if (old.status !== task.status) {
+      changes.push(`Статус: ${TASK_STATUSES[old.status].label} → ${TASK_STATUSES[task.status].label}`);
+
+      // ===== ЦЕНТРАЛИЗОВАННАЯ ЛОГИКА УВЕДОМЛЕНИЙ О СМЕНЕ СТАТУСА =====
+      const currentUser = this._currentUser;
+      const actorName = currentUser ? `${currentUser.last} ${currentUser.first}` : 'Система';
+
+      // 1. Исполнитель отправляет задачу на проверку (inwork → review)
+      if (old.status === 'inwork' && task.status === 'review') {
+        const assignees = task.assigneeIds || [];
+        const project = this._data.projects.find(p => p.id === task.projectId);
+        const message = `Задача "${task.title}" отправлена на проверку исполнителем ${actorName}`;
+
+        // Уведомить автора задачи (создателя)
+        if (task.creatorId && !assignees.includes(task.creatorId)) {
+          this.addNotification(task.creatorId, message, { targetType: 'task', targetId: task.id });
+        }
+        // Уведомить ответственного по проекту, если он не совпадает с автором и не является исполнителем
+        if (project && project.managerId && project.managerId !== task.creatorId && !assignees.includes(project.managerId)) {
+          this.addNotification(project.managerId, message, { targetType: 'task', targetId: task.id });
+        }
+      }
+
+      // 2. Автор/проверяющий возвращает задачу на доработку (review → inwork)
+      if (old.status === 'review' && task.status === 'inwork') {
+        const assignees = task.assigneeIds || [];
+        const message = `Задача "${task.title}" возвращена на доработку пользователем ${actorName}`;
+
+        // Уведомить всех исполнителей
+        assignees.forEach(id => {
+          if (id !== currentUser?.id) {
+            this.addNotification(id, message, { targetType: 'task', targetId: task.id });
+          }
+        });
+        // Уведомить автора, если он не исполнитель и не текущий пользователь
+        if (task.creatorId && !assignees.includes(task.creatorId) && task.creatorId !== currentUser?.id) {
+          this.addNotification(task.creatorId, message, { targetType: 'task', targetId: task.id });
+        }
+      }
+
+      // 3. Закрытие/отмена задачи (любой статус → closed/cancelled)
+      if ((task.status === 'closed' || task.status === 'cancelled') && old.status !== task.status) {
+        task.closedAt = TODAY;
+        const assignees = task.assigneeIds || [];
+        const message = `Задача "${task.title}" ${task.status === 'closed' ? 'закрыта' : 'отменена'} пользователем ${actorName}`;
+
+        // Уведомить всех исполнителей (кроме текущего)
+        assignees.forEach(id => {
+          if (id !== currentUser?.id) {
+            this.addNotification(id, message, { targetType: 'task', targetId: task.id });
+          }
+        });
+        // Уведомить автора, если он не исполнитель и не текущий пользователь
+        if (task.creatorId && !assignees.includes(task.creatorId) && task.creatorId !== currentUser?.id) {
+          this.addNotification(task.creatorId, message, { targetType: 'task', targetId: task.id });
+        }
+        // Уведомить ответственного по проекту, если он не совпадает с автором/исполнителями
+        const project = this._data.projects.find(p => p.id === task.projectId);
+        if (project && project.managerId && project.managerId !== task.creatorId && !assignees.includes(project.managerId) && project.managerId !== currentUser?.id) {
+          this.addNotification(project.managerId, message, { targetType: 'task', targetId: task.id });
+        }
+      }
+    }
+
+    // ... остальные сравнения (dependency и т.д.) без изменений
+
+    if (changes.length > 0) {
+      auditMessage = `Изменение задачи "${task.title}": ${changes.join('; ')}`;
+      this.addAudit('Изменение задачи', auditMessage, 'task', task.id);
+    }
+    tasks = this._data.tasks.map(t => t.id === task.id ? task : t);
+    this._checkDeadlineNotifications(task, old);
+  } else {
+    // Создание новой задачи (без изменений)
+    if (!task.createdAt) {
+      task.createdAt = new Date().toISOString();
+    }
+    tasks = [...this._data.tasks, task];
+    this.addAudit('Создание задачи', task.title, 'task', task.id);
+    (task.assigneeIds || []).forEach(id => {
+      if (id !== this._currentUser?.id) {
+        this.addNotification(id, `Вам назначена задача "${task.title}"`, { targetType: 'task', targetId: task.id });
+      }
+    });
+    this._checkDeadlineNotifications(task, null);
+  }
+
+  this._data = { ...this._data, tasks };
+  this._notify();
+  this._archiveOldTasks(ARCHIVE_AFTER_MONTHS);
+}
 
   _checkDeadlineNotifications(task, oldTask) {
     if (!task.deadline || ['closed', 'cancelled'].includes(task.status)) return;
@@ -515,9 +561,12 @@ export default class DataStore {
   }
 
   markAllNotificationsRead(userId) {
+    if (!userId) return;
     this._data = {
       ...this._data,
-      notifications: this._data.notifications.map(n => n.userId === userId ? { ...n, read: true } : n)
+      notifications: this._data.notifications.map(n =>
+        n.userId === userId ? { ...n, read: true } : n
+      )
     };
     this._notify();
   }

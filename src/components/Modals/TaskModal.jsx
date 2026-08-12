@@ -127,11 +127,11 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
   const { empName, getTaskSpent, vacOverlap, primaryDept } = useDataHelpers(db);
   const existing = taskId ? db.tasks.find((t) => t.id === taskId) : null;
   const readOnly = !!(existing && existing.archived);
-  
+
   const hasDelegateFromTask = existing && existing.isDelegated && existing.delegationEnd && new Date(existing.delegationEnd) >= new Date();
   const hasDelegateFromProp = vacationData && vacationData.hasDelegate;
   const hasDelegate = hasDelegateFromTask || hasDelegateFromProp;
-  
+
   const delegateInfoFromTask = hasDelegateFromTask && existing.delegatedTo
     ? db.employees.find(e => e.id === existing.delegatedTo)
     : null;
@@ -139,7 +139,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
     ? db.employees.find(e => e.id === vacationData.delegateId)
     : null;
   const delegateInfo = delegateInfoFromTask || delegateInfoFromProp;
-  
+
   const originalAssigneeFromTask = hasDelegateFromTask && existing.delegatedFrom
     ? db.employees.find(e => e.id === existing.delegatedFrom)
     : null;
@@ -147,29 +147,29 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
     ? db.employees.find(e => e.id === vacationData.delegatedFrom)
     : null;
   const originalAssignee = originalAssigneeFromTask || originalAssigneeFromProp;
-  
+
   const delegationStart = hasDelegateFromTask ? existing.delegationStart : (vacationData ? vacationData.delegationStart : null);
   const delegationEnd = hasDelegateFromTask ? existing.delegationEnd : (vacationData ? vacationData.delegationEnd : null);
-  
+
   const hasVacationWarning = vacationData && vacationData.vacation && vacationData.employee && !hasDelegate;
   const vacationInfo = hasVacationWarning ? vacationData.vacation : null;
   const employeeInfo = hasVacationWarning ? vacationData.employee : null;
-  
+
   const currentProjectId = initialProjectId || (existing ? existing.projectId : '');
   const isProjectFromInitial = !!initialProjectId && !existing;
-  
+
   const canEditFields = !readOnly && (existing ? canEditTaskFields(ur, existing, db) : canCreateTask(ur));
   const canChangeStatus = !readOnly && existing && canChangeTaskStatus(ur, existing, null, db);
   const canEditPlannedHours = hasRole(ur, 'admin', 'director');
   const isAuthor = existing && existing.creatorId === ur.id;
   const isReview = existing && existing.status === 'review';
-  
+
   const scope = computeScope(ur, db) || { all: false, empIds: new Set(), projIds: new Set() };
   const projs = (scope.all ? db.projects : db.projects.filter((p) => scope.projIds.has(p.id))).filter((p) => p.status === "active" && !p.archived);
   const asOpts = assigneeOptions(ur, db);
-  
-  const [f, setF] = useState(existing ? { 
-    ...existing, 
+
+  const [f, setF] = useState(existing ? {
+    ...existing,
     comments: existing.comments || [],
     start: existing.start ? iso(parseISO(existing.start)) : TODAY,
     deadline: existing.deadline ? iso(parseISO(existing.deadline)) : null,
@@ -191,15 +191,15 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
   const [tab, setTab] = useState(initialTab);
   const [confirmVac, setConfirmVac] = useState(null);
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
-  
+
   const proj = db.projects.find((p) => p.id === f.projectId);
   const isAdminProj = proj && proj.ptype === "admin";
   const sp = f.logs.reduce((s, l) => s + l.hours, 0);
   const remainProj = proj && proj.budget != null && !proj.archived ? proj.budget - (planSum(proj.id) - (existing ? (existing.plannedHours || 0) : 0)) : null;
-  
+
   const vacWarn = useMemo(() => {
     if (readOnly || !f.assigneeIds || f.assigneeIds.length === 0 || !f.deadline) return null;
-    
+
     if (hasDelegate && originalAssignee) {
       const assigneesToCheck = f.assigneeIds.filter(id => id !== originalAssignee.id);
       for (const id of assigneesToCheck) {
@@ -210,7 +210,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
       }
       return null;
     }
-    
+
     for (const id of f.assigneeIds) {
       const vac = vacOverlap(id, f.start || f.deadline, f.deadline);
       if (vac && (!vac.end || new Date(vac.end) >= new Date())) {
@@ -219,7 +219,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
     }
     return null;
   }, [readOnly, f.assigneeIds, f.start, f.deadline, hasDelegate, originalAssignee, vacOverlap]);
-  
+
   const isExec = existing && (existing.assigneeIds || []).includes(ur.id);
   const canLog = !readOnly && ((existing ? isExec : f.assigneeIds?.includes(ur.id)) || has(ur, "admin"));
 
@@ -248,10 +248,10 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
     if (existing && existing.status !== statusToSave) {
       history.push({ ts: Date.now(), who: ur.id, text: `Статус: ${TASK_STATUSES[existing.status].label} → ${TASK_STATUSES[statusToSave].label}` });
     }
-    
+
     let finalStart = f.start;
     let finalDeadline = f.deadline;
-    
+
     if (f.dependencyId && f.dependencyType) {
       const depTask = db.tasks.find(t => t.id === f.dependencyId);
       if (depTask) {
@@ -294,7 +294,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
         }
       }
     }
-    
+
     const newClosed = statusToSave === "closed" && (!existing || existing.status !== "closed");
     const taskToSave = {
       ...f,
@@ -344,17 +344,17 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
         onSave(taskToSave, !existing);
       }
     } catch (error) {
-      toast(error.message || 'Ошибка сохранения задачи', 'err');
+      toast.error(error.message || 'Ошибка сохранения задачи');
     }
   };
 
   const save = () => {
-    if (!f.title.trim()) return toast("Укажите название задачи", "err");
-    if (!f.projectId) return toast("Задача обязательно назначается в рамках проекта", "err");
-    if (!f.assigneeIds || f.assigneeIds.length === 0) return toast("Выберите хотя бы одного исполнителя", "err");
+    if (!f.title.trim()) return toast.error("Укажите название задачи");
+    if (!f.projectId) return toast.error("Задача обязательно назначается в рамках проекта");
+    if (!f.assigneeIds || f.assigneeIds.length === 0) return toast.error("Выберите хотя бы одного исполнителя");
     if (!isAdminProj) {
-      if (!f.plannedHours || +f.plannedHours <= 0) return toast("Для производственного проекта плановые часы обязательны", "err");
-      if (!f.deadline) return toast("Для производственного проекта срок выполнения обязателен", "err");
+      if (!f.plannedHours || +f.plannedHours <= 0) return toast.error("Для производственного проекта плановые часы обязательны");
+      if (!f.deadline) return toast.error("Для производственного проекта срок выполнения обязателен");
     }
 
     const projForBudget = db.projects.find(p => p.id === f.projectId);
@@ -362,9 +362,8 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
       const currentPlanSum = planSum(projForBudget.id);
       const newTotal = currentPlanSum + (+f.plannedHours || 0);
       if (newTotal > projForBudget.budget) {
-        toast(
-          `Превышение бюджета проекта! Бюджет: ${projForBudget.budget} ч, текущая сумма задач: ${currentPlanSum} ч, запрошено: ${f.plannedHours || 0} ч. Требуется увеличение бюджета проекта.`,
-          "err"
+        toast.error(
+          `Превышение бюджета проекта! Бюджет: ${projForBudget.budget} ч, текущая сумма задач: ${currentPlanSum} ч, запрошено: ${f.plannedHours || 0} ч. Требуется увеличение бюджета проекта.`
         );
         return;
       }
@@ -372,16 +371,16 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
 
     if (f.repeatType !== 'none') {
       if (f.repeatType === 'weekly_days' && (!f.repeatDays || f.repeatDays.length === 0)) {
-        return toast("Выберите хотя бы один день недели", "err");
+        return toast.error("Выберите хотя бы один день недели");
       }
       if (f.repeatEndType === 'date' && !f.repeatEndValue) {
-        return toast("Укажите дату окончания повторения", "err");
+        return toast.error("Укажите дату окончания повторения");
       }
       if (f.repeatEndType === 'count' && (!f.repeatEndValue || parseInt(f.repeatEndValue, 10) <= 0)) {
-        return toast("Укажите количество повторений", "err");
+        return toast.error("Укажите количество повторений");
       }
       if (f.repeatEndType === 'date' && f.repeatEndValue && f.repeatEndValue <= f.start) {
-        return toast("Дата окончания должна быть позже даты начала", "err");
+        return toast.error("Дата окончания должна быть позже даты начала");
       }
     }
 
@@ -394,23 +393,23 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
 
   const addLog = () => {
     const h = parseFloat(String(logH).replace(",", "."));
-    if (!h || h <= 0) return toast("Введите корректное количество часов", "err");
-    if (f.plannedHours && sp + h > f.plannedHours) return toast(`Нельзя внести больше плановых: доступно ещё ${Math.max(0, f.plannedHours - sp)} ч`, "err");
-    if (logDate > TODAY) return toast("Дата не может быть в будущем", "err");
-    
+    if (!h || h <= 0) return toast.error("Введите корректное количество часов");
+    if (f.plannedHours && sp + h > f.plannedHours) return toast.error(`Нельзя внести больше плановых: доступно ещё ${Math.max(0, f.plannedHours - sp)} ч`);
+    if (logDate > TODAY) return toast.error("Дата не может быть в будущем");
+
     const newLogs = [...f.logs, { id: uid(), userId: ur.id, date: logDate, hours: h, note: logNote.trim() }];
     setF((s) => ({ ...s, logs: newLogs }));
-    
+
     const newSp = sp + h;
     const projectCode = db.projects.find(p => p.id === f.projectId)?.code || '—';
     const assigneesStr = (f.assigneeIds || []).map(id => empName(id)).join(', ');
     const auditDetails = `Задача "${f.title}" в проекте ${projectCode}, плановые часы: ${f.plannedHours ?? '—'}, фактические часы: ${newSp} (внесено ${h})${logNote.trim() ? `, комментарий: ${logNote.trim()}` : ''}, исполнители: ${assigneesStr || 'не назначены'}`;
     store.addAudit('Внесение часов', auditDetails, 'task', f.id);
-    
+
     setLogH("");
     setLogNote("");
     setLogDate(TODAY);
-    toast("Часы учтены");
+    toast.success("Часы учтены");
   };
 
   const [showAssigneeSelector, setShowAssigneeSelector] = useState(false);
@@ -419,7 +418,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
   const addAssignee = () => {
     if (!newAssigneeId) return;
     if (f.assigneeIds.includes(newAssigneeId)) {
-      toast("Этот исполнитель уже добавлен", "err");
+      toast.error("Этот исполнитель уже добавлен");
       return;
     }
     setF(prev => ({ ...prev, assigneeIds: [...prev.assigneeIds, newAssigneeId] }));
@@ -450,10 +449,9 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
       <div className="tabs sm">{[["form", "Данные"], ["time", `Учёт времени (${sp}/${f.plannedHours ?? "—"})`], ...(existing ? [["chat", `Обсуждение (${f.comments.length})`], ["hist", "История"]] : [])].map(([id, l]) => <button key={id} className={"tab" + (tab === id ? " on" : "")} onClick={() => setTab(id)}>{l}</button>)}</div>
 
       {tab === "form" && (<>
-
         {hasDelegate && (
           <div className="info-box" style={{background: '#eff6ff', border: '1px solid #3b82f6', color: '#1e40af'}}>
-            <Ic d={ICONS.user} size={15} />  
+            <Ic d={ICONS.user} size={15} />
             <strong>Задача делегирована</strong> на период отпуска:
             <div style={{marginTop: '8px', marginLeft: '20px'}}>
               {originalAssignee && (
@@ -470,13 +468,13 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
         )}
         {hasVacationWarning && vacationInfo && employeeInfo && (
           <div className="warn-box">
-            <Ic d={ICONS.beach} size={15} />  
+            <Ic d={ICONS.beach} size={15} />
             Внимание! Исполнитель <strong>{employeeInfo.last} {employeeInfo.first}</strong> находится в отпуске с {fmtDMY(vacationInfo.start)} по {fmtDMY(vacationInfo.end)}. Даты пересекаются с периодом задачи.
           </div>
         )}
         {vacWarn && !hasDelegate && !hasVacationWarning && (
           <div className="warn-box">
-            <Ic d={ICONS.beach} size={15} />  
+            <Ic d={ICONS.beach} size={15} />
             Один из исполнителей находится в отпуске с {vacWarn.start ? fmtDMY(vacWarn.start) : '—'} по {vacWarn.end ? fmtDMY(vacWarn.end) : '—'}. Даты пересекаются с периодом задачи.
           </div>
         )}
@@ -496,7 +494,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
           <select className="inp sel" disabled={!canEditFields} value={f.priority} onChange={(e) => set("priority", e.target.value)}>
             {Object.entries(PRIORITIES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
           </select>
-          
+
           <label className="lbl">Исполнители *</label>
           {readOnly ? (
             <input className="inp" disabled value={(f.assigneeIds || []).map(id => empName(id)).join(', ')} />
@@ -547,12 +545,12 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
             {statusOptions.map((s) => <option key={s} value={s}>{TASK_STATUSES[s].label}</option>)}
           </select>
           {isExec && !canEditFields && !readOnly && <div className="mut sm" style={{ gridColumn: "1 / -1" }}>Исполнитель может переводить задачу в «В работе» и «На проверке»; закрытие и отмена — у ответственного/руководителя.</div>}
-          
+
           <label className="lbl">Зависит от задачи</label>
-          <select 
-            className="inp sel" 
-            disabled={!canEditFields} 
-            value={f.dependencyId || ''} 
+          <select
+            className="inp sel"
+            disabled={!canEditFields}
+            value={f.dependencyId || ''}
             onChange={(e) => set("dependencyId", e.target.value || null)}
           >
             <option value="">— нет зависимости —</option>
@@ -563,12 +561,12 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
               ))
             }
           </select>
-          
+
           <label className="lbl">Тип зависимости</label>
-          <select 
-            className="inp sel" 
-            disabled={!canEditFields || !f.dependencyId} 
-            value={f.dependencyType || 'FS'} 
+          <select
+            className="inp sel"
+            disabled={!canEditFields || !f.dependencyId}
+            value={f.dependencyType || 'FS'}
             onChange={(e) => set("dependencyType", e.target.value)}
           >
             {Object.entries(DEPENDENCY_TYPES).map(([key, val]) => (
@@ -651,7 +649,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
         )}
 
         {remainProj !== null && <div className="budget-hint">Остаток бюджета проекта «{proj.code}»: <b>{remainProj} ч</b> из {proj.budget} ч</div>}
-        
+
         {isAuthor && isReview && !readOnly && (
           <div style={{ marginTop: 16, display: 'flex', gap: 10 }}>
             <button className="btn primary" onClick={handleAccept}><Ic d={ICONS.check} size={15} /> Принять (закрыть)</button>
@@ -687,7 +685,18 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
         </div>
       )}
 
-      {tab === "chat" && existing && <Discussion db={db} ur={ur} task={f} patchTask={localPatchTask} notify={notify} toast={toast} readOnly={readOnly} />}
+      {tab === "chat" && existing && (
+        <Discussion
+          db={db}
+          ur={ur}
+          entity={f}
+          entityType="task"
+          onUpdate={localPatchTask}
+          notify={notify}
+          toast={toast}
+          readOnly={readOnly}
+        />
+      )}
 
       {tab === "hist" && existing && (
         <div className="tm-logs" style={{ maxHeight: 260 }}>

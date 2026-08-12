@@ -86,6 +86,7 @@ export const canChangeTaskStatus = (user, task, newStatus, data) => {
       if (newStatus === 'closed' || newStatus === 'cancelled') return false;
       if (task.status === 'new' && newStatus === 'inwork') return true;
       if (task.status === 'inwork' && newStatus === 'review') return true;
+      if (task.status === 'review' && newStatus === 'inwork') return true;
       return false;
     }
     

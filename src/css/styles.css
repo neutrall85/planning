@@ -2389,3 +2389,15 @@ input, select, textarea {
     grid-template-columns: 1fr;
   }
 }
+/* drag-and-drop placeholder */
+.drag-placeholder {
+  height: 60px;
+  margin: 8px 0;
+  border: 2px dashed #94a3b8;
+  border-radius: 12px;
+  background: #f1f5f9;
+  transition: background 0.15s;
+}
+.drag-placeholder:last-child {
+  margin-bottom: 0;
+}

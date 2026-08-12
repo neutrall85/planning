@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { uid, fmtDT, initials } from '../../utils/date';
 import { has } from '../../utils/permissions';
 import { Ic, ICONS } from '../Icons';
@@ -40,9 +40,23 @@ export default function ProjectDiscussion({ project, currentUser, onAddComment, 
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState("");
   const [mentionQ, setMentionQ] = useState(null);
+  const [mentionPosition, setMentionPosition] = useState('top');
+  const textareaRef = useRef(null);
+  const wrapRef = useRef(null);
+
   const comments = project.comments || [];
   const { primaryDept } = useDataHelpers(db);
   const candidates = useMemo(() => projectParticipants(db, project.id).filter((e) => e.id !== currentUser.id), [db, project.id, currentUser.id]);
+
+  useEffect(() => {
+    if (mentionQ !== null && textareaRef.current && wrapRef.current) {
+      const textareaRect = textareaRef.current.getBoundingClientRect();
+      const wrapRect = wrapRef.current.getBoundingClientRect();
+      const spaceAbove = textareaRect.top - wrapRect.top;
+      const spaceBelow = wrapRect.bottom - textareaRect.bottom;
+      setMentionPosition(spaceAbove >= spaceBelow ? 'top' : 'bottom');
+    }
+  }, [mentionQ]);
 
   const onType = (val) => {
     setText(val);
@@ -83,7 +97,7 @@ export default function ProjectDiscussion({ project, currentUser, onAddComment, 
     while (changed) { changed = false; comments.forEach((x) => { if (x.parentId && subtree.has(x.parentId) && !subtree.has(x.id)) { subtree.add(x.id); changed = true; } }); }
     const updatedComments = comments.filter((x) => !subtree.has(x.id));
     onAddComment(null, null, updatedComments);
-    toast("Комментарий удалён");
+    toast.success("Комментарий удалён");
   };
 
   const saveEdit = (c) => {
@@ -141,9 +155,24 @@ export default function ProjectDiscussion({ project, currentUser, onAddComment, 
               <button className="link" onClick={() => setReplyTo(null)}>отменить</button>
             </div>
           )}
-          <div className="cm-input-wrap">
+          <div className="cm-input-wrap" ref={wrapRef} style={{ position: 'relative' }}>
             {mentionQ !== null && filtered.length > 0 && (
-              <div className="mention-pop">
+              <div 
+                className="mention-pop" 
+                style={{ 
+                  position: 'absolute',
+                  [mentionPosition === 'top' ? 'bottom' : 'top']: 'calc(100% + 4px)',
+                  left: 0,
+                  right: 0,
+                  background: '#fff',
+                  border: '1px solid var(--line)',
+                  borderRadius: '10px',
+                  boxShadow: 'var(--sh)',
+                  maxHeight: '200px',
+                  overflowY: 'auto',
+                  zIndex: 10,
+                }}
+              >
                 {filtered.slice(0, 6).map((e) => (
                   <div key={e.id} className="mention-item" onClick={() => pickMention(e)}>
                     <span className="avatar xs">{initials(e.first, e.last)}</span>{e.last} {e.first} <span className="mut sm">· {primaryDept(e)?.name || ""}</span>
@@ -151,7 +180,14 @@ export default function ProjectDiscussion({ project, currentUser, onAddComment, 
                 ))}
               </div>
             )}
-            <textarea className="inp" rows="2" placeholder="Комментарий… Введите @ для упоминания участника проекта" value={text} onChange={(e) => onType(e.target.value)} />
+            <textarea 
+              ref={textareaRef}
+              className="inp" 
+              rows="2" 
+              placeholder="Комментарий… Введите @ для упоминания участника проекта" 
+              value={text} 
+              onChange={(e) => onType(e.target.value)} 
+            />
           </div>
           <div className="cm-foot">
             <span className="mut sm">Участники получат уведомление; упомянутые — отдельно.</span>

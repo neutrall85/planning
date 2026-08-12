@@ -2,12 +2,12 @@ import React from 'react';
 import { fmtDT } from '../utils/date';
 import { Ic } from './Icons';
 
-export default function NotifPanel({ list, store, onNavigate, onClose }) {
+export default function NotifPanel({ list, store, onNavigate, onClose, currentUserId }) {
   const markAllRead = () => {
-    if (store && store.markAllNotificationsRead) {
-      store.markAllNotificationsRead();
+    if (store && store.markAllNotificationsRead && currentUserId) {
+      store.markAllNotificationsRead(currentUserId);
     }
-    if (onClose) onClose();
+    // НЕ закрываем окно!
   };
 
   const handleClick = (item) => {
@@ -23,9 +23,9 @@ export default function NotifPanel({ list, store, onNavigate, onClose }) {
       </div>
       <div className="notif-list">
         {list.slice(0, 12).map(n => (
-          <div 
-            key={n.id} 
-            className={`notif-item${n.read ? '' : ' new'}`} 
+          <div
+            key={n.id}
+            className={`notif-item${n.read ? '' : ' new'}`}
             onClick={() => handleClick(n)}
           >
             <div>{n.text}</div>

@@ -114,45 +114,6 @@ export default function MainLayout({ store, data, user, toast }) {
       task: task.title,
       status: `${TASK_STATUSES[task.status].label} → ${TASK_STATUSES[newStatus].label}`
     }, 'task', task.id);
-
-    if (newStatus === 'review') {
-      const project = data.projects.find(p => p.id === task.projectId);
-      if (project && project.ptype !== 'admin') {
-        const creatorId = task.creatorId || task.history?.find(h => h.who !== 'system')?.who || task.history[0]?.who;
-        let managerId = project?.managerId;
-        if (!managerId) {
-          const pmCandidate = data.employees.find(e =>
-            e.roles.includes('project_lead') &&
-            data.tasks.some(t => t.projectId === task.projectId && (t.assigneeIds || []).includes(e.id))
-          );
-          if (pmCandidate) managerId = pmCandidate.id;
-        }
-        if (creatorId && creatorId !== user.id) {
-          store.addNotification(
-            creatorId,
-            `Задача "${task.title}" переведена на проверку исполнителем ${user.last} ${user.first}.`,
-            { targetType: 'task', targetId: task.id }
-          );
-        }
-        if (managerId && managerId !== user.id && managerId !== creatorId) {
-          store.addNotification(
-            managerId,
-            `Задача "${task.title}" переведена на проверку исполнителем ${user.last} ${user.first}.`,
-            { targetType: 'task', targetId: task.id }
-          );
-        }
-      }
-    }
-    if (isClosing) {
-      const creatorId = task.creatorId;
-      if (creatorId && creatorId !== user.id) {
-        store.addNotification(
-          creatorId,
-          `Задача "${task.title}" ${newStatus === 'closed' ? 'закрыта' : 'отменена'} пользователем ${user.last} ${user.first}.`,
-          { targetType: 'task', targetId: task.id }
-        );
-      }
-    }
   };
 
   const handleNotificationNavigate = (notification) => {
@@ -160,8 +121,8 @@ export default function MainLayout({ store, data, user, toast }) {
     if (!targetType || !targetId) return;
     store.markNotificationRead(notification.id);
     switch (targetType) {
-      case 'task': 
-        openTask(targetId, 'chat');
+      case 'task':
+        openTask(targetId, 'form'); // <-- изменено с 'chat' на 'form'
         break;
       case 'project': openProject(targetId); break;
       case 'hours': 
@@ -229,11 +190,12 @@ export default function MainLayout({ store, data, user, toast }) {
                 {unread > 0 && <span className="bell-count">{unread}</span>}
               </button>
               {notifOpen && (
-                <NotifPanel 
-                  list={myNotifs} 
+                <NotifPanel
+                  list={myNotifs}
                   store={store}
                   onNavigate={handleNotificationNavigate}
                   onClose={() => setNotifOpen(false)}
+                  currentUserId={user.id} // добавляем
                 />
               )}
             </div>
@@ -476,15 +438,6 @@ export default function MainLayout({ store, data, user, toast }) {
             store.addAudit('Создание задачи', auditDetails, 'task', t.id);
           } else if (hasChanges) {
             store.addAudit('Изменение задачи', auditDetails, 'task', t.id);
-          }
-          
-          if (isNew) {
-            const assignees = t.assigneeIds || [];
-            assignees.forEach(id => {
-              if (id !== user.id) {
-                store.addNotification(id, `Вам назначена задача "${t.title}" (проект ${data.projects.find(p => p.id === t.projectId)?.code || '—'}).`, { targetType: 'task', targetId: t.id });
-              }
-            });
           }
           
           setModal(null);

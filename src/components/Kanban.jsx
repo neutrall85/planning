@@ -4,6 +4,7 @@ import { TASK_STATUSES, TASK_STATUS_ORDER, PRIORITIES } from '../utils/constants
 import { TODAY, fmtD, daysDiff, initials, isTaskActive } from '../utils/date';
 import { computeScope, taskVisible, canCreateTask, canChangeTaskStatus, hasRole } from '../utils/permissions';
 import EmployeeTooltip from './EmployeeTooltip';
+import { useDragAndDrop } from '../hooks';
 
 export default function Kanban({
   db,
@@ -16,16 +17,14 @@ export default function Kanban({
   hideFilters = false,
   assigneeFilter,
   onAssigneeFilterChange,
-  onAssigneeOptionsChange, // новый пропс
+  onAssigneeOptionsChange,
 }) {
   const [fProj, setFProj] = useState("all");
   const [fPrio, setFPrio] = useState("all");
   const [fDept, setFDept] = useState("all");
   const [q, setQ] = useState("");
-  const [dragOverCol, setDragOverCol] = useState(null);
   const [localShowOnlyMy, setLocalShowOnlyMy] = useState(false);
   const [localSortBy, setLocalSortBy] = useState("deadline");
-
   const [tooltip, setTooltip] = useState({ visible: false, employee: null, x: 0, y: 0 });
 
   const showOnlyMy = parentShowOnlyMyTasks !== undefined ? parentShowOnlyMyTasks : localShowOnlyMy;
@@ -35,6 +34,7 @@ export default function Kanban({
   const canSeeAll = hasRole(ur, "admin", "director", "economist", "kb_chief", "head", "project_lead", "project_manager");
   const isOnlyExecutor = ur.roles.length === 1 && ur.roles[0] === 'executor';
 
+  // Фильтрация и сортировка
   const visible = useMemo(() => {
     let list = db.tasks.filter((t) => isTaskActive(t) && taskVisible(ur, scope, t, db));
     if (!hideFilters) {
@@ -43,13 +43,18 @@ export default function Kanban({
         list = list.filter(t => (t.assigneeIds || []).includes(assigneeFilter));
       }
       if (fPrio !== "all") list = list.filter(t => t.priority === fPrio);
-      if (fDept !== "all") list = list.filter(t => {
-        const assignees = (t.assigneeIds || []).map(id => db.employees.find(e => e.id === id)).filter(Boolean);
-        return assignees.some(a => a.departments.some(d => d.deptId === fDept));
-      });
+      if (fDept !== "all") {
+        list = list.filter(t => {
+          const assignees = (t.assigneeIds || []).map(id => db.employees.find(e => e.id === id)).filter(Boolean);
+          return assignees.some(a => a.departments.some(d => d.deptId === fDept));
+        });
+      }
       if (q.trim()) {
         const s = q.trim().toLowerCase();
-        list = list.filter(t => t.title.toLowerCase().includes(s) || (db.projects.find(p => p.id === t.projectId)?.name || "").toLowerCase().includes(s));
+        list = list.filter(t =>
+          t.title.toLowerCase().includes(s) ||
+          (db.projects.find(p => p.id === t.projectId)?.name || "").toLowerCase().includes(s)
+        );
       }
     }
     if (showOnlyMy) {
@@ -82,11 +87,9 @@ export default function Kanban({
           return 0;
       }
     });
-
     return list;
   }, [db, ur, scope, fProj, assigneeFilter, fPrio, fDept, q, showOnlyMy, sortBy, hideFilters]);
 
-  // Вычисляем список исполнителей и передаём в MainLayout
   useEffect(() => {
     if (onAssigneeOptionsChange) {
       const ids = new Set();
@@ -96,14 +99,31 @@ export default function Kanban({
     }
   }, [visible, db, onAssigneeOptionsChange]);
 
+  // Drag‑and‑drop с проверкой прав при drop
+  const { dragState, handlers } = useDragAndDrop((taskId, newStatus) => {
+    const task = db.tasks.find(t => t.id === taskId);
+    if (!task) return;
+    if (!canChangeTaskStatus(ur, task, newStatus, db)) {
+      alert(`У вас нет прав на перевод задачи в статус "${TASK_STATUSES[newStatus].label}"`);
+      return;
+    }
+    onMove(taskId, newStatus);
+  });
+  const { dragItemId, dragOverCol, dragOverIndex } = dragState;
+
   return (
     <div>
       {!hideFilters && parentShowOnlyMyTasks === undefined && (
         <div className="toolbar">
-          <div className="search-box"><Ic d={ICONS.search} size={15} /><input placeholder="Поиск задач…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+          <div className="search-box">
+            <Ic d={ICONS.search} size={15} />
+            <input placeholder="Поиск задач…" value={q} onChange={(e) => setQ(e.target.value)} />
+          </div>
           <select className="inp sel sm" value={fProj} onChange={(e) => setFProj(e.target.value)}>
             <option value="all">Все проекты</option>
-            {db.projects.filter(p => !p.archived && (scope.all || scope.projIds.has(p.id))).map(p => <option key={p.id} value={p.id}>{p.code}</option>)}
+            {db.projects
+              .filter(p => !p.archived && (scope.all || scope.projIds.has(p.id)))
+              .map(p => <option key={p.id} value={p.id}>{p.code}</option>)}
           </select>
           <select className="inp sel sm" value={fPrio} onChange={(e) => setFPrio(e.target.value)}>
             <option value="all">Любой приоритет</option>
@@ -141,76 +161,103 @@ export default function Kanban({
 
       <div className="kanban k5">
         {TASK_STATUS_ORDER.map((st) => {
-          const list = visible.filter((t) => t.status === st);
+          const list = visible.filter(t => t.status === st);
+
           return (
-            <div 
-              key={st} 
+            <div
+              key={st}
               className={`kcol${dragOverCol === st ? ' over' : ''}`}
-              onDragOver={(e) => { e.preventDefault(); setDragOverCol(st); }}
-              onDragLeave={() => setDragOverCol(null)}
-              onDrop={(e) => { 
-                e.preventDefault(); 
-                setDragOverCol(null); 
-                const id = e.dataTransfer.getData("text/plain"); 
-                if (id) {
-                  const task = db.tasks.find(t => t.id === id);
-                  if (task && !canChangeTaskStatus(ur, task, st, db)) {
-                    alert('У вас нет прав на перевод задачи в статус ' + TASK_STATUSES[st].label);
-                    return;
-                  }
-                  onMove(id, st); 
-                }
-              }}
+              onDragOver={(e) => handlers.onDragOver(e, st)}
+              onDrop={(e) => handlers.onDrop(e, st)}
+              onDragLeave={handlers.onDragEnd}
             >
-              <div className="kcol-head"><span className="kdot" style={{ background: TASK_STATUSES[st].color }} />{TASK_STATUSES[st].label}<span className="kcount">{list.length}</span></div>
+              <div className="kcol-head">
+                <span className="kdot" style={{ background: TASK_STATUSES[st].color }} />
+                {TASK_STATUSES[st].label}
+                <span className="kcount">{list.length}</span>
+              </div>
               <div className="kcol-body">
-                {list.length === 0 ? <div className="kempty">Нет задач</div> : list.map(t => {
+                {list.length === 0 && dragOverCol !== st && (
+                  <div className="kempty">Нет задач</div>
+                )}
+                {list.map((t, idx) => {
+                  // Разрешено ли перетаскивание:
+                  // - задача не закрыта и не отменена
+                  // - пользователь является исполнителем, администратором или директором
+                  const canDrag = !["closed", "cancelled"].includes(t.status) &&
+                    (hasRole(ur, "admin", "director") ||
+                     (t.assigneeIds && t.assigneeIds.includes(ur.id)));
+
+                  const showPlaceholder =
+                    dragItemId &&
+                    dragOverCol === st &&
+                    dragOverIndex === idx &&
+                    t.id !== dragItemId;
+
                   const p = db.projects.find(x => x.id === t.projectId);
                   const assignees = (t.assigneeIds || []).map(id => db.employees.find(e => e.id === id)).filter(Boolean);
-                  const sp = t.logs.reduce((s, l) => s + l.hours, 0);
+                  const spent = t.logs.reduce((s, l) => s + l.hours, 0);
                   const overdue = t.deadline && !["closed", "cancelled"].includes(t.status) && t.deadline < TODAY;
                   const soon = t.deadline && !overdue && !["closed", "cancelled"].includes(t.status) && daysDiff(TODAY, t.deadline) <= 3;
-                  const canDrag = (!["closed", "cancelled"].includes(t.status) && canChangeTaskStatus(ur, t, st, db));
                   const prioColor = PRIORITIES[t.priority]?.color || PRIORITIES.mid.color;
+
                   return (
-                    <div 
-                      key={t.id} 
-                      className={`kcard${t.status === 'cancelled' ? ' dim' : ''}`} 
-                      draggable={canDrag}
-                      onDragStart={(e) => e.dataTransfer.setData("text/plain", t.id)} 
-                      onClick={() => openTask(t.id)}
-                    >
-                      <div className="kcard-prio" style={{ background: prioColor }} />
-                      <div className="kcard-title">{t.title}</div>
-                      <div className="kcard-proj"><span className="pdot" style={{ background: p?.color }} />{p?.code}</div>
-                      <div className="kcard-meta">
-                        {assignees.length > 0 && (
-                          <span className="kassignee">
-                            {assignees.slice(0, 2).map(a => (
-                              <span 
-                                key={a.id} 
-                                className="avatar xs" 
-                                style={{ marginRight: -4, cursor: 'pointer' }}
-                                onMouseEnter={(e) => setTooltip({ visible: true, employee: a, x: e.clientX, y: e.clientY })}
-                                onMouseLeave={() => setTooltip(prev => ({ ...prev, visible: false }))}
-                                onMouseMove={(e) => setTooltip(prev => ({ ...prev, x: e.clientX, y: e.clientY }))}
-                              >
-                                {a.photo ? (
-                                  <img src={a.photo} alt="Аватар" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-                                ) : (
-                                  initials(a.first, a.last)
-                                )}
-                              </span>
-                            ))}
-                            {assignees.length > 2 && <span className="mut sm">+{assignees.length - 2}</span>}
+                    <React.Fragment key={t.id}>
+                      {showPlaceholder && <div className="drag-placeholder" />}
+                      <div
+                        className={`kcard${t.status === 'cancelled' ? ' dim' : ''}`}
+                        draggable={canDrag}
+                        onDragStart={(e) => handlers.onDragStart(e, t.id)}
+                        onDragEnd={handlers.onDragEnd}
+                        onClick={() => openTask(t.id)}
+                      >
+                        <div className="kcard-prio" style={{ background: prioColor }} />
+                        <div className="kcard-title">{t.title}</div>
+                        <div className="kcard-proj">
+                          <span className="pdot" style={{ background: p?.color }} />
+                          {p?.code}
+                        </div>
+                        <div className="kcard-meta">
+                          {assignees.length > 0 && (
+                            <span className="kassignee">
+                              {assignees.slice(0, 2).map(a => (
+                                <span
+                                  key={a.id}
+                                  className="avatar xs"
+                                  style={{ marginRight: -4, cursor: 'pointer' }}
+                                  onMouseEnter={(e) => setTooltip({ visible: true, employee: a, x: e.clientX, y: e.clientY })}
+                                  onMouseLeave={() => setTooltip(prev => ({ ...prev, visible: false }))}
+                                  onMouseMove={(e) => setTooltip(prev => ({ ...prev, x: e.clientX, y: e.clientY }))}
+                                >
+                                  {a.photo ? (
+                                    <img src={a.photo} alt="Аватар" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                                  ) : (
+                                    initials(a.first, a.last)
+                                  )}
+                                </span>
+                              ))}
+                              {assignees.length > 2 && <span className="mut sm">+{assignees.length - 2}</span>}
+                            </span>
+                          )}
+                          <span className="khours">
+                            <Ic d={ICONS.clock} size={13} /> {spent}/{t.plannedHours ?? "—"} ч
                           </span>
-                        )}
-                        <span className="khours"><Ic d={ICONS.clock} size={13} /> {sp}/{t.plannedHours ?? "—"} ч</span>
+                        </div>
+                        <div className="kcard-foot">
+                          <span className={"kdl" + (overdue ? " late" : soon ? " soon" : "")}>
+                            {t.deadline ? (overdue ? `просрочено ${-daysDiff(TODAY, t.deadline)} дн` : `до ${fmtD(t.deadline)}`) : "без срока"}
+                          </span>
+                        </div>
                       </div>
-                      <div className="kcard-foot"><span className={"kdl" + (overdue ? " late" : soon ? " soon" : "")}>{t.deadline ? (overdue ? `просрочено ${-daysDiff(TODAY, t.deadline)} дн` : `до ${fmtD(t.deadline)}`) : "без срока"}</span></div>
-                    </div>
+                    </React.Fragment>
                   );
                 })}
+                {dragItemId && dragOverCol === st && dragOverIndex === list.length && (
+                  <div className="drag-placeholder" />
+                )}
+                {list.length === 0 && dragOverCol === st && (
+                  <div className="drag-placeholder" />
+                )}
               </div>
             </div>
           );
