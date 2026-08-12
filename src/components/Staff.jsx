@@ -53,9 +53,6 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
           {e.roles.includes('kb_chief') && (e.kbIds || []).map(k => (
             <span key={k} className="role-chip blue">{db.kbs.find(x => x.id === k)?.name}</span>
           ))}
-          {e.roles.includes('head') && (e.headDeptIds || []).map(d => (
-            <span key={d} className="role-chip indigo">{db.departments.find(x => x.id === d)?.name}</span>
-          ))}
           {/* Отображение отделов с указанием ставки и типа занятости */}
           {e.departments.length > 0 && (
             <div className="st-depts-list">
