@@ -3,11 +3,15 @@ import { Modal } from '../Modal';
 import { useDataHelpers } from '../../hooks';
 import { VACATION_TYPES, TASK_STATUSES } from '../../utils/constants';
 import { TODAY, iso, addDays, uid, fmtDMY, parseISO } from '../../utils/date';
-import { canManageAllVacations } from '../../utils/permissions';
+import { canManageAllVacations, hasRoleDirectors } from '../../utils/permissions';
 
 export const VacationModal = ({ db, ur, vacationId, forEmpId, onClose, onSave }) => {
   const existing = vacationId ? db.vacations.find((v) => v.id === vacationId) : null;
   const canPick = canManageAllVacations(ur);
+  // Если пользователь с ролью директор и создает новый отпуск (не редактирует существующий),
+  // то показываем список сотрудников. Иначе empId фиксируется на текущем пользователе
+  const isDirectorCreatingOwnVacation = !existing && hasRoleDirectors(ur) && !forEmpId;
+  const showEmployeeSelector = canPick && !isDirectorCreatingOwnVacation;
   const { empName, primaryDept } = useDataHelpers(db);
   const [f, setF] = useState(existing ? { 
     ...existing, 
@@ -39,7 +43,7 @@ export const VacationModal = ({ db, ur, vacationId, forEmpId, onClose, onSave })
     <Modal title={existing ? "Отпуск" : "Новый отпуск"} onClose={onClose} width={560}>
       {error && <div className="login-err">{error}</div>}
       <div className="form-grid">
-        {canPick && (<>
+        {showEmployeeSelector && (<>
           <label className="lbl">Сотрудник *</label>
           <select className="inp sel" value={f.empId} onChange={(e) => set("empId", e.target.value)}>
             {db.employees.map((e) => <option key={e.id} value={e.id}>{empName(e.id)} — {primaryDept(e)?.name || ""}</option>)}

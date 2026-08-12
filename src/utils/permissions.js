@@ -3,6 +3,9 @@ import { ROLES } from './constants';
 export const hasRole = (user, ...roles) => !!user && roles.some(r => user.roles.includes(r));
 export const has = hasRole;
 
+// Вспомогательная функция для проверки роли директора
+export const hasRoleDirectors = (user) => hasRole(user, 'director');
+
 export const canEditDepartments = (user) => hasRole(user, "admin", "director", "hr");
 export const canManageAllVacations = (user) => hasRole(user, "admin", "director", "hr");
 export const canRestore = (user) => hasRole(user, "admin", "director");
