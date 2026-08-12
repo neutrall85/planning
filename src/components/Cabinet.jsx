@@ -362,6 +362,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
                   
                   <label className="lbl">Табельный №</label>
                   <input className="inp" disabled value={user.tab || ''} />
+                  <div className="mut sm" style={{ marginTop: -8, marginBottom: 8 }}>Изменение контактных данных доступно через кнопку «изменить» слева.</div>
                   
                   <label className="lbl">Подразделения</label>
                   <div className="depts-readonly">

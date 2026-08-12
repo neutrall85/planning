@@ -47,10 +47,6 @@ export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
   const save = () => {
     if (!canEditAll) {
       // Обычные пользователи могут менять только phone и extension
-      if (!isEditing) {
-        toast.info('Нажмите "Изменить", чтобы редактировать поля');
-        return;
-      }
       const updated = {
         ...currentEmp,
         phone: f.phone || '',
@@ -162,15 +158,9 @@ export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
         <label className="lbl">Имя *</label>
         <input className="inp" value={f.first} onChange={e => set('first', e.target.value)} disabled={!canEditAll} />
 
-        <label className="lbl">Логин (часть email) *</label>
+        <label className="lbl">E-mail</label>
         <div className="duo">
-          <input
-            className="inp"
-            value={f.email}
-            onChange={e => set('email', e.target.value)}
-            placeholder="user"
-            disabled={!canEditAll}
-          />
+          <input className="inp" disabled value={f.email} />
           <span className="mut sm">@{COMPANY_DOMAIN}</span>
         </div>
 
@@ -179,15 +169,7 @@ export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
 
         {!canEditAll && (
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gridColumn: '1 / -1' }}>
-            <label className="lbl" style={{ margin: 0 }}>Контактные данные</label>
-            <button
-              type="button"
-              className={`btn ${isEditing ? 'ghost' : 'link'}`}
-              onClick={() => setIsEditing(!isEditing)}
-              style={{ fontSize: '13px', padding: '4px 8px' }}
-            >
-              {isEditing ? 'Отменить' : 'Изменить'}
-            </button>
+            <label className="lbl" style={{ margin: 0 }}>Контактные данные (редактируемые)</label>
           </div>
         )}
 
@@ -197,7 +179,7 @@ export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
           value={f.phone}
           onChange={e => set('phone', e.target.value)}
           placeholder="+7 (___) ___-__-__"
-          disabled={!canEditAll && !isEditing}
+          disabled={!canEditAll}
         />
 
         <label className="lbl">Внутренний номер</label>
@@ -206,14 +188,13 @@ export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
           value={f.extension}
           onChange={e => set('extension', e.target.value)}
           placeholder="1234"
-          disabled={!canEditAll && !isEditing}
+          disabled={!canEditAll}
         />
 
         <label className="lbl">Табельный №</label>
         <input
           className="inp"
           value={f.tab}
-          onChange={e => set('tab', e.target.value)}
           disabled={true}
           title="Табельный номер неизменяем"
         />
