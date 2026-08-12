@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { Modal } from '../Modal';
-import { validateData, schemas } from '../../utils/validation';
+import validation from '../../utils/validation';
 import { PASSWORD_MIN_LENGTH } from '../../utils/config';
+
+const { schemas } = validation;
 
 /**
  * Модалка смены пароля с валидацией старого пароля и проверкой сложности нового
