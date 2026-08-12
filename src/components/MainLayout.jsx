@@ -150,7 +150,7 @@ export default function MainLayout({ store, data, user, toast }) {
       <aside className="sidebar">
         <div className="logo">
           <div className="logo-mark">АП</div>
-          <div><div className="logo-name">План/Факт VDE</div><div className="logo-sub">планирование и учёт времени</div></div>
+          <div><div className="logo-name">ФактПланер</div><div className="logo-sub">планирование и учёт времени</div></div>
         </div>
         <div className="user-card" onClick={() => setView('cabinet')} style={{ cursor: 'pointer', marginBottom: '16px' }}>
           <div className="avatar">
