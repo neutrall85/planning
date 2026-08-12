@@ -47,6 +47,7 @@ export const DeptsModal = ({ db, store, empId, onClose, toast, audit }) => {
                 <>
                   <input
                     type="number"
+                    className="no-spinner"
                     step="0.1"
                     min="0.1"
                     max="1"
