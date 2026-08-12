@@ -115,6 +115,9 @@ export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
       extension: f.extension || '',
       tab: f.tab || '',
       position: f.position || '',
+      // Сохраняем пароль и историю паролей без изменений
+      pass: currentEmp.pass,
+      passwordHistory: currentEmp.passwordHistory,
     };
 
     store.updateEmployee(updated);
