@@ -105,7 +105,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
     const reader = new FileReader();
     reader.onload = (ev) => {
       const photoData = ev.target.result; // base64
-      const updated = { ...user, photo: photoData };
+      const updated = { ...user, photo: photoData, pass: user.pass, passwordHistory: user.passwordHistory };
       store.upsertEmployee(updated);
       showToast('Фото загружено', 'success');
     };
@@ -113,7 +113,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
   };
   const handlePhotoDelete = () => {
     if (user.photo && window.confirm('Удалить фото?')) {
-      const updated = { ...user, photo: null };
+      const updated = { ...user, photo: null, pass: user.pass, passwordHistory: user.passwordHistory };
       store.upsertEmployee(updated);
     }
   };
@@ -398,7 +398,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
               <label key={k} className="toggle-row">
                 <span>{label}</span>
                 <span className={`toggle${user.notif[k] ? ' on' : ''}`} onClick={() => {
-                  const updated = { ...user, notif: { ...user.notif, [k]: !user.notif[k] } };
+                  const updated = { ...user, notif: { ...user.notif, [k]: !user.notif[k] }, pass: user.pass, passwordHistory: user.passwordHistory };
                   store.upsertEmployee(updated);
                 }}><span className="toggle-knob" /></span>
               </label>
