@@ -318,7 +318,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
                   <input className="inp" disabled value={user.first} />
                   
                   <label className="lbl">E-mail</label>
-                  <input className="inp" disabled value={user.email + '@volga-dnepr.com'} />
+                  <input className="inp" disabled value={user.email} />
                   
                   <label className="lbl">Мобильный телефон</label>
                   <input
