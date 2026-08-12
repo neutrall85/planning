@@ -10,7 +10,6 @@ import TaskList from './TaskList';
 import Gantt from './Gantt';
 import Calendar from './Calendar';
 import Projects from './Projects';
-import ProjectsKanban from './ProjectsKanban';
 import Cabinet from './Cabinet';
 import Staff from './Staff';
 import Reports from './Reports';
@@ -308,13 +307,15 @@ export default function MainLayout({ store, data, user, toast }) {
                 )}
               </div>
               {projectsView === 'kanban' ? (
-                <ProjectsKanban 
+                <Kanban 
+                  type="project"
                   db={data} 
                   ur={user} 
                   openProject={openProject} 
                   showOnlyMyProjects={showOnlyMyProjects} 
                   sortBy={projectSortBy}
-                  moveProject={(id, newStatus) => {
+                  onNew={() => openProject(null)}
+                  onMove={(id, newStatus) => {
                     const project = data.projects.find(p => p.id === id);
                     if (project && project.status !== newStatus) {
                       store.upsertProject({...project, status: newStatus});
