@@ -7,6 +7,7 @@ export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
   const isAdmin = ur.roles.includes('admin');
   const canEditAll = isAdmin; // Только суперадмин может менять всё
   const [selectedEmpId, setSelectedEmpId] = useState(empId);
+  const [isEditing, setIsEditing] = useState(false); // Режим редактирования для обычных пользователей
 
   const getLocalPart = (email) => {
     if (!email) return '';
@@ -46,6 +47,10 @@ export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
   const save = () => {
     if (!canEditAll) {
       // Обычные пользователи могут менять только phone и extension
+      if (!isEditing) {
+        toast.info('Нажмите "Изменить", чтобы редактировать поля');
+        return;
+      }
       const updated = {
         ...currentEmp,
         phone: f.phone || '',
