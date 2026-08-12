@@ -114,8 +114,6 @@ export const canEditProjectFields = (user, project) => {
   if (!user || !project) return false;
   if (project.archived) return false;
   if (hasRole(user, "admin", "director")) return true;
-  // Главный конструктор КБ может редактировать поля проектов своего КБ
-  if (hasRole(user, "kb_chief") && project.kbId && (user.kbIds || []).includes(project.kbId)) return true;
   // Менеджер проектов не может редактировать поля проекта (только статус)
   if (hasRole(user, "project_manager")) return false;
   return false;
