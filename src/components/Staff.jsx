@@ -197,15 +197,30 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
       {db.kbs.map(k => {
         const deptsInKb = db.departments.filter(d => d.kbId === k.id);
         const membersInKb = activeEmployees.filter(e => e.departments.some(d => deptsInKb.some(x => x.id === d.deptId)));
-        if (!membersInKb.length && deptsInKb.length === 0) return null;
+        // Главные конструкторы этого КБ (они в КБ, но без отделов)
+        const chiefsInKb = activeEmployees.filter(e => 
+          e.roles.includes('kb_chief') && e.kbIds.includes(k.id)
+        );
+        if (!membersInKb.length && deptsInKb.length === 0 && chiefsInKb.length === 0) return null;
         return (
           <div className="st-section" key={k.id}>
             <div className="st-sec-head">
               <div className="st-sec-title">{k.name}</div>
               <div className="st-sec-sub">
-                {k.full} · главный конструктор: {db.employees.filter(e => e.roles.includes('kb_chief') && e.kbIds.includes(k.id) && !e.fired).map(e => `${e.last} ${e.first}`).join(', ') || '—'}
+                {k.full} · главный конструктор: {chiefsInKb.map(e => `${e.last} ${e.first}`).join(', ') || '—'}
               </div>
             </div>
+            {/* Отображаем главных конструкторов КБ (без отделов) */}
+            {chiefsInKb.length > 0 && (
+              <div className="st-dept">
+                <div className="st-dept-head">
+                  <span className="st-dept-name">Руководство КБ</span>
+                  <span className="mut">Главные конструкторы</span>
+                  <span className="kcount">{chiefsInKb.length}</span>
+                </div>
+                {chiefsInKb.map(e => rowFor(e))}
+              </div>
+            )}
             {deptsBlock(deptsInKb, activeEmployees)}
           </div>
         );
