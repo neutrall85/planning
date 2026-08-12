@@ -652,12 +652,73 @@ export default class DataStore {
   }
 
   approveRoleDelegation(delegationId, approved) {
+    const delegation = this._data.roleDelegations.find(r => r.id === delegationId);
+    if (!delegation) return;
+
+    // Проверка: только получатель может утвердить/отклонить
+    if (delegation.toId !== this._currentUser?.id) {
+      throw new Error('Только получатель может подтвердить делегирование');
+    }
+
+    // Проверка: не истёк ли срок
+    if (delegation.end && new Date(delegation.end) < new Date(TODAY)) {
+      throw new Error('Срок действия делегирования истёк');
+    }
+
     this._data = {
       ...this._data,
       roleDelegations: this._data.roleDelegations.map(r =>
-        r.id === delegationId ? { ...r, status: approved ? 'active' : 'rejected' } : r
+        r.id === delegationId ? { ...r, status: approved ? 'active' : 'rejected', approvedAt: approved ? TODAY : null } : r
       )
     };
+    
+    // Уведомление делегирующему
+    const fromName = this.empName(delegation.fromId);
+    const toName = this.empName(delegation.toId);
+    const rolesStr = delegation.roles.join(', ');
+    const msg = approved
+      ? `Ваш запрос на передачу ролей (${rolesStr}) пользователю ${toName} принят`
+      : `Ваш запрос на передачу ролей (${rolesStr}) пользователю ${toName} отклонён`;
+    this.addNotification(delegation.fromId, msg, { targetType: 'delegation', targetId: delegationId });
+    
+    this._notify();
+  }
+
+  /**
+   * Отзыв активного делегирования делегировавшим
+   * @param {string} delegationId - ID делегирования
+   */
+  revokeRoleDelegation(delegationId) {
+    const delegation = this._data.roleDelegations.find(r => r.id === delegationId);
+    if (!delegation) {
+      throw new Error('Делегирование не найдено');
+    }
+
+    // Проверка: только делегировавший может отозвать
+    if (delegation.fromId !== this._currentUser?.id) {
+      throw new Error('Только делегировавший может отозвать делегирование');
+    }
+
+    // Проверка: можно отозвать только активное
+    if (delegation.status !== 'active') {
+      throw new Error('Можно отозвать только активное делегирование');
+    }
+
+    this._data = {
+      ...this._data,
+      roleDelegations: this._data.roleDelegations.map(r =>
+        r.id === delegationId ? { ...r, status: 'revoked', revokedAt: TODAY, revokedBy: delegation.fromId } : r
+      )
+    };
+    
+    // Уведомление получателю
+    const fromName = this.empName(delegation.fromId);
+    const toName = this.empName(delegation.toId);
+    const rolesStr = delegation.roles.join(', ');
+    this.addNotification(delegation.toId, `Делегирование ролей (${rolesStr}) от пользователя ${fromName} отозвано`, { targetType: 'delegation', targetId: delegationId });
+    
+    this.addAudit('Отзыв делегирования ролей', `${fromName} отозвал делегирование ролей (${rolesStr}) у ${toName}`, 'delegation', delegationId);
+    
     this._notify();
   }
 
