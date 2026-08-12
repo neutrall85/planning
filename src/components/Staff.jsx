@@ -9,7 +9,7 @@ import { Modal } from "./Modal";
 // CreateEmployeeModal – оставляем без изменений (не показан, но он есть в проекте)
 // ...
 
-export default function Staff({ db, store, ur, openRoles, openDepts, openVacation }) {
+export default function Staff({ db, store, ur, openRoles, openDepts, openVacation, openEmployeeEdit }) {
   const { getEmployeeLoad, empName, primaryDept } = useDataHelpers(db);
   const norm = 160;
   const [showFired, setShowFired] = useState(false);
@@ -89,6 +89,11 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
             store.addAudit(e.fired ? 'Восстановление сотрудника' : 'Увольнение сотрудника', `${e.last} ${e.first}`);
           }}>
             <Ic d={isFired ? ICONS.restore : ICONS.x} size={13} /> {isFired ? 'Восстановить' : 'Уволить'}
+          </button>
+        )}
+        {hasRole(ur, 'admin') && !isFired && (
+          <button className="btn ghost sm" title="Редактировать данные сотрудника" onClick={() => openEmployeeEdit(e.id)}>
+            <Ic d={ICONS.edit} size={13} />
           </button>
         )}
       </div>
