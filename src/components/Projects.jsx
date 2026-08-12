@@ -7,7 +7,8 @@ import EmployeeTooltip from './EmployeeTooltip';
 
 export default function Projects({ db, ur, openProject, openHoursReq, showOnlyMyProjects: parentShowOnlyMyProjects, sortBy: parentSortBy }) {
   const scope = useMemo(() => computeScope(ur, db), [ur, db]);
-  const canSeeAllProjects = hasRole(ur, "admin", "director", "economist", "kb_chief", "head", "project_lead", "project_manager");
+  // Главные конструкторы НЕ видят все проекты - они видят только проекты своего КБ через scope
+  const canSeeAllProjects = hasRole(ur, "admin", "director", "economist", "head", "project_lead", "project_manager");
   
   // Состояние для tooltip
   const [tooltip, setTooltip] = useState({ visible: false, employee: null, x: 0, y: 0 });
@@ -118,12 +119,12 @@ export default function Projects({ db, ur, openProject, openHoursReq, showOnlyMy
                   )}
                 </div>
                 <div className="pj-actions" onClick={(e) => e.stopPropagation()}>
-                  {((hasRole(ur, 'project_lead') && p.managerId === ur.id) || hasRole(ur, 'admin', 'director', 'economist', 'kb_chief')) && p.status === 'active' && p.ptype !== 'admin' && (
+                  {((hasRole(ur, 'project_lead') && p.managerId === ur.id) || hasRole(ur, 'admin', 'director', 'economist')) && p.status === 'active' && p.ptype !== 'admin' && (
                     <button className="btn ghost sm" onClick={() => openHoursReq('project', p.id)}>
                       <Ic d={ICONS.clock} size={13} /> Запросить изменение часов
                     </button>
                   )}
-                  {hasRole(ur, 'admin', 'director', 'economist', 'kb_chief') && (
+                  {hasRole(ur, 'admin', 'director', 'economist') && (
                     <button className="icon-btn" title="Редактировать" onClick={() => openProject(p.id)}>
                       <Ic d={ICONS.edit} size={15} />
                     </button>
