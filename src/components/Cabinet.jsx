@@ -24,7 +24,7 @@ function downloadCSV(name, rows) {
   setTimeout(() => URL.revokeObjectURL(a.href), 500);
 }
 
-export default function Cabinet({ store, data, user, openTask, openVacation, openDelegation, openEmployeeEdit, toast }) {
+export default function Cabinet({ store, data, user, openTask, openVacation, openDelegation, openEmployeeEdit, openChangePassword, toast }) {
   const { empName, getEmployeeLoad } = useDataHelpers(data);
   const [tab, setTab] = useState('overview');
 
@@ -89,24 +89,6 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
     ['delegation', 'Делегирование ролей'],
     ['profile', 'Профиль и уведомления']
   ];
-
-  // Функция смены пароля
-  const changePassword = () => {
-    const newPass = window.prompt('Введите новый пароль:');
-    if (!newPass) return;
-    if (newPass.length < 8 || !/[A-ZА-ЯЁ]/.test(newPass) || !/[a-zа-яё]/.test(newPass) || !/\d/.test(newPass) || !/[^A-Za-zА-Яа-яЁё0-9]/.test(newPass)) {
-      showToast('Пароль не соответствует требованиям безопасности (минимум 8 символов, заглавные и строчные буквы, цифры, спецсимволы)');
-      return;
-    }
-    const history = user.passwordHistory || [];
-    if (history.some(p => p === newPass)) {
-      showToast('Этот пароль уже использовался ранее. Выберите другой.');
-      return;
-    }
-    const updated = { ...user, pass: newPass, passwordHistory: [...history.slice(-4), newPass] };
-    store.upsertEmployee(updated);
-    showToast('Пароль изменён. На вашу почту отправлено подтверждение.', 'success');
-  };
 
   // Загрузка фото
   const fileInputRef = useRef(null);
@@ -347,32 +329,39 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
                   </div>
                   
                   <label className="lbl">Мобильный телефон</label>
-                  <input
-                    className="inp"
-                    value={user.phone || ''}
-                    onChange={e => {
-                      const updated = { ...user, phone: e.target.value };
-                      store.upsertEmployee(updated);
-                    }}
-                    placeholder="+7 (___) ___-__-__"
-                  />
+                  <div className="duo">
+                    <input
+                      className="inp"
+                      disabled
+                      value={user.phone || ''}
+                      placeholder="+7 (___) ___-__-__"
+                    />
+                    <button 
+                      className="btn ghost sm" 
+                      onClick={() => openEmployeeEdit(user.id)}
+                    >
+                      изменить
+                    </button>
+                  </div>
 
                   <label className="lbl">Внутренний номер телефона</label>
-                  <input
-                    className="inp"
-                    value={user.extension || ''}
-                    onChange={e => {
-                      const updated = { ...user, extension: e.target.value.trim() };
-                      store.upsertEmployee(updated);
-                    }}
-                    placeholder="1234"
-                  />
+                  <div className="duo">
+                    <input
+                      className="inp"
+                      disabled
+                      value={user.extension || ''}
+                      placeholder="1234"
+                    />
+                    <button 
+                      className="btn ghost sm" 
+                      onClick={() => openEmployeeEdit(user.id)}
+                    >
+                      изменить
+                    </button>
+                  </div>
                   
                   <label className="lbl">Табельный №</label>
-                  <input className="inp" value={user.tab || ''} onChange={e => {
-                    const updated = { ...user, tab: e.target.value };
-                    store.upsertEmployee(updated);
-                  }} />
+                  <input className="inp" disabled value={user.tab || ''} />
                   
                   <label className="lbl">Подразделения</label>
                   <div className="depts-readonly">
@@ -387,7 +376,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
                   <label className="lbl">Пароль</label>
                   <div className="duo">
                     <input className="inp" disabled value="••••••••" />
-                    <button className="btn ghost sm" onClick={changePassword}>сменить</button>
+                    <button className="btn ghost sm" onClick={openChangePassword}>сменить</button>
                   </div>
                 </div>
               </div>

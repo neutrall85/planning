@@ -21,7 +21,7 @@ import NotifPanel from './NotifPanel';
 import { useToast } from './Toast';
 import { 
   TaskModal, ProjectModal, HoursRequestModal, RolesModal, DeptsModal, 
-  VacationModal, DelegationModal, VacNowModal, EmployeeEditModal 
+  VacationModal, DelegationModal, VacNowModal, EmployeeEditModal, ChangePasswordModal 
 } from './Modals';
 
 export default function MainLayout({ store, data, user, toast }) {
@@ -30,6 +30,7 @@ export default function MainLayout({ store, data, user, toast }) {
   const [modal, setModal] = useState(null);
   const [notifOpen, setNotifOpen] = useState(false);
   const [vacModalOpen, setVacModalOpen] = useState(false);
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const notifRef = useRef(null);
   
   const showToast = toast?.error || ((msg) => alert(msg));
@@ -82,6 +83,7 @@ export default function MainLayout({ store, data, user, toast }) {
   const openVacation = (vacationId = null, forEmpId = null) => setModal({ type: 'vacation', vacationId, forEmpId });
   const openDelegation = () => setModal({ type: 'delegation' });
   const openEmployeeEdit = (empId) => setModal({ type: 'employeeEdit', empId });
+  const openChangePassword = () => setPasswordModalOpen(true);
 
   const [requestsTab, setRequestsTab] = useState('hours');
   const [tasksView, setTasksView] = useState('kanban');
@@ -347,6 +349,7 @@ export default function MainLayout({ store, data, user, toast }) {
             openVacation={openVacation} 
             openDelegation={openDelegation}
             openEmployeeEdit={openEmployeeEdit}
+            openChangePassword={openChangePassword}
             toast={toast}
           />}
           {view === 'staff' && <Staff 
@@ -518,6 +521,14 @@ export default function MainLayout({ store, data, user, toast }) {
           ur={user}
           empId={modal.empId}
           onClose={() => setModal(null)}
+          toast={toast}
+        />
+      )}
+      {passwordModalOpen && (
+        <ChangePasswordModal
+          user={user}
+          store={store}
+          onClose={() => setPasswordModalOpen(false)}
           toast={toast}
         />
       )}
