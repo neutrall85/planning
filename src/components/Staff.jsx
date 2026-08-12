@@ -91,7 +91,7 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
             <Ic d={isFired ? ICONS.restore : ICONS.x} size={13} /> {isFired ? 'Восстановить' : 'Уволить'}
           </button>
         )}
-        {hasRole(ur, 'admin') && !isFired && (
+        {hasRole(ur, 'admin') && !isFired && e.id === ur.id && (
           <button className="btn ghost sm" title="Редактировать данные сотрудника" onClick={() => openEmployeeEdit(e.id)}>
             <Ic d={ICONS.edit} size={13} />
           </button>
