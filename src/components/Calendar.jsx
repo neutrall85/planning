@@ -18,8 +18,8 @@ const DayCell = ({ d, big, byDay, db, openTask, onAvatarEnter, onAvatarLeave, on
           const prioColor = t.priority ? (t.priority === 'high' ? '#ef4444' : t.priority === 'crit' ? '#dc2626' : t.priority === 'low' ? '#3b82f6' : '#f59e0b') : '#f59e0b';
           const statusColor = t.status === 'closed' ? '#10b981' : t.status === 'cancelled' ? '#64748b' : prioColor;
           return (
-            <div key={t.id} className="cal-chip" style={{ borderColor: statusColor, background: statusColor + '1a' }} onClick={() => openTask(t.id)} title={t.title}>
-              <div className="cal-task-title">
+            <div key={t.id} className="cal-chip" style={{ borderColor: statusColor, background: statusColor + '1a' }} onClick={() => openTask(t.id)}>
+              <div className="cal-task-title" title={t.title}>
                 <span className="pdot" style={{ background: statusColor }} />
                 <span>{t.title}</span>
               </div>
