@@ -30,6 +30,26 @@ function extractMentions(text, employees) {
   return found;
 }
 
+function taskParticipants(db, taskId, comments = []) {
+  const ids = new Set();
+  
+  // Добавляем исполнителей задачи
+  const task = db.tasks.find((t) => t.id === taskId);
+  if (task && task.assigneeIds) {
+    task.assigneeIds.forEach((id) => ids.add(id));
+  }
+  
+  // Добавляем автора задачи
+  if (task && task.creatorId) ids.add(task.creatorId);
+  
+  // Добавляем авторов комментариев
+  comments.forEach((c) => {
+    if (c.authorId) ids.add(c.authorId);
+  });
+  
+  return [...ids].map((id) => db.employees.find((e) => e.id === id)).filter(Boolean);
+}
+
 function projectParticipants(db, projectId, comments = []) {
   const ids = new Set();
   
@@ -88,8 +108,14 @@ export default function Discussion({
   const comments = entity.comments || [];
   const { primaryDept } = useDataHelpers(db);
   const candidates = useMemo(
-    () => projectParticipants(db, entity.projectId, comments).filter((e) => e.id !== ur.id),
-    [db, entity.projectId, ur.id, comments]
+    () => {
+      if (entityType === 'project') {
+        return projectParticipants(db, entity.id, comments).filter((e) => e.id !== ur.id);
+      } else {
+        return taskParticipants(db, entity.id, comments).filter((e) => e.id !== ur.id);
+      }
+    },
+    [db, entityType, entity.id, ur.id, comments]
   );
 
   useEffect(() => {
