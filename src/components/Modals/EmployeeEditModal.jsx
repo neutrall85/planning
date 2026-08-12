@@ -62,14 +62,10 @@ export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
       }
 
       store.updateEmployee(updated);
-      store.addAudit('Изменение данных сотрудника', {
-        employee: `${updated.last} ${updated.first}`,
-        changes: changes.join('; '),
-      }, 'employee', updated.id);
 
       toast.success('Данные обновлены');
       onClose();
-      return;
+      return; // Важно: прекращаем выполнение, чтобы не идти дальше
     }
 
     // Суперадмин может менять всё
@@ -125,16 +121,6 @@ export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
     };
 
     store.updateEmployee(updated);
-    store.addAudit('Изменение данных сотрудника', {
-      employee: `${updated.last} ${updated.first}`,
-      changes: changes.join('; '),
-    }, 'employee', updated.id);
-
-    // Обновляем _currentUser в store, если редактируется текущий пользователь
-    if (store.getCurrentUser && store.getCurrentUser().id === currentEmp.id) {
-      store._currentUser = updated;
-      store._notify();
-    }
 
     toast.success('Данные обновлены');
     onClose();
