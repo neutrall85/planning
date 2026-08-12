@@ -83,12 +83,18 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
     showToast('Отчёт выгружен!', 'success');
   };
 
-  const tabs = [
-    ['overview', 'Сводка'],
-    ['vacations', 'Мои отпуска'],
-    ['delegation', 'Делегирование ролей'],
-    ['profile', 'Профиль и уведомления']
-  ];
+  const tabs = useMemo(() => {
+    const baseTabs = [
+      ['overview', 'Сводка'],
+      ['vacations', 'Мои отпуска'],
+      ['profile', 'Профиль и уведомления']
+    ];
+    // Вкладка "Делегирование ролей" доступна только суперадминам и тем, у кого есть право делегирования
+    if (user.is_super_admin || user.can_delegate_roles) {
+      baseTabs.splice(2, 0, ['delegation', 'Делегирование ролей']);
+    }
+    return baseTabs;
+  }, [user]);
 
   // Загрузка фото
   const fileInputRef = useRef(null);
