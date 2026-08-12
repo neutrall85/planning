@@ -8,10 +8,9 @@ import { canManageAllVacations, hasRoleDirectors } from '../../utils/permissions
 export const VacationModal = ({ db, ur, vacationId, forEmpId, onClose, onSave }) => {
   const existing = vacationId ? db.vacations.find((v) => v.id === vacationId) : null;
   const canPick = canManageAllVacations(ur);
-  // Если пользователь с ролью директор и создает новый отпуск (не редактирует существующий),
-  // то показываем список сотрудников. Иначе empId фиксируется на текущем пользователе
-  const isDirectorCreatingOwnVacation = !existing && hasRoleDirectors(ur) && !forEmpId;
-  const showEmployeeSelector = canPick && !isDirectorCreatingOwnVacation;
+  // Показываем выбор сотрудника только если это не создание отпуска для себя
+  // Директор и другие роли с canManageAllVacations видят список только если явно указан forEmpId (из раздела Персонал)
+  const showEmployeeSelector = canPick && forEmpId !== undefined && forEmpId !== null;
   const { empName, primaryDept } = useDataHelpers(db);
   const [f, setF] = useState(existing ? { 
     ...existing, 
