@@ -221,9 +221,11 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
         <div className="rep-panel">
           <div className="rep-panel-title">
             Мои отпуска
-            <button className="btn primary sm" style={{ marginLeft: 'auto' }} onClick={() => openVacation(null)}>
-              <Ic d={ICONS.plus} size={13} /> Добавить отпуск
-            </button>
+            {!hasRole(user, 'admin') && (
+              <button className="btn primary sm" style={{ marginLeft: 'auto' }} onClick={() => openVacation(null)}>
+                <Ic d={ICONS.plus} size={13} /> Добавить отпуск
+              </button>
+            )}
           </div>
           <table className="tbl">
             <thead><tr><th>Начало</th><th>Окончание</th><th>Тип</th><th>Комментарий</th><th>Делегирование</th><th>Статус</th><th></th></tr></thead>
@@ -240,7 +242,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
                       {{ pending: 'На утверждении', approved: 'Утверждён', rejected: 'Отклонён' }[v.status]}
                     </span></td>
                     <td>
-                      {!started && v.status !== 'rejected' ? (
+                      {!started && v.status !== 'rejected' && !hasRole(user, 'admin') ? (
                         <>
                           <button className="icon-btn" onClick={() => openVacation(v.id)}><Ic d={ICONS.edit} size={14} /></button>
                           <button className="icon-btn danger" onClick={() => { store.deleteVacation(v.id); store.addAudit('Удаление отпуска', fmtDMY(v.start)); }}><Ic d={ICONS.trash} size={14} /></button>
@@ -379,10 +381,12 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
                   <label className="lbl">Пароль</label>
                   <input className="inp" disabled value="••••••••" />
                   
-                  <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                    <button className="btn ghost sm" onClick={() => openEmployeeEdit(user.id)}>Изменить данные</button>
-                    <button className="btn ghost sm" onClick={openChangePassword}>Сменить пароль</button>
-                  </div>
+                  {!hasRole(user, 'admin') && (
+                    <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                      <button className="btn ghost sm" onClick={() => openEmployeeEdit(user.id)}>Изменить данные</button>
+                      <button className="btn ghost sm" onClick={openChangePassword}>Сменить пароль</button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
