@@ -44,6 +44,27 @@ input, select, textarea {
   color: var(--txt);
 }
 
+/* Скрываем стрелки у input type="number" */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* Гарантированное скрытие стрелок для полей ставки */
+.no-spinner::-webkit-outer-spin-button,
+.no-spinner::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.no-spinner {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
