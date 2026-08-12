@@ -121,13 +121,10 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
   });
 
   // Собираем сотрудников без отдела (тех, у кого departments пустой)
-  const noDeptEmployees = activeEmployees.filter(e => e.departments.length === 0);
-  // Сортируем так, чтобы Генеральный директор был первым
-  noDeptEmployees.sort((a, b) => {
-    if (a.roles.includes('director') && !b.roles.includes('director')) return -1;
-    if (!a.roles.includes('director') && b.roles.includes('director')) return 1;
-    return a.last.localeCompare(b.last);
-  });
+  // Оставляем только Генерального директора
+  const noDeptEmployees = activeEmployees.filter(e => 
+    e.departments.length === 0 && e.roles.includes('director')
+  );
 
   // Сотрудники с отделами только по совмещению (нет primary: true)
   const secondaryOnlyEmployees = activeEmployees.filter(e => 
@@ -171,11 +168,11 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
         />
       )}
 
-      {/* --- СЕКЦИЯ: СОТРУДНИКИ БЕЗ ПОДРАЗДЕЛЕНИЙ (РУКОВОДСТВО) --- */}
+      {/* --- СЕКЦИЯ: РУКОВОДСТВО ОРГАНИЗАЦИИ --- */}
       {noDeptEmployees.length > 0 && (
         <div className="st-section">
           <div className="st-sec-head">
-            <div className="st-sec-title">Руководство и сотрудники без подразделений</div>
+            <div className="st-sec-title">Руководство организации</div>
             <div className="st-sec-sub">{noDeptEmployees.length} чел.</div>
           </div>
           {noDeptEmployees.map(e => rowFor(e))}
@@ -207,20 +204,11 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
             <div className="st-sec-head">
               <div className="st-sec-title">{k.name}</div>
               <div className="st-sec-sub">
-                {k.full} · главный конструктор: {chiefsInKb.map(e => `${e.last} ${e.first}`).join(', ') || '—'}
+                {k.full}
               </div>
             </div>
-            {/* Отображаем главных конструкторов КБ (без отделов) */}
-            {chiefsInKb.length > 0 && (
-              <div className="st-dept">
-                <div className="st-dept-head">
-                  <span className="st-dept-name">Руководство КБ</span>
-                  <span className="mut">Главные конструкторы</span>
-                  <span className="kcount">{chiefsInKb.length}</span>
-                </div>
-                {chiefsInKb.map(e => rowFor(e))}
-              </div>
-            )}
+            {/* Отображаем главных конструкторов КБ сразу под названием КБ */}
+            {chiefsInKb.length > 0 && chiefsInKb.map(e => rowFor(e))}
             {deptsBlock(deptsInKb, activeEmployees)}
           </div>
         );
