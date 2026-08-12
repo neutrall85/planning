@@ -44,7 +44,6 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
             {e.last} {e.first}
             {isFired && <span className="vac-badge fired">Уволен</span>}
             {vacNow && <span className="vac-badge">в отпуске до {fmtDMY(vacNow.end)}</span>}
-            {delegatedCount > 0 && <span className="vac-badge delegated" title="Делегированные задачи">★ {delegatedCount}</span>}
           </div>
           <div className="st-pos">
             {e.position}
@@ -112,6 +111,16 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
     
     if (!membersWithRates.length) return null;
     const headNames = db.employees.filter(e => (e.headDeptIds || []).includes(d.id) && !e.fired).map(e => `${e.last} ${e.first[0]}.`).join(', ');
+    
+    // Сортируем сотрудников: сначала начальники отделов (у кого этот отдел в headDeptIds), затем остальные
+    const sortedMembers = [...membersWithRates].sort((a, b) => {
+      const aIsHead = (a.headDeptIds || []).includes(d.id);
+      const bIsHead = (b.headDeptIds || []).includes(d.id);
+      if (aIsHead && !bIsHead) return -1;
+      if (!aIsHead && bIsHead) return 1;
+      return 0;
+    });
+    
     return (
       <div className="st-dept" key={d.id}>
         <div className="st-dept-head">
@@ -119,7 +128,7 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
           <span className="mut">руководитель: {headNames || '—'}</span>
           <span className="kcount">{Number.isInteger(totalStaffCount) ? totalStaffCount : totalStaffCount.toFixed(1)}</span>
         </div>
-        {membersWithRates.map(e => rowFor(e))}
+        {sortedMembers.map(e => rowFor(e))}
       </div>
     );
   });
