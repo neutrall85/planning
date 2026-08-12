@@ -30,10 +30,26 @@ function extractMentions(text, employees) {
   return found;
 }
 
-function projectParticipants(db, projectId) {
-  const ids = new Set(db.tasks.filter((t) => t.projectId === projectId).map((t) => t.assigneeIds || []).flat());
+function projectParticipants(db, projectId, comments = []) {
+  const ids = new Set();
+  
+  // Добавляем исполнителей задач проекта
+  db.tasks
+    .filter((t) => t.projectId === projectId)
+    .forEach((t) => (t.assigneeIds || []).forEach((id) => ids.add(id)));
+  
+  // Добавляем менеджера проекта
   const p = db.projects.find((x) => x.id === projectId);
-  if (p && p.managerId) ids.add(p.managerId);
+  if (p) {
+    if (p.managerId) ids.add(p.managerId);
+    if (p.creatorId) ids.add(p.creatorId);
+  }
+  
+  // Добавляем авторов комментариев
+  comments.forEach((c) => {
+    if (c.authorId) ids.add(c.authorId);
+  });
+  
   return [...ids].map((id) => db.employees.find((e) => e.id === id)).filter(Boolean);
 }
 
@@ -62,8 +78,8 @@ export default function Discussion({
   const comments = entity.comments || [];
   const { primaryDept } = useDataHelpers(db);
   const candidates = useMemo(
-    () => projectParticipants(db, entity.projectId).filter((e) => e.id !== ur.id),
-    [db, entity.projectId, ur.id]
+    () => projectParticipants(db, entity.projectId, comments).filter((e) => e.id !== ur.id),
+    [db, entity.projectId, ur.id, comments]
   );
 
   useEffect(() => {
