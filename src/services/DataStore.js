@@ -518,7 +518,11 @@ export default class DataStore {
   }
 
   // === АУДИТ И УВЕДОМЛЕНИЯ ===
-  addAudit(action, details, targetType = null, targetId = null) {
+  addAudit = (action, details, targetType = null, targetId = null) => {
+    if (!this._data) {
+      console.warn('addAudit called but _data is not initialized');
+      return;
+    }
     let detailsStr = details;
     if (typeof details === 'object') {
       detailsStr = JSON.stringify(details);
