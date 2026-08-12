@@ -2010,8 +2010,8 @@ input, select, textarea {
   position: relative;
 }
 .mention-pop {
-  position: absolute;
-  bottom: calc(100% + 4px);
+  position: fixed;
+  bottom: auto;
   left: 0;
   background: #fff;
   border: 1px solid var(--line);
@@ -2019,7 +2019,7 @@ input, select, textarea {
   box-shadow: var(--sh);
   max-height: 170px;
   overflow: auto;
-  z-index: 10;
+  z-index: 10000;
   min-width: 300px;
 }
 .mention-item {
@@ -2077,6 +2077,8 @@ input, select, textarea {
   align-items: center;
   padding: 15px 20px;
   border-bottom: 1px solid var(--line);
+  position: relative;
+  z-index: 1;
 }
 .modal-head h3 {
   font-size: 16px;
