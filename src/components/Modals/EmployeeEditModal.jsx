@@ -177,14 +177,46 @@ export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
         <label className="lbl">Должность</label>
         <input className="inp" value={f.position} onChange={e => set('position', e.target.value)} disabled={!canEditAll} />
 
+        {!canEditAll && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gridColumn: '1 / -1' }}>
+            <label className="lbl" style={{ margin: 0 }}>Контактные данные</label>
+            <button
+              type="button"
+              className={`btn ${isEditing ? 'ghost' : 'link'}`}
+              onClick={() => setIsEditing(!isEditing)}
+              style={{ fontSize: '13px', padding: '4px 8px' }}
+            >
+              {isEditing ? 'Отменить' : 'Изменить'}
+            </button>
+          </div>
+        )}
+
         <label className="lbl">Мобильный телефон</label>
-        <input className="inp" value={f.phone} onChange={e => set('phone', e.target.value)} placeholder="+7 (___) ___-__-__" />
+        <input
+          className="inp"
+          value={f.phone}
+          onChange={e => set('phone', e.target.value)}
+          placeholder="+7 (___) ___-__-__"
+          disabled={!canEditAll && !isEditing}
+        />
 
         <label className="lbl">Внутренний номер</label>
-        <input className="inp" value={f.extension} onChange={e => set('extension', e.target.value)} placeholder="1234" />
+        <input
+          className="inp"
+          value={f.extension}
+          onChange={e => set('extension', e.target.value)}
+          placeholder="1234"
+          disabled={!canEditAll && !isEditing}
+        />
 
         <label className="lbl">Табельный №</label>
-        <input className="inp" value={f.tab} onChange={e => set('tab', e.target.value)} disabled={!canEditAll} />
+        <input
+          className="inp"
+          value={f.tab}
+          onChange={e => set('tab', e.target.value)}
+          disabled={true}
+          title="Табельный номер неизменяем"
+        />
       </div>
 
       <div className="modal-foot">
