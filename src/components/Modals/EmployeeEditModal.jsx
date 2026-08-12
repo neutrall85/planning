@@ -130,6 +130,12 @@ export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
       changes: changes.join('; '),
     }, 'employee', updated.id);
 
+    // Обновляем _currentUser в store, если редактируется текущий пользователь
+    if (store.getCurrentUser && store.getCurrentUser().id === currentEmp.id) {
+      store._currentUser = updated;
+      store._notify();
+    }
+
     toast.success('Данные обновлены');
     onClose();
   };
