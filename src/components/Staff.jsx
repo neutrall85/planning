@@ -24,9 +24,6 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
     const pct = Math.min(100, Math.round((l.plan / norm) * 100));
     const vacNow = db.vacations.find(v => v.empId === e.id && v.status === 'approved' && v.start <= TODAY && TODAY <= v.end);
     
-    // Вычисляем общую ставку сотрудника (сумма ставок по всем отделам)
-    const totalRate = e.departments.reduce((sum, d) => sum + (d.rate || 1), 0);
-    
     return (
       <div className="st-row" key={e.id}>
         <span className="avatar sm">
@@ -53,17 +50,15 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
           {e.roles.includes('kb_chief') && (e.kbIds || []).map(k => (
             <span key={k} className="role-chip blue">{db.kbs.find(x => x.id === k)?.name}</span>
           ))}
-          {/* Отображение отделов с указанием ставки и типа занятости */}
+          {/* Отображение отделов (без ставки и совмещения — просто названия) */}
           {e.departments.length > 0 && (
             <div className="st-depts-list">
               {e.departments.map((d, idx) => {
                 const dd = db.departments.find(x => x.id === d.deptId);
                 if (!dd) return null;
-                const isPrimary = d.primary === true;
-                const rate = d.rate || 1;
                 return (
-                  <span key={d.deptId} className={`dept-chip ${!isPrimary ? 'dept-chip-secondary' : ''}`}>
-                    {dd.name}{rate !== 1 ? ` (${rate})` : ''}{!isPrimary ? ' совм' : ''}
+                  <span key={d.deptId} className="dept-chip">
+                    {dd.name}
                   </span>
                 );
               })}
@@ -91,48 +86,26 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
       </div>
     );
   };
-
-  // Функция для построения блока подразделения
+  // Функция для построения блока подразделения (без отображения количества сотрудников по ставкам)
   const deptsBlock = (deptList, employees) => deptList.map(d => {
-    // Считаем сотрудников и их ставки: основные + совмещения
-    const membersWithRates = employees.filter(e => e.departments.some(x => x.deptId === d.id) && !e.fired);
-    // Подсчёт дробного количества сотрудников (сумма ставок)
-    let totalStaffCount = 0;
-    membersWithRates.forEach(e => {
-      e.departments.forEach(dep => {
-        if (dep.deptId === d.id) {
-          totalStaffCount += (dep.rate || 1);
-        }
-      });
-    });
+    const members = employees.filter(e => e.departments.some(x => x.deptId === d.id) && !e.fired);
     
-    if (!membersWithRates.length) return null;
+    if (!members.length) return null;
     const headNames = db.employees.filter(e => (e.headDeptIds || []).includes(d.id) && !e.fired).map(e => `${e.last} ${e.first[0]}.`).join(', ');
     return (
       <div className="st-dept" key={d.id}>
         <div className="st-dept-head">
           <span className="st-dept-name">{d.name}</span>
           <span className="mut">руководитель: {headNames || '—'}</span>
-          <span className="kcount">{Number.isInteger(totalStaffCount) ? totalStaffCount : totalStaffCount.toFixed(1)}</span>
+          <span className="kcount">{members.length}</span>
         </div>
-        {membersWithRates.map(e => rowFor(e))}
+        {members.map(e => rowFor(e))}
       </div>
     );
   });
 
-  // Собираем сотрудников без отдела (тех, у кого departments пустой)
-  const noDeptEmployees = activeEmployees.filter(e => e.departments.length === 0);
-  // Сортируем так, чтобы Генеральный директор был первым
-  noDeptEmployees.sort((a, b) => {
-    if (a.roles.includes('director') && !b.roles.includes('director')) return -1;
-    if (!a.roles.includes('director') && b.roles.includes('director')) return 1;
-    return a.last.localeCompare(b.last);
-  });
-
-  // Сотрудники с отделами только по совмещению (нет primary: true)
-  const secondaryOnlyEmployees = activeEmployees.filter(e => 
-    e.departments.length > 0 && !e.departments.some(d => d.primary === true)
-  );
+  // Находим Генерального директора (он отображается просто наверху, без подразделений)
+  const director = activeEmployees.find(e => e.roles.includes('director'));
 
   const allVacs = [...db.vacations].sort((a,b) => (a.start < b.start ? 1 : -1));
 
@@ -171,25 +144,13 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
         />
       )}
 
-      {/* --- СЕКЦИЯ: СОТРУДНИКИ БЕЗ ПОДРАЗДЕЛЕНИЙ (РУКОВОДСТВО) --- */}
-      {noDeptEmployees.length > 0 && (
+      {/* --- ГЕНЕРАЛЬНЫЙ ДИРЕКТОР (ПРОСТО НАВЕРХУ, БЕЗ ПОДРАЗДЕЛЕНИЙ) --- */}
+      {director && (
         <div className="st-section">
           <div className="st-sec-head">
-            <div className="st-sec-title">Руководство и сотрудники без подразделений</div>
-            <div className="st-sec-sub">{noDeptEmployees.length} чел.</div>
+            <div className="st-sec-title">Генеральный директор</div>
           </div>
-          {noDeptEmployees.map(e => rowFor(e))}
-        </div>
-      )}
-
-      {/* --- СЕКЦИЯ: СОТРУДНИКИ ТОЛЬКО ПО СОВМЕЩЕНИЮ --- */}
-      {secondaryOnlyEmployees.length > 0 && (
-        <div className="st-section">
-          <div className="st-sec-head">
-            <div className="st-sec-title">Сотрудники по совмещению (без основного отдела)</div>
-            <div className="st-sec-sub">{secondaryOnlyEmployees.length} чел.</div>
-          </div>
-          {secondaryOnlyEmployees.map(e => rowFor(e))}
+          {rowFor(director)}
         </div>
       )}
 
