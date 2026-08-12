@@ -50,6 +50,16 @@ function projectParticipants(db, projectId, comments = []) {
     if (c.authorId) ids.add(c.authorId);
   });
   
+  // Если участников всё ещё мало, добавляем всех с ролями project_manager и project_lead
+  if (ids.size < 3) {
+    db.employees.forEach((e) => {
+      if ((e.roles || []).includes('project_manager') || 
+          (e.roles || []).includes('project_lead')) {
+        ids.add(e.id);
+      }
+    });
+  }
+  
   return [...ids].map((id) => db.employees.find((e) => e.id === id)).filter(Boolean);
 }
 
