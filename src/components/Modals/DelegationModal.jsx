@@ -10,7 +10,8 @@ export const DelegationModal = ({ db, ur, onClose, onSubmit }) => {
   const [end, setEnd] = useState(iso(addDays(new Date(), 14)));
   const [openEnd, setOpenEnd] = useState(false);
   const [reason, setReason] = useState("");
-  const allowed = ur.roles.filter((r) => !["admin", "director", "executor"].includes(r));
+  // Генеральный директор может делегировать свою роль, администратор - нет
+  const allowed = ur.roles.filter((r) => !["admin", "executor"].includes(r));
   return (
     <Modal title="Временная передача ролей" onClose={onClose} width={520}>
       <div className="form-grid">
