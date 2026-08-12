@@ -159,7 +159,12 @@ export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
         <input className="inp" value={f.first} onChange={e => set('first', e.target.value)} disabled={!canEditAll} />
 
         <label className="lbl">E-mail</label>
-        <input className="inp" disabled value={f.email} />
+        <input
+          className="inp"
+          value={f.email}
+          onChange={e => set('email', e.target.value)}
+          disabled={!canEditAll}
+        />
 
         <label className="lbl">Должность</label>
         <input className="inp" value={f.position} onChange={e => set('position', e.target.value)} disabled={!canEditAll} />
@@ -190,8 +195,8 @@ export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
         <input
           className="inp"
           value={f.tab}
-          disabled={true}
-          title="Табельный номер неизменяем"
+          onChange={e => set('tab', e.target.value)}
+          disabled={!canEditAll}
         />
       </div>
 
