@@ -7,10 +7,10 @@ import { canManageAllVacations, hasRoleDirectors } from '../../utils/permissions
 
 export const VacationModal = ({ db, ur, vacationId, forEmpId, onClose, onSave }) => {
   const existing = vacationId ? db.vacations.find((v) => v.id === vacationId) : null;
+  // Показываем выбор сотрудника ТОЛЬКО если явно указан forEmpId (из раздела Персонал)
+  // В личном кабинете (когда forEmpId не передан) каждый сотрудник ставит отпуск только себе
+  const showEmployeeSelector = forEmpId !== undefined && forEmpId !== null;
   const canPick = canManageAllVacations(ur);
-  // Показываем выбор сотрудника только если это не создание отпуска для себя
-  // Директор и другие роли с canManageAllVacations видят список только если явно указан forEmpId (из раздела Персонал)
-  const showEmployeeSelector = canPick && forEmpId !== undefined && forEmpId !== null;
   const { empName, primaryDept } = useDataHelpers(db);
   const [f, setF] = useState(existing ? { 
     ...existing, 
