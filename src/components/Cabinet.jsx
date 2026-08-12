@@ -2,6 +2,7 @@ import React, { useState, useMemo, useRef } from 'react';
 import { TASK_STATUSES, TASK_STATUS_ORDER, VACATION_TYPES, PROJECT_CATEGORIES } from '../utils/constants';
 import { TODAY, fmtDMY, fmtD, iso, addDays, initials, isTaskActive } from '../utils/date';
 import { useDataHelpers } from '../hooks';
+import { hasRole } from '../utils/permissions';
 import { Ic, ICONS } from './Icons';
 import { useToast } from './Toast';
 import EmployeeTooltip from './EmployeeTooltip';
@@ -89,8 +90,8 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
       ['vacations', 'Мои отпуска'],
       ['profile', 'Профиль и уведомления']
     ];
-    // Вкладка "Делегирование ролей" доступна только суперадминам и тем, у кого есть право делегирования
-    if (user.is_super_admin || user.can_delegate_roles) {
+    // Вкладка "Делегирование ролей" доступна суперадминам, генеральному директору и тем, у кого есть право делегирования
+    if (user.is_super_admin || user.can_delegate_roles || hasRole(user, 'director')) {
       baseTabs.splice(2, 0, ['delegation', 'Делегирование ролей']);
     }
     return baseTabs;
