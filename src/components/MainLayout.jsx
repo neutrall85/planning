@@ -215,10 +215,13 @@ export default function MainLayout({ store, data, user, toast }) {
                       Канбан
                     </button>
                   </div>
-                  <label className="dept-pick" style={{ margin: 0 }}>
-                    <input type="checkbox" checked={showOnlyMyTasks} onChange={(e) => setShowOnlyMyTasks(e.target.checked)} />
-                    <span style={{ fontSize: 13 }}>Только мои задачи</span>
-                  </label>
+                  {/* Скрываем для пользователей с ролью только "executor" */}
+                  {(user.roles.length > 1 || !user.roles.includes('executor')) && (
+                    <label className="dept-pick" style={{ margin: 0 }}>
+                      <input type="checkbox" checked={showOnlyMyTasks} onChange={(e) => setShowOnlyMyTasks(e.target.checked)} />
+                      <span style={{ fontSize: 13 }}>Только мои задачи</span>
+                    </label>
+                  )}
                   <select className="inp sel sm" value={taskSortBy} onChange={(e) => setTaskSortBy(e.target.value)} style={{ minWidth: 180 }}>
                     <option value="deadline">По дате выполнения (возр.)</option>
                     <option value="deadlineDesc">По дате выполнения (убыв.)</option>
@@ -289,10 +292,13 @@ export default function MainLayout({ store, data, user, toast }) {
                       Канбан
                     </button>
                   </div>
-                  <label className="dept-pick" style={{ margin: 0 }}>
-                    <input type="checkbox" checked={showOnlyMyProjects} onChange={(e) => setShowOnlyMyProjects(e.target.checked)} />
-                    <span style={{ fontSize: 13 }}>Показать проекты с моими задачами</span>
-                  </label>
+                  {/* Скрываем для пользователей с ролью только "executor" */}
+                  {(user.roles.length > 1 || !user.roles.includes('executor')) && (
+                    <label className="dept-pick" style={{ margin: 0 }}>
+                      <input type="checkbox" checked={showOnlyMyProjects} onChange={(e) => setShowOnlyMyProjects(e.target.checked)} />
+                      <span style={{ fontSize: 13 }}>Показать проекты с моими задачами</span>
+                    </label>
+                  )}
                   <select className="inp sel sm" value={projectSortBy} onChange={(e) => setProjectSortBy(e.target.value)} style={{ minWidth: 180 }}>
                     <option value="name">По названию (А-Я)</option>
                     <option value="nameDesc">По названию (Я-А)</option>
