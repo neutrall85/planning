@@ -91,7 +91,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
       ['profile', 'Профиль и уведомления']
     ];
     // Вкладка "Делегирование ролей" доступна суперадминам, генеральному директору и тем, у кого есть право делегирования
-    if (user.is_super_admin || user.can_delegate_roles || hasRole(user, 'director')) {
+    if (!hasRole(user, 'executor', 'admin')) {
       baseTabs.splice(2, 0, ['delegation', 'Делегирование ролей']);
     }
     return baseTabs;
