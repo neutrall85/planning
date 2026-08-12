@@ -281,6 +281,13 @@ export default function Discussion({
             </div>
           )}
           <div className="cm-input-wrap">
+            <textarea
+              className="inp"
+              rows="2"
+              placeholder="Комментарий… Введите @ для упоминания участника проекта"
+              value={text}
+              onChange={(e) => onType(e.target.value)}
+            />
             {mentionQ !== null && filtered.length > 0 && (
               <div className="mention-pop">
                 {filtered.slice(0, 6).map((e) => (
@@ -292,13 +299,6 @@ export default function Discussion({
                 ))}
               </div>
             )}
-            <textarea
-              className="inp"
-              rows="2"
-              placeholder="Комментарий… Введите @ для упоминания участника проекта"
-              value={text}
-              onChange={(e) => onType(e.target.value)}
-            />
           </div>
           <div className="cm-foot">
             <span className="mut sm">

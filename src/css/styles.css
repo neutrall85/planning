@@ -1954,6 +1954,7 @@ input, select, textarea {
   display: flex;
   flex-direction: column;
   gap: 9px;
+  position: relative;
 }
 .cm {
   border: 1px solid var(--line);
@@ -2018,7 +2019,7 @@ input, select, textarea {
   box-shadow: var(--sh);
   max-height: 170px;
   overflow: auto;
-  z-index: 5;
+  z-index: 10;
   min-width: 300px;
 }
 .mention-item {
@@ -2065,7 +2066,9 @@ input, select, textarea {
   max-height: 92vh;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
+  position: relative;
+  z-index: 1;
 }
 .modal-head {
   flex-shrink: 0;
@@ -2083,6 +2086,7 @@ input, select, textarea {
   flex: 1;
   padding: 16px 20px;
   overflow-y: auto;
+  position: relative;
 }
 .modal-foot {
   flex-shrink: 0;
