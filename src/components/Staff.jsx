@@ -27,6 +27,9 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
     // Вычисляем общую ставку сотрудника (сумма ставок по всем отделам)
     const totalRate = e.departments.reduce((sum, d) => sum + (d.rate || 1), 0);
     
+    // Получаем количество делегированных задач
+    const delegatedCount = e.delegatedTasksCount || 0;
+    
     return (
       <div className="st-row" key={e.id}>
         <span className="avatar sm">
@@ -41,6 +44,7 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
             {e.last} {e.first}
             {isFired && <span className="vac-badge fired">Уволен</span>}
             {vacNow && <span className="vac-badge">в отпуске до {fmtDMY(vacNow.end)}</span>}
+            {delegatedCount > 0 && <span className="vac-badge delegated" title="Делегированные задачи">★ {delegatedCount}</span>}
           </div>
           <div className="st-pos">
             {e.position}

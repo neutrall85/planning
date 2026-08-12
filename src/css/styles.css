@@ -1694,6 +1694,10 @@ input[type="number"] {
   background: #fef2f2;
   color: #dc2626;
 }
+.vac-badge.delegated {
+  background: #fef3c7;
+  color: #d97706;
+}
 .st-pos {
   font-size: 11px;
   color: var(--mut);
