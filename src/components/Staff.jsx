@@ -232,16 +232,29 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
         );
       })}
 
-      {/* --- Отделы вне КБ --- */}
-      {db.departments.filter(d => d.kbId === null).length > 0 && (
-        <div className="st-section">
-          <div className="st-sec-head">
-            <div className="st-sec-title">Отделы вне КБ</div>
-            <div className="st-sec-sub">Подразделения прямого подчинения</div>
+      {/* --- Отделы и сотрудники вне КБ --- */}
+      {(() => {
+        const deptsNoKb = db.departments.filter(d => d.kbId === null);
+        // Сотрудники без отдела и без КБ (исключая генерального директора)
+        const employeesNoDeptNoKb = activeEmployees.filter(e => 
+          e.departments.length === 0 && 
+          (!e.kbIds || e.kbIds.length === 0) &&
+          !e.roles.includes('director')
+        );
+        
+        if (deptsNoKb.length === 0 && employeesNoDeptNoKb.length === 0) return null;
+        
+        return (
+          <div className="st-section">
+            <div className="st-sec-head">
+              <div className="st-sec-title">Отделы и сотрудники вне КБ</div>
+              <div className="st-sec-sub">Подразделения прямого подчинения и сотрудники без привязки</div>
+            </div>
+            {deptsBlock(deptsNoKb, activeEmployees)}
+            {employeesNoDeptNoKb.map(e => rowFor(e))}
           </div>
-          {deptsBlock(db.departments.filter(d => d.kbId === null), activeEmployees)}
-        </div>
-      )}
+        );
+      })()}
 
       {/* --- Все отпуска (для HR/админов) --- */}
       {canManageAllVacations(ur) && (
