@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { uid, fmtDT, initials } from '../../utils/date';
 import { has } from '../../utils/permissions';
 import { Ic, ICONS } from '../Icons';
@@ -55,6 +56,8 @@ export default function Discussion({
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState("");
   const [mentionQ, setMentionQ] = useState(null);
+  const [mentionPos, setMentionPos] = useState({ top: 0, left: 0 });
+  const textareaRef = useRef(null);
 
   const comments = entity.comments || [];
   const { primaryDept } = useDataHelpers(db);
@@ -62,6 +65,16 @@ export default function Discussion({
     () => projectParticipants(db, entity.projectId).filter((e) => e.id !== ur.id),
     [db, entity.projectId, ur.id]
   );
+
+  useEffect(() => {
+    if (mentionQ !== null && textareaRef.current) {
+      const rect = textareaRef.current.getBoundingClientRect();
+      setMentionPos({
+        top: rect.top,
+        left: rect.left,
+      });
+    }
+  }, [mentionQ]);
 
   const onType = (val) => {
     setText(val);
@@ -282,14 +295,15 @@ export default function Discussion({
           )}
           <div className="cm-input-wrap">
             <textarea
+              ref={textareaRef}
               className="inp"
               rows="2"
               placeholder="Комментарий… Введите @ для упоминания участника проекта"
               value={text}
               onChange={(e) => onType(e.target.value)}
             />
-            {mentionQ !== null && filtered.length > 0 && (
-              <div className="mention-pop">
+            {mentionQ !== null && filtered.length > 0 && ReactDOM.createPortal(
+              <div className="mention-pop" style={{ top: mentionPos.top - 170, left: mentionPos.left }}>
                 {filtered.slice(0, 6).map((e) => (
                   <div key={e.id} className="mention-item" onClick={() => pickMention(e)}>
                     <span className="avatar xs">{initials(e.first, e.last)}</span>
@@ -297,7 +311,8 @@ export default function Discussion({
                     <span className="mut sm">· {primaryDept(e)?.name || ""}</span>
                   </div>
                 ))}
-              </div>
+              </div>,
+              document.body
             )}
           </div>
           <div className="cm-foot">

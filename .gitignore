@@ -1,71 +1,23 @@
 ```
+# Build artifacts
+dist/
+build/
+*.css
+
 # Dependencies
 node_modules/
-
-# Logs and temp files
-*.log
-*.tmp
-
-# Environment
-.env
-.env.local
-*.env.*
 
 # Editors
 .vscode/
 .idea/
 
-# Python
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-env/
-venv/
-.venv/
-pip-log.txt
-pip-delete-this-directory.txt
-.tox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
+# Logs and temp files
 *.log
-.git
-.mypy_cache/
-.pytest_cache/
-.hypothesis/
+*.tmp
+*.swp
 
-# Build artifacts
-dist/
-build/
-*.egg-info/
-.eggs/
-
-# Compression
-*.zip
-*.gz
-*.tar
-*.tgz
-*.bz2
-*.xz
-*.7z
-*.rar
-*.zst
-*.lz4
-*.lzh
-*.cab
-*.arj
-*.rpm
-*.deb
-*.Z
-*.lz
-*.lzo
-
-# System
-.DS_Store
-Thumbs.db
+# Environment
+.env
+.env.local
+.env.*
 ```
