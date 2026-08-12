@@ -30,7 +30,6 @@ const DayCell = ({ d, big, byDay, db, openTask, onAvatarEnter, onAvatarLeave, on
                     <span
                       key={a.id}
                       className="avatar xs"
-                      title={`${a.last} ${a.first}`}
                       style={{ cursor: 'pointer' }}
                       onMouseEnter={(e) => onAvatarEnter && onAvatarEnter(e, a)}
                       onMouseLeave={onAvatarLeave}
