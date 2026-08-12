@@ -47,13 +47,13 @@ export const DeptsModal = ({ db, store, empId, onClose, toast, audit }) => {
                 <>
                   <input
                     type="number"
-                    className="no-spinner"
+                    className="no-spinner rate-input"
                     step="0.1"
                     min="0.1"
                     max="1"
                     value={cur.rate || 1}
                     onChange={(e) => updateRate(d.id, e.target.value)}
-                    style={{ width: '50px', padding: '4px', textAlign: 'center' }}
+                    style={{ width: '60px' }}
                     title="Ставка (доля)"
                   />
                   <button className={"btn ghost sm" + (cur.primary ? " prim-btn" : "")} onClick={(e) => { e.preventDefault(); setPrimary(d.id); }}>{cur.primary ? "основное ✓" : "сделать основным"}</button>
