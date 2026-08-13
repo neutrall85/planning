@@ -65,7 +65,7 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
           ))}
           {/* Если это отдел совмещения - показываем название отдела с пометкой (совм) */}
           {isSecondaryInCurrent && (
-            <span className="vac-badge" style={{ fontSize: '10px', padding: '2px 4px', marginLeft: '8px' }}>(совм)</span>
+            <span className="sim-badge">(совм)</span>
           )}
           {/* Если это основной отдел и есть совмещения - показываем названия отделов совмещения под ролями с пометкой (совм) */}
           {isPrimaryInCurrent && hasSecondary && (
