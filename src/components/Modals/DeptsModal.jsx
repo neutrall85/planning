@@ -32,8 +32,15 @@ export const DeptsModal = ({ db, store, empId, onClose, toast, audit }) => {
       return;
     }
     
-    const before = emp.departments.map((x) => `${x.deptId}${x.position ? ':' + x.position : ''}`).join(", ");
-    const after = sel.map((x) => `${x.deptId}${x.position ? ':' + x.position : ''}`).join(", ");
+    // Функция для получения названия подразделения по ID
+    const getDeptName = (deptId) => {
+      const dept = db.departments.find(d => d.id === deptId);
+      return dept ? dept.name : deptId;
+    };
+    
+    // Формируем читаемые списки подразделений
+    const beforeList = emp.departments.map(x => getDeptName(x.deptId)).join(', ');
+    const afterList = sel.map(x => getDeptName(x.deptId)).join(', ');
     
     // Формируем данные для отправки на бэкенд
     const payload = {
@@ -47,7 +54,7 @@ export const DeptsModal = ({ db, store, empId, onClose, toast, audit }) => {
     
     const updatedEmp = { ...emp, departments: sel };
     store.updateEmployee(updatedEmp);
-    audit("Изменение подразделений", `${emp.last} ${emp.first}: [${before || '–'}] → [${after || '–'}]`);
+    audit("Изменение подразделений", `${emp.last} ${emp.first}: ${beforeList || '–'} → ${afterList || '–'}`);
     
     if (toast && typeof toast.success === 'function') {
       toast.success("Подразделения обновлены");
