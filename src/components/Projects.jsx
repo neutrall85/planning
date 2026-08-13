@@ -57,6 +57,7 @@ export default function Projects({ db, ur, openProject, openHoursReq, showOnlyMy
       <div className="pj-grid">
         {list.map(p => {
           const tasks = db.tasks.filter(t => t.projectId === p.id && isTaskActive(t));
+          const hasProjectTasks = tasks.some(t => (t.assigneeIds || []).includes(ur.id));
           const plan = tasks.reduce((s, t) => s + (t.plannedHours || 0), 0);
           const fact = tasks.reduce((s, t) => s + t.logs.reduce((lsum, l) => lsum + l.hours, 0), 0);
           const usePct = p.budget ? Math.round((fact / Math.max(1, p.budget)) * 100) : 0;
@@ -119,7 +120,7 @@ export default function Projects({ db, ur, openProject, openHoursReq, showOnlyMy
                   )}
                 </div>
                 <div className="pj-actions" onClick={(e) => e.stopPropagation()}>
-                  {!hasRole(ur, 'admin') && p.status === 'active' && p.ptype !== 'admin' && (
+                  {!hasRole(ur, 'admin') && p.status === 'active' && p.ptype !== 'admin' && hasProjectTasks && (
                     <button className="btn ghost sm" onClick={() => openHoursReq('project', p.id)}>
                       <Ic d={ICONS.clock} size={13} /> Запросить изменение часов
                     </button>
