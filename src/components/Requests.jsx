@@ -46,9 +46,9 @@ export default function Requests({ db, store, ur, initialTab = 'hours', addAudit
     
     setTimeout(() => {
       if (ok) {
-        addAudit('Утверждение запроса часов', { task: targetTitle, previousHours: r.oldH, newHours: r.newH, reason: r.reason || 'Не указана' }, 'hoursRequest', r.id);
+        addAudit('Утверждение запроса часов', { task: targetTitle, previousHours: r.oldH, newHours: r.newH, justification: r.reason || 'Не указана' }, 'hoursRequest', r.id);
       } else {
-        addAudit('Отклонение запроса часов', { task: targetTitle, requestedHours: r.newH, reason: r.reason }, 'hoursRequest', r.id);
+        addAudit('Отклонение запроса часов', { task: targetTitle, requestedHours: r.newH, justification: r.reason || 'Не указана' }, 'hoursRequest', r.id);
       }
     }, 0);
   };
