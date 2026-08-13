@@ -1702,6 +1702,12 @@ input[type="number"] {
   font-size: 11px;
   color: var(--mut);
 }
+.st-primary-dept {
+  font-size: 11px;
+  color: #0f172a;
+  font-weight: 600;
+  margin-top: 4px;
+}
 .st-roles {
   display: flex;
   gap: 5px;
