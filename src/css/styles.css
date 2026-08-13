@@ -1698,6 +1698,16 @@ input[type="number"] {
   background: #fef3c7;
   color: #d97706;
 }
+.sim-badge {
+  font-size: 10px;
+  font-weight: 800;
+  color: #0284c7;
+  background: #e0f2fe;
+  border-radius: 6px;
+  padding: 2px 7px;
+  margin-left: 8px;
+  white-space: nowrap;
+}
 .st-pos {
   font-size: 11px;
   color: var(--mut);
