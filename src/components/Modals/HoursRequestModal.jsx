@@ -7,9 +7,15 @@ export const HoursRequestModal = ({ db, ur, kind, targetId, onClose, onSubmit })
   const cur = kind === "task" ? target?.plannedHours : target?.budget;
   const [newH, setNewH] = useState(cur);
   const [reason, setReason] = useState("");
+  
+  // Определяем, кто утверждает запрос: ГК для своих КБ, иначе ГД
+  const project = kind === "task" ? db.projects.find(p => p.id === target?.projectId) : target;
+  const isKbProject = project && project.kbId;
+  const approverText = isKbProject ? "главному конструктору вашего КБ" : "генеральному директору";
+  
   return (
     <Modal title={`Запрос изменения часов — ${kind === "task" ? "задача" : "бюджет проекта"}`} onClose={onClose} width={480}>
-      <p className="mut sm">{kind === "task" ? target?.title : target?.name}. Запрос будет направлен генеральному директору.</p>
+      <p className="mut sm">{kind === "task" ? target?.title : target?.name}. Запрос будет направлен {approverText}.</p>
       <div className="form-grid">
         <label className="lbl">Текущее значение</label><input className="inp" disabled value={(cur ?? "—") + " ч"} />
         <label className="lbl">Новое значение *</label><input className="inp" type="number" min="1" step="0.5" value={newH} onChange={(e) => setNewH(e.target.value)} />

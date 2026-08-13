@@ -576,8 +576,50 @@ export default class DataStore {
   }
 
   // === ЗАПРОСЫ ===
-  addHoursRequest(req) {
+  addHoursRequest(req, db) {
     this._data = { ...this._data, hoursRequests: [req, ...this._data.hoursRequests] };
+    
+    // Определяем, кто утверждает запрос: ГК для своих КБ, иначе ГД
+    const target = req.kind === 'task' 
+      ? db.tasks.find(t => t.id === req.targetId)
+      : db.projects.find(p => p.id === req.targetId);
+    
+    let approverId = null;
+    if (target) {
+      const project = req.kind === 'task'
+        ? db.projects.find(p => p.id === target.projectId)
+        : target;
+      
+      if (project && project.kbId) {
+        // Проект в КБ - ищем главного конструктора этого КБ
+        const kbChief = db.employees.find(e => 
+          e.roles.includes('kb_chief') && 
+          e.kbIds && 
+          e.kbIds.includes(project.kbId)
+        );
+        if (kbChief) {
+          approverId = kbChief.id;
+        }
+      }
+      
+      // Если не нашли ГК или проект не в КБ - уведомляем ГД
+      if (!approverId) {
+        const director = db.employees.find(e => e.roles.includes('director'));
+        if (director) {
+          approverId = director.id;
+        }
+      }
+    }
+    
+    // Создаём уведомление для утверждающего
+    if (approverId) {
+      const targetTitle = req.kind === 'task' ? target?.title : target?.name;
+      const requestorName = db.employees.find(e => e.id === req.reqId);
+      const reqNameStr = requestorName ? `${requestorName.last} ${requestorName.first}` : 'Сотрудник';
+      const msg = `Запрос на изменение часов от ${reqNameStr}: ${targetTitle} (${req.oldH} → ${req.newH} ч). Требуется ваше утверждение.`;
+      this.addNotification(approverId, msg, { targetType: 'hours', targetId: req.id });
+    }
+    
     this._notify();
   }
 

@@ -119,7 +119,7 @@ export default function Projects({ db, ur, openProject, openHoursReq, showOnlyMy
                   )}
                 </div>
                 <div className="pj-actions" onClick={(e) => e.stopPropagation()}>
-                  {((hasRole(ur, 'project_lead') && p.managerId === ur.id) || hasRole(ur, 'admin', 'director', 'economist')) && p.status === 'active' && p.ptype !== 'admin' && (
+                  {!hasRole(ur, 'admin') && p.status === 'active' && p.ptype !== 'admin' && (
                     <button className="btn ghost sm" onClick={() => openHoursReq('project', p.id)}>
                       <Ic d={ICONS.clock} size={13} /> Запросить изменение часов
                     </button>

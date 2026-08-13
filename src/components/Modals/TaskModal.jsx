@@ -161,6 +161,8 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
   const canEditFields = !readOnly && (existing ? canEditTaskFields(ur, existing, db) : canCreateTask(ur));
   const canChangeStatus = !readOnly && existing && canChangeTaskStatus(ur, existing, null, db);
   const canEditPlannedHours = hasRole(ur, 'admin', 'director');
+  // Кнопка запроса изменения часов доступна всем, кроме админа, если задача не в режиме чтения
+  const canRequestHours = !readOnly && !has(ur, 'admin');
   const isAuthor = existing && existing.creatorId === ur.id;
   const isReview = existing && existing.status === 'review';
 
@@ -616,7 +618,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
           <label className="lbl">Плановые часы {!isAdminProj && "*"}</label>
           <div className="duo">
             <input className="inp" type="number" min="0.5" step="0.5" disabled={!canEditPlannedHours} value={f.plannedHours ?? ""} onChange={(e) => set("plannedHours", e.target.value)} />
-            {(!canEditFields && !readOnly) ? null : (has(ur, "project_lead", "head", "kb_chief", "director", "admin") && existing && !isAdminProj) ? <button className="btn ghost sm" type="button" onClick={() => onHoursReq("task", existing.id)}><Ic d={ICONS.clock} size={13} /> Запросить изменение часов</button> : <span className="duo-note">{isAdminProj ? "опционально" : "отдельно от срока выполнения"}</span>}
+            {canRequestHours && existing ? <button className="btn ghost sm" type="button" onClick={() => onHoursReq("task", existing.id)}><Ic d={ICONS.clock} size={13} /> Запросить изменение часов</button> : <span className="duo-note">{isAdminProj ? "опционально" : "отдельно от срока выполнения"}</span>}
           </div>
           <label className="lbl">Статус *</label>
           <select className="inp sel" disabled={!canChangeStatus && !isAuthor && !isExec} value={f.status} onChange={(e) => set("status", e.target.value)}>
