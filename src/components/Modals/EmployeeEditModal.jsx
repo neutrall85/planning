@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from '../Modal';
-import { COMPANY_DOMAIN } from '../../utils/config';
+import { COMPANY_DOMAIN, ALLOWED_EMAIL_DOMAINS } from '../../utils/config';
 import { useDataHelpers } from '../../hooks';
 
 export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
@@ -8,17 +8,10 @@ export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
   const canEditAll = isAdmin; // Только суперадмин может менять всё
   const [isEditing, setIsEditing] = useState(false); // Режим редактирования для обычных пользователей
 
-  const getLocalPart = (email) => {
-    if (!email) return '';
-    return email.split('@')[0];
-  };
-
-  const currentEmp = db.employees.find(e => e.id === empId);
-
   const [f, setF] = useState({
     last: currentEmp?.last || '',
     first: currentEmp?.first || '',
-    email: getLocalPart(currentEmp?.email),
+    email: currentEmp?.email || '',
     phone: currentEmp?.phone || '',
     extension: currentEmp?.extension || '',
     tab: currentEmp?.tab || '',
@@ -30,7 +23,7 @@ export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
       setF({
         last: currentEmp.last || '',
         first: currentEmp.first || '',
-        email: getLocalPart(currentEmp.email),
+        email: currentEmp.email || '',
         phone: currentEmp.phone || '',
         extension: currentEmp.extension || '',
         tab: currentEmp.tab || '',
@@ -71,19 +64,18 @@ export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
       toast.error('Имя и фамилия обязательны');
       return;
     }
-    let localPart = f.email.trim();
-    if (localPart.includes('@')) {
-      localPart = localPart.split('@')[0];
-    }
-    if (!localPart) {
-      toast.error('Введите логин (часть email до @)');
+    // Требуем полный email - без авто-добавления домена
+    let fullEmail = f.email.trim();
+    if (!fullEmail.includes('@')) {
+      toast.error('Введите полный e-mail (например, ivanov@company.com)');
       return;
     }
-    if (!/^[a-zA-Z0-9._-]+$/.test(localPart)) {
-      toast.error('Логин может содержать только латиницу, цифры, точки, дефис и подчёркивание');
+    // Извлекаем домен и проверяем его наличие в списке разрешённых
+    const emailDomain = fullEmail.split('@')[1];
+    if (!ALLOWED_EMAIL_DOMAINS.includes(emailDomain)) {
+      toast.error(`Домен "${emailDomain}" не входит в список разрешённых. Разрешённые домены: ${ALLOWED_EMAIL_DOMAINS.join(', ')}`);
       return;
     }
-    const fullEmail = `${localPart}@${COMPANY_DOMAIN}`;
 
     const existing = db.employees.find(e =>
       e.id !== currentEmp.id && e.email.toLowerCase() === fullEmail.toLowerCase()

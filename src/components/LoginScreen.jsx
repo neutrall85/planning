@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Ic, ICONS } from './Icons';
 import { validateRegistration, sanitizeObject } from '../utils/validation';
 import { logger } from '../utils/logging/logger';
-import { COMPANY_DOMAIN, SHAKE_ANIMATION_MS, PASSWORD_AUTO_HIDE_MS } from '../utils/config';
+import { COMPANY_DOMAIN, ALLOWED_EMAIL_DOMAINS, SHAKE_ANIMATION_MS, PASSWORD_AUTO_HIDE_MS } from '../utils/config';
 import { uid } from '../utils/date';
 
 /**
@@ -104,11 +104,20 @@ export default function LoginScreen({ db, onLogin, toast, store }) {
         // Санитизация входных данных
         const sanitizedReg = sanitizeObject(reg);
         
-        // Глубокая валидация через Zod схему
+        // Требуем полный email - без авто-добавления домена
+        const emailValue = sanitizedReg.email.trim();
+        
+        // Проверка: email должен содержать @
+        if (!emailValue.includes('@')) {
+          logger.warn('Попытка регистрации без полного email', { email: emailValue });
+          return fail("Введите полный e-mail (например, ivanov@company.com)");
+        }
+        
+        // Глубокая валидация через Zod схему (проверяет домен по списку)
         const validation = validateRegistration({
           first: sanitizedReg.first,
           last: sanitizedReg.last,
-          email: sanitizedReg.email,
+          email: emailValue,
           pass: sanitizedReg.pass,
           pass2: sanitizedReg.pass2,
         });
@@ -120,9 +129,9 @@ export default function LoginScreen({ db, onLogin, toast, store }) {
         }
         
         // Проверка на существующий email
-        if (db.employees.some((x) => x.email.toLowerCase() === sanitizedReg.email.trim().toLowerCase()) || 
-            db.regRequests.some((x) => x.email.toLowerCase() === sanitizedReg.email.trim().toLowerCase())) {
-          logger.info(`Попытка регистрации с существующим email: ${sanitizedReg.email}`);
+        if (db.employees.some((x) => x.email.toLowerCase() === emailValue.toLowerCase()) || 
+            db.regRequests.some((x) => x.email.toLowerCase() === emailValue.toLowerCase())) {
+          logger.info(`Попытка регистрации с существующим email: ${emailValue}`);
           return fail("Такой e-mail уже зарегистрирован");
         }
 
@@ -130,7 +139,7 @@ export default function LoginScreen({ db, onLogin, toast, store }) {
           id: "e_" + uid(),
           last: sanitizedReg.last.trim(),
           first: sanitizedReg.first.trim(),
-          email: sanitizedReg.email.trim().toLowerCase(),
+          email: emailValue.toLowerCase(),
           pass: sanitizedReg.pass,
           position: "Сотрудник",
           departments: [],
@@ -151,7 +160,7 @@ export default function LoginScreen({ db, onLogin, toast, store }) {
         
         // Используем публичный API store
         if (store && typeof store.registerEmployee === 'function') {
-          store.registerEmployee(sanitizedReg);
+          store.registerEmployee({ ...sanitizedReg, email: emailValue });
         } else {
           // Fallback для обратной совместимости
           store.setData({
@@ -164,9 +173,9 @@ export default function LoginScreen({ db, onLogin, toast, store }) {
           });
         }
         toast("Регистрация успешна! Выполняется вход...");
-        const loginOk = onLogin(sanitizedReg.email.trim().toLowerCase(), sanitizedReg.pass);
+        const loginOk = onLogin(emailValue.toLowerCase(), sanitizedReg.pass);
         if (!loginOk) {
-          logger.error('Ошибка автоматического входа после регистрации', { email: sanitizedReg.email });
+          logger.error('Ошибка автоматического входа после регистрации', { email: emailValue });
           fail("Ошибка автоматического входа после регистрации.");
         }
         setReg({ first: "", last: "", email: "", pass: "", pass2: "" });
@@ -258,7 +267,17 @@ export default function LoginScreen({ db, onLogin, toast, store }) {
                 <div><label className="lbl">Фамилия *</label><input className="inp" value={reg.last} onChange={(e) => setReg({ ...reg, last: e.target.value })} /></div>
               </div>
               <label className="lbl">E-mail *</label>
-              <div className="email-inp"><input className="inp" value={reg.email} onChange={(e) => setReg({ ...reg, email: e.target.value })} placeholder="ivanov" /><span className="email-dom">{"@" + COMPANY_DOMAIN}</span></div>
+              <div className="email-inp">
+                <input 
+                  className="inp" 
+                  value={reg.email} 
+                  onChange={(e) => setReg({ ...reg, email: e.target.value })} 
+                  placeholder={`ivanov@${COMPANY_DOMAIN}`} 
+                />
+              </div>
+              <div className="login-sub" style={{fontSize: '0.85rem', marginTop: '4px'}}>
+                Введите полный e-mail с разрешённым доменом: {ALLOWED_EMAIL_DOMAINS.join(', ')}
+              </div>
               <label className="lbl">Пароль *</label>
               <div style={{ position: 'relative' }}>
                 <input

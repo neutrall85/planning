@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { TASK_STATUSES, VACATION_TYPES, ROLES } from "../utils/constants";
+import { COMPANY_DOMAIN } from "../utils/config";
 import { fmtDMY, fmtDT } from "../utils/date";
 import { hasRole, canApproveVacation } from "../utils/permissions";
 import { Ic, ICONS } from "./Icons";
@@ -228,7 +229,7 @@ export default function Requests({ db, store, ur, initialTab = 'hours', addAudit
             <tbody>
               {db.regRequests.map(r => (
                 <tr key={r.id}>
-                  <td><b>{r.last} {r.first}</b></td><td>{r.email}@volga-dnepr.com</td>
+                  <td><b>{r.last} {r.first}</b></td><td>{r.email}@{COMPANY_DOMAIN}</td>
                   <td>{r.status === "pending" ? (<><button className="btn primary sm" onClick={() => decideReg(r, true)}>Одобрить</button> <button className="btn danger sm" onClick={() => decideReg(r, false)}>Отклонить</button></>) : <span className={"st-chip " + (r.status === "approved" ? "approved" : "rejected")}>{r.status}</span>}</td>
                 </tr>
               ))}
