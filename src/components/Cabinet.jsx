@@ -370,11 +370,25 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
                   <div className="depts-readonly">
                     {user.departments.map(d => {
                       const dd = data.departments.find(x => x.id === d.deptId);
-                      const positionText = d.position ? ` — ${d.position}` : '';
-                      return dd ? <span key={d.deptId} className={`dept-chip${d.primary ? ' prim' : ''}`}>{dd.name}{positionText}{d.primary ? ' · основное' : ''}</span> : null;
+                      return dd ? <span key={d.deptId} className={`dept-chip${d.primary ? ' prim' : ''}`}>{dd.name}{d.primary ? ' · основное' : ''}</span> : null;
                     })}
                     {user.departments.length === 0 && <span className="mut sm">не назначены</span>}
                     <div className="mut sm" style={{ marginTop: 6 }}>Подразделения изменяют только HR-менеджер, суперадминистратор и генеральный директор.</div>
+                  </div>
+                  
+                  <label className="lbl">Должности в подразделениях</label>
+                  <div className="depts-readonly">
+                    {user.departments.map(d => {
+                      const dd = data.departments.find(x => x.id === d.deptId);
+                      if (!dd) return null;
+                      const positionText = d.position || '—';
+                      return (
+                        <div key={d.deptId} style={{ marginBottom: 4 }}>
+                          <strong>{dd.name}</strong>: {positionText}{d.primary ? ' · основное' : ''}
+                        </div>
+                      );
+                    })}
+                    {user.departments.length === 0 && <span className="mut sm">не назначены</span>}
                   </div>
                   
                   <label className="lbl">Пароль</label>
