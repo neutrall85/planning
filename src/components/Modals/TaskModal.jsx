@@ -158,6 +158,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
   const currentProjectId = initialProjectId || (existing ? existing.projectId : '');
   const isProjectFromInitial = !!initialProjectId && !existing;
 
+  const isExec = existing && (existing.assigneeIds || []).includes(ur.id);
   const canEditFields = !readOnly && (existing ? canEditTaskFields(ur, existing, db) : canCreateTask(ur));
   const canChangeStatus = !readOnly && existing && canChangeTaskStatus(ur, existing, null, db);
   const canEditPlannedHours = hasRole(ur, 'admin', 'director');
@@ -276,7 +277,6 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
     return null;
   }, [readOnly, f.assigneeIds, f.start, f.deadline, hasDelegate, originalAssignee, vacOverlap]);
 
-  const isExec = existing && (existing.assigneeIds || []).includes(ur.id);
   const canLog = !readOnly && ((existing ? isExec : f.assigneeIds?.includes(ur.id)) || has(ur, "admin"));
 
   const statusOptions = useMemo(() => {
