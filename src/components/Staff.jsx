@@ -19,13 +19,23 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
   const firedEmployees = db.employees.filter(e => e.fired);
 
   // Функция для отрисовки одной строки сотрудника
-  const rowFor = (e, isFired = false) => {
+  // currentDeptId - ID отдела, в котором сейчас отображается сотрудник (если есть)
+  const rowFor = (e, isFired = false, currentDeptId = null) => {
     const l = getEmployeeLoad(e.id);
     const pct = Math.min(100, Math.round((l.plan / norm) * 100));
     const vacNow = db.vacations.find(v => v.empId === e.id && v.status === 'approved' && v.start <= TODAY && TODAY <= v.end);
     
     // Получаем количество делегированных задач
     const delegatedCount = e.delegatedTasksCount || 0;
+    
+    // Определяем статус сотрудника в текущем отделе
+    const deptInCurrent = e.departments.find(d => d.deptId === currentDeptId);
+    const isSecondaryInCurrent = currentDeptId && deptInCurrent && deptInCurrent.primary !== true;
+    const isPrimaryInCurrent = currentDeptId && deptInCurrent && deptInCurrent.primary === true;
+    
+    // Получаем отделы совмещения (где primary !== true)
+    const secondaryDepts = e.departments.filter(d => d.primary !== true);
+    const hasSecondary = secondaryDepts.length > 0;
     
     return (
       <div className="st-row" key={e.id}>
@@ -54,22 +64,14 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
             <span key={k} className="role-chip blue">{db.kbs.find(x => x.id === k)?.name}</span>
           ))}
           {/* Если это отдел совмещения - показываем только плашку "совм" */}
-          {e.departments.filter(d => d.primary !== true).length > 0 && (
-            <div className="st-depts-list">
-              {e.departments.filter(d => d.primary !== true).map((d) => {
-                return (
-                  <span key={d.deptId} className="dept-chip dept-chip-secondary">
-                    <span className="vac-badge" style={{ fontSize: '10px', padding: '2px 4px' }}>совм</span>
-                  </span>
-                );
-              })}
-            </div>
+          {isSecondaryInCurrent && (
+            <span className="vac-badge" style={{ fontSize: '10px', padding: '2px 4px', marginLeft: '8px' }}>совм</span>
           )}
-          {/* Если это основной отдел - показываем название отдела совмещения под ролями */}
-          {e.departments.some(d => d.primary === true) && e.departments.filter(d => d.primary !== true).length > 0 && (
+          {/* Если это основной отдел и есть совмещения - показываем названия отделов совмещения под ролями */}
+          {isPrimaryInCurrent && hasSecondary && (
             <div className="st-depts-list" style={{ marginTop: '4px' }}>
               <span className="mut sm" style={{ fontSize: '11px' }}>
-                {e.departments.filter(d => d.primary !== true).map(d => db.departments.find(dept => dept.id === d.deptId)?.name).join(', ')}
+                {secondaryDepts.map(d => db.departments.find(dept => dept.id === d.deptId)?.name).join(', ')}
               </span>
             </div>
           )}
@@ -134,7 +136,7 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
           <span className="mut">руководитель: {headNames || '—'}</span>
           <span className="kcount">{Number.isInteger(totalStaffCount) ? totalStaffCount : totalStaffCount.toFixed(1)}</span>
         </div>
-        {sortedMembers.map(e => rowFor(e))}
+        {sortedMembers.map(e => rowFor(e, false, d.id))}
       </div>
     );
   });
