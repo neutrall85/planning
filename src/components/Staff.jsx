@@ -24,9 +24,6 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
     const pct = Math.min(100, Math.round((l.plan / norm) * 100));
     const vacNow = db.vacations.find(v => v.empId === e.id && v.status === 'approved' && v.start <= TODAY && TODAY <= v.end);
     
-    // Вычисляем общую ставку сотрудника (сумма ставок по всем отделам)
-    const totalRate = e.departments.reduce((sum, d) => sum + (d.rate || 1), 0);
-    
     // Получаем количество делегированных задач
     const delegatedCount = e.delegatedTasksCount || 0;
     
@@ -56,17 +53,30 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
           {e.roles.includes('kb_chief') && (e.kbIds || []).map(k => (
             <span key={k} className="role-chip blue">{db.kbs.find(x => x.id === k)?.name}</span>
           ))}
-          {/* Отображение отделов с указанием ставки и типа занятости */}
-          {e.departments.length > 0 && (
+          {/* Отображение основной должности с основным отделом */}
+          {e.departments.length > 0 && (() => {
+            const primaryDept = e.departments.find(d => d.primary === true);
+            if (primaryDept) {
+              const dd = db.departments.find(x => x.id === primaryDept.deptId);
+              if (dd) {
+                return (
+                  <div className="st-primary-dept">
+                    {dd.name}
+                  </div>
+                );
+              }
+            }
+            return null;
+          })()}
+          {/* Отображение отделов с совмещением */}
+          {e.departments.filter(d => d.primary !== true).length > 0 && (
             <div className="st-depts-list">
-              {e.departments.map((d, idx) => {
+              {e.departments.filter(d => d.primary !== true).map((d) => {
                 const dd = db.departments.find(x => x.id === d.deptId);
                 if (!dd) return null;
-                const isPrimary = d.primary === true;
-                const rate = d.rate || 1;
                 return (
-                  <span key={d.deptId} className={`dept-chip ${!isPrimary ? 'dept-chip-secondary' : ''}`}>
-                    {dd.name}{rate !== 1 ? ` (${rate})` : ''}{!isPrimary ? ' совм' : ''}
+                  <span key={d.deptId} className="dept-chip dept-chip-secondary">
+                    {dd.name} <span className="vac-badge" style={{ fontSize: '10px', padding: '2px 4px' }}>совм</span>
                   </span>
                 );
               })}
@@ -102,14 +112,14 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
 
   // Функция для построения блока подразделения
   const deptsBlock = (deptList, employees) => deptList.map(d => {
-    // Считаем сотрудников и их ставки: основные + совмещения
+    // Считаем сотрудников отдела: основные + совмещения
     const membersWithRates = employees.filter(e => e.departments.some(x => x.deptId === d.id) && !e.fired);
-    // Подсчёт дробного количества сотрудников (сумма ставок)
+    // Подсчёт количества сотрудников (каждый сотрудник считается как 1, независимо от ставки)
     let totalStaffCount = 0;
     membersWithRates.forEach(e => {
       e.departments.forEach(dep => {
         if (dep.deptId === d.id) {
-          totalStaffCount += (dep.rate || 1);
+          totalStaffCount += 1;
         }
       });
     });
