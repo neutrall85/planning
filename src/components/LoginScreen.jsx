@@ -113,6 +113,23 @@ export default function LoginScreen({ db, onLogin, toast, store }) {
           return fail("Введите полный e-mail (например, ivanov@company.com)");
         }
         
+        // Проверка пароля на соответствие требованиям
+        const passIssuesList = passIssues(sanitizedReg.pass || "");
+        const invalidIssues = passIssuesList.filter(i => !i.ok);
+        if (invalidIssues.length > 0) {
+          const issuesText = invalidIssues.map(i => i.t).join(', ');
+          logger.warn('Пароль не соответствует требованиям', { issues: invalidIssues });
+          toast(`Пароль не соответствует требованиям: ${issuesText}`, 'warning');
+          return fail("Пароль не соответствует требованиям");
+        }
+        
+        // Проверка совпадения паролей
+        if (sanitizedReg.pass !== sanitizedReg.pass2) {
+          logger.warn('Пароли не совпадают', { pass: sanitizedReg.pass, pass2: sanitizedReg.pass2 });
+          toast('Пароли не совпадают', 'warning');
+          return fail("Пароли не совпадают");
+        }
+        
         // Глубокая валидация через Zod схему (проверяет домен по списку)
         const validation = validateRegistration({
           first: sanitizedReg.first,
