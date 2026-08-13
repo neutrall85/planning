@@ -103,7 +103,6 @@ export default function Projects({ db, ur, openProject, openHoursReq, showOnlyMy
                         <span
                           key={`${t.id}-${a.id}`}
                           className="avatar xs"
-                          title={`${a.last} ${a.first}`}
                           style={{ cursor: 'pointer' }}
                           onMouseEnter={(e) => setTooltip(prev => ({ ...prev, visible: true, employee: a, x: e.clientX, y: e.clientY }))}
                           onMouseLeave={() => setTooltip(prev => ({ ...prev, visible: false }))}

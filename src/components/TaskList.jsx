@@ -142,7 +142,6 @@ export default function TaskList({
                           <span
                             key={a.id}
                             className="avatar xs"
-                            title={`${a.last} ${a.first}`}
                             style={{ cursor: 'pointer' }}
                             onMouseEnter={(e) => setTooltip(prev => ({ ...prev, visible: true, employee: a, x: e.clientX, y: e.clientY }))}
                             onMouseLeave={() => setTooltip(prev => ({ ...prev, visible: false }))}
