@@ -278,7 +278,7 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
       })()}
 
       {/* --- Все отпуска (для HR/админов) --- */}
-      {canManageAllVacations(ur) && (
+      {hasRole(ur, 'admin', 'director', 'hr') && (
         <div className="st-section">
           <div className="st-sec-head">
             <div className="st-sec-title">Все отпуска (управление HR / ГД / суперадминистратор)</div>
