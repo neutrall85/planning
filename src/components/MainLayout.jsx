@@ -184,9 +184,7 @@ export default function MainLayout({ store, data, user, toast }) {
             <div className="page-sub">{fmtFullDate()} · вы вошли как {user.last} {user.first}</div>
           </div>
           <div className="top-tools">
-            {hasRole(user, 'admin', 'director', 'hr') && (
-              <button className="btn ghost" onClick={() => openVacation(null, null)}><Ic d={ICONS.beach} size={15} /> Сотрудники в отпусках</button>
-            )}
+            <button className="btn ghost" onClick={() => openVacation(null, null)}><Ic d={ICONS.beach} size={15} /> Сотрудники в отпусках</button>
             <div className="bell-wrap" ref={notifRef}>
               <button className={`icon-btn bell${unread ? ' has' : ''}`} onClick={() => setNotifOpen(v => !v)}>
                 <Ic d={ICONS.bell} size={17} />
