@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth, useStore } from '../hooks';
 import { hasRole, canCreateTask, canExport, canCreateProject, canChangeTaskStatus } from '../utils/permissions';
-import { getEmpNameFromData, getPrimaryDeptFromData } from '../utils/string';
 import { ICONS, Ic } from './Icons';
 import { initials, TODAY, fmtDMY, fmtDT, fmtFullDate } from '../utils/date';
 import { TASK_STATUSES, ROLES, PROJECT_STATUSES, PRIORITIES } from '../utils/constants';
@@ -21,7 +20,7 @@ import NotifPanel from './NotifPanel';
 import { useToast } from './Toast';
 import { 
   TaskModal, ProjectModal, HoursRequestModal, RolesModal, DeptsModal, 
-  VacationModal, DelegationModal, EmployeeEditModal, ChangePasswordModal 
+  VacationModal, DelegationModal, EmployeeEditModal, ChangePasswordModal, VacNowModal
 } from './Modals';
 
 export default function MainLayout({ store, data, user, toast }) {
@@ -184,7 +183,7 @@ export default function MainLayout({ store, data, user, toast }) {
             <div className="page-sub">{fmtFullDate()} · вы вошли как {user.last} {user.first}</div>
           </div>
           <div className="top-tools">
-            <button className="btn ghost" onClick={() => openVacation(null, null)}><Ic d={ICONS.beach} size={15} /> Сотрудники в отпусках</button>
+            <button className="btn ghost" onClick={() => setModal({ type: 'vacnow' })}><Ic d={ICONS.beach} size={15} /> Сотрудники в отпусках</button>
             <div className="bell-wrap" ref={notifRef}>
               <button className={`icon-btn bell${unread ? ' has' : ''}`} onClick={() => setNotifOpen(v => !v)}>
                 <Ic d={ICONS.bell} size={17} />
@@ -522,6 +521,7 @@ export default function MainLayout({ store, data, user, toast }) {
       {modal?.type === 'roles' && <RolesModal db={data} store={store} empId={modal.empId} onClose={() => setModal(null)} toast={toast} audit={store.addAudit} />}
       {modal?.type === 'depts' && <DeptsModal db={data} store={store} empId={modal.empId} onClose={() => setModal(null)} toast={toast} audit={store.addAudit} />}
       {modal?.type === 'vacation' && <VacationModal db={data} ur={user} vacationId={modal.vacationId} forEmpId={modal.forEmpId || null} onClose={() => setModal(null)} onSave={(v, isNew) => { store.upsertVacation(v); store.addAudit(isNew ? 'Создание отпуска' : 'Изменение отпуска', { employee: empName(v.empId), period: `${fmtDMY(v.start)}—${fmtDMY(v.end)}` }, 'vacation', v.id); setModal(null); }} />}
+      {modal?.type === 'vacnow' && <VacNowModal db={data} onClose={() => setModal(null)} toast={toast} />}
       {modal?.type === 'delegation' && <DelegationModal db={data} ur={user} onClose={() => setModal(null)} onSubmit={(rd) => { store.upsertRoleDelegation(rd); store.addNotification(rd.toId, `Вам предложено временное принятие ролей: ${rd.roles.map(r => ROLES[r].label).join(", ")}.`, { targetType: 'delegation', targetId: rd.id }); store.addAudit('Создание делегирования ролей', { from: empName(rd.fromId), to: empName(rd.toId), roles: rd.roles.join(', ') }, 'delegation', rd.id); setModal(null); }} />}
       {modal?.type === 'employeeEdit' && (
         <EmployeeEditModal
