@@ -191,8 +191,21 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
   const [tab, setTab] = useState(initialTab);
   const [confirmVac, setConfirmVac] = useState(null);
 
-  // Сохраняем последние введенные данные для часов и комментария при закрытии/открытии модалки
+  // Сохраняем последние введенные данные для всех полей при закрытии/открытии модалки
   useEffect(() => {
+    if (!existing) {
+      // Для новой задачи восстанавливаем данные из localStorage
+      const savedForm = localStorage.getItem('taskModal_form');
+      if (savedForm) {
+        try {
+          const parsed = JSON.parse(savedForm);
+          setF(prev => ({ ...prev, ...parsed }));
+        } catch (e) {
+          console.error('Ошибка восстановления данных формы:', e);
+        }
+      }
+    }
+    
     const savedLogH = localStorage.getItem('taskModal_logH');
     const savedLogNote = localStorage.getItem('taskModal_logNote');
     const savedLogDate = localStorage.getItem('taskModal_logDate');
@@ -202,11 +215,21 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
 
     return () => {
       // Сохраняем при размонтировании или закрытии
+      if (!existing) {
+        localStorage.setItem('taskModal_form', JSON.stringify(f));
+      }
       localStorage.setItem('taskModal_logH', logH);
       localStorage.setItem('taskModal_logNote', logNote);
       localStorage.setItem('taskModal_logDate', logDate);
     };
   }, []);
+
+  // Сохраняем данные формы при каждом изменении (только для новых задач)
+  useEffect(() => {
+    if (!existing) {
+      localStorage.setItem('taskModal_form', JSON.stringify(f));
+    }
+  }, [f, existing]);
 
   // Сохраняем данные при каждом изменении
   useEffect(() => {
@@ -370,9 +393,21 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
             onSave(taskCopy, true);
           }
         });
+        // Очищаем localStorage после успешного сохранения
+        if (!existing) {
+          localStorage.removeItem('taskModal_form');
+          localStorage.removeItem('taskModal_showAssigneeSelector');
+          localStorage.removeItem('taskModal_newAssigneeId');
+        }
         onClose();
       } else {
         onSave(taskToSave, !existing);
+        // Очищаем localStorage после успешного сохранения
+        if (!existing) {
+          localStorage.removeItem('taskModal_form');
+          localStorage.removeItem('taskModal_showAssigneeSelector');
+          localStorage.removeItem('taskModal_newAssigneeId');
+        }
       }
     } catch (error) {
       toast.error(error.message || 'Ошибка сохранения задачи');
@@ -449,6 +484,14 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
 
   const [showAssigneeSelector, setShowAssigneeSelector] = useState(false);
   const [newAssigneeId, setNewAssigneeId] = useState('');
+
+  // Сохранение состояния селектора исполнителей
+  useEffect(() => {
+    if (!existing) {
+      localStorage.setItem('taskModal_showAssigneeSelector', JSON.stringify(showAssigneeSelector));
+      localStorage.setItem('taskModal_newAssigneeId', newAssigneeId);
+    }
+  }, [showAssigneeSelector, newAssigneeId, existing]);
 
   const addAssignee = () => {
     if (!newAssigneeId) return;
@@ -745,7 +788,18 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
         <div className="spacer" />
         {!readOnly && (canEditFields || isExec) ? (
           <>
-            <button className="btn ghost" onClick={onClose}>Отмена</button>
+            <button className="btn ghost" onClick={() => {
+              // При отмене очищаем localStorage для новой задачи
+              if (!existing) {
+                localStorage.removeItem('taskModal_form');
+                localStorage.removeItem('taskModal_logH');
+                localStorage.removeItem('taskModal_logNote');
+                localStorage.removeItem('taskModal_logDate');
+                localStorage.removeItem('taskModal_showAssigneeSelector');
+                localStorage.removeItem('taskModal_newAssigneeId');
+              }
+              onClose();
+            }}>Отмена</button>
             <button className="btn primary" onClick={save}>{existing ? "Сохранить" : "Создать задачу"}</button>
           </>
         ) : (
