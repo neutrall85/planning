@@ -207,7 +207,6 @@ export default function LoginScreen({ db, onLogin, toast, store }) {
             ]
           });
         }
-        toast("Регистрация успешна! Выполняется вход...", 'success');
         const loginOk = onLogin(emailValue.toLowerCase(), sanitizedReg.pass);
         if (!loginOk) {
           logger.error('Ошибка автоматического входа после регистрации', { email: emailValue });

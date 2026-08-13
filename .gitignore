@@ -1,50 +1,40 @@
 ```gitignore
+# Compiled and build artifacts
+*.pyc
+__pycache__/
+*.o
+*.obj
+*.class
+*.exe
+*.dll
+*.so
+*.a
+*.out
+
 # Dependencies
 node_modules/
+venv/
+.venv/
+.env
+.env.local
+*.env.*
 
-# Build artifacts
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+*.swo
+
+# Editors
+.vscode/
+.idea/
+
+# Build directories
 dist/
 build/
 target/
-
-# Python
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-env/
-venv/
-.venv/
-.ENV
-.pytest_cache/
-.mypy_cache/
-
-# Logs
-*.log
-
-# Environment variables
-.env
-.env.local
-.env.*
-
-# IDE files
-.vscode/
-.idea/
-*.swp
-*.swo
-*.tmp
-
-# OS generated files
-.DS_Store
-Thumbs.db
-
-# Coverage reports
-coverage/
-htmlcov/
-.coverage
-
-# Compressed files
+*.jar
+*.war
 *.zip
 *.gz
 *.tar
@@ -67,4 +57,32 @@ htmlcov/
 *.tar.bz2
 *.tar.xz
 *.tar.zst
+
+# Coverage reports
+coverage/
+htmlcov/
+.coverage
+
+# Python specific
+.mypy_cache/
+.pytest_cache/
+*.pyo
+*.pyd
+
+# Java/Gradle
+.gradle/
+*.class
+*.jar
+*.war
+*.ear
+
+# OS generated files
+.DS_Store
+Thumbs.db
+```
+
+Wait, I need to reconsider. Looking at the modified files, it's only `src/components/LoginScreen.jsx` which is a source code file. The change list doesn't show any build artifacts, dependencies, or temporary files that would need to be ignored.
+
+```gitignore
+
 ```
