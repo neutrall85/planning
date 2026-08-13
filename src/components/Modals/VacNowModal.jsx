@@ -19,6 +19,13 @@ export const VacNowModal = ({ db, onClose, toast }) => {
     .filter((r) => fDept === "all" || (r.dept && r.dept.id === fDept))
     .sort((a, b) => (sort === "start" ? (a.v.start < b.v.start ? -1 : 1) : (a.v.end < b.v.end ? -1 : 1)));
 
+  const handleRefresh = () => {
+    setTick((x) => x + 1);
+    if (toast && typeof toast.info === 'function') {
+      toast.info("Список обновлён");
+    }
+  };
+
   return (
     <Modal title="Сотрудники в отпусках (сейчас)" onClose={onClose} width={880}>
       <div className="toolbar">
@@ -37,7 +44,7 @@ export const VacNowModal = ({ db, onClose, toast }) => {
           </button>
         </div>
         <div className="spacer" />
-        <button className="btn ghost sm" onClick={() => { setTick((x) => x + 1); toast?.info?.("Список обновлён"); }}>
+        <button className="btn ghost sm" onClick={handleRefresh}>
           ⟳ Обновить
         </button>
       </div>

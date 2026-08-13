@@ -21,7 +21,7 @@ import NotifPanel from './NotifPanel';
 import { useToast } from './Toast';
 import { 
   TaskModal, ProjectModal, HoursRequestModal, RolesModal, DeptsModal, 
-  VacationModal, DelegationModal, VacNowModal, EmployeeEditModal, ChangePasswordModal 
+  VacationModal, DelegationModal, EmployeeEditModal, ChangePasswordModal 
 } from './Modals';
 
 export default function MainLayout({ store, data, user, toast }) {
@@ -64,12 +64,11 @@ export default function MainLayout({ store, data, user, toast }) {
     { id: 'gantt', label: 'Диаграмма Ганта', icon: ICONS.gantt },
     { id: 'calendar', label: 'Календарь', icon: ICONS.cal },
     { id: 'projects', label: 'Проекты', icon: ICONS.folder },
-    ...(hasRole(user, 'admin', 'director', 'economist', 'kb_chief', 'head', 'hr') ? [{ id: 'staff', label: 'Персонал', icon: ICONS.users }] : []),
+    { id: 'staff', label: 'Персонал', icon: ICONS.users },
     ...(canExport(user) || hasRole(user, 'kb_chief', 'head', 'project_lead', 'hr') ? [{ id: 'reports', label: 'Отчёты', icon: ICONS.chart }] : []),
     { id: 'archive', label: 'Архив', icon: ICONS.archive },
     { id: 'requests', label: 'Запросы и заявки', icon: ICONS.inbox },
     ...(hasRole(user, 'admin', 'director') ? [{ id: 'journal', label: 'Журнал', icon: ICONS.book }] : []),
-    ...(!hasRole(user, 'admin', 'director', 'economist', 'kb_chief', 'head', 'hr') ? [{ id: 'vacnow', label: 'Персонал', icon: ICONS.users }] : []),
   ];
 
   const myNotifs = data.notifications.filter(n => n.userId === user.id);
@@ -185,7 +184,9 @@ export default function MainLayout({ store, data, user, toast }) {
             <div className="page-sub">{fmtFullDate()} · вы вошли как {user.last} {user.first}</div>
           </div>
           <div className="top-tools">
-            <button className="btn ghost" onClick={() => setView('vacnow')}><Ic d={ICONS.beach} size={15} /> Сотрудники в отпусках</button>
+            {hasRole(user, 'admin', 'director', 'hr') && (
+              <button className="btn ghost" onClick={() => openVacation(null, null)}><Ic d={ICONS.beach} size={15} /> Сотрудники в отпусках</button>
+            )}
             <div className="bell-wrap" ref={notifRef}>
               <button className={`icon-btn bell${unread ? ' has' : ''}`} onClick={() => setNotifOpen(v => !v)}>
                 <Ic d={ICONS.bell} size={17} />
@@ -361,7 +362,6 @@ export default function MainLayout({ store, data, user, toast }) {
             openVacation={openVacation}
             openEmployeeEdit={openEmployeeEdit}
           />}
-          {view === 'vacnow' && <VacNowModal db={data} onClose={() => setView('tasks')} toast={toast} />}
           {view === 'reports' && <Reports db={data} ur={user} />}
           {view === 'archive' && <Archive db={data} ur={user} openTask={openTask} openProject={openProject} setArchiveMonths={(m) => { store.setData({ ...store.data, settings: { ...store.data.settings, archiveMonths: m } }); }} 
             restoreTask={(id) => { 
