@@ -57,11 +57,9 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
           {e.departments.filter(d => d.primary !== true).length > 0 && (
             <div className="st-depts-list">
               {e.departments.filter(d => d.primary !== true).map((d) => {
-                const dd = db.departments.find(x => x.id === d.deptId);
-                if (!dd) return null;
                 return (
                   <span key={d.deptId} className="dept-chip dept-chip-secondary">
-                    {dd.name} <span className="vac-badge" style={{ fontSize: '10px', padding: '2px 4px' }}>совм</span>
+                    <span className="vac-badge" style={{ fontSize: '10px', padding: '2px 4px' }}>совм</span>
                   </span>
                 );
               })}
