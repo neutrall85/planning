@@ -240,25 +240,40 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
         );
       })}
 
-      {/* --- Отделы и сотрудники вне КБ --- */}
+      {/* --- Отделы без КБ --- */}
       {(() => {
         const deptsNoKb = db.departments.filter(d => d.kbId === null);
-        // Сотрудники без отдела и без КБ (исключая генерального директора)
+        
+        if (deptsNoKb.length === 0) return null;
+        
+        return (
+          <div className="st-section">
+            <div className="st-sec-head">
+              <div className="st-sec-title">Отделы вне КБ</div>
+              <div className="st-sec-sub">Подразделения прямого подчинения</div>
+            </div>
+            {deptsBlock(deptsNoKb, activeEmployees)}
+          </div>
+        );
+      })()}
+
+      {/* --- Сотрудники без подразделения (вне КБ) --- */}
+      {(() => {
+        // Сотрудники без отдела и без КБ (исключая генерального директора, он уже в "Руководство организации")
         const employeesNoDeptNoKb = activeEmployees.filter(e => 
           e.departments.length === 0 && 
           (!e.kbIds || e.kbIds.length === 0) &&
           !e.roles.includes('director')
         );
         
-        if (deptsNoKb.length === 0 && employeesNoDeptNoKb.length === 0) return null;
+        if (employeesNoDeptNoKb.length === 0) return null;
         
         return (
           <div className="st-section">
             <div className="st-sec-head">
-              <div className="st-sec-title">Отделы и сотрудники вне КБ</div>
-              <div className="st-sec-sub">Подразделения прямого подчинения и сотрудники без привязки</div>
+              <div className="st-sec-title">Сотрудники без подразделения</div>
+              <div className="st-sec-sub">{employeesNoDeptNoKb.length} чел.</div>
             </div>
-            {deptsBlock(deptsNoKb, activeEmployees)}
             {employeesNoDeptNoKb.map(e => rowFor(e))}
           </div>
         );
