@@ -37,7 +37,7 @@ export const VacNowModal = ({ db, onClose, toast }) => {
           </button>
         </div>
         <div className="spacer" />
-        <button className="btn ghost sm" onClick={() => { setTick((x) => x + 1); toast("Список обновлён", "info"); }}>
+        <button className="btn ghost sm" onClick={() => { setTick((x) => x + 1); toast?.info?.("Список обновлён"); }}>
           ⟳ Обновить
         </button>
       </div>

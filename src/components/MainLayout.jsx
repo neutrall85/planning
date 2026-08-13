@@ -29,7 +29,6 @@ export default function MainLayout({ store, data, user, toast }) {
   const [view, setView] = useState('tasks');
   const [modal, setModal] = useState(null);
   const [notifOpen, setNotifOpen] = useState(false);
-  const [vacModalOpen, setVacModalOpen] = useState(false);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const notifRef = useRef(null);
   
@@ -70,6 +69,7 @@ export default function MainLayout({ store, data, user, toast }) {
     { id: 'archive', label: 'Архив', icon: ICONS.archive },
     { id: 'requests', label: 'Запросы и заявки', icon: ICONS.inbox },
     ...(hasRole(user, 'admin', 'director') ? [{ id: 'journal', label: 'Журнал', icon: ICONS.book }] : []),
+    ...(!hasRole(user, 'admin', 'director', 'economist', 'kb_chief', 'head', 'hr') ? [{ id: 'vacnow', label: 'Персонал', icon: ICONS.users }] : []),
   ];
 
   const myNotifs = data.notifications.filter(n => n.userId === user.id);
@@ -185,7 +185,7 @@ export default function MainLayout({ store, data, user, toast }) {
             <div className="page-sub">{fmtFullDate()} · вы вошли как {user.last} {user.first}</div>
           </div>
           <div className="top-tools">
-            <button className="btn ghost" onClick={() => setVacModalOpen(true)}><Ic d={ICONS.beach} size={15} /> Сотрудники в отпусках</button>
+            <button className="btn ghost" onClick={() => setView('vacnow')}><Ic d={ICONS.beach} size={15} /> Сотрудники в отпусках</button>
             <div className="bell-wrap" ref={notifRef}>
               <button className={`icon-btn bell${unread ? ' has' : ''}`} onClick={() => setNotifOpen(v => !v)}>
                 <Ic d={ICONS.bell} size={17} />
@@ -361,6 +361,7 @@ export default function MainLayout({ store, data, user, toast }) {
             openVacation={openVacation}
             openEmployeeEdit={openEmployeeEdit}
           />}
+          {view === 'vacnow' && <VacNowModal db={data} onClose={() => setView('tasks')} toast={toast} />}
           {view === 'reports' && <Reports db={data} ur={user} />}
           {view === 'archive' && <Archive db={data} ur={user} openTask={openTask} openProject={openProject} setArchiveMonths={(m) => { store.setData({ ...store.data, settings: { ...store.data.settings, archiveMonths: m } }); }} 
             restoreTask={(id) => { 
@@ -542,7 +543,6 @@ export default function MainLayout({ store, data, user, toast }) {
           toast={toast}
         />
       )}
-      {vacModalOpen && <VacNowModal db={data} onClose={() => setVacModalOpen(false)} toast={toast} />}
     </div>
   );
 }
