@@ -59,6 +59,7 @@ export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
       }
 
       store.updateEmployee(updated);
+      store.addAudit('Изменение контактных данных', `${currentEmp.last} ${currentEmp.first}: ${changes.join('; ')}`);
 
       toast.success('Данные обновлены');
       onClose();
@@ -121,6 +122,7 @@ export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
     };
 
     store.updateEmployee(updated);
+    store.addAudit('Изменение данных сотрудника', `${currentEmp.last} ${currentEmp.first}: ${changes.join('; ')}`);
 
     toast.success('Данные обновлены');
     onClose();
