@@ -336,11 +336,22 @@ export const validateData = (data, schema) => {
         };
       }
       
-      const errors = errorList.map(err => ({
-        field: err.path && Array.isArray(err.path) ? err.path.join('.') : 'unknown',
-        message: err.message || 'Ошибка валидации',
-        code: err.code || 'invalid',
-      }));
+      const errors = errorList.map(err => {
+        // Корректно определяем имя поля
+        let fieldName = 'unknown';
+        if (err.path && Array.isArray(err.path) && err.path.length > 0) {
+          fieldName = err.path.join('.');
+        } else if (err.code === 'custom' && err.path && err.path.length > 0) {
+          // Для кастомных ошибок (как проверка домена) используем путь
+          fieldName = err.path.join('.');
+        }
+        
+        return {
+          field: fieldName,
+          message: err.message || 'Ошибка валидации',
+          code: err.code || 'invalid',
+        };
+      });
       return { success: false, errors };
     }
     return { 
