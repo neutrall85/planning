@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Modal } from '../Modal';
 import Discussion from './Discussion';
 import { useDataHelpers } from '../../hooks';
@@ -190,6 +190,37 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
   const [logDate, setLogDate] = useState(TODAY);
   const [tab, setTab] = useState(initialTab);
   const [confirmVac, setConfirmVac] = useState(null);
+
+  // Сохраняем последние введенные данные для часов и комментария при закрытии/открытии модалки
+  useEffect(() => {
+    const savedLogH = localStorage.getItem('taskModal_logH');
+    const savedLogNote = localStorage.getItem('taskModal_logNote');
+    const savedLogDate = localStorage.getItem('taskModal_logDate');
+    if (savedLogH) setLogH(savedLogH);
+    if (savedLogNote) setLogNote(savedLogNote);
+    if (savedLogDate) setLogDate(savedLogDate);
+
+    return () => {
+      // Сохраняем при размонтировании или закрытии
+      localStorage.setItem('taskModal_logH', logH);
+      localStorage.setItem('taskModal_logNote', logNote);
+      localStorage.setItem('taskModal_logDate', logDate);
+    };
+  }, []);
+
+  // Сохраняем данные при каждом изменении
+  useEffect(() => {
+    localStorage.setItem('taskModal_logH', logH);
+  }, [logH]);
+
+  useEffect(() => {
+    localStorage.setItem('taskModal_logNote', logNote);
+  }, [logNote]);
+
+  useEffect(() => {
+    localStorage.setItem('taskModal_logDate', logDate);
+  }, [logDate]);
+
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
 
   const proj = db.projects.find((p) => p.id === f.projectId);
@@ -406,9 +437,13 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
     const auditDetails = `Задача "${f.title}" в проекте ${projectCode}, плановые часы: ${f.plannedHours ?? '—'}, фактические часы: ${newSp} (внесено ${h})${logNote.trim() ? `, комментарий: ${logNote.trim()}` : ''}, исполнители: ${assigneesStr || 'не назначены'}`;
     store.addAudit('Внесение часов', auditDetails, 'task', f.id);
 
+    // Очищаем поля и localStorage после успешного добавления
     setLogH("");
     setLogNote("");
     setLogDate(TODAY);
+    localStorage.removeItem('taskModal_logH');
+    localStorage.removeItem('taskModal_logNote');
+    localStorage.removeItem('taskModal_logDate');
     toast.success("Часы учтены");
   };
 
