@@ -53,7 +53,7 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
           {e.roles.includes('kb_chief') && (e.kbIds || []).map(k => (
             <span key={k} className="role-chip blue">{db.kbs.find(x => x.id === k)?.name}</span>
           ))}
-          {/* Отображение отделов с совмещением */}
+          {/* Если это отдел совмещения - показываем только плашку "совм" */}
           {e.departments.filter(d => d.primary !== true).length > 0 && (
             <div className="st-depts-list">
               {e.departments.filter(d => d.primary !== true).map((d) => {
@@ -63,6 +63,14 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
                   </span>
                 );
               })}
+            </div>
+          )}
+          {/* Если это основной отдел - показываем название отдела совмещения под ролями */}
+          {e.departments.some(d => d.primary === true) && e.departments.filter(d => d.primary !== true).length > 0 && (
+            <div className="st-depts-list" style={{ marginTop: '4px' }}>
+              <span className="mut sm" style={{ fontSize: '11px' }}>
+                {e.departments.filter(d => d.primary !== true).map(d => db.departments.find(dept => dept.id === d.deptId)?.name).join(', ')}
+              </span>
             </div>
           )}
         </div>
