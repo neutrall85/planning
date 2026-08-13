@@ -37,6 +37,9 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
     const secondaryDepts = e.departments.filter(d => d.primary !== true);
     const hasSecondary = secondaryDepts.length > 0;
     
+    // Получаем должность для текущего отдела
+    const positionInCurrent = deptInCurrent?.position || e.position;
+    
     return (
       <div className="st-row" key={e.id}>
         <span className="avatar sm">
@@ -53,27 +56,26 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
             {vacNow && <span className="vac-badge">в отпуске до {fmtDMY(vacNow.end)}</span>}
           </div>
           <div className="st-pos">
-            {e.position}
+            {positionInCurrent}
           </div>
         </div>
         <div className="st-roles">
           {e.roles.map(r => (
             <span key={r} className="role-chip" style={{ background: ROLES[r].color + '1e', color: ROLES[r].color }}>{ROLES[r].short}</span>
           ))}
-          {e.roles.includes('kb_chief') && (e.kbIds || []).map(k => (
-            <span key={k} className="role-chip blue">{db.kbs.find(x => x.id === k)?.name}</span>
-          ))}
+          {/* Плашки КБ у главных конструкторов убраны */}
           {/* Если это отдел совмещения - показываем название отдела с пометкой (совм) */}
           {isSecondaryInCurrent && (
             <span className="sim-badge">(совм)</span>
           )}
-          {/* Если это основной отдел и есть совмещения - показываем названия отделов совмещения под ролями с пометкой (совм) */}
+          {/* Если это основной отдел и есть совмещения - показываем названия отделов совмещения с должностями под ролями с пометкой (совм) */}
           {isPrimaryInCurrent && hasSecondary && (
             <div className="st-depts-list" style={{ marginTop: '4px' }}>
               <span className="mut sm" style={{ fontSize: '11px' }}>
                 {secondaryDepts.map(d => {
                   const deptName = db.departments.find(dept => dept.id === d.deptId)?.name;
-                  return `${deptName} (совм)`;
+                  const deptPosition = d.position || '';
+                  return `${deptName}${deptPosition ? ` (${deptPosition})` : ''} (совм)`;
                 }).join(', ')}
               </span>
             </div>
