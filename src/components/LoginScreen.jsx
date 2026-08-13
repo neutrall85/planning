@@ -147,12 +147,17 @@ export default function LoginScreen({ db, onLogin, toast, store }) {
         
         if (!validation || !validation.success) {
           logger.warn('Валидация регистрации не пройдена', validation?.errors);
-          const firstError = validation?.errors?.[0];
-          const errorMsg = firstError?.message || "Ошибка валидации данных";
+          
+          // Извлекаем первое сообщение об ошибке, если оно есть
+          let errorMsg = "Ошибка валидации данных";
+          if (validation?.errors && Array.isArray(validation.errors) && validation.errors.length > 0) {
+            const firstError = validation.errors[0];
+            errorMsg = typeof firstError === 'string' ? firstError : (firstError?.message || errorMsg);
+          }
           
           // Если ошибка связана с доменом email - показываем понятное сообщение
-          if (firstError?.field === 'email' && errorMsg.includes('домен')) {
-            return fail(`Недопустимый домен почты. Разрешены только: ${ALLOWED_EMAIL_DOMAINS.join(', ')}`);
+          if (errorMsg.includes('домен') || errorMsg.includes('Email должен быть одного из разрешённых доменов')) {
+             return fail(`Недопустимый домен почты. Разрешены только: ${ALLOWED_EMAIL_DOMAINS.join(', ')}`);
           }
           
           return fail(errorMsg);
