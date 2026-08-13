@@ -10,7 +10,7 @@ export default function Requests({ db, store, ur, initialTab = 'hours', addAudit
   const [tab, setTab] = useState(initialTab);
 
   const tabs = [];
-  if (hasRole(ur, 'director', 'admin')) tabs.push(['hours', 'Изменение часов']);
+  if (hasRole(ur, 'director', 'admin', 'kb_chief')) tabs.push(['hours', 'Изменение часов']);
   tabs.push(['vac', 'Делегирование отпусков']);
   tabs.push(['rd', 'Передача ролей']);
   if (hasRole(ur, 'admin')) tabs.push(['reg', 'Заявки на регистрацию']);
@@ -107,7 +107,7 @@ export default function Requests({ db, store, ur, initialTab = 'hours', addAudit
     <div>
       <div className="tabs">{tabs.map(([id, l]) => <button key={id} className={"tab" + (tab === id ? " on" : "")} onClick={() => setTab(id)}>{l}</button>)}</div>
 
-      {tab === "hours" && hasRole(ur, "director", "admin") && (
+      {tab === "hours" && hasRole(ur, "director", "admin", "kb_chief") && (
         <div className="rep-panel">
           <div className="rep-panel-title">Запросы на изменение плановых часов</div>
           <table className="tbl">
@@ -122,7 +122,20 @@ export default function Requests({ db, store, ur, initialTab = 'hours', addAudit
               </tr>
             </thead>
             <tbody>
-              {db.hoursRequests.map(r => (
+              {db.hoursRequests.filter(r => {
+                // ГК видит только запросы по своим КБ
+                if (hasRole(ur, 'kb_chief')) {
+                  const target = r.kind === "task" 
+                    ? db.tasks.find(t => t.id === r.targetId)
+                    : db.projects.find(p => p.id === r.targetId);
+                  if (!target) return false;
+                  const project = r.kind === "task" 
+                    ? db.projects.find(p => p.id === target.projectId)
+                    : target;
+                  return project && project.kbId && (ur.kbIds || []).includes(project.kbId);
+                }
+                return true;
+              }).map(r => (
                 <tr key={r.id}>
                   <td><b>{r.kind === "task" ? db.tasks.find(t => t.id === r.targetId)?.title : db.projects.find(p => p.id === r.targetId)?.name}</b></td>
                   <td>{r.oldH} ч</td>
