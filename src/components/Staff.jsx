@@ -53,21 +53,6 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
           {e.roles.includes('kb_chief') && (e.kbIds || []).map(k => (
             <span key={k} className="role-chip blue">{db.kbs.find(x => x.id === k)?.name}</span>
           ))}
-          {/* Отображение основной должности с основным отделом */}
-          {e.departments.length > 0 && (() => {
-            const primaryDept = e.departments.find(d => d.primary === true);
-            if (primaryDept) {
-              const dd = db.departments.find(x => x.id === primaryDept.deptId);
-              if (dd) {
-                return (
-                  <div className="st-primary-dept">
-                    {dd.name}
-                  </div>
-                );
-              }
-            }
-            return null;
-          })()}
           {/* Отображение отделов с совмещением */}
           {e.departments.filter(d => d.primary !== true).length > 0 && (
             <div className="st-depts-list">
