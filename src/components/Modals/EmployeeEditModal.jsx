@@ -8,6 +8,9 @@ export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
   const canEditAll = isAdmin; // Только суперадмин может менять всё
   const [isEditing, setIsEditing] = useState(false); // Режим редактирования для обычных пользователей
 
+  
+  // Получаем данные сотрудника по empId
+  const currentEmp = db.employees.find(e => e.id === empId);
   const [f, setF] = useState({
     last: currentEmp?.last || '',
     first: currentEmp?.first || '',
