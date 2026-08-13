@@ -131,18 +131,31 @@ export default function LoginScreen({ db, onLogin, toast, store }) {
         }
         
         // Глубокая валидация через Zod схему (проверяет домен по списку)
-        const validation = validateRegistration({
-          first: sanitizedReg.first,
-          last: sanitizedReg.last,
-          email: emailValue,
-          pass: sanitizedReg.pass,
-          pass2: sanitizedReg.pass2,
-        });
+        let validation;
+        try {
+          validation = validateRegistration({
+            first: sanitizedReg.first,
+            last: sanitizedReg.last,
+            email: emailValue,
+            pass: sanitizedReg.pass,
+            pass2: sanitizedReg.pass2,
+          });
+        } catch (ex) {
+          logger.error('Исключение при валидации регистрации', ex);
+          return fail("Ошибка проверки данных. Попробуйте еще раз.");
+        }
         
-        if (!validation.success) {
-          logger.warn('Валидация регистрации не пройдена', validation.errors);
-          const firstError = validation.errors[0];
-          return fail(firstError.message || "Ошибка валидации");
+        if (!validation || !validation.success) {
+          logger.warn('Валидация регистрации не пройдена', validation?.errors);
+          const firstError = validation?.errors?.[0];
+          const errorMsg = firstError?.message || "Ошибка валидации данных";
+          
+          // Если ошибка связана с доменом email - показываем понятное сообщение
+          if (firstError?.field === 'email' && errorMsg.includes('домен')) {
+            return fail(`Недопустимый домен почты. Разрешены только: ${ALLOWED_EMAIL_DOMAINS.join(', ')}`);
+          }
+          
+          return fail(errorMsg);
         }
         
         // Проверка на существующий email
