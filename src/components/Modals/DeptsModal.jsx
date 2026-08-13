@@ -32,7 +32,8 @@ export const DeptsModal = ({ db, store, empId, onClose, toast, audit }) => {
       return;
     }
     
-    const before = emp.departments.map((x) => `${x.deptId}:${x.position || ''}`).join(",");
+    const before = emp.departments.map((x) => `${x.deptId}${x.position ? ':' + x.position : ''}`).join(", ");
+    const after = sel.map((x) => `${x.deptId}${x.position ? ':' + x.position : ''}`).join(", ");
     
     // Формируем данные для отправки на бэкенд
     const payload = {
@@ -46,7 +47,7 @@ export const DeptsModal = ({ db, store, empId, onClose, toast, audit }) => {
     
     const updatedEmp = { ...emp, departments: sel };
     store.updateEmployee(updatedEmp);
-    audit("Изменение подразделений сотрудника", `${emp.last} ${emp.first}: [${before}] → [${sel.map((x) => `${x.deptId}:${x.position || ''}`).join(",")}]`);
+    audit("Изменение подразделений", `${emp.last} ${emp.first}: [${before || '–'}] → [${after || '–'}]`);
     
     if (toast && typeof toast.success === 'function') {
       toast.success("Подразделения обновлены");
