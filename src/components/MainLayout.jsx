@@ -516,6 +516,7 @@ export default function MainLayout({ store, data, user, toast }) {
           target: modal.kind === 'task' ? target?.title : target?.name,
           oldH: r.oldH,
           newH: r.newH,
+          justification: r.reason || 'Не указана'
         }, 'hoursRequest', r.id);
         setModal(null); 
       }} />}
