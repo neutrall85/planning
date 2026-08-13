@@ -370,7 +370,8 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
                   <div className="depts-readonly">
                     {user.departments.map(d => {
                       const dd = data.departments.find(x => x.id === d.deptId);
-                      return dd ? <span key={d.deptId} className={`dept-chip${d.primary ? ' prim' : ''}`}>{dd.name}{d.primary ? ' · основное' : ''}</span> : null;
+                      const positionText = d.position ? ` — ${d.position}` : '';
+                      return dd ? <span key={d.deptId} className={`dept-chip${d.primary ? ' prim' : ''}`}>{dd.name}{positionText}{d.primary ? ' · основное' : ''}</span> : null;
                     })}
                     {user.departments.length === 0 && <span className="mut sm">не назначены</span>}
                     <div className="mut sm" style={{ marginTop: 6 }}>Подразделения изменяют только HR-менеджер, суперадминистратор и генеральный директор.</div>

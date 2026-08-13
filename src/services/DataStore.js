@@ -853,4 +853,22 @@ export default class DataStore {
     const e = this._data.employees.find(x => x.id === id);
     return e ? `${e.last} ${e.first}` : '—';
   }
+  
+  empPositionInDept(empId, deptId) {
+    const e = this._data.employees.find(x => x.id === empId);
+    if (!e || !deptId) return null;
+    const dept = e.departments.find(d => d.deptId === deptId);
+    return dept?.position || null;
+  }
+  
+  empNameWithPosition(id, deptId = null) {
+    const e = this._data.employees.find(x => x.id === id);
+    if (!e) return '—';
+    const name = `${e.last} ${e.first}`;
+    if (deptId) {
+      const position = this.empPositionInDept(id, deptId);
+      if (position) return `${name}, ${position}`;
+    }
+    return name;
+  }
 }
