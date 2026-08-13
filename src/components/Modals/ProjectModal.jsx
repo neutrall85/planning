@@ -83,17 +83,17 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
   ];
 
   const save = () => {
-    if (!f.name.trim()) return toast("Укажите название проекта", "err");
-    if (!f.code.trim()) return toast("Укажите код проекта", "err");
-    if (!f.start) return toast("Укажите дату начала", "err");
-    if (!f.customer?.trim()) return toast("Укажите заказчика", "err");
+    if (!f.name.trim()) return toast("Укажите название проекта", "error");
+    if (!f.code.trim()) return toast("Укажите код проекта", "error");
+    if (!f.start) return toast("Укажите дату начала", "error");
+    if (!f.customer?.trim()) return toast("Укажите заказчика", "error");
     
     if (!isAdminType) {
-      if (!f.aircraftType) return toast("Выберите тип ВС", "err");
-      if (!f.projectType) return toast("Выберите тип проекта", "err");
-      if (!f.managerId) return toast("Для производственного проекта ответственный обязателен", "err");
-      if (!f.end) return toast("Для производственного проекта дата окончания обязательна", "err");
-      if (!f.budget || +f.budget <= 0) return toast("Для производственного проекта бюджет обязателен", "err");
+      if (!f.aircraftType) return toast("Выберите тип ВС", "error");
+      if (!f.projectType) return toast("Выберите тип проекта", "error");
+      if (!f.managerId) return toast("Для производственного проекта ответственный обязателен", "error");
+      if (!f.end) return toast("Для производственного проекта дата окончания обязательна", "error");
+      if (!f.budget || +f.budget <= 0) return toast("Для производственного проекта бюджет обязателен", "error");
     }
     onSave({ ...f, kbId: f.kbId || null, budget: isAdminType ? null : +f.budget, managerId: isAdminType ? (f.managerId || "") : f.managerId, end: isAdminType ? (f.end || null) : f.end, longterm: isAdminType ? !!f.longterm : false, files: f.files }, !existing);
   };
@@ -139,14 +139,14 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
       const updatedProject = { ...f, comments: updatedCommentsList };
       store.upsertProject(updatedProject);
     }
-    toast("Комментарий добавлен");
+    toast("Комментарий добавлен", "success");
   };
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
     if (file.size > 10 * 1024 * 1024) {
-      toast("Файл слишком большой (максимум 10 МБ)", "err");
+      toast("Файл слишком большой (максимум 10 МБ)", "error");
       e.target.value = '';
       return;
     }
@@ -167,7 +167,7 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
         const updatedProject = { ...f, files: updatedFiles };
         store.upsertProject(updatedProject);
       }
-      toast("Файл загружен");
+      toast("Файл загружен", "success");
       e.target.value = '';
     };
     reader.readAsDataURL(file);
@@ -181,7 +181,7 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
       const updatedProject = { ...f, files: updatedFiles };
       store.upsertProject(updatedProject);
     }
-    toast("Файл удалён");
+    toast("Файл удалён", "success");
   };
 
   return (

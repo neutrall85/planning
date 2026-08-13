@@ -202,7 +202,7 @@ export default function LoginScreen({ db, onLogin, toast, store }) {
       if (mode === "forgot") {
         if (!forgot.trim()) return fail("Укажите e-mail");
         logger.info(`Запрос восстановления пароля для: ${forgot.trim()}`);
-        toast("Ссылка для восстановления пароля отправлена на " + forgot.trim() + "@" + COMPANY_DOMAIN + " (действует 1 час). Заглушка.");
+        toast("Ссылка для восстановления пароля отправлена на " + forgot.trim() + "@" + COMPANY_DOMAIN + " (действует 1 час). Заглушка.", "info");
         setMode("login");
       }
     } catch (ex) {
