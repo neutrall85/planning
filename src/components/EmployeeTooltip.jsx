@@ -1,4 +1,5 @@
 import React from 'react';
+import { COMPANY_DOMAIN } from '../utils/config';
 
 /**
  * Всплывающее окно с информацией о сотруднике
@@ -7,7 +8,7 @@ import React from 'react';
  * @param {string} employee.last - Фамилия  
  * @param {string} employee.phone - Мобильный телефон
  * @param {string} employee.extension - Внутренний номер
- * @param {string} employee.email - Email (может быть с доменом или без)
+ * @param {string} employee.email - Email (полный, с доменом)
  * @param {boolean} visible - Видимость tooltip
  * @param {number} x - Позиция X
  * @param {number} y - Позиция Y
@@ -17,7 +18,8 @@ export default function EmployeeTooltip({ employee, visible, x, y }) {
 
   const fullName = `${employee.last} ${employee.first}`;
   const internalPhone = employee.extension ? ` ${employee.extension}` : '';
-  const email = employee.email ? `${employee.email}@volga-dnepr.com` : '';
+  // email уже хранится полным (с доменом), не нужно добавлять домен
+  const email = employee.email || '';
 
   return (
     <div 

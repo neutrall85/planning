@@ -19,6 +19,13 @@ export const PASSWORD_MIN_LENGTH = 8;
 export const MAX_LOGIN_ATTEMPTS = 5;
 export const COMPANY_DOMAIN = "volga-dnepr.com";
 
+// ===== РАЗРЕШЁННЫЕ ДОМЕНЫ EMAIL =====
+export const ALLOWED_EMAIL_DOMAINS = [
+  "volga-dnepr.com",
+  "volgadnepr.com",
+  "vd-aviation.com",
+];
+
 // ===== НАСТРОЙКИ ПРОВЕРКИ ДЕДЛАЙНОВ =====
 export const DEADLINE_CHECK_HOUR_MOSCOW = 7; // Час проверки дедлайнов (по Москве)
 export const DEADLINE_NOTIFY_DAYS = [1, 3]; // За сколько дней до дедлайна отправлять уведомления
