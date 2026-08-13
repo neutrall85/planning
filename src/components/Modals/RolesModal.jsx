@@ -12,7 +12,7 @@ export const RolesModal = ({ db, store, empId, onClose, toast, audit }) => {
     const updatedEmp = { ...emp, roles, kbIds: roles.includes("kb_chief") ? kbIds : [], headDeptIds: roles.includes("head") ? headDeptIds : [] };
     store.updateEmployee(updatedEmp);
     audit("Назначение ролей", `${emp.last} ${emp.first}: ${roles.map((r) => ROLES[r].short).join(", ")}`);
-    toast("Роли сохранены");
+    toast("Роли сохранены", "success");
     onClose();
   };
   return (
