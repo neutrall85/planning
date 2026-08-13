@@ -325,10 +325,21 @@ export const validateData = (data, schema) => {
     return { success: true, data: validatedData };
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const errors = error.errors.map(err => ({
-        field: err.path.join('.'),
-        message: err.message,
-        code: err.code,
+      // Надежная обработка ошибок Zod
+      const errorList = Array.isArray(error.errors) ? error.errors : [];
+      
+      if (errorList.length === 0) {
+        // Если массив ошибок пуст, но ошибка есть, создаем общую ошибку
+        return { 
+          success: false, 
+          errors: [{ field: 'unknown', message: error.message || 'Ошибка валидации' }] 
+        };
+      }
+      
+      const errors = errorList.map(err => ({
+        field: err.path && Array.isArray(err.path) ? err.path.join('.') : 'unknown',
+        message: err.message || 'Ошибка валидации',
+        code: err.code || 'invalid',
       }));
       return { success: false, errors };
     }
