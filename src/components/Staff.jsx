@@ -63,15 +63,18 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
           {e.roles.includes('kb_chief') && (e.kbIds || []).map(k => (
             <span key={k} className="role-chip blue">{db.kbs.find(x => x.id === k)?.name}</span>
           ))}
-          {/* Если это отдел совмещения - показываем только плашку "совм" */}
+          {/* Если это отдел совмещения - показываем название отдела с пометкой (совм) */}
           {isSecondaryInCurrent && (
-            <span className="vac-badge" style={{ fontSize: '10px', padding: '2px 4px', marginLeft: '8px' }}>совм</span>
+            <span className="vac-badge" style={{ fontSize: '10px', padding: '2px 4px', marginLeft: '8px' }}>(совм)</span>
           )}
-          {/* Если это основной отдел и есть совмещения - показываем названия отделов совмещения под ролями */}
+          {/* Если это основной отдел и есть совмещения - показываем названия отделов совмещения под ролями с пометкой (совм) */}
           {isPrimaryInCurrent && hasSecondary && (
             <div className="st-depts-list" style={{ marginTop: '4px' }}>
               <span className="mut sm" style={{ fontSize: '11px' }}>
-                {secondaryDepts.map(d => db.departments.find(dept => dept.id === d.deptId)?.name).join(', ')}
+                {secondaryDepts.map(d => {
+                  const deptName = db.departments.find(dept => dept.id === d.deptId)?.name;
+                  return `${deptName} (совм)`;
+                }).join(', ')}
               </span>
             </div>
           )}
