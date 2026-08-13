@@ -137,7 +137,6 @@ export default function ProjectsKanban({
                               <span
                                 key={id}
                                 className="avatar xs"
-                                title={`${a.last} ${a.first}`}
                                 onMouseEnter={(e) => setTooltip(prev => ({ ...prev, visible: true, employee: a, x: e.clientX, y: e.clientY }))}
                                 onMouseLeave={() => setTooltip(prev => ({ ...prev, visible: false }))}
                                 onMouseMove={(e) => setTooltip(prev => ({ ...prev, x: e.clientX, y: e.clientY }))}
