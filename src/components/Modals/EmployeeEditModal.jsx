@@ -7,18 +7,19 @@ export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
   const isAdmin = ur.roles.includes('admin');
   const canEditAll = isAdmin; // Только суперадмин может менять всё
   const [isEditing, setIsEditing] = useState(false); // Режим редактирования для обычных пользователей
-
   
   // Получаем данные сотрудника по empId
-  const currentEmp = db.employees.find(e => e.id === empId);
+  const currentEmp = db.employees?.find(e => e.id === empId);
+  
+  // Инициализируем форму пустыми значениями, если сотрудник не найден
   const [f, setF] = useState({
-    last: currentEmp?.last || '',
-    first: currentEmp?.first || '',
-    email: currentEmp?.email || '',
-    phone: currentEmp?.phone || '',
-    extension: currentEmp?.extension || '',
-    tab: currentEmp?.tab || '',
-    position: currentEmp?.position || '',
+    last: '',
+    first: '',
+    email: '',
+    phone: '',
+    extension: '',
+    tab: '',
+    position: '',
   });
 
   useEffect(() => {
