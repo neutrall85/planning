@@ -5,9 +5,7 @@ import { canEditDepartments, canEditRoles, canManageAllVacations, hasRole, canFi
 import { Ic, ICONS } from "./Icons";
 import { useDataHelpers } from "../hooks";
 import { Modal } from "./Modal";
-
-// CreateEmployeeModal – оставляем без изменений (не показан, но он есть в проекте)
-// ...
+import { CreateEmployeeModal } from "./Modals";
 
 export default function Staff({ db, store, ur, openRoles, openDepts, openVacation, openEmployeeEdit }) {
   const { getEmployeeLoad, empName, primaryDept } = useDataHelpers(db);
