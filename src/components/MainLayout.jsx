@@ -436,6 +436,18 @@ export default function MainLayout({ store, data, user, toast }) {
           }
           
           store.upsertTask(t);
+          
+          const actual = t.logs ? t.logs.reduce((s, l) => s + l.hours, 0) : 0;
+          const projectCode = data.projects.find(p => p.id === t.projectId)?.code || '—';
+          const assigneesStr = (t.assigneeIds || []).map(id => empName(id)).join(', ');
+          const auditDetails = `Задача "${t.title}" в проекте ${projectCode}, плановые часы: ${t.plannedHours ?? '—'}, фактические часы: ${actual}, исполнители: ${assigneesStr || 'не назначены'}`;
+          
+          if (isNew) {
+            store.addAudit('Создание задачи', auditDetails, 'task', t.id);
+          } else if (hasChanges) {
+            store.addAudit('Изменение задачи', auditDetails, 'task', t.id);
+          }
+          
           setModal(null);
         }} 
         onDelete={(id) => { 
@@ -483,8 +495,24 @@ export default function MainLayout({ store, data, user, toast }) {
         store={store}
       />}
       {modal?.type === 'hours' && <HoursRequestModal db={data} ur={user} kind={modal.kind} targetId={modal.targetId} onClose={() => setModal(null)} onSubmit={(r) => { store.addHoursRequest(r); 
+        const target = modal.kind === 'task' ? data.tasks.find(t => t.id === modal.targetId) : null;
+        const project = modal.kind === 'task' ? data.projects.find(p => p.id === target?.projectId) : target;
+        
+        // Определяем, кому отправлять уведомление: ГК для КБ проектов, иначе ГД
+        let approverId = 'e_kozlov'; // ГД по умолчанию
+        if (project && project.kbId) {
+          // Находим ГК этого КБ
+          const kbChief = data.employees.find(e => e.roles.includes('kb_chief') && e.kbIds && e.kbIds.includes(project.kbId));
+          if (kbChief) approverId = kbChief.id;
+        }
+        
+        const authorId = target?.creatorId || (target?.history?.length > 0 ? target.history[0].who : null);
+        if (authorId) {
+          store.addNotification(authorId, `Запрос на изменение часов по ${modal.kind === 'task' ? 'задаче' : 'проекту'} "${target?.title || target?.name || ''}" от ${user.last} ${user.first}.`, { targetType: 'hours', targetId: r.id });
+        }
+        store.addNotification(approverId, `Запрос на изменение часов по ${modal.kind === 'task' ? 'задаче' : 'проекту'} "${target?.title || target?.name || ''}" от ${user.last} ${user.first}.`, { targetType: 'hours', targetId: r.id });
         store.addAudit('Запрос изменения часов', {
-          target: modal.kind === 'task' ? data.tasks.find(t => t.id === modal.targetId)?.title : data.projects.find(p => p.id === modal.targetId)?.name,
+          target: modal.kind === 'task' ? target?.title : target?.name,
           oldH: r.oldH,
           newH: r.newH,
           justification: r.reason || 'Не указана'
