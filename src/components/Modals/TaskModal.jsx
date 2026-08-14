@@ -161,7 +161,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
   const isExec = existing && (existing.assigneeIds || []).includes(ur.id);
   const canEditFields = !readOnly && (existing ? canEditTaskFields(ur, existing, db) : canCreateTask(ur));
   const canChangeStatus = !readOnly && existing && canChangeTaskStatus(ur, existing, null, db);
-  const canEditPlannedHours = hasRole(ur, 'admin', 'director');
+  const canEditPlannedHours = !readOnly && hasRole(ur, 'admin', 'director');
   // Кнопка запроса изменения часов доступна только исполнителям своих задач (не админу), и только для неархивных задач
   const canRequestHours = !readOnly && !has(ur, 'admin') && isExec && !existing.archived;
   const isAuthor = existing && existing.creatorId === ur.id;
