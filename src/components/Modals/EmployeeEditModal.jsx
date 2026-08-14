@@ -125,10 +125,38 @@ export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
     onClose();
   };
 
+  // Функция генерации надежного пароля
+  const generatePassword = () => {
+    const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const lower = 'abcdefghijklmnopqrstuvwxyz';
+    const digits = '0123456789';
+    const special = '!@#$%^&*()_+-=[]{}|;:,.<>?';
+    
+    let password = '';
+    password += upper[Math.floor(Math.random() * upper.length)];
+    password += lower[Math.floor(Math.random() * lower.length)];
+    password += digits[Math.floor(Math.random() * digits.length)];
+    password += special[Math.floor(Math.random() * special.length)];
+    
+    const allChars = upper + lower + digits + special;
+    for (let i = 0; i < 8; i++) {
+      password += allChars[Math.floor(Math.random() * allChars.length)];
+    }
+    
+    // Перемешиваем символы
+    return password.split('').sort(() => Math.random() - 0.5).join('');
+  };
+
   // Функция сброса пароля суперадмином
   const handleResetPassword = () => {
-    const newPassword = window.prompt('Введите новый пароль для сотрудника:');
-    if (!newPassword) return;
+    setShowResetPassword(true);
+  };
+
+  const confirmResetPassword = () => {
+    if (!newPassword) {
+      toast.error('Введите пароль');
+      return;
+    }
     
     // Валидация пароля
     const issues = [
@@ -161,7 +189,10 @@ export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
     store.addAudit('Сброс пароля сотрудника', `${currentEmp.last} ${currentEmp.first} (суперадмином)`);
     toast.success('Пароль успешно сброшен');
     setShowResetPassword(false);
+    setNewPassword('');
   };
+
+  const [newPassword, setNewPassword] = useState('');
 
   return (
     <Modal title={`Редактирование сотрудника${isAdmin ? ' (админ)' : ''}`} onClose={onClose} width={560}>
@@ -229,6 +260,51 @@ export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
         <button className="btn ghost" onClick={onClose}>Отмена</button>
         <button className="btn primary" onClick={save}>Сохранить</button>
       </div>
+
+      {showResetPassword && (
+        <Modal title="Сброс пароля сотрудника" onClose={() => setShowResetPassword(false)} width={500}>
+          <div style={{ marginBottom: '20px' }}>
+            <p style={{ marginBottom: '15px', color: '#666' }}>
+              Сотрудник: <strong>{currentEmp?.last} {currentEmp?.first}</strong>
+            </p>
+            <label className="lbl" style={{ display: 'block', marginBottom: '8px' }}>
+              Новый пароль:
+            </label>
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
+              <input
+                type="password"
+                className="inp"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Введите или сгенерируйте пароль"
+                style={{ flex: 1 }}
+              />
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={() => setNewPassword(generatePassword())}
+                title="Сгенерировать надежный пароль"
+              >
+                🎲 Сгенерировать
+              </button>
+            </div>
+            <div style={{ fontSize: '13px', color: '#666', lineHeight: '1.6' }}>
+              <strong>Требования к паролю:</strong>
+              <ul style={{ margin: '5px 0 0 20px', padding: 0 }}>
+                <li>Минимум 8 символов</li>
+                <li>Заглавная буква (A-Z, А-Я)</li>
+                <li>Строчная буква (a-z, а-я)</li>
+                <li>Цифра (0-9)</li>
+                <li>Специальный символ (!@#$%^&*...)</li>
+              </ul>
+            </div>
+          </div>
+          <div className="modal-foot">
+            <button className="btn ghost" onClick={() => setShowResetPassword(false)}>Отмена</button>
+            <button className="btn primary" onClick={confirmResetPassword}>Сбросить пароль</button>
+          </div>
+        </Modal>
+      )}
     </Modal>
   );
 };
