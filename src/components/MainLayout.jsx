@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth, useStore } from '../hooks';
 import { hasRole, canCreateTask, canExport, canCreateProject, canChangeTaskStatus } from '../utils/permissions';
+import { getEmpNameFromData, getPrimaryDeptFromData } from '../utils/string';
 import { ICONS, Ic } from './Icons';
 import { initials, TODAY, fmtDMY, fmtDT, fmtFullDate } from '../utils/date';
 import { TASK_STATUSES, ROLES, PROJECT_STATUSES, PRIORITIES } from '../utils/constants';
