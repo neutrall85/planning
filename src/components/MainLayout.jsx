@@ -436,6 +436,18 @@ export default function MainLayout({ store, data, user, toast }) {
           }
           
           store.upsertTask(t);
+          
+          const actual = t.logs ? t.logs.reduce((s, l) => s + l.hours, 0) : 0;
+          const projectCode = data.projects.find(p => p.id === t.projectId)?.code || '—';
+          const assigneesStr = (t.assigneeIds || []).map(id => empName(id)).join(', ');
+          const auditDetails = `Задача "${t.title}" в проекте ${projectCode}, плановые часы: ${t.plannedHours ?? '—'}, фактические часы: ${actual}, исполнители: ${assigneesStr || 'не назначены'}`;
+          
+          if (isNew) {
+            store.addAudit('Создание задачи', auditDetails, 'task', t.id);
+          } else if (hasChanges) {
+            store.addAudit('Изменение задачи', auditDetails, 'task', t.id);
+          }
+          
           setModal(null);
         }} 
         onDelete={(id) => { 
