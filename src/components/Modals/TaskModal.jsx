@@ -417,12 +417,12 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
   };
 
   const save = () => {
-    if (!f.title.trim()) return toast.error("Укажите название задачи");
-    if (!f.projectId) return toast.error("Задача обязательно назначается в рамках проекта");
+    if (!f.title.trim()) return toast.error("Введите название задачи");
+    if (!f.projectId) return toast.error("Выберите проект для задачи");
     if (!f.assigneeIds || f.assigneeIds.length === 0) return toast.error("Выберите хотя бы одного исполнителя");
     if (!isAdminProj) {
-      if (!f.plannedHours || +f.plannedHours <= 0) return toast.error("Для производственного проекта плановые часы обязательны");
-      if (!f.deadline) return toast.error("Для производственного проекта срок выполнения обязателен");
+      if (!f.plannedHours || +f.plannedHours <= 0) return toast.error("Укажите плановые часы для задачи");
+      if (!f.deadline) return toast.error("Укажите срок выполнения задачи");
     }
 
     const projForBudget = db.projects.find(p => p.id === f.projectId);
@@ -431,7 +431,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
       const newTotal = currentPlanSum + (+f.plannedHours || 0);
       if (newTotal > projForBudget.budget) {
         toast.error(
-          `Превышение бюджета проекта! Бюджет: ${projForBudget.budget} ч, текущая сумма задач: ${currentPlanSum} ч, запрошено: ${f.plannedHours || 0} ч. Требуется увеличение бюджета проекта.`
+          `Превышен бюджет проекта. Бюджет: ${projForBudget.budget} ч, уже запланировано: ${currentPlanSum} ч, требуется: ${f.plannedHours || 0} ч. Необходимо увеличить бюджет проекта.`
         );
         return;
       }
@@ -439,7 +439,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
 
     if (f.repeatType !== 'none') {
       if (f.repeatType === 'weekly_days' && (!f.repeatDays || f.repeatDays.length === 0)) {
-        return toast.error("Выберите хотя бы один день недели");
+        return toast.error("Выберите дни недели для повторения");
       }
       if (f.repeatEndType === 'date' && !f.repeatEndValue) {
         return toast.error("Укажите дату окончания повторения");
@@ -462,8 +462,8 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
   const addLog = () => {
     const h = parseFloat(String(logH).replace(",", "."));
     if (!h || h <= 0) return toast.error("Введите корректное количество часов");
-    if (f.plannedHours && sp + h > f.plannedHours) return toast.error(`Нельзя внести больше плановых: доступно ещё ${Math.max(0, f.plannedHours - sp)} ч`);
-    if (logDate > TODAY) return toast.error("Дата не может быть в будущем");
+    if (f.plannedHours && sp + h > f.plannedHours) return toast.error(`Превышены плановые часы. Доступно: ${Math.max(0, f.plannedHours - sp)} ч`);
+    if (logDate > TODAY) return toast.error("Нельзя указать дату в будущем");
 
     const newLogs = [...f.logs, { id: uid(), userId: ur.id, date: logDate, hours: h, note: logNote.trim() }];
     setF((s) => ({ ...s, logs: newLogs }));
@@ -498,7 +498,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
   const addAssignee = () => {
     if (!newAssigneeId) return;
     if (f.assigneeIds.includes(newAssigneeId)) {
-      toast.error("Этот исполнитель уже добавлен");
+      toast.error("Сотрудник уже назначен исполнителем");
       return;
     }
     setF(prev => ({ ...prev, assigneeIds: [...prev.assigneeIds, newAssigneeId] }));
