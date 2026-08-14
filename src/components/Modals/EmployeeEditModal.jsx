@@ -7,7 +7,6 @@ export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
   const isAdmin = ur.roles.includes('admin');
   const canEditAll = isAdmin; // Только суперадмин может менять всё
   const [isEditing, setIsEditing] = useState(false); // Режим редактирования для обычных пользователей
-  const [showResetPassword, setShowResetPassword] = useState(false);
   
   // Получаем данные сотрудника по empId
   const currentEmp = db.employees?.find(e => e.id === empId);
@@ -125,44 +124,6 @@ export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
     onClose();
   };
 
-  // Функция сброса пароля суперадмином
-  const handleResetPassword = () => {
-    const newPassword = window.prompt('Введите новый пароль для сотрудника:');
-    if (!newPassword) return;
-    
-    // Валидация пароля
-    const issues = [
-      { ok: newPassword.length >= 8, t: "Минимум 8 символов" },
-      { ok: /[A-ZА-ЯЁ]/.test(newPassword), t: "Заглавная буква" },
-      { ok: /[a-zа-яё]/.test(newPassword), t: "Строчная буква" },
-      { ok: /\d/.test(newPassword), t: "Цифра" },
-      { ok: /[^A-Za-zА-Яа-яЁё0-9]/.test(newPassword), t: "Специальный символ" },
-    ];
-    const failedChecks = issues.filter(i => !i.ok);
-    if (failedChecks.length > 0) {
-      toast.error(`Пароль не соответствует требованиям: ${failedChecks.map(i => i.t).join('; ')}`);
-      return;
-    }
-
-    // Проверка истории паролей
-    const history = currentEmp.passwordHistory || [];
-    if (history.includes(newPassword)) {
-      toast.error('Этот пароль уже использовался ранее. Выберите другой.');
-      return;
-    }
-
-    const updated = {
-      ...currentEmp,
-      pass: newPassword,
-      passwordHistory: [...history.slice(-4), newPassword],
-    };
-
-    store.updateEmployee(updated);
-    store.addAudit('Сброс пароля сотрудника', `${currentEmp.last} ${currentEmp.first} (суперадмином)`);
-    toast.success('Пароль успешно сброшен');
-    setShowResetPassword(false);
-  };
-
   return (
     <Modal title={`Редактирование сотрудника${isAdmin ? ' (админ)' : ''}`} onClose={onClose} width={560}>
 
@@ -217,15 +178,6 @@ export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
 
       <div className="modal-foot">
         <div className="spacer" />
-        {isAdmin && (
-          <button 
-            className="btn ghost danger" 
-            onClick={handleResetPassword}
-            style={{ marginRight: 'auto' }}
-          >
-            Сбросить пароль
-          </button>
-        )}
         <button className="btn ghost" onClick={onClose}>Отмена</button>
         <button className="btn primary" onClick={save}>Сохранить</button>
       </div>
