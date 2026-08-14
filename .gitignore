@@ -15,6 +15,14 @@ node_modules/
 .julia/
 .zig-cache/
 deps/
+```
+# Build artifacts
+dist/
+build/
+*.js
+
+# Dependencies
+node_modules/
 
 # Logs and temp files
 *.log
@@ -26,6 +34,7 @@ deps/
 .env
 .env.local
 .env.*
+*.env.*
 
 # Editors
 .vscode/
@@ -43,6 +52,14 @@ htmlcov/
 Thumbs.db
 
 # Compressed files
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Compression
 *.zip
 *.gz
 *.tar
@@ -65,4 +82,8 @@ Thumbs.db
 *.tar.bz2
 *.tar.xz
 *.tar.zst
+```javascript
+// No build artifacts, dependencies, or temp files detected in changes
+// Only source code files (.jsx, .js) were modified
+// No .gitignore rules needed
 ```
