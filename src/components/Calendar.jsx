@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { iso, addDays, fmtDMY, isTaskActive, initials, parseISO } from '../utils/date';
 import { taskVisible, computeScope, hasRole } from '../utils/permissions';
 import { Ic, ICONS } from './Icons';
@@ -53,7 +53,7 @@ const DayCell = ({ d, big, byDay, db, openTask, onAvatarEnter, onAvatarLeave, on
 };
 
 export default function Calendar({ db, ur, openTask }) {
-  const scope = useMemo(() => computeScope(ur, db), [ur, db]);
+  const scope = computeScope(ur, db);
   const [mode, setMode] = useState('month');
   const [anchor, setAnchor] = useState(new Date());
   const [showOnlyMy, setShowOnlyMy] = useState(false);

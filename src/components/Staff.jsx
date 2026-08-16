@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { ROLES, VACATION_TYPES } from "../utils/constants";
 import { TODAY, fmtDMY, initials, uid } from "../utils/date";
 import { canEditDepartments, canEditRoles, canManageAllVacations, hasRole, canFireEmployee } from "../utils/permissions";

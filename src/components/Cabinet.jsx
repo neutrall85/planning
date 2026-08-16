@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { TASK_STATUSES, TASK_STATUS_ORDER, VACATION_TYPES, PROJECT_CATEGORIES } from '../utils/constants';
 import { TODAY, fmtDMY, fmtD, iso, addDays, isTaskActive } from '../utils/date';
 import { empName } from '../utils/dataHelpers';
@@ -45,7 +45,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
   const days = [];
   for (let i = range - 1; i >= 0; i--) days.push(iso(addDays(new Date(), -i)));
 
-  const taskTableData = useMemo(() => {
+  const taskTableData = (() => {
     return myTasks.map(t => {
       const logMap = {};
       t.logs.forEach(l => {
@@ -53,7 +53,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
       });
       return { task: t, logMap };
     });
-  }, [myTasks]);
+  })();
 
   const exportMyReport = () => {
     if (!expFrom || !expTo) return showToast('Выберите даты начала и окончания периода');
@@ -83,7 +83,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
     showToast('Отчёт выгружен!', 'success');
   };
 
-  const tabs = useMemo(() => {
+  const tabs = (() => {
     const baseTabs = [
       ['overview', 'Сводка'],
       ['vacations', 'Мои отпуска'],
@@ -94,7 +94,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
       baseTabs.splice(2, 0, ['delegation', 'Делегирование ролей']);
     }
     return baseTabs;
-  }, [user]);
+  })();
 
   // Загрузка фото
   const fileInputRef = useRef(null);

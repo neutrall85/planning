@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { Modal } from '../Modal';
 import { Ic, ICONS } from '../Icons';
 import { PASSWORD_AUTO_HIDE_MS } from '../../utils/config';

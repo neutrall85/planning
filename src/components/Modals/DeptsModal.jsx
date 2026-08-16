@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Modal } from '../Modal';
 
 export const DeptsModal = ({ db, store, empId, onClose, toast, audit }) => {

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Ic, ICONS } from './Icons';
 import { TASK_STATUSES, TASK_STATUS_ORDER, PRIORITIES } from '../utils/constants';
 import { TODAY, fmtD, daysDiff, initials, isTaskActive } from '../utils/date';
@@ -30,12 +30,12 @@ export default function Kanban({
   const showOnlyMy = parentShowOnlyMyTasks !== undefined ? parentShowOnlyMyTasks : localShowOnlyMy;
   const sortBy = parentSortBy !== undefined ? parentSortBy : localSortBy;
 
-  const scope = useMemo(() => computeScope(ur, db), [ur, db]);
+  const scope = computeScope(ur, db);
   const canSeeAll = hasRole(ur, "admin", "director", "economist", "kb_chief", "head", "project_lead", "project_manager");
   const isOnlyExecutor = ur.roles.length === 1 && ur.roles[0] === 'executor';
 
   // Фильтрация и сортировка
-  const visible = useMemo(() => {
+  const visible = (() => {
     let list = db.tasks.filter((t) => isTaskActive(t) && taskVisible(ur, scope, t, db));
     if (!hideFilters) {
       if (fProj !== "all") list = list.filter(t => t.projectId === fProj);
@@ -88,7 +88,7 @@ export default function Kanban({
       }
     });
     return list;
-  }, [db, ur, scope, fProj, assigneeFilter, fPrio, fDept, q, showOnlyMy, sortBy, hideFilters]);
+  })();
 
   useEffect(() => {
     if (onAssigneeOptionsChange) {

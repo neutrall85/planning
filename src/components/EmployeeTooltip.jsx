@@ -1,4 +1,4 @@
-import React from 'react';
+import { } from 'react';
 import { COMPANY_DOMAIN } from '../utils/config';
 
 /**

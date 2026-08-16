@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { TASK_STATUSES, PRIORITIES, PROJECT_STATUSES, PROJECT_TYPES } from '../utils/constants';
 import { TODAY, fmtDMY, fmtDT } from '../utils/date';
 import { hasRole, computeScope, taskVisible } from '../utils/permissions';
@@ -18,7 +18,7 @@ const REPORT_TYPES = [
 ];
 
 export default function Reports({ db, ur }) {
-  const scope = useMemo(() => computeScope(ur, db), [ur, db]);
+  const scope = computeScope(ur, db);
 
   // Защита от отсутствия данных
   const safeDb = useMemo(() => {

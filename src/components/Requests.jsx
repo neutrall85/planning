@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { TASK_STATUSES, VACATION_TYPES, ROLES } from "../utils/constants";
 import { COMPANY_DOMAIN } from "../utils/config";
 import { fmtDMY, fmtDT } from "../utils/date";

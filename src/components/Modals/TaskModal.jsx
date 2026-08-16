@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Modal } from '../Modal';
 import Discussion from './Discussion';
 import { empName, primaryDept, getTaskSpent, vacOverlap } from '../utils/dataHelpers';

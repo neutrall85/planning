@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { PROJECT_STATUSES, PROJECT_TYPES, PROJECT_CATEGORIES } from '../utils/constants';
 import { fmtDMY, initials, isTaskActive } from '../utils/date';
 import { Ic, ICONS } from './Icons';
@@ -6,7 +6,7 @@ import { computeScope, hasRole } from '../utils/permissions';
 import EmployeeTooltip from './EmployeeTooltip';
 
 export default function Projects({ db, ur, openProject, openHoursReq, showOnlyMyProjects: parentShowOnlyMyProjects, sortBy: parentSortBy }) {
-  const scope = useMemo(() => computeScope(ur, db), [ur, db]);
+  const scope = computeScope(ur, db);
   // Главные конструкторы НЕ видят все проекты - они видят только проекты своего КБ через scope
   const canSeeAllProjects = hasRole(ur, "admin", "director", "economist", "head", "project_lead", "project_manager");
   

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { Ic, ICONS } from './Icons';
 
 export const Modal = ({ title, onClose, children, width = 640 }) => {
