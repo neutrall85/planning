@@ -8,7 +8,6 @@ import EmployeeTooltip from './EmployeeTooltip';
 export default function Projects({ db, ur, openProject, openHoursReq, showOnlyMyProjects: parentShowOnlyMyProjects, sortBy: parentSortBy }) {
   const scope = computeScope(ur, db);
   // Главные конструкторы НЕ видят все проекты - они видят только проекты своего КБ через scope
-  const canSeeAllProjects = hasRole(ur, "admin", "director", "economist", "head", "project_lead", "project_manager");
   
   // Состояние для tooltip
   const [tooltip, setTooltip] = useState({ visible: false, employee: null, x: 0, y: 0 });

@@ -9,7 +9,6 @@ export const TaskWorkLogs = ({
   canRequestHours,
   onAddLog, 
   onRequestHours,
-  empName 
 }) => {
   const [hours, setHours] = useState('');
   const [note, setNote] = useState('');

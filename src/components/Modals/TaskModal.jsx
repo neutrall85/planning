@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Modal } from '../Modal';
 import Discussion from './Discussion';
-import { empName, primaryDept, vacOverlap } from '../../utils/dataHelpers';
+import { empName, primaryDept } from '../../utils/dataHelpers';
 import {
   TASK_STATUSES, PRIORITIES, TASK_STATUS_ORDER, DEPENDENCY_TYPES,
 } from '../../utils/constants';
@@ -248,7 +248,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', planSum, onClos
       }
     }
     return null;
-  }, [readOnly, f.assigneeIds, f.start, f.deadline, hasDelegate, originalAssignee, vacOverlap]);
+  }, [readOnly, f.assigneeIds, f.start, f.deadline, hasDelegate, originalAssignee, db, f, ur]);
 
   const canLog = !readOnly && ((existing ? isExec : f.assigneeIds?.includes(ur.id)) || has(ur, "admin"));
 

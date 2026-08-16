@@ -1,8 +1,5 @@
 import React, { useState } from 'react';
-import { PROJECT_STATUSES, PROJECT_TYPES, PROJECT_CATEGORIES } from '../utils/constants';
-import { fmtDMY, initials, isTaskActive } from '../utils/date';
 import { Ic, ICONS } from './Icons';
-import { computeScope, hasRole, canChangeProjectStatus } from '../utils/permissions';
 import { useToast } from './Toast';
 import EmployeeTooltip from './EmployeeTooltip';
 import { useDragAndDrop } from '../hooks';
@@ -96,7 +93,6 @@ export default function ProjectsKanban({
                   p.id !== dragItemId;
 
                 const tasks = db.tasks.filter(t => t.projectId === p.id && isTaskActive(t));
-                const plan = tasks.reduce((s, t) => s + (t.plannedHours || 0), 0);
                 const fact = tasks.reduce((s, t) => s + t.logs.reduce((lsum, l) => lsum + l.hours, 0), 0);
                 const usePct = p.budget ? Math.round((fact / Math.max(1, p.budget)) * 100) : 0;
                 const uniqueAssignees = [...new Set(tasks.flatMap(t => t.assigneeIds || []))];

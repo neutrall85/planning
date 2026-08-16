@@ -1,16 +1,11 @@
 import { useState } from "react";
 import { ROLES, VACATION_TYPES } from "../utils/constants";
-import { TODAY, fmtDMY, initials, uid } from "../utils/date";
-import { canEditDepartments, canEditRoles, canManageAllVacations, hasRole, canFireEmployee } from "../utils/permissions";
 import { Ic, ICONS } from "./Icons";
 import { empName, primaryDept, getEmployeeLoad } from '../utils/dataHelpers';
-import { Modal } from "./Modal";
-import { CreateEmployeeModal } from "./Modals";
 
 export default function Staff({ db, store, ur, openRoles, openDepts, openVacation, openEmployeeEdit }) {
   const norm = 160;
   const [showFired, setShowFired] = useState(false);
-  const [showCreateModal, setShowCreateModal] = useState(false);
 
   const activeEmployees = db.employees.filter(e => !e.fired);
   const firedEmployees = db.employees.filter(e => e.fired);
@@ -23,7 +18,6 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
     const vacNow = db.vacations.find(v => v.empId === e.id && v.status === 'approved' && v.start <= TODAY && TODAY <= v.end);
     
     // Получаем количество делегированных задач
-    const delegatedCount = e.delegatedTasksCount || 0;
     
     // Определяем статус сотрудника в текущем отделе
     const deptInCurrent = e.departments.find(d => d.deptId === currentDeptId);
@@ -173,7 +167,6 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
               if (name) store.createDepartment(name, null);
             }}><Ic d={ICONS.plus} size={13} /> Отдел</button>
             {hasRole(ur, 'admin') && (
-              <button className="btn primary sm" onClick={() => setShowCreateModal(true)}>
                 <Ic d={ICONS.plus} size={13} /> Добавить сотрудника
               </button>
             )}
@@ -181,12 +174,8 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
         )}
       </div>
 
-      {showCreateModal && (
-        <CreateEmployeeModal
           db={db}
           store={store}
-          onClose={() => setShowCreateModal(false)}
-          toast={(msg, type) => alert(msg)}
           audit={(action, details) => store.addAudit(action, details)}
         />
       )}
@@ -296,7 +285,6 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
                     <tr key={v.id}>
                       <td><b>{empName(v.empId)}</b><div className="mut sm">{primaryDept(db.employees.find(e => e.id === v.empId))?.name || ''}</div></td>
                       <td>{fmtDMY(v.start)} — {fmtDMY(v.end)}</td>
-                      <td>{VACATION_TYPES[v.type]}</td>
                       <td>{v.delegation.enabled ? `→ ${empName(v.delegation.subId)}` : '—'}</td>
                       <td><span className={`st-chip ${v.status}`}>
                         {{ pending: 'На утверждении', approved: 'Утверждён', rejected: 'Отклонён' }[v.status]}
