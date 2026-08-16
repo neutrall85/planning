@@ -1,1 +1,3 @@
-Nothing should be ignored based on the provided file changes. The modified files ('src/components/Modals/ProjectModal.jsx', 'src/services/DataStore.js') are source code files that should be tracked in version control. No build artifacts, dependencies, or temporary files are present in the changes.
+```
+dist/
+```
