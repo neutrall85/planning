@@ -1,31 +1,113 @@
-```
-# Build artifacts
-dist/
-build/
-
 # Dependencies
 node_modules/
 
-# Environment
+# Build artifacts
+dist/
+build/
+*.js.map
+
+# Environment variables
 .env
 .env.local
-.env.*
+*.env.*
 
 # Editors
 .vscode/
 .idea/
+*.swp
+*.swo
 
 # Logs
 *.log
+
+# Temp files
+*.tmp
 
 # Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+.Python
+*.so
 
-# Temporary files
-*.tmp
+# Coverage
+coverage/
+htmlcov/
+.coverage
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+*.pytest_cache/
+.mypy_cache/
+tox.ini
+.pytest_cache/
+
+# Runtime
+.rpt2_cache/
+.nyc_output/
+coverage/
+lib-cov/
+
+# Distribution
+*.tar.gz
+*.egg-info/
+dist/
+build/
+*.egg
+
+# IDE
+.vscode/
+.idea/
 *.swp
+*.swo
 *~
-```
+
+# General
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Icon?
+.directory
+*.nib
+*~
+*.tmp
+*.bak
+*.swp
+*.swo
+*#
+._*
+.DS_Store?
+.DS_Store
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+*.lnk
+*~
+.DS_Store
+.Spotlight-V100
+.Trashes
+Icon?
+.directory
+*.nib
+*~
+*.tmp
+*.bak
+*.swp
+*.swo
+*#
+._*
+.DS_Store?
+.DS_Store
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+*.lnk
+*~
