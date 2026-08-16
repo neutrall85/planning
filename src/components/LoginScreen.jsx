@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { Ic, ICONS } from './Icons';
 import { validateRegistration, sanitizeObject } from '../utils/validation';
 import { logger } from '../utils/logging/logger';
-import { ALLOWED_EMAIL_DOMAINS } from '../utils/config';
+import { ALLOWED_EMAIL_DOMAINS, COMPANY_DOMAIN } from '../utils/config';
 import { uid } from '../utils/date';
 
 /**

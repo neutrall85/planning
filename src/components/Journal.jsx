@@ -108,11 +108,6 @@ export default function Journal({ db }) {
   }, [filteredEntries]);
 
   const totalEntries = filteredEntries.length;
-  const paginated = useMemo(() => {
-    const flat = [];
-    groupedEntries.forEach(g => g.entries.forEach(e => flat.push(e)));
-    return flat.slice((page - 1) * pageSize, page * pageSize);
-  }, [groupedEntries, page]);
 
   const totalPages = Math.ceil(totalEntries / pageSize);
 
@@ -171,7 +166,7 @@ export default function Journal({ db }) {
       // group.date имеет формат DD.MM.YYYY, преобразуем правильно
       const parts = group.date.split('.');
       if (parts.length !== 3) return;
-      const [dayStr, monthStr, yearStr] = parts.map(Number);
+      const [, monthStr, yearStr] = parts.map(Number);
       const monthDate = new Date(yearStr, monthStr - 1, 1);
       const monthLabel = !isNaN(monthDate.getTime()) 
         ? monthDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })

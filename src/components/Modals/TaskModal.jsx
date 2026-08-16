@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Modal } from '../Modal';
 import Discussion from './Discussion';
-import { empName, primaryDept, getTaskSpent, vacOverlap } from '../../utils/dataHelpers';
+import { empName, primaryDept, vacOverlap } from '../../utils/dataHelpers';
 import {
-  TASK_STATUSES, TASK_STATUS_ORDER, PRIORITIES, DEPENDENCY_TYPES,
+  TASK_STATUSES, PRIORITIES, TASK_STATUS_ORDER, DEPENDENCY_TYPES,
 } from '../../utils/constants';
 import {
   TODAY, fmtDMY, fmtDT, iso, addDays, addMonths, addYears, uid, fmtD, parseISO,
@@ -13,7 +13,6 @@ import {
   assigneeOptions, computeScope, canChangeTaskStatus,
 } from '../../utils/permissions';
 import { Ic, ICONS } from '../Icons';
-import { sanitizeHtml } from '../../utils/string';
 
 function generateRepeatDates(startDate, deadline, repeatConfig, endDate, maxCount = 100) {
   const { type, interval, days, endType, endValue } = repeatConfig;
@@ -29,9 +28,9 @@ function generateRepeatDates(startDate, deadline, repeatConfig, endDate, maxCoun
   const endDateObj = endType === 'date' ? new Date(endValue) : null;
   const maxCountLimit = endType === 'count' ? parseInt(endValue, 10) : null;
 
-  let diffDays = 0;
+  let diff = 0;
   if (currentDeadline) {
-    diffDays = Math.round((currentDeadline - currentStart) / (1000 * 60 * 60 * 24));
+    diff = Math.round((currentDeadline - currentStart) / (1000 * 60 * 60 * 24));
   }
 
   while (count < maxCount) {
@@ -61,7 +60,6 @@ function generateRepeatDates(startDate, deadline, repeatConfig, endDate, maxCoun
         break;
       case 'weekly_days': {
         const dayNumbers = days.map(d => parseInt(d, 10));
-        const currentDay = currentStart.getDay() || 7;
         let found = false;
         for (let i = 1; i <= 7; i++) {
           const nextDay = new Date(currentStart);
@@ -123,7 +121,7 @@ function generateRepeatDates(startDate, deadline, repeatConfig, endDate, maxCoun
   return result;
 }
 
-export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum, onClose, onSave, onDelete, onHoursReq, toast, patchTask, notify, store, initialProjectId, vacationData }) => {
+export const TaskModal = ({ db, ur, taskId, initialTab = 'form', planSum, onClose, onSave, onDelete, onHoursReq, toast, notify, store, initialProjectId, vacationData }) => {
   const existing = taskId ? db.tasks.find((t) => t.id === taskId) : null;
   const readOnly = !!(existing && existing.archived);
 
@@ -187,44 +185,20 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
     repeatEndType: 'date',
     repeatEndValue: '',
   });
-  const [logH, setLogH] = useState("");
-  const [logNote, setLogNote] = useState("");
-  const [logDate, setLogDate] = useState(TODAY);
+  const [logH, setLogH] = useState(() => localStorage.getItem('taskModal_logH') || '');
+  const [logNote, setLogNote] = useState(() => localStorage.getItem('taskModal_logNote') || '');
+  const [logDate, setLogDate] = useState(() => {
+    const saved = localStorage.getItem('taskModal_logDate');
+    return saved || TODAY;
+  });
   const [tab, setTab] = useState(initialTab);
   const [confirmVac, setConfirmVac] = useState(null);
 
-  // Сохраняем последние введенные данные для всех полей при закрытии/открытии модалки
   useEffect(() => {
-    if (!existing) {
-      // Для новой задачи восстанавливаем данные из localStorage
-      const savedForm = localStorage.getItem('taskModal_form');
-      if (savedForm) {
-        try {
-          const parsed = JSON.parse(savedForm);
-          setF(prev => ({ ...prev, ...parsed }));
-        } catch (e) {
-          console.error('Ошибка восстановления данных формы:', e);
-        }
-      }
-    }
-    
-    const savedLogH = localStorage.getItem('taskModal_logH');
-    const savedLogNote = localStorage.getItem('taskModal_logNote');
-    const savedLogDate = localStorage.getItem('taskModal_logDate');
-    if (savedLogH) setLogH(savedLogH);
-    if (savedLogNote) setLogNote(savedLogNote);
-    if (savedLogDate) setLogDate(savedLogDate);
-
-    return () => {
-      // Сохраняем при размонтировании или закрытии
-      if (!existing) {
-        localStorage.setItem('taskModal_form', JSON.stringify(f));
-      }
-      localStorage.setItem('taskModal_logH', logH);
-      localStorage.setItem('taskModal_logNote', logNote);
-      localStorage.setItem('taskModal_logDate', logDate);
-    };
-  }, []);
+    localStorage.setItem('taskModal_logH', logH);
+    localStorage.setItem('taskModal_logNote', logNote);
+    localStorage.setItem('taskModal_logDate', logDate);
+  }, [logH, logNote, logDate]);
 
   // Сохраняем данные формы при каждом изменении (только для новых задач)
   useEffect(() => {
@@ -283,7 +257,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
       return TASK_STATUS_ORDER.filter(s => ['new', 'inwork', 'review'].includes(s));
     }
     return TASK_STATUS_ORDER;
-  }, [isExec, f, ur, db]);
+  }, [isExec, f.status, ur.id, db.tasks.length]);
 
   const localPatchTask = (updatedTask) => {
     setF(prev => ({ ...prev, ...updatedTask }));

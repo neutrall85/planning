@@ -5,13 +5,20 @@ import { ALLOWED_EMAIL_DOMAINS } from '../../utils/config';
 export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
   const isAdmin = ur.roles.includes('admin');
   const canEditAll = isAdmin; // Только суперадмин может менять всё
-  const [isEditing, setIsEditing] = useState(false); // Режим редактирования для обычных пользователей
   
   // Получаем данные сотрудника по empId
   const currentEmp = db.employees?.find(e => e.id === empId);
   
-  // Инициализируем форму пустыми значениями, если сотрудник не найден
-  const [f, setF] = useState({
+  // Инициализируем форму данными сотрудника сразу
+  const [f, setF] = useState(currentEmp ? {
+    last: currentEmp.last || '',
+    first: currentEmp.first || '',
+    email: currentEmp.email || '',
+    phone: currentEmp.phone || '',
+    extension: currentEmp.extension || '',
+    tab: currentEmp.tab || '',
+    position: currentEmp.position || '',
+  } : {
     last: '',
     first: '',
     email: '',
@@ -20,20 +27,6 @@ export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
     tab: '',
     position: '',
   });
-
-  useEffect(() => {
-    if (currentEmp) {
-      setF({
-        last: currentEmp.last || '',
-        first: currentEmp.first || '',
-        email: currentEmp.email || '',
-        phone: currentEmp.phone || '',
-        extension: currentEmp.extension || '',
-        tab: currentEmp.tab || '',
-        position: currentEmp.position || '',
-      });
-    }
-  }, [currentEmp]);
 
   const set = (k, v) => setF(prev => ({ ...prev, [k]: v }));
 

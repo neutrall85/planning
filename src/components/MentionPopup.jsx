@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { initials } from '../utils/date';
 
-export default function MentionPopup({ candidates, onSelect, searchQuery, anchorRef, renderItem }) {
+export default function MentionPopup({ candidates, onSelect, anchorRef, renderItem }) {
   const [position, setPosition] = useState({ top: 0, left: 0, maxHeight: 200 });
   const popupRef = useRef();
 

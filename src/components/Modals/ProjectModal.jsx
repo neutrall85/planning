@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
 import { Modal } from '../Modal';
-import { empName, getTaskSpent } from '../../utils/dataHelpers';
+import { getTaskSpent } from '../../utils/dataHelpers';
 import {
-  PROJECT_STATUSES, PROJECT_TYPES, PROJECT_CATEGORIES, TASK_STATUSES,
+  PROJECT_TYPES, PROJECT_CATEGORIES, TASK_STATUSES,
 } from '../../utils/constants';
 import {
   TODAY, iso, addDays, uid, fmtDT, fmtDMY, parseISO,
@@ -23,10 +23,6 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
   const scope = computeScope(ur, db);
   const isExec = !scope.all && !hasRole(ur, 'director', 'economist', 'kb_chief', 'head', 'project_lead');
   
-  // Определяем тип проекта ДО инициализации состояния
-  const initialProjectType = existing?.ptype || "prod";
-  const isAdminTypeInitial = initialProjectType === "admin";
-
   const [f, setF] = useState(existing ? { 
     ...existing, 
     start: existing.start ? iso(parseISO(existing.start)) : TODAY,
@@ -61,6 +57,7 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
     history: [{ ts: Date.now(), who: ur.id, text: "Проект создан" }],
     files: [],
   });
+  
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
   const isAdminType = f.ptype === "admin";
 
@@ -115,7 +112,7 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
 
   const canUploadFiles = hasRole(ur, 'admin', 'director', 'project_manager') || (existing && existing.managerId === ur.id);
 
-  const handleAddComment = (text, parentId, updatedComments) => {
+  const addComment = (text, parentId, updatedComments) => {
     if (updatedComments) {
       setF(prev => ({ ...prev, comments: updatedComments }));
       if (existing && store) {
