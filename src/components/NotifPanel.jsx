@@ -1,6 +1,5 @@
 import { } from 'react';
 import { fmtDT } from '../utils/date';
-import { Ic } from './Icons';
 
 export default function NotifPanel({ list, store, onNavigate, onClose, currentUserId }) {
   const markAllRead = () => {

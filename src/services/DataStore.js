@@ -1,7 +1,4 @@
-import { TODAY, iso, addDays, addMonths, uid, fmtDMY } from '../utils/date';
-import { TASK_STATUSES, TASK_STATUS_ORDER, PRIORITIES, VACATION_TYPES, PROJECT_STATUSES, PROJECT_TYPES, DEPENDENCY_TYPES } from '../utils/constants';
 import { ARCHIVE_AFTER_MONTHS, DEADLINE_CHECK_INTERVAL_MS, DEADLINE_CHECK_HOUR_MOSCOW, MAX_LOGIN_ATTEMPTS, ACCOUNT_LOCKOUT_DURATION_MS } from '../utils/config';
-import { empName as getEmpName, sanitizeHtml } from '../utils/string';
 import { buildMockData } from '../mocks/dataMock';
 
 export default class DataStore {
@@ -151,7 +148,6 @@ export default class DataStore {
   upsertTask(task) {
   const idx = this._data.tasks.findIndex(t => t.id === task.id);
   let tasks;
-  let auditMessage = '';
 
   // Проверка бюджета (без изменений)
   const projectForBudget = this._data.projects.find(p => p.id === task.projectId);
@@ -168,22 +164,14 @@ export default class DataStore {
   }
 
   if (idx >= 0) {
-    const old = this._data.tasks[idx];
     const changes = [];
-    if (old.title !== task.title) changes.push(`Название: "${old.title}" → "${task.title}"`);
-    if (old.plannedHours !== task.plannedHours) changes.push(`Плановые часы: ${old.plannedHours ?? '—'} → ${task.plannedHours ?? '—'}`);
-    if (JSON.stringify(old.assigneeIds) !== JSON.stringify(task.assigneeIds)) {
-      changes.push(`Исполнители: ${old.assigneeIds.map(id => this.empName(id)).join(', ')} → ${task.assigneeIds.map(id => this.empName(id)).join(', ')}`);
     }
-    if (old.status !== task.status) {
-      changes.push(`Статус: ${TASK_STATUSES[old.status].label} → ${TASK_STATUSES[task.status].label}`);
 
       // ===== ЦЕНТРАЛИЗОВАННАЯ ЛОГИКА УВЕДОМЛЕНИЙ О СМЕНЕ СТАТУСА =====
       const currentUser = this._currentUser;
       const actorName = currentUser ? `${currentUser.last} ${currentUser.first}` : 'Система';
 
       // 1. Исполнитель отправляет задачу на проверку (inwork → review)
-      if (old.status === 'inwork' && task.status === 'review') {
         const assignees = task.assigneeIds || [];
         const project = this._data.projects.find(p => p.id === task.projectId);
         const message = `Задача "${task.title}" отправлена на проверку исполнителем ${actorName}`;
@@ -199,7 +187,6 @@ export default class DataStore {
       }
 
       // 2. Автор/проверяющий возвращает задачу на доработку (review → inwork)
-      if (old.status === 'review' && task.status === 'inwork') {
         const assignees = task.assigneeIds || [];
         const message = `Задача "${task.title}" возвращена на доработку пользователем ${actorName}`;
 
@@ -216,7 +203,6 @@ export default class DataStore {
       }
 
       // 3. Закрытие/отмена задачи (любой статус → closed/cancelled)
-      if ((task.status === 'closed' || task.status === 'cancelled') && old.status !== task.status) {
         task.closedAt = TODAY;
         const assignees = task.assigneeIds || [];
         const message = `Задача "${task.title}" ${task.status === 'closed' ? 'закрыта' : 'отменена'} пользователем ${actorName}`;
@@ -242,11 +228,8 @@ export default class DataStore {
     // ... остальные сравнения (dependency и т.д.) без изменений
 
     if (changes.length > 0) {
-      auditMessage = `Изменение задачи "${task.title}": ${changes.join('; ')}`;
-      this.addAudit('Изменение задачи', auditMessage, 'task', task.id);
     }
     tasks = this._data.tasks.map(t => t.id === task.id ? task : t);
-    this._checkDeadlineNotifications(task, old);
   } else {
     // Создание новой задачи (без изменений)
     if (!task.createdAt) {
@@ -267,7 +250,6 @@ export default class DataStore {
   this._archiveOldTasks(ARCHIVE_AFTER_MONTHS);
 }
 
-  _checkDeadlineNotifications(task, oldTask) {
     if (!task.deadline || ['closed', 'cancelled'].includes(task.status)) return;
 
     const now = new Date(TODAY);
@@ -310,16 +292,8 @@ export default class DataStore {
   upsertProject(project) {
     const idx = this._data.projects.findIndex(p => p.id === project.id);
     let projects;
-    let auditMessage = '';
     if (idx >= 0) {
-      const oldProject = this._data.projects[idx];
       const changes = [];
-      if (oldProject.name !== project.name) changes.push(`Название: "${oldProject.name}" → "${project.name}"`);
-      if (oldProject.code !== project.code) changes.push(`Код: "${oldProject.code}" → "${project.code}"`);
-      if (oldProject.budget !== project.budget) changes.push(`Бюджет: ${oldProject.budget ?? '—'} → ${project.budget ?? '—'}`);
-      if (oldProject.status !== project.status) {
-        changes.push(`Статус: ${PROJECT_STATUSES[oldProject.status]} → ${PROJECT_STATUSES[project.status]}`);
-        if ((project.status === 'closed' || project.status === 'cancelled') && oldProject.status !== project.status) {
           project.archived = true;
           project.archivedAt = TODAY;
           this._data.tasks = this._data.tasks.map(t => {
@@ -336,8 +310,6 @@ export default class DataStore {
         }
       }
       if (changes.length > 0) {
-        auditMessage = `Изменение проекта "${project.name}": ${changes.join('; ')}`;
-        this.addAudit('Изменение проекта', auditMessage, 'project', project.id);
       }
       projects = this._data.projects.map(p => p.id === project.id ? project : p);
     } else {
@@ -367,7 +339,6 @@ export default class DataStore {
     const idx = this._data.vacations.findIndex(v => v.id === vac.id);
     let vacations;
     if (idx >= 0) {
-      const old = this._data.vacations[idx];
       this.addAudit('Изменение отпуска', `${vac.empId} ${fmtDMY(vac.start)}—${fmtDMY(vac.end)}`);
       vacations = this._data.vacations.map(v => v.id === vac.id ? vac : v);
     } else {
@@ -466,13 +437,9 @@ export default class DataStore {
     const idx = this._data.employees.findIndex(e => e.id === emp.id);
     let employees;
     if (idx >= 0) {
-      const old = this._data.employees[idx];
       // Слияние: сохраняем все поля старого и обновляем переданными
-      const merged = { ...old, ...emp };
 
       // Аудит изменений ролей (изменения подразделений логируются явно в компоненте DeptsModal)
-      if (JSON.stringify(old.roles) !== JSON.stringify(emp.roles)) {
-        this.addAudit('Изменение ролей', `${emp.last} ${emp.first}: ${old.roles.join(', ')} → ${emp.roles.join(', ')}`);
       }
 
       employees = this._data.employees.map(e => e.id === emp.id ? merged : e);
@@ -614,7 +581,6 @@ export default class DataStore {
       const targetTitle = req.kind === 'task' ? target?.title : target?.name;
       const requestorName = db.employees.find(e => e.id === req.reqId);
       const reqNameStr = requestorName ? `${requestorName.last} ${requestorName.first}` : 'Сотрудник';
-      const msg = `Запрос на изменение часов от ${reqNameStr}: ${targetTitle} (${req.oldH} → ${req.newH} ч). Требуется ваше утверждение.`;
       this.addNotification(approverId, msg, { targetType: 'hours', targetId: req.id });
     }
     
@@ -652,7 +618,6 @@ export default class DataStore {
     const vac = this._data.vacations.find(v => v.id === vacationId);
     if (!vac) return;
     
-    const oldStatus = vac.status;
     const newStatus = approved ? 'approved' : 'rejected';
     
     this._data = {
@@ -669,7 +634,6 @@ export default class DataStore {
       employee: empName,
       period: `${fmtDMY(vac.start)} — ${fmtDMY(vac.end)}`,
       type: VACATION_TYPES[vac.type],
-      oldStatus: oldStatus,
       newStatus: newStatus
     };
     if (justification && justification.trim()) {
@@ -713,7 +677,6 @@ export default class DataStore {
     };
     
     // Уведомление делегирующему
-    const fromName = this.empName(delegation.fromId);
     const toName = this.empName(delegation.toId);
     const rolesStr = delegation.roles.join(', ');
     const msg = approved
@@ -752,12 +715,9 @@ export default class DataStore {
     };
     
     // Уведомление получателю
-    const fromName = this.empName(delegation.fromId);
     const toName = this.empName(delegation.toId);
     const rolesStr = delegation.roles.join(', ');
-    this.addNotification(delegation.toId, `Делегирование ролей (${rolesStr}) от пользователя ${fromName} отозвано`, { targetType: 'delegation', targetId: delegationId });
     
-    this.addAudit('Отзыв делегирования ролей', `${fromName} отозвал делегирование ролей (${rolesStr}) у ${toName}`, 'delegation', delegationId);
     
     this._notify();
   }

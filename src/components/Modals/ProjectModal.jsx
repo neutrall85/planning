@@ -1,11 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Modal } from '../Modal';
 import { getTaskSpent } from '../../utils/dataHelpers';
 import {
   PROJECT_TYPES, PROJECT_CATEGORIES, TASK_STATUSES,
 } from '../../utils/constants';
 import {
-  TODAY, iso, addDays, uid, fmtDT, fmtDMY, parseISO,
+  TODAY, iso, uid, fmtDT, fmtDMY, parseISO,
 } from '../../utils/date';
 import {
   hasRole, computeScope, canEditProjectFields, canChangeProjectStatus, canCreateProject,
@@ -23,39 +23,43 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
   const scope = computeScope(ur, db);
   const isExec = !scope.all && !hasRole(ur, 'director', 'economist', 'kb_chief', 'head', 'project_lead');
   
-  const [f, setF] = useState(existing ? { 
-    ...existing, 
-    start: existing.start ? iso(parseISO(existing.start)) : TODAY,
-    end: existing.end ? iso(parseISO(existing.end)) : "",
-    aircraftType: existing.aircraftType || "",
-    projectType: existing.projectType || "",
-    budget: existing.budget || "",
-    managerId: existing.managerId || "",
-  } : {
-    id: "p_" + uid(),
-    code: "",
-    name: "",
-    desc: "",
-    kbId: "",
-    managerId: "",
-    start: TODAY,
-    end: "",
-    status: "active",
-    budget: "",
-    color: ["#0ea5e9", "#8b5cf6", "#f43f5e", "#f59e0b", "#10b981", "#ec4899"][Math.floor(Math.random() * 6)],
-    ptype: "prod",
-    category: "NORM",
-    longterm: false,
-    archived: false,
-    archivedAt: null,
-    closedAt: null,
-    creatorId: ur.id,
-    customer: "",
-    aircraftType: "",
-    projectType: "",
-    comments: [],
-    history: [{ ts: Date.now(), who: ur.id, text: "Проект создан" }],
-    files: [],
+  const [f, setF] = useState(() => {
+    const randomColor = ["#0ea5e9", "#8b5cf6", "#f43f5e", "#f59e0b", "#10b981", "#ec4899"][Math.floor(Math.random() * 6)];
+    const now = Date.now();
+    return existing ? { 
+      ...existing, 
+      start: existing.start ? iso(parseISO(existing.start)) : TODAY,
+      end: existing.end ? iso(parseISO(existing.end)) : "",
+      aircraftType: existing.aircraftType || "",
+      projectType: existing.projectType || "",
+      budget: existing.budget || "",
+      managerId: existing.managerId || "",
+    } : {
+      id: "p_" + uid(),
+      code: "",
+      name: "",
+      desc: "",
+      kbId: "",
+      managerId: "",
+      start: TODAY,
+      end: "",
+      status: "active",
+      budget: "",
+      color: randomColor,
+      ptype: "prod",
+      category: "NORM",
+      longterm: false,
+      archived: false,
+      archivedAt: null,
+      closedAt: null,
+      creatorId: ur.id,
+      customer: "",
+      aircraftType: "",
+      projectType: "",
+      comments: [],
+      history: [{ ts: now, who: ur.id, text: "Проект создан" }],
+      files: [],
+    };
   });
   
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));

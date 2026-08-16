@@ -1,12 +1,14 @@
+```
 # Dependencies
 node_modules/
 
 # Build artifacts
 dist/
 build/
-*.js.map
+*.min.js
+*.bundle.js
 
-# Environment variables
+# Environment
 .env
 .env.local
 *.env.*
@@ -20,94 +22,13 @@ build/
 # Logs
 *.log
 
-# Temp files
-*.tmp
-
-# Python
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-*.so
-
 # Coverage
 coverage/
 htmlcov/
 .coverage
 
-# OS
-.DS_Store
-Thumbs.db
-
-# Testing
-*.pytest_cache/
-.mypy_cache/
-tox.ini
-.pytest_cache/
-
-# Runtime
-.rpt2_cache/
-.nyc_output/
-coverage/
-lib-cov/
-
-# Distribution
-*.tar.gz
-*.egg-info/
-dist/
-build/
-*.egg
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# General
-.DS_Store
-Thumbs.db
-ehthumbs.db
-Icon?
-.directory
-*.nib
-*~
+# Temporary files
 *.tmp
-*.bak
-*.swp
-*.swo
-*#
-._*
-.DS_Store?
 .DS_Store
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
-desktop.ini
-*.lnk
-*~
-.DS_Store
-.Spotlight-V100
-.Trashes
-Icon?
-.directory
-*.nib
-*~
-*.tmp
-*.bak
-*.swp
-*.swo
-*#
-._*
-.DS_Store?
-.DS_Store
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-desktop.ini
-*.lnk
-*~
+```

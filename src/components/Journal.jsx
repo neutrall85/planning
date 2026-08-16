@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
 import { fmtDT, fmtDMY, initials } from '../utils/date';
-import { empName } from '../utils/dataHelpers';
 import { Ic, ICONS } from './Icons';
 import EmployeeTooltip from './EmployeeTooltip';
 
@@ -53,8 +52,6 @@ export default function Journal({ db }) {
 
   const userOptions = useMemo(() => {
     const userIds = new Set(allEntries.map(e => e.userId).filter(id => id !== 'system'));
-    return [...userIds].map(id => ({ id, name: empName(id) || id }));
-  }, [allEntries, empName]);
 
   const filteredEntries = useMemo(() => {
     return allEntries.filter(entry => {
@@ -143,7 +140,6 @@ export default function Journal({ db }) {
       const d = new Date(e.ts);
       const date = fmtDMY(e.ts);
       const time = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-      const user = e.userId === 'system' ? 'Система' : empName(e.userId) || e.userId;
       const details = typeof e.details === 'string' ? e.details.replace(/"/g, '""') : '';
       return [date, time, user, e.action, `"${details}"`].join(';');
     });
@@ -390,11 +386,9 @@ export default function Journal({ db }) {
                                   height: '24px',
                                   fontSize: '9px',
                                 }}>
-                                  {(empName(entry.userId) || entry.userId).charAt(0).toUpperCase()}
                                 </div>
                               );
                             })()}
-                            {entry.userId === 'system' ? 'Система' : empName(entry.userId) || entry.userId}
                           </div>
                         </td>
                         <td>
