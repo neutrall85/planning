@@ -1,68 +1,43 @@
 ```
-# Build artifacts
+# Compiled and build artifacts
+*.pyc
+__pycache__/
+*.o
+*.obj
 dist/
 build/
+target/
 
 # Dependencies
+.venv/
+venv/
 node_modules/
-
-# Environment
-.env
-.env.local
-*.env.*
-
-# Editors
-.vscode/
-.idea/
+.pip-tools/
+.tox/
+.coverage
+coverage/
+htmlcov/
 
 # Logs and temp files
 *.log
 *.tmp
 *.swp
+*.swo
 
-# Python
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-env/
-venv/
-.venv/
-pip-log.txt
-pip-delete-this-directory.txt
-.tox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.log
-.git/modules/
-*.sublime-workspace
-.pytest_cache/
-.mypy_cache/
+# Environment
+.env
+.env.local
+.env.*
 
-# Compiled and binary files
-*.o
-*.obj
-*.exe
-*.dll
-*.so
-*.a
-*.out
-*.class
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
 
-# OS generated files
+# OS
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
-desktop.ini
 
 # Compressed files
 *.zip
@@ -87,9 +62,4 @@ desktop.ini
 *.tar.bz2
 *.tar.xz
 *.tar.zst
-
-# Testing
-coverage/
-htmlcov/
-.nyc_output/
 ```
