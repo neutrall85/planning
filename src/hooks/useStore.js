@@ -1,4 +1,8 @@
-// useStore.js - хук для доступа к контексту хранилища
-// Вынесен в отдельный файл для корректной работы Fast Refresh
+import { useContext } from 'react';
+import { StoreContext } from '../context/StoreContextConstants';
 
-export { useStore } from '../context/StoreContext';
+export const useStore = () => {
+  const ctx = useContext(StoreContext);
+  if (!ctx) throw new Error('useStore must be used within StoreProvider');
+  return ctx;
+};
