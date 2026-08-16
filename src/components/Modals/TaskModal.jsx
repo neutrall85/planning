@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Modal } from '../Modal';
 import Discussion from './Discussion';
-import { empName, primaryDept } from '../../utils/dataHelpers';
+import { empName, primaryDept, vacOverlap } from '../../utils/dataHelpers';
 import {
   TASK_STATUSES, PRIORITIES, TASK_STATUS_ORDER, DEPENDENCY_TYPES,
 } from '../../utils/constants';
@@ -27,11 +27,6 @@ function generateRepeatDates(startDate, deadline, repeatConfig, endDate, maxCoun
 
   const endDateObj = endType === 'date' ? new Date(endValue) : null;
   const maxCountLimit = endType === 'count' ? parseInt(endValue, 10) : null;
-
-  let diff = 0;
-  if (currentDeadline) {
-    diff = Math.round((currentDeadline - currentStart) / (1000 * 60 * 60 * 24));
-  }
 
   while (count < maxCount) {
     result.push({
@@ -233,7 +228,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', planSum, onClos
     if (hasDelegate && originalAssignee) {
       const assigneesToCheck = f.assigneeIds.filter(id => id !== originalAssignee.id);
       for (const id of assigneesToCheck) {
-        const vac = vacOverlap(id, f.start || f.deadline, f.deadline);
+        const vac = vacOverlap(db, id, f.start || f.deadline, f.deadline);
         if (vac && (!vac.end || new Date(vac.end) >= new Date())) {
           return vac;
         }
@@ -242,13 +237,13 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', planSum, onClos
     }
 
     for (const id of f.assigneeIds) {
-      const vac = vacOverlap(id, f.start || f.deadline, f.deadline);
+      const vac = vacOverlap(db, id, f.start || f.deadline, f.deadline);
       if (vac && (!vac.end || new Date(vac.end) >= new Date())) {
         return vac;
       }
     }
     return null;
-  }, [readOnly, f.assigneeIds, f.start, f.deadline, hasDelegate, originalAssignee, db, f, ur]);
+  }, [readOnly, f.assigneeIds, f.start, f.deadline, hasDelegate, originalAssignee, db]);
 
   const canLog = !readOnly && ((existing ? isExec : f.assigneeIds?.includes(ur.id)) || has(ur, "admin"));
 
@@ -257,7 +252,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', planSum, onClos
       return TASK_STATUS_ORDER.filter(s => ['new', 'inwork', 'review'].includes(s));
     }
     return TASK_STATUS_ORDER;
-  }, [isExec, f.status, ur.id, db.tasks.length]);
+  }, [isExec, ur, f, db]);
 
   const localPatchTask = (updatedTask) => {
     setF(prev => ({ ...prev, ...updatedTask }));
