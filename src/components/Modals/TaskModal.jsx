@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Modal } from '../Modal';
 import Discussion from './Discussion';
-import { empName, primaryDept, getTaskSpent, vacOverlap } from '../utils/dataHelpers';
+import { empName, primaryDept, getTaskSpent, vacOverlap } from '../../utils/dataHelpers';
 import {
   TASK_STATUSES, TASK_STATUS_ORDER, PRIORITIES, DEPENDENCY_TYPES,
 } from '../../utils/constants';

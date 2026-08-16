@@ -1,10 +1,10 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { uid, fmtDT, initials } from '../../utils/date';
 import { has } from '../../utils/permissions';
 import { Ic, ICONS } from '../Icons';
 import { COMMENT_EDIT_WINDOW_MS } from '../../utils/config';
-import { primaryDept } from '../utils/dataHelpers';
+import { primaryDept } from '../../utils/dataHelpers';
 import { sanitizeHtml } from '../../utils/string';
 
 function renderMentionText(text) {
@@ -102,19 +102,23 @@ export default function Discussion({
   const [mentionPos, setMentionPos] = useState({ top: 0, left: 0 });
   const textareaRef = useRef(null);
 
+  const [now, setNow] = useState(() => Date.now());
+  
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   const comments = entity?.comments || [];
   
-  const candidates = useMemo(
-    () => {
-      if (!entity) return [];
-      if (entityType === 'project') {
-        return projectParticipants(db, entity.id, comments).filter((e) => e.id !== ur.id);
-      } else {
-        return taskParticipants(db, entity.id, comments).filter((e) => e.id !== ur.id);
-      }
-    },
-    [db, entityType, entity?.id, ur.id, comments.length]
-  );
+  const candidates = (() => {
+    if (!entity) return [];
+    if (entityType === 'project') {
+      return projectParticipants(db, entity.id, comments).filter((e) => e.id !== ur.id);
+    } else {
+      return taskParticipants(db, entity.id, comments).filter((e) => e.id !== ur.id);
+    }
+  })();
 
   useEffect(() => {
     if (mentionQ !== null && textareaRef.current) {
@@ -211,8 +215,8 @@ export default function Discussion({
     return c.authorId === ur.id && !hasReplies;
   };
 
-  const canEdit = (c) =>
-    c.authorId === ur.id && Date.now() - c.ts < COMMENT_EDIT_WINDOW_MS;
+  const canEdit = (c, now) =>
+    c.authorId === ur.id && now - c.ts < COMMENT_EDIT_WINDOW_MS;
 
   const del = (c) => {
     const subtree = new Set([c.id]);
@@ -270,7 +274,7 @@ export default function Discussion({
                 <span className="mut sm">{fmtDT(c.ts)}</span>
                 {!readOnly &&
                   editingId !== c.id &&
-                  Date.now() - c.ts < COMMENT_EDIT_WINDOW_MS &&
+                  now - c.ts < COMMENT_EDIT_WINDOW_MS &&
                   c.authorId === ur.id && (
                     <span className="mut sm">· можно редактировать</span>
                   )}
@@ -300,7 +304,7 @@ export default function Discussion({
                   <button className="link" onClick={() => setReplyTo(c.id)}>
                     Ответить
                   </button>
-                  {canEdit(c) && editingId !== c.id && (
+                  {canEdit(c, now) && editingId !== c.id && (
                     <button
                       className="link"
                       onClick={() => {

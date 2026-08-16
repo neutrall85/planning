@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Modal } from '../Modal';
-import { empName, primaryDept } from '../utils/dataHelpers';
+import { empName, primaryDept } from '../../utils/dataHelpers';
 import { VACATION_TYPES, TASK_STATUSES } from '../../utils/constants';
 import { TODAY, iso, addDays, uid, fmtDMY, parseISO } from '../../utils/date';
 import { canManageAllVacations, hasRoleDirectors } from '../../utils/permissions';

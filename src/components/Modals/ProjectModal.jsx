@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Modal } from '../Modal';
-import { empName, getTaskSpent } from '../utils/dataHelpers';
+import { empName, getTaskSpent } from '../../utils/dataHelpers';
 import {
   PROJECT_STATUSES, PROJECT_TYPES, PROJECT_CATEGORIES, TASK_STATUSES,
 } from '../../utils/constants';
