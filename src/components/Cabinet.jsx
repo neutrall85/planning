@@ -1,7 +1,7 @@
-import React, { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { TASK_STATUSES, TASK_STATUS_ORDER, VACATION_TYPES, PROJECT_CATEGORIES } from '../utils/constants';
-import { TODAY, fmtDMY, fmtD, iso, addDays, initials, isTaskActive } from '../utils/date';
-import { useDataHelpers } from '../hooks';
+import { TODAY, fmtDMY, fmtD, iso, addDays, isTaskActive } from '../utils/date';
+import { empName } from '../utils/dataHelpers';
 import { hasRole } from '../utils/permissions';
 import { Ic, ICONS } from './Icons';
 import { useToast } from './Toast';
@@ -26,7 +26,6 @@ function downloadCSV(name, rows) {
 }
 
 export default function Cabinet({ store, data, user, openTask, openVacation, openDelegation, openEmployeeEdit, openChangePassword, toast }) {
-  const { empName, getEmployeeLoad } = useDataHelpers(data);
   const [tab, setTab] = useState('overview');
 
   const showToast = useToast(toast);

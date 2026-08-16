@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Modal } from '../Modal';
-import { useDataHelpers } from '../../hooks';
+import { empName, primaryDept } from '../utils/dataHelpers';
 import { VACATION_TYPES } from '../../utils/constants';
 import { TODAY, fmtDMY } from '../../utils/date';
 
@@ -8,7 +8,6 @@ export const VacNowModal = ({ db, onClose, toast }) => {
   const [fDept, setFDept] = useState("all");
   const [sort, setSort] = useState("start");
   const [, setTick] = useState(0);
-  const { primaryDept, empName } = useDataHelpers(db);
 
   const rows = db.vacations
     .filter((v) => v.status === "approved" && v.start <= TODAY && TODAY <= v.end)

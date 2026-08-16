@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from '../Modal';
-import { COMPANY_DOMAIN, ALLOWED_EMAIL_DOMAINS } from '../../utils/config';
-import { useDataHelpers } from '../../hooks';
+import { ALLOWED_EMAIL_DOMAINS } from '../../utils/config';
 
 export const EmployeeEditModal = ({ db, store, ur, empId, onClose, toast }) => {
   const isAdmin = ur.roles.includes('admin');

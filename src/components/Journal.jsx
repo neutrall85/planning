@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { fmtDT, fmtDMY, initials } from '../utils/date';
-import { useDataHelpers } from '../hooks';
+import { empName } from '../utils/dataHelpers';
 import { Ic, ICONS } from './Icons';
 import EmployeeTooltip from './EmployeeTooltip';
 
@@ -36,7 +36,6 @@ const ACTIONS = [
 ];
 
 export default function Journal({ db }) {
-  const { empName } = useDataHelpers(db);
   const [filters, setFilters] = useState({
     dateFrom: '',
     dateTo: '',

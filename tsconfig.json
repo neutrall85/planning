@@ -20,18 +20,6 @@
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
     
-    /* Paths */
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["src/*"],
-      "@utils/*": ["src/utils/*"],
-      "@components/*": ["src/components/*"],
-      "@hooks/*": ["src/hooks/*"],
-      "@services/*": ["src/services/*"],
-      "@context/*": ["src/context/*"],
-      "@assets/*": ["src/assets/*"]
-    },
-
     /* Type checking */
     "noImplicitAny": true,
     "strictNullChecks": true,
@@ -42,6 +30,6 @@
     "useUnknownInCatchVariables": true,
     "noUncheckedIndexedAccess": true
   },
-  "include": ["src"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.js", "src/**/*.jsx"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
