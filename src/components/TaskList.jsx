@@ -1,25 +1,23 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { TASK_STATUSES, PRIORITIES } from '../utils/constants';
 import { fmtD, initials, isTaskActive, daysDiff, TODAY } from '../utils/date';
-import { Ic, ICONS } from './Icons';
-import { computeScope, taskVisible, hasRole } from '../utils/permissions';
+
+import { computeScope, taskVisible } from '../utils/permissions';
 import EmployeeTooltip from './EmployeeTooltip';
 
 export default function TaskList({
   db,
   ur,
   openTask,
-  onMove,
-  onNew,
+  
+  
   showOnlyMyTasks: parentShowOnlyMyTasks,
   sortBy: parentSortBy,
   assigneeFilter,
-  onAssigneeFilterChange,
-  onAssigneeOptionsChange, // новый пропс
+  
+  
 }) {
   const scope = computeScope(ur, db);
-  const canSeeAll = hasRole(ur, "admin", "director", "economist", "kb_chief", "head", "project_lead", "project_manager");
-  const isOnlyExecutor = ur.roles.length === 1 && ur.roles[0] === 'executor';
 
   const [tooltip, setTooltip] = useState({ visible: false, employee: null, x: 0, y: 0 });
 
@@ -63,15 +61,6 @@ export default function TaskList({
     }
   });
 
-  // Вычисляем список исполнителей и передаём в MainLayout
-  useEffect(() => {
-    if (onAssigneeOptionsChange) {
-      const ids = new Set();
-      list.forEach(t => (t.assigneeIds || []).forEach(id => ids.add(id)));
-      const options = [...ids].map(id => db.employees.find(e => e.id === id)).filter(Boolean);
-      onAssigneeOptionsChange(options);
-    }
-  }, [list, db, onAssigneeOptionsChange]);
 
   const getCategoryColor = (task) => {
     const project = db.projects.find(p => p.id === task.projectId);

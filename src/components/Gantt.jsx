@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { TODAY, iso, addDays, parseISO, fmtD, fmtDMY, isTaskActive } from '../utils/date';
-import { TASK_STATUSES, DEPENDENCY_TYPES, PROJECT_CATEGORIES, PRIORITIES } from '../utils/constants';
-import { empName, getTaskSpent, vacOverlap } from '../utils/dataHelpers';
+import { TASK_STATUSES, PROJECT_CATEGORIES, PRIORITIES } from '../utils/constants';
+import { getTaskSpent, vacOverlap } from '../utils/dataHelpers';
 import { computeScope, taskVisible } from '../utils/permissions';
 import { Ic, ICONS } from './Icons';
 
@@ -93,7 +93,7 @@ export default function Gantt({ db, ur, openTask, openProject }) {
       g.items = items;
     });
     return { days, months, groups: groups.filter(g => g.items.length > 0) };
-  }, [tasks, db.projects, anchor, mode, range, scope]);
+  }, [tasks, db.projects, anchor, range, scope]);
 
   if (!ganttData || ganttData.groups.length === 0) {
     return (
@@ -195,7 +195,6 @@ export default function Gantt({ db, ur, openTask, openProject }) {
                     const a = assignees[0];
                     const left = t.sIdx * DW + 2;
                     const w = Math.max((t.eIdx - t.sIdx + 1) * DW - 4, DW - 8);
-                    const sp = getTaskSpent(t);
                     
                     // Проверяем, есть ли делегирование у задачи (используем новые поля)
                     const hasDelegate = t.isDelegated && t.delegationEnd && new Date(t.delegationEnd) >= new Date(TODAY);

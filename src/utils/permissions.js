@@ -3,7 +3,7 @@
  * Использует декларативный подход вместо хардкода условий
  */
 
-import { RBAC_CONFIG, DEFAULT_ROLES } from '../config/rbacConfig';
+import { RBAC_CONFIG } from '../config/rbacConfig';
 
 /**
  * Проверка наличия роли у пользователя
@@ -85,7 +85,6 @@ const checkBusinessRules = (user, resource, action, context, data) => {
       if (!project) return false;
 
       const isProdProject = project.ptype !== 'admin';
-      const isAdminProject = project.ptype === 'admin';
 
       // Директор может всё
       if (hasRole(user, 'director')) return true;
@@ -261,7 +260,7 @@ export const canChangeProjectStatus = (user, project, newStatus) => {
   return can(user, 'project', 'change_status', { ...project, newStatus });
 };
 
-export const projectEditable = (user, project, data) => canEditProjectFields(user, project);
+export const projectEditable = (user, project) => canEditProjectFields(user, project);
 
 export const canApproveVacation = (user, vacation, data) => {
   if (!user || !vacation || !data) return false;
@@ -352,9 +351,9 @@ export function taskVisible(u, scope, t, db) {
 export const assigneeOptions = (user, data) => {
   if (!user || !data) return [];
   
-  let list = [];
   const allEmployees = data.employees.filter(e => !e.fired);
 
+  let list;
   if (hasRole(user, "admin", "director", "economist", "project_lead", "project_manager")) {
     list = allEmployees;
   } else if (hasRole(user, "kb_chief") && (user.kbIds || []).length) {

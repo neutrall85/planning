@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useStore } from '../hooks';
 import { hasRole, canCreateTask, canExport, canChangeTaskStatus } from '../utils/permissions';
-import { empName, primaryDept } from '../utils/dataHelpers';
+import { empName } from '../utils/dataHelpers';
 import { ICONS, Ic } from './Icons';
 import { initials, TODAY, fmtDMY, fmtFullDate } from '../utils/date';
 import { TASK_STATUSES, ROLES, PROJECT_STATUSES, PRIORITIES } from '../utils/constants';
@@ -18,7 +18,6 @@ import Archive from './Archive';
 import Requests from './Requests';
 import Journal from './Journal';
 import NotifPanel from './NotifPanel';
-import { useToast } from './Toast';
 import { 
   TaskModal, ProjectModal, HoursRequestModal, RolesModal, DeptsModal, 
   VacationModal, DelegationModal, EmployeeEditModal, ChangePasswordModal, VacNowModal

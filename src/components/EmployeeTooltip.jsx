@@ -1,5 +1,4 @@
 import { } from 'react';
-import { COMPANY_DOMAIN } from '../utils/config';
 
 /**
  * Всплывающее окно с информацией о сотруднике
