@@ -13,7 +13,6 @@ const DayCell = ({ d, big, byDay, db, openTask, onAvatarEnter, onAvatarLeave, on
       <div className="cal-daynum">{d.getDate()}</div>
       <div className="cal-chips">
         {tasks.slice(0, big ? 12 : 3).map(t => {
-          const p = db.projects.find(x => x.id === t.projectId);
           const assignees = (t.assigneeIds || []).map(id => db.employees.find(e => e.id === id)).filter(Boolean);
           const prioColor = t.priority ? (t.priority === 'high' ? '#ef4444' : t.priority === 'crit' ? '#dc2626' : t.priority === 'low' ? '#3b82f6' : '#f59e0b') : '#f59e0b';
           const statusColor = t.status === 'closed' ? '#10b981' : t.status === 'cancelled' ? '#64748b' : prioColor;
@@ -100,7 +99,6 @@ export default function Calendar({ db, ur, openTask }) {
   const title = mode === 'month' ? `${['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'][anchor.getMonth()]} ${anchor.getFullYear()}` :
     mode === 'week' ? `Неделя ${fmtDMY(iso(addDays(anchor, -((anchor.getDay()+6)%7))))} — ${fmtDMY(iso(addDays(anchor, 6-((anchor.getDay()+6)%7))))}` : fmtDMY(iso(anchor));
 
-  let body = null;
   if (mode === 'month') {
     const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
     const offset = (first.getDay() + 6) % 7;
