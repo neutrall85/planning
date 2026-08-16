@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Modal } from '../Modal';
 import { empName, primaryDept } from '../../utils/dataHelpers';
 import { VACATION_TYPES, TASK_STATUSES } from '../../utils/constants';
+import { iso, parseISO, addDays, TODAY, uid } from '../../utils/date';
+import { canManageAllVacations } from '../../utils/permissions';
 
 export const VacationModal = ({ db, ur, vacationId, forEmpId, onClose, onSave }) => {
   const existing = vacationId ? db.vacations.find((v) => v.id === vacationId) : null;

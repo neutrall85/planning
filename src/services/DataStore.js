@@ -165,63 +165,65 @@ export default class DataStore {
 
   if (idx >= 0) {
     const changes = [];
+    const oldTask = this._data.tasks[idx];
+
+    // ===== ЦЕНТРАЛИЗОВАННАЯ ЛОГИКА УВЕДОМЛЕНИЙ О СМЕНЕ СТАТУСА =====
+    const currentUser = this._currentUser;
+    const actorName = currentUser ? `${currentUser.last} ${currentUser.first}` : 'Система';
+
+    // 1. Исполнитель отправляет задачу на проверку (inwork → review)
+    if (oldTask.status === 'inwork' && task.status === 'review') {
+      const assignees = task.assigneeIds || [];
+      const project = this._data.projects.find(p => p.id === task.projectId);
+      const message = `Задача "${task.title}" отправлена на проверку исполнителем ${actorName}`;
+
+      // Уведомить автора задачи (создателя)
+      if (task.creatorId && !assignees.includes(task.creatorId)) {
+        this.addNotification(task.creatorId, message, { targetType: 'task', targetId: task.id });
+      }
+      // Уведомить ответственного по проекту, если он не совпадает с автором и не является исполнителем
+      if (project && project.managerId && project.managerId !== task.creatorId && !assignees.includes(project.managerId)) {
+        this.addNotification(project.managerId, message, { targetType: 'task', targetId: task.id });
+      }
     }
 
-      // ===== ЦЕНТРАЛИЗОВАННАЯ ЛОГИКА УВЕДОМЛЕНИЙ О СМЕНЕ СТАТУСА =====
-      const currentUser = this._currentUser;
-      const actorName = currentUser ? `${currentUser.last} ${currentUser.first}` : 'Система';
+    // 2. Автор/проверяющий возвращает задачу на доработку (review → inwork)
+    if (oldTask.status === 'review' && task.status === 'inwork') {
+      const assignees = task.assigneeIds || [];
+      const message = `Задача "${task.title}" возвращена на доработку пользователем ${actorName}`;
 
-      // 1. Исполнитель отправляет задачу на проверку (inwork → review)
-        const assignees = task.assigneeIds || [];
-        const project = this._data.projects.find(p => p.id === task.projectId);
-        const message = `Задача "${task.title}" отправлена на проверку исполнителем ${actorName}`;
-
-        // Уведомить автора задачи (создателя)
-        if (task.creatorId && !assignees.includes(task.creatorId)) {
-          this.addNotification(task.creatorId, message, { targetType: 'task', targetId: task.id });
+      // Уведомить всех исполнителей
+      assignees.forEach(id => {
+        if (id !== currentUser?.id) {
+          this.addNotification(id, message, { targetType: 'task', targetId: task.id });
         }
-        // Уведомить ответственного по проекту, если он не совпадает с автором и не является исполнителем
-        if (project && project.managerId && project.managerId !== task.creatorId && !assignees.includes(project.managerId)) {
-          this.addNotification(project.managerId, message, { targetType: 'task', targetId: task.id });
-        }
+      });
+      // Уведомить автора, если он не исполнитель и не текущий пользователь
+      if (task.creatorId && !assignees.includes(task.creatorId) && task.creatorId !== currentUser?.id) {
+        this.addNotification(task.creatorId, message, { targetType: 'task', targetId: task.id });
       }
+    }
 
-      // 2. Автор/проверяющий возвращает задачу на доработку (review → inwork)
-        const assignees = task.assigneeIds || [];
-        const message = `Задача "${task.title}" возвращена на доработку пользователем ${actorName}`;
+    // 3. Закрытие/отмена задачи (любой статус → closed/cancelled)
+    if (task.status === 'closed' || task.status === 'cancelled') {
+      task.closedAt = TODAY;
+      const assignees = task.assigneeIds || [];
+      const message = `Задача "${task.title}" ${task.status === 'closed' ? 'закрыта' : 'отменена'} пользователем ${actorName}`;
 
-        // Уведомить всех исполнителей
-        assignees.forEach(id => {
-          if (id !== currentUser?.id) {
-            this.addNotification(id, message, { targetType: 'task', targetId: task.id });
-          }
-        });
-        // Уведомить автора, если он не исполнитель и не текущий пользователь
-        if (task.creatorId && !assignees.includes(task.creatorId) && task.creatorId !== currentUser?.id) {
-          this.addNotification(task.creatorId, message, { targetType: 'task', targetId: task.id });
+      // Уведомить всех исполнителей (кроме текущего)
+      assignees.forEach(id => {
+        if (id !== currentUser?.id) {
+          this.addNotification(id, message, { targetType: 'task', targetId: task.id });
         }
+      });
+      // Уведомить автора, если он не исполнитель и не текущий пользователь
+      if (task.creatorId && !assignees.includes(task.creatorId) && task.creatorId !== currentUser?.id) {
+        this.addNotification(task.creatorId, message, { targetType: 'task', targetId: task.id });
       }
-
-      // 3. Закрытие/отмена задачи (любой статус → closed/cancelled)
-        task.closedAt = TODAY;
-        const assignees = task.assigneeIds || [];
-        const message = `Задача "${task.title}" ${task.status === 'closed' ? 'закрыта' : 'отменена'} пользователем ${actorName}`;
-
-        // Уведомить всех исполнителей (кроме текущего)
-        assignees.forEach(id => {
-          if (id !== currentUser?.id) {
-            this.addNotification(id, message, { targetType: 'task', targetId: task.id });
-          }
-        });
-        // Уведомить автора, если он не исполнитель и не текущий пользователь
-        if (task.creatorId && !assignees.includes(task.creatorId) && task.creatorId !== currentUser?.id) {
-          this.addNotification(task.creatorId, message, { targetType: 'task', targetId: task.id });
-        }
-        // Уведомить ответственного по проекту, если он не совпадает с автором/исполнителями
-        const project = this._data.projects.find(p => p.id === task.projectId);
-        if (project && project.managerId && project.managerId !== task.creatorId && !assignees.includes(project.managerId) && project.managerId !== currentUser?.id) {
-          this.addNotification(project.managerId, message, { targetType: 'task', targetId: task.id });
-        }
+      // Уведомить ответственного по проекту, если он не совпадает с автором/исполнителями
+      const project = this._data.projects.find(p => p.id === task.projectId);
+      if (project && project.managerId && project.managerId !== task.creatorId && !assignees.includes(project.managerId) && project.managerId !== currentUser?.id) {
+        this.addNotification(project.managerId, message, { targetType: 'task', targetId: task.id });
       }
     }
 

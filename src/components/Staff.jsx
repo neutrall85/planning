@@ -1,7 +1,9 @@
 import { useState } from "react";
-import { ROLES, VACATION_TYPES } from "../utils/constants";
+import { ROLES } from "../utils/constants";
 import { Ic, ICONS } from "./Icons";
 import { empName, primaryDept, getEmployeeLoad } from '../utils/dataHelpers';
+import { TODAY, fmtDMY, initials } from '../utils/date';
+import { hasRole, canEditDepartments, canEditRoles, canFireEmployee } from '../utils/permissions';
 
 export default function Staff({ db, store, ur, openRoles, openDepts, openVacation, openEmployeeEdit }) {
   const norm = 160;
@@ -167,18 +169,13 @@ export default function Staff({ db, store, ur, openRoles, openDepts, openVacatio
               if (name) store.createDepartment(name, null);
             }}><Ic d={ICONS.plus} size={13} /> Отдел</button>
             {hasRole(ur, 'admin') && (
+              <button className="btn ghost sm" onClick={() => openEmployeeEdit(null)}>
                 <Ic d={ICONS.plus} size={13} /> Добавить сотрудника
               </button>
             )}
           </div>
         )}
       </div>
-
-          db={db}
-          store={store}
-          audit={(action, details) => store.addAudit(action, details)}
-        />
-      )}
 
       {/* --- СЕКЦИЯ: РУКОВОДСТВО ОРГАНИЗАЦИИ --- */}
       {noDeptEmployees.length > 0 && (
