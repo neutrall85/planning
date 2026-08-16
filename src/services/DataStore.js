@@ -1,6 +1,6 @@
 import { ARCHIVE_AFTER_MONTHS, DEADLINE_CHECK_INTERVAL_MS, DEADLINE_CHECK_HOUR_MOSCOW, MAX_LOGIN_ATTEMPTS, ACCOUNT_LOCKOUT_DURATION_MS } from '../utils/config';
 import { buildMockData } from '../mocks/dataMock';
-import { iso, addMonths, TODAY } from '../utils/date';
+import { iso, addMonths, TODAY, uid } from '../utils/date.ts';
 
 export default class DataStore {
   constructor(initialData = null) {
