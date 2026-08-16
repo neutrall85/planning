@@ -146,11 +146,11 @@ export default class DataStore {
 
   // === ЗАДАЧИ ===
   upsertTask(task) {
-  const idx = this._data.tasks.findIndex(t => t.id === task.id);
-  let tasks;
+    const idx = this._data.tasks.findIndex(t => t.id === task.id);
+    let tasks;
 
-  // Проверка бюджета (без изменений)
-  const projectForBudget = this._data.projects.find(p => p.id === task.projectId);
+    // Проверка бюджета (без изменений)
+    const projectForBudget = this._data.projects.find(p => p.id === task.projectId);
   if (projectForBudget && projectForBudget.budget != null && projectForBudget.ptype !== 'admin' && !projectForBudget.archived) {
     const otherTasksSum = this._data.tasks
       .filter(t => t.projectId === task.projectId && t.id !== task.id)
@@ -251,36 +251,6 @@ export default class DataStore {
   this._notify();
   this._archiveOldTasks(ARCHIVE_AFTER_MONTHS);
 }
-
-    if (!task.deadline || ['closed', 'cancelled'].includes(task.status)) return;
-
-    const now = new Date(TODAY);
-    const deadlineDate = new Date(task.deadline);
-    const daysUntilDeadline = Math.ceil((deadlineDate - now) / (1000 * 60 * 60 * 24));
-
-    const shouldNotifyThreeDays = daysUntilDeadline === 3;
-    const shouldNotifyOneDay = daysUntilDeadline === 1;
-
-    if (!shouldNotifyThreeDays && !shouldNotifyOneDay) return;
-
-    const existingNotif = this._data.notifications.find(n =>
-      n.targetType === 'task' &&
-      n.targetId === task.id &&
-      (n.text.includes('дней до срока выполнения') || n.text.includes('день до срока выполнения'))
-    );
-
-    if (existingNotif) return;
-
-    const assigneeIds = task.assigneeIds || [];
-    assigneeIds.forEach(id => {
-      const emp = this._data.employees.find(e => e.id === id);
-      if (emp) {
-        const daysText = daysUntilDeadline === 1 ? '1 день' : '3 дня';
-        this.addNotification(id, `До срока выполнения задачи "${task.title}" остался ${daysText}! Срок выполнения: ${task.deadline}`, { targetType: 'task', targetId: task.id });
-      }
-    });
-  }
-
   deleteTask(id) {
     const task = this._data.tasks.find(t => t.id === id);
     if (task) {
@@ -311,9 +281,6 @@ export default class DataStore {
           this.addNotification(project.managerId || 'system', `Проект "${project.name}" архивирован`, { targetType: 'project', targetId: project.id });
         }
       }
-      if (changes.length > 0) {
-      }
-      projects = this._data.projects.map(p => p.id === project.id ? project : p);
     } else {
       projects = [...this._data.projects, project];
       this.addAudit('Создание проекта', project.name, 'project', project.id);

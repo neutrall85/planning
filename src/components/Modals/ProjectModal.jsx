@@ -116,31 +116,6 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
 
   const canUploadFiles = hasRole(ur, 'admin', 'director', 'project_manager') || (existing && existing.managerId === ur.id);
 
-  const addComment = (text, parentId, updatedComments) => {
-    if (updatedComments) {
-      setF(prev => ({ ...prev, comments: updatedComments }));
-      if (existing && store) {
-        const updatedProject = { ...f, comments: updatedComments };
-        store.upsertProject(updatedProject);
-      }
-      return;
-    }
-    if (!text?.trim()) return;
-    const newComment = {
-      id: uid(),
-      authorId: ur.id,
-      ts: Date.now(),
-      text: text.trim(),
-      parentId: parentId || null,
-    };
-    const updatedCommentsList = [...(f.comments || []), newComment];
-    setF(prev => ({ ...prev, comments: updatedCommentsList }));
-    if (existing && store) {
-      const updatedProject = { ...f, comments: updatedCommentsList };
-      store.upsertProject(updatedProject);
-    }
-    toast("Комментарий добавлен", "success");
-  };
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
