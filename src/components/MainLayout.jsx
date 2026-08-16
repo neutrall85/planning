@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
-import { useAuth, useStore } from '../hooks';
-import { hasRole, canCreateTask, canExport, canCreateProject, canChangeTaskStatus } from '../utils/permissions';
-import { getEmpNameFromData, getPrimaryDeptFromData } from '../utils/string';
+import { useStore } from '../hooks';
+import { hasRole, canCreateTask, canExport, canChangeTaskStatus } from '../utils/permissions';
+import { empName, primaryDept } from '../utils/dataHelpers';
 import { ICONS, Ic } from './Icons';
-import { initials, TODAY, fmtDMY, fmtDT, fmtFullDate } from '../utils/date';
+import { initials, TODAY, fmtDMY, fmtFullDate } from '../utils/date';
 import { TASK_STATUSES, ROLES, PROJECT_STATUSES, PRIORITIES } from '../utils/constants';
 import Kanban from './Kanban';
 import TaskList from './TaskList';
@@ -56,8 +56,7 @@ export default function MainLayout({ store, data, user, toast }) {
   const spent = (task) => task.logs.reduce((s, l) => s + l.hours, 0);
   const planSum = (projectId) => data.tasks.filter(t => t.projectId === projectId).reduce((s, t) => s + (t.plannedHours || 0), 0);
 
-  const empName = (id) => getEmpNameFromData(data, id);
-  const primaryDept = (emp) => getPrimaryDeptFromData(data, emp);
+  // empName и primaryDept уже импортированы из dataHelpers
 
   const navItems = [
     { id: 'tasks', label: 'Задачи', icon: ICONS.kanban },
