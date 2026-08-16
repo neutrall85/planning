@@ -3,11 +3,10 @@ import { Ic, ICONS } from './Icons';
 import { useToast } from './Toast';
 import EmployeeTooltip from './EmployeeTooltip';
 import { useDragAndDrop } from '../hooks';
-import { computeScope } from '../utils/dataHelpers';
+import { computeScope } from '../utils/permissions';
 import { canChangeProjectStatus } from '../utils/permissions';
-import { isTaskActive } from '../utils/date';
+import { isTaskActive, initials } from '../utils/date';
 import { PROJECT_CATEGORIES, PROJECT_TYPES } from '../utils/constants';
-import { initials } from '../utils/date';
 
 const PROJECT_STATUS_ORDER = ['inactive', 'active', 'closed', 'cancelled'];
 
