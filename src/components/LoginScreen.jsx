@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { Ic, ICONS } from './Icons';
 import { validateRegistration, sanitizeObject } from '../utils/validation';
 import { logger } from '../utils/logging/logger';
-import { COMPANY_DOMAIN, ALLOWED_EMAIL_DOMAINS, SHAKE_ANIMATION_MS, PASSWORD_AUTO_HIDE_MS } from '../utils/config';
+import { ALLOWED_EMAIL_DOMAINS } from '../utils/config';
 import { uid } from '../utils/date';
 
 /**
@@ -24,9 +24,6 @@ export default function LoginScreen({ db, onLogin, toast, store }) {
   const [mode, setMode] = useState("login");
   const [lg, setLg] = useState("");
   const [pw, setPw] = useState("");
-  const [showPass, setShowPass] = useState(false);
-  const [passTimer, setPassTimer] = useState(null);
-  const passTimerRef = useRef(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const [shake, setShake] = useState(false);

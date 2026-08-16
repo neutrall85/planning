@@ -1,10 +1,10 @@
-import { useState, useMemo, useEffect } from 'react';
-import { TASK_STATUSES, PRIORITIES, PROJECT_STATUSES, PROJECT_TYPES } from '../utils/constants';
-import { TODAY, fmtDMY, fmtDT } from '../utils/date';
-import { hasRole, computeScope, taskVisible } from '../utils/permissions';
+import { useState, useMemo } from 'react';
+import { TASK_STATUSES, PRIORITIES, PROJECT_STATUSES } from '../utils/constants';
+import { fmtDMY, fmtDT } from '../utils/date';
+import { computeScope, taskVisible } from '../utils/permissions';
 import { Ic, ICONS } from './Icons';
 import { empName, getTaskSpent, getProjectStats } from '../utils/dataHelpers';
-import { useToast } from './Toast';
+
 
 const AIRCRAFT_TYPES = ['Все', 'Су-57', 'МиГ-35', 'Ту-160', 'Ил-76', 'Ка-52', 'Другой'];
 const PROJECT_TYPE_OPTIONS = ['Все', 'Ремонт', 'Модификация'];
@@ -185,9 +185,6 @@ export default function Reports({ db, ur }) {
     }
   };
 
-  useEffect(() => {
-    applyFilters();
-  }, [filters, safeDb, ur, scope]);
 
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -470,10 +467,8 @@ export default function Reports({ db, ur }) {
 
   // Определение, какие фильтры показывать
   const type = filters.type;
-  const showTaskSpecific = type === 'tasks';
   const showProjectDates = type === 'projects';
   const showWorklogDates = type === 'worklog';
-  const showEmployeeFilters = type === 'employees';
   // Для сотрудников даты не показываем
   const showDateRange = type !== 'employees';
   // Для проектов и задач показываем дедлайн/окончание

@@ -99,6 +99,7 @@ export default function Calendar({ db, ur, openTask }) {
   const title = mode === 'month' ? `${['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'][anchor.getMonth()]} ${anchor.getFullYear()}` :
     mode === 'week' ? `Неделя ${fmtDMY(iso(addDays(anchor, -((anchor.getDay()+6)%7))))} — ${fmtDMY(iso(addDays(anchor, 6-((anchor.getDay()+6)%7))))}` : fmtDMY(iso(anchor));
 
+  let body;
   if (mode === 'month') {
     const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
     const offset = (first.getDay() + 6) % 7;

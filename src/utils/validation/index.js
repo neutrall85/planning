@@ -4,7 +4,7 @@
  */
 
 import { z } from 'zod';
-import { COMPANY_DOMAIN, ALLOWED_EMAIL_DOMAINS, PASSWORD_MIN_LENGTH } from '../config';
+import { ALLOWED_EMAIL_DOMAINS, PASSWORD_MIN_LENGTH } from '../config';
 
 // ===== Базовые типы и утилиты =====
 
