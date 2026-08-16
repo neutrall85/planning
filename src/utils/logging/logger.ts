@@ -2,7 +2,6 @@
  * Lightweight Logger for Production
  * Simplified version: removed timer groups, history storage, and localStorage.
  * Only logs ERROR to server (mocked) and filters by level.
- * @file
  */
 
 // Уровни логирования
@@ -11,13 +10,21 @@ export const LOG_LEVELS = {
   INFO: 1,
   WARN: 2,
   ERROR: 3,
-};
+} as const;
+
+export type LogLevel = typeof LOG_LEVELS[keyof typeof LOG_LEVELS];
+
+interface LogEntry {
+  level: string;
+  message: string;
+  context?: string;
+}
 
 // Текущий уровень логирования (по умолчанию INFO для production)
-let currentLevel = import.meta.env.PROD ? LOG_LEVELS.INFO : LOG_LEVELS.DEBUG;
+let currentLevel: LogLevel = (import.meta as any).env?.PROD ? LOG_LEVELS.INFO : LOG_LEVELS.DEBUG;
 
 // Безопасное преобразование объекта в строку с скрытием чувствительных данных
-const safeStringify = (obj) => {
+const safeStringify = (obj: unknown): string => {
   try {
     if (obj === undefined) return 'undefined';
     if (obj === null) return 'null';
@@ -25,7 +32,7 @@ const safeStringify = (obj) => {
     if (typeof obj === 'number' || typeof obj === 'boolean') return String(obj);
     if (typeof obj === 'function') return '[Function]';
     
-    const seen = new WeakSet();
+    const seen = new WeakSet<object>();
     return JSON.stringify(obj, (key, value) => {
       if (typeof value === 'object' && value !== null) {
         if (seen.has(value)) return '[Circular]';
@@ -40,25 +47,25 @@ const safeStringify = (obj) => {
       }
       return value;
     }, 2);
-  } catch (e) {
+  } catch {
     return '[Stringify Error]';
   }
 };
 
 // Основной метод логирования
-const log = (level, message, ...args) => {
+const log = (level: LogLevel, message: string, ...args: unknown[]): void => {
   if (level < currentLevel) return;
   
-  const levelStr = Object.keys(LOG_LEVELS).find(key => LOG_LEVELS[key] === level);
+  const levelStr = Object.keys(LOG_LEVELS).find(key => LOG_LEVELS[key as keyof typeof LOG_LEVELS] === level) || 'UNKNOWN';
   const context = args.length > 0 ? args.map(safeStringify).join(' ') : '';
   
   const consoleMethod = level === LOG_LEVELS.ERROR ? 'error' : 
                        level === LOG_LEVELS.WARN ? 'warn' : 'log';
   
   if (context) {
-    console[consoleMethod](`[${levelStr}] ${message}`, ...args);
+    (console as any)[consoleMethod](`[${levelStr}] ${message}`, ...args);
   } else {
-    console[consoleMethod](`[${levelStr}] ${message}`);
+    (console as any)[consoleMethod](`[${levelStr}] ${message}`);
   }
   
   // Отправка на сервер только для ERROR уровня
@@ -70,15 +77,19 @@ const log = (level, message, ...args) => {
 };
 
 // Отправка логов на сервер (заглушка для production)
-const sendToServer = async (logEntry) => {
+const sendToServer = async (logEntry: LogEntry): Promise<void> => {
   // В production использовать реальный сервис мониторинга (Sentry, LogRocket)
   // localStorage больше не используется для хранения ошибок
-  if (import.meta.env.PROD) {
-    await fetch('/api/logs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(logEntry),
-    });
+  if ((import.meta as any).env?.PROD) {
+    try {
+      await fetch('/api/logs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(logEntry),
+      });
+    } catch {
+      // Silently fail - don't log errors while logging errors
+    }
   }
 };
 
@@ -86,44 +97,40 @@ const sendToServer = async (logEntry) => {
 export const logger = {
   /**
    * Установка уровня логирования
-   * @param {number} level - один из LOG_LEVELS
    */
-  setLevel: (level) => {
+  setLevel: (level: LogLevel): void => {
     currentLevel = level;
   },
   
   /**
    * Получение текущего уровня логирования
    */
-  getLevel: () => currentLevel,
+  getLevel: (): LogLevel => currentLevel,
   
   /**
    * Логирование отладочных сообщений
    */
-  debug: (message, ...args) => log(LOG_LEVELS.DEBUG, message, ...args),
+  debug: (message: string, ...args: unknown[]): void => log(LOG_LEVELS.DEBUG, message, ...args),
   
   /**
    * Логирование информационных сообщений
    */
-  info: (message, ...args) => log(LOG_LEVELS.INFO, message, ...args),
+  info: (message: string, ...args: unknown[]): void => log(LOG_LEVELS.INFO, message, ...args),
   
   /**
    * Логирование предупреждений
    */
-  warn: (message, ...args) => log(LOG_LEVELS.WARN, message, ...args),
+  warn: (message: string, ...args: unknown[]): void => log(LOG_LEVELS.WARN, message, ...args),
   
   /**
    * Логирование ошибок
    */
-  error: (message, ...args) => log(LOG_LEVELS.ERROR, message, ...args),
+  error: (message: string, ...args: unknown[]): void => log(LOG_LEVELS.ERROR, message, ...args),
   
   /**
    * Логирование ошибки с контекстом
-   * @param {Error} error - объект ошибки
-   * @param {string} message - дополнительное сообщение
-   * @param {Object} context - контекст ошибки
    */
-  errorWithStack: (error, message = '', context = {}) => {
+  errorWithStack: (error: Error, message = '', context: Record<string, unknown> = {}): void => {
     const errorInfo = {
       name: error.name,
       message: error.message,
@@ -154,7 +161,7 @@ if (typeof window !== 'undefined') {
   window.addEventListener('unhandledrejection', (event) => {
     logger.error('[Unhandled Promise Rejection]', {
       reason: event.reason,
-      type: event.reason?.constructor?.name,
+      type: (event.reason as Error)?.constructor?.name,
     });
   });
 }

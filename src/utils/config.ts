@@ -24,11 +24,11 @@ export const ALLOWED_EMAIL_DOMAINS = [
   "volga-dnepr.com",
   "volgadnepr.com",
   "vd-aviation.com",
-];
+] as const;
 
 // ===== НАСТРОЙКИ ПРОВЕРКИ ДЕДЛАЙНОВ =====
 export const DEADLINE_CHECK_HOUR_MOSCOW = 7; // Час проверки дедлайнов (по Москве)
-export const DEADLINE_NOTIFY_DAYS = [1, 3]; // За сколько дней до дедлайна отправлять уведомления
+export const DEADLINE_NOTIFY_DAYS = [1, 3] as const; // За сколько дней до дедлайна отправлять уведомления
 
 // ===== ОГРАНИЧЕНИЯ ДАННЫХ =====
 export const MAX_ASSIGNEES_PER_TASK = 10; // Максимальное количество исполнителей на задаче
@@ -48,8 +48,8 @@ export const MAX_TAB_LENGTH = 20; // Максимальная длина таб�
 
 // ===== ПОВТОРЯЮЩИЕСЯ ЗАДАЧИ =====
 export const MAX_REPEAT_INSTANCES = 100; // Максимальное количество генерируемых повторений
-export const REPEAT_TYPES = ['none', 'daily', 'weekly_days', 'workdays', 'monthly', 'yearly', 'custom'];
-export const REPEAT_END_TYPES = ['date', 'count'];
+export const REPEAT_TYPES = ['none', 'daily', 'weekly_days', 'workdays', 'monthly', 'yearly', 'custom'] as const;
+export const REPEAT_END_TYPES = ['date', 'count'] as const;
 
 // ===== АРХИВАЦИЯ =====
 export const MIN_ARCHIVE_MONTHS = 3; // Минимальный срок архивации
@@ -71,10 +71,11 @@ export const LOG_LEVELS = {
   INFO: 1,
   WARN: 2,
   ERROR: 3,
-};
-export const DEFAULT_LOG_LEVEL = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development' 
-  ? LOG_LEVELS.DEBUG 
-  : LOG_LEVELS.WARN;
+} as const;
+
+export type LogLevel = typeof LOG_LEVELS[keyof typeof LOG_LEVELS];
+
+export const DEFAULT_LOG_LEVEL: LogLevel = (import.meta as any).env?.PROD ? LOG_LEVELS.WARN : LOG_LEVELS.DEBUG;
 
 // ===== UX/UI КОНСТАНТЫ =====
 export const MODAL_Z_INDEX = 1000;

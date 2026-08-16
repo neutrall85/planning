@@ -3,7 +3,7 @@ import { TASK_STATUSES, PRIORITIES, PROJECT_STATUSES, PROJECT_TYPES } from '../u
 import { TODAY, fmtDMY, fmtDT } from '../utils/date';
 import { hasRole, computeScope, taskVisible } from '../utils/permissions';
 import { Ic, ICONS } from './Icons';
-import { useDataHelpers } from '../hooks';
+import { empName, getTaskSpent, getProjectStats } from '../utils/dataHelpers';
 import { useToast } from './Toast';
 
 const AIRCRAFT_TYPES = ['Все', 'Су-57', 'МиГ-35', 'Ту-160', 'Ил-76', 'Ка-52', 'Другой'];
@@ -18,7 +18,6 @@ const REPORT_TYPES = [
 ];
 
 export default function Reports({ db, ur }) {
-  const { empName, getTaskSpent, getProjectStats } = useDataHelpers(db);
   const scope = useMemo(() => computeScope(ur, db), [ur, db]);
 
   // Защита от отсутствия данных

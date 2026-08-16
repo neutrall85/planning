@@ -4,10 +4,9 @@ import { COMPANY_DOMAIN } from "../utils/config";
 import { fmtDMY, fmtDT } from "../utils/date";
 import { hasRole, canApproveVacation } from "../utils/permissions";
 import { Ic, ICONS } from "./Icons";
-import { useDataHelpers } from "../hooks";
+import { empName } from '../utils/dataHelpers';
 
 export default function Requests({ db, store, ur, initialTab = 'hours', addAudit }) {
-  const { empName } = useDataHelpers(db);
   const [tab, setTab] = useState(initialTab);
 
   const tabs = [];

@@ -4,7 +4,7 @@ import { uid, fmtDT, initials } from '../../utils/date';
 import { has } from '../../utils/permissions';
 import { Ic, ICONS } from '../Icons';
 import { COMMENT_EDIT_WINDOW_MS } from '../../utils/config';
-import { useDataHelpers } from '../../hooks';
+import { primaryDept } from '../utils/dataHelpers';
 import { sanitizeHtml } from '../../utils/string';
 
 function renderMentionText(text) {
@@ -103,7 +103,6 @@ export default function Discussion({
   const textareaRef = useRef(null);
 
   const comments = entity?.comments || [];
-  const { primaryDept } = useDataHelpers(db);
   
   const candidates = useMemo(
     () => {

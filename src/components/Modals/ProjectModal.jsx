@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Modal } from '../Modal';
-import { useDataHelpers } from '../../hooks';
+import { empName, getTaskSpent } from '../utils/dataHelpers';
 import {
   PROJECT_STATUSES, PROJECT_TYPES, PROJECT_CATEGORIES, TASK_STATUSES,
 } from '../../utils/constants';
@@ -20,7 +20,6 @@ const PROJECT_TYPE_OPTIONS = ['Ремонт', 'Модификация'];
 
 export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toast, openTask, store }) => {
   const existing = projectId ? db.projects.find((p) => p.id === projectId) : null;
-  const { empName, getTaskSpent } = useDataHelpers(db);
   const scope = computeScope(ur, db);
   const isExec = !scope.all && !hasRole(ur, 'director', 'economist', 'kb_chief', 'head', 'project_lead');
   

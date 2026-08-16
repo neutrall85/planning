@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Modal } from '../Modal';
 import Discussion from './Discussion';
-import { useDataHelpers } from '../../hooks';
+import { empName, primaryDept, getTaskSpent, vacOverlap } from '../utils/dataHelpers';
 import {
   TASK_STATUSES, TASK_STATUS_ORDER, PRIORITIES, DEPENDENCY_TYPES,
 } from '../../utils/constants';
@@ -124,7 +124,6 @@ function generateRepeatDates(startDate, deadline, repeatConfig, endDate, maxCoun
 }
 
 export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum, onClose, onSave, onDelete, onHoursReq, toast, patchTask, notify, store, initialProjectId, vacationData }) => {
-  const { empName, getTaskSpent, vacOverlap, primaryDept } = useDataHelpers(db);
   const existing = taskId ? db.tasks.find((t) => t.id === taskId) : null;
   const readOnly = !!(existing && existing.archived);
 

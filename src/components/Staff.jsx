@@ -3,12 +3,11 @@ import { ROLES, VACATION_TYPES } from "../utils/constants";
 import { TODAY, fmtDMY, initials, uid } from "../utils/date";
 import { canEditDepartments, canEditRoles, canManageAllVacations, hasRole, canFireEmployee } from "../utils/permissions";
 import { Ic, ICONS } from "./Icons";
-import { useDataHelpers } from "../hooks";
+import { empName, primaryDept, getEmployeeLoad } from '../utils/dataHelpers';
 import { Modal } from "./Modal";
 import { CreateEmployeeModal } from "./Modals";
 
 export default function Staff({ db, store, ur, openRoles, openDepts, openVacation, openEmployeeEdit }) {
-  const { getEmployeeLoad, empName, primaryDept } = useDataHelpers(db);
   const norm = 160;
   const [showFired, setShowFired] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);

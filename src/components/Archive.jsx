@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { PROJECT_TYPES, PROJECT_CATEGORIES, TASK_STATUSES } from '../utils/constants';
 import { fmtDMY, TODAY } from '../utils/date';
 import { canRestore } from '../utils/permissions';
 import { Ic, ICONS } from './Icons';
-import { useDataHelpers } from '../hooks';
+import { empName, getTaskSpent } from '../utils/dataHelpers';
 
 function getCategoryColor(project) {
   if (!project || project.ptype === 'admin') return '#6b7280';
@@ -14,7 +14,6 @@ function getCategoryColor(project) {
 }
 
 export default function Archive({ db, ur, openTask, openProject, restoreTask, restoreProject }) {
-  const { getTaskSpent, empName } = useDataHelpers(db);
   const [fFrom, setFFrom] = useState('');
   const [fTo, setFTo] = useState('');
   const [fProj, setFProj] = useState('all');

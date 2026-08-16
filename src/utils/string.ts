@@ -6,7 +6,7 @@
  * Санитизация HTML для предотвращения XSS атак
  * Экранирует специальные символы
  */
-export const sanitizeHtml = (str) => {
+export const sanitizeHtml = (str: string | null | undefined): string => {
   if (!str) return '';
   return String(str)
     .replace(/&/g, '&amp;')
@@ -19,17 +19,16 @@ export const sanitizeHtml = (str) => {
 /**
  * Безопасная вставка текста в уведомления
  */
-export const escapeForNotification = (text) => {
+export const escapeForNotification = (text: string | null | undefined): string => {
   return sanitizeHtml(text);
 };
 
+import type { Employee, Department, StoreData } from '../types';
+
 /**
  * Форматирование имени сотрудника
- * @param {Array} employees - массив сотрудников
- * @param {string} id - ID сотрудника
- * @returns {string} Форматированное имя или "—"
  */
-export const empName = (employees, id) => {
+export const empName = (employees: Employee[] | undefined, id: string | null | undefined): string => {
   if (!id || !employees) return '—';
   const e = employees.find(x => x.id === id);
   return e ? `${e.last} ${e.first}` : '—';
@@ -37,20 +36,17 @@ export const empName = (employees, id) => {
 
 /**
  * Получение основного отдела сотрудника
- * @param {Object} emp - сотрудник
- * @param {Array} departments - массив отделов
- * @returns {Object|null} Основной отдел или null
  */
-export const primaryDept = (emp, departments) => {
+export const primaryDept = (emp: Employee | null | undefined, departments: Department[] | null | undefined): Department | null => {
   if (!emp || !departments) return null;
   const p = emp.departments?.find(x => x.primary) || emp.departments?.[0];
-  return p ? departments.find(d => d.id === p.deptId) : null;
+  return p ? departments.find(d => d.id === p.deptId) || null : null;
 };
 
 /**
  * Тримминг и нормализация email
  */
-export const normalizeEmail = (email) => {
+export const normalizeEmail = (email: string | null | undefined): string => {
   if (!email) return '';
   return email.trim().toLowerCase();
 };
@@ -59,7 +55,11 @@ export const normalizeEmail = (email) => {
  * Проверка на race condition при регистрации
  * Возвращает true если email уже существует
  */
-export const isEmailExists = (email, employees, regRequests) => {
+export const isEmailExists = (
+  email: string,
+  employees: Employee[],
+  regRequests: Array<{ email: string }>
+): boolean => {
   const normalized = normalizeEmail(email);
   return employees.some((x) => normalizeEmail(x.email) === normalized) ||
          regRequests.some((x) => normalizeEmail(x.email) === normalized);
@@ -67,22 +67,16 @@ export const isEmailExists = (email, employees, regRequests) => {
 
 /**
  * Хелпер для безопасного получения имени сотрудника из data object
- * @param {Object} data - объект данных хранилища
- * @param {string} id - ID сотрудника
- * @returns {string} Форматированное имя или "—"
  */
-export const getEmpNameFromData = (data, id) => {
+export const getEmpNameFromData = (data: StoreData | null | undefined, id: string | null | undefined): string => {
   if (!data || !data.employees || !id) return '—';
   return empName(data.employees, id);
 };
 
 /**
  * Хелпер для безопасного получения основного отдела из data object
- * @param {Object} data - объект данных хранилища
- * @param {Object} emp - сотрудник
- * @returns {Object|null} Основной отдел или null
  */
-export const getPrimaryDeptFromData = (data, emp) => {
+export const getPrimaryDeptFromData = (data: StoreData | null | undefined, emp: Employee | null | undefined): Department | null => {
   if (!data || !data.departments || !emp) return null;
   return primaryDept(emp, data.departments);
 };
