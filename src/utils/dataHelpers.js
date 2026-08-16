@@ -1,3 +1,5 @@
+import { getEmpNameFromData, getPrimaryDeptFromData } from '../utils/string';
+
 /**
  * Утилиты для работы с данными сотрудников и задач
  * Заменяют удаленные хуки useDataHelpers и useEmployeeHelpers
@@ -5,7 +7,6 @@
  */
 
 import { COMMENT_EDIT_WINDOW_MS } from './config';
-import { getEmpNameFromData, getPrimaryDeptFromData } from './string';
 
 /**
  * Получить имя сотрудника по ID

@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Modal } from '../Modal';
-import { COMPANY_DOMAIN, ALLOWED_EMAIL_DOMAINS } from '../../utils/config';
-import { empName, primaryDept } from '../utils/dataHelpers';
+import { ALLOWED_EMAIL_DOMAINS } from '../../utils/config';
 import { ROLES } from '../../utils/constants';
 
 export const CreateEmployeeModal = ({ db, store, onClose, toast, audit }) => {
