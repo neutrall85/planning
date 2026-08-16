@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { TASK_STATUSES, PRIORITIES } from '../utils/constants';
 import { fmtD, initials, isTaskActive, daysDiff, TODAY } from '../utils/date';
 import { Ic, ICONS } from './Icons';
@@ -17,7 +17,7 @@ export default function TaskList({
   onAssigneeFilterChange,
   onAssigneeOptionsChange, // новый пропс
 }) {
-  const scope = useMemo(() => computeScope(ur, db), [ur, db]);
+  const scope = computeScope(ur, db);
   const canSeeAll = hasRole(ur, "admin", "director", "economist", "kb_chief", "head", "project_lead", "project_manager");
   const isOnlyExecutor = ur.roles.length === 1 && ur.roles[0] === 'executor';
 

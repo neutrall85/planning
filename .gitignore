@@ -1,108 +1,41 @@
 ```
 # Dependencies
 node_modules/
-.pnpm-store/
 
-# Build outputs
+# Build artifacts
 dist/
 build/
-coverage/
-htmlcov/
+*.js.map
 
-# TypeScript
-*.tsbuildinfo
-.next/
-.nuxt/
-
-# Environment variables
+# Environment
 .env
 .env.local
-.env.*
+*.env.*
 
-# IDE files
+# Editors
 .vscode/
 .idea/
-*.swp
-*.swo
 
 # Logs
 *.log
 
-# Temp files
-*.tmp
-
-# Package manager
-package-lock.json
-.yarn/
-.pnp.*
-.pnp.js
-
-# OS generated files
-.DS_Store
-Thumbs.db
-
-# Python (if co-existing)
+# Python cache
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-.Python
-.pytest_cache/
-.mypy_cache/
 
-# Java (if co-existing)
-*.class
-*.jar
-*.war
-*.ear
-target/
-.gradle/
-build/
+# Coverage
+coverage/
+htmlcov/
+.coverage
 
-# C/C++ (if co-existing)
-*.o
-*.a
-*.so
-*.dll
-*.exe
-*.out
+# Temporary files
+*.tmp
+*.swp
+*.swo
 
-# Go (if co-existing)
-*.exe
-*.test
-*.prof
-go.mod
-go.sum
-
-# Rust (if co-existing)
-Cargo.lock
-*.rlib
-*.so
-*.dylib
-*.dll
-target/
-
-# Compressed files
-*.zip
-*.gz
-*.tar
-*.tgz
-*.bz2
-*.xz
-*.7z
-*.rar
-*.zst
-*.lz4
-*.lzh
-*.cab
-*.arj
-*.rpm
-*.deb
-*.Z
-*.lz
-*.lzo
-*.tar.gz
-*.tar.bz2
-*.tar.xz
-*.tar.zst
+# OS generated files
+.DS_Store
+Thumbs.db
 ```

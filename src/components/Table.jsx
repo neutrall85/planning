@@ -1,4 +1,4 @@
-import React from 'react';
+import { } from 'react';
 
 export const Table = ({ columns, data, renderRow, emptyMessage = 'Нет данных' }) => (
   <table className="tbl">

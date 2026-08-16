@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { initials } from '../utils/date';
 
 export default function MentionPopup({ candidates, onSelect, searchQuery, anchorRef, renderItem }) {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Modal } from '../Modal';
 import { ROLES } from '../../utils/constants';
 import { TODAY, iso, addDays, uid } from '../../utils/date';

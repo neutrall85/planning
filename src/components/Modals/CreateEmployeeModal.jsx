@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Modal } from '../Modal';
 import { COMPANY_DOMAIN, ALLOWED_EMAIL_DOMAINS } from '../../utils/config';
 import { empName, primaryDept } from '../utils/dataHelpers';

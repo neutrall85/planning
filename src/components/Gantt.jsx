@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { TODAY, iso, addDays, parseISO, fmtD, fmtDMY, isTaskActive } from '../utils/date';
 import { TASK_STATUSES, DEPENDENCY_TYPES, PROJECT_CATEGORIES, PRIORITIES } from '../utils/constants';
 import { empName, getTaskSpent, vacOverlap } from '../utils/dataHelpers';
@@ -6,7 +6,7 @@ import { computeScope, taskVisible } from '../utils/permissions';
 import { Ic, ICONS } from './Icons';
 
 export default function Gantt({ db, ur, openTask, openProject }) {
-  const scope = useMemo(() => computeScope(ur, db), [ur, db]);
+  const scope = computeScope(ur, db);
   // Заменяем !t.archived на isTaskActive(t)
   const tasks = db.tasks.filter(t => isTaskActive(t) && taskVisible(ur, scope, t, db) && t.start && t.deadline);
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Modal } from '../Modal';
 import { empName, primaryDept } from '../utils/dataHelpers';
 import { VACATION_TYPES } from '../../utils/constants';

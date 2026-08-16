@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { PROJECT_STATUSES, PROJECT_TYPES, PROJECT_CATEGORIES } from '../utils/constants';
 import { fmtDMY, initials, isTaskActive } from '../utils/date';
 import { Ic, ICONS } from './Icons';
@@ -25,7 +25,7 @@ export default function ProjectsKanban({
   sortBy: parentSortBy,
   toast,
 }) {
-  const scope = useMemo(() => computeScope(ur, db), [ur, db]);
+  const scope = computeScope(ur, db);
   const showToast = useToast(toast);
   const [tooltip, setTooltip] = useState({ visible: false, employee: null, x: 0, y: 0 });
 

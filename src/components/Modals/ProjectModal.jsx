@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Modal } from '../Modal';
 import { empName, getTaskSpent } from '../utils/dataHelpers';
 import {
