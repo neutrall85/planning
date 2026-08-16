@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Modal } from '../Modal';
-import { empName, primaryDept } from '../utils/dataHelpers';
+import { empName, primaryDept } from '../../utils/dataHelpers';
 import { VACATION_TYPES } from '../../utils/constants';
 import { TODAY, fmtDMY } from '../../utils/date';
 
