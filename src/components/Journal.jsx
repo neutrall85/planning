@@ -52,6 +52,11 @@ export default function Journal({ db }) {
 
   const userOptions = useMemo(() => {
     const userIds = new Set(allEntries.map(e => e.userId).filter(id => id !== 'system'));
+    return Array.from(userIds).map(id => {
+      const emp = db.employees.find(e => e.id === id);
+      return { id, name: emp ? `${emp.first} ${emp.last}` : `ID:${id}` };
+    }).sort((a, b) => a.name.localeCompare(b.name));
+  }, [allEntries, db.employees]);
 
   const filteredEntries = useMemo(() => {
     return allEntries.filter(entry => {
@@ -141,7 +146,9 @@ export default function Journal({ db }) {
       const date = fmtDMY(e.ts);
       const time = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
       const details = typeof e.details === 'string' ? e.details.replace(/"/g, '""') : '';
-      return [date, time, user, e.action, `"${details}"`].join(';');
+      const emp = e.userId === 'system' ? { first: 'System', last: '' } : db.employees.find(emp => emp.id === e.userId);
+      const userName = emp ? `${emp.first} ${emp.last}`.trim() : `ID:${e.userId}`;
+      return [date, time, userName, e.action, `"${details}"`].join(';');
     });
     const csv = [headers.join(';'), ...rows].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -435,7 +442,7 @@ export default function Journal({ db }) {
                 justifyContent: 'center',
               }}
             >
-              ←
+              &larr;
             </button>
             <span style={{ 
               fontSize: '13px', 
@@ -457,7 +464,7 @@ export default function Journal({ db }) {
                 justifyContent: 'center',
               }}
             >
-              →
+              &rarr;
             </button>
           </div>
         )}

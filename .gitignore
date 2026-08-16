@@ -1,7 +1,18 @@
+```
 # Dependencies
 node_modules/
 
-# Editor/IDE files
+# Build artifacts
+dist/
+build/
+*.js.map
+
+# Environment
+.env
+.env.local
+*.env.*
+
+# Editors
 .vscode/
 .idea/
 *.swp
@@ -11,65 +22,24 @@ node_modules/
 # Logs
 *.log
 
-# Environment
-.env
-.env.local
-*.env.*
-
 # Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 .Python
-env/
 venv/
 .venv/
-pip-log.txt
-pip-delete-this-directory.txt
-.tox/
+.env
+
+# Coverage
+coverage/
+htmlcov/
 .coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.log
-.git/
-.mypy_cache/
-.pytest_cache/
-.hypothesis/
 
-# Build results
-dist/
-build/
-*.egg
-*.egg-info/
-.eggs/
-eggs/
-parts/
-var/
-sdist/
-develop-eggs/
-.installed.cfg
-lib/
-lib64/
-area/
-.git/
+# OS
 .DS_Store
 Thumbs.db
-
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-Thumbs.db:encryptable
-*:*
-*~
 
 # Compressed files
 *.zip
@@ -94,21 +64,4 @@ Thumbs.db:encryptable
 *.tar.bz2
 *.tar.xz
 *.tar.zst
-
-# Coverage
-coverage/
-htmlcov/
-.coverage
-
-# Gradle
-.gradle/
-build/
-
-# Target
-target/
-
-# Temporary files
-*.tmp
-*~
-.DS_Store
-Thumbs.db
+```
