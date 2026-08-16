@@ -4,7 +4,7 @@ import { TODAY, fmtDMY, fmtD, iso, addDays, isTaskActive } from '../utils/date';
 import { empName } from '../utils/dataHelpers';
 import { hasRole } from '../utils/permissions';
 import { Ic, ICONS } from './Icons';
-import { useToast } from './Toast';
+import { useToastLogic as useToast } from './ToastLogic';
 import EmployeeTooltip from './EmployeeTooltip';
 
 function getCategoryColor(project) {

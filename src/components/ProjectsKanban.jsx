@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Ic, ICONS } from './Icons';
-import { useToast } from './Toast';
+import { useToastLogic as useToast } from './ToastLogic';
 import EmployeeTooltip from './EmployeeTooltip';
 import { useDragAndDrop } from '../hooks';
 import { computeScope } from '../utils/permissions';

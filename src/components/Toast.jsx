@@ -1,6 +1,4 @@
-// Toast.jsx - точка входа для совместимости
-// useToast экспортируется из ToastLogic.jsx (только хук = Fast Refresh OK)
-// Компоненты экспортируются из ToastComponent.jsx
+// Toast.jsx - компонент для отображения уведомлений
+// Fast Refresh работает корректно, так как файл экспортирует только компонент
 
-export { useToastLogic as useToast } from './ToastLogic';
 export { ToastComponent as Toast, ToastComponent as default } from './ToastComponent';

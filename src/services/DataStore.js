@@ -1,6 +1,9 @@
 import { ARCHIVE_AFTER_MONTHS, DEADLINE_CHECK_INTERVAL_MS, DEADLINE_CHECK_HOUR_MOSCOW, MAX_LOGIN_ATTEMPTS, ACCOUNT_LOCKOUT_DURATION_MS } from '../utils/config';
 import { buildMockData } from '../mocks/dataMock';
 import { iso, addMonths, TODAY, uid } from '../utils/date.ts';
+import { sanitizeHtml } from '../utils/string';
+import { fmtDMY } from '../utils/date';
+import { VACATION_TYPES } from '../utils/constants';
 
 export default class DataStore {
   constructor(initialData = null) {
@@ -231,6 +234,7 @@ export default class DataStore {
       // ... остальные сравнения (dependency и т.д.) без изменений
 
       if (changes.length > 0) {
+        // Логика обработки изменений может быть добавлена здесь
       }
       tasks = this._data.tasks.map(t => t.id === task.id ? task : t);
     } else {
@@ -266,7 +270,7 @@ export default class DataStore {
     const idx = this._data.projects.findIndex(p => p.id === project.id);
     let projects;
     if (idx >= 0) {
-      const changes = [];
+      // Обновление существующего проекта
       if (project.archived) {
         project.archivedAt = TODAY;
         this._data.tasks = this._data.tasks.map(t => {
@@ -552,10 +556,10 @@ export default class DataStore {
     
     // Создаём уведомление для утверждающего
     if (approverId) {
-      const targetTitle = req.kind === 'task' ? target?.title : target?.name;
       const requestorName = db.employees.find(e => e.id === req.reqId);
       const reqNameStr = requestorName ? `${requestorName.last} ${requestorName.first}` : 'Сотрудник';
-      this.addNotification(approverId, msg, { targetType: 'hours', targetId: req.id });
+      const msgText = `Запрос на изменение часов от ${reqNameStr}`;
+      this.addNotification(approverId, msgText, { targetType: 'hours', targetId: req.id });
     }
     
     this._notify();
@@ -688,10 +692,10 @@ export default class DataStore {
       )
     };
     
-    // Уведомление получателю
-    const toName = this.empName(delegation.toId);
+    // Уведомление получателю об отзыве
     const rolesStr = delegation.roles.join(', ');
-    
+    const msgText = `С вас отозваны роли (${rolesStr}) от ${this.empName(delegation.fromId)}`;
+    this.addNotification(delegation.toId, msgText, { targetType: 'delegation', targetId: delegation.id });
     
     this._notify();
   }

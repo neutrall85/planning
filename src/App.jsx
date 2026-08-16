@@ -1,6 +1,6 @@
 import { StoreProvider } from './context/StoreContext';
 import { useStore, useAuth } from './hooks';
-import { useToast } from './components/Toast';
+import { useToastLogic as useToast } from './components/ToastLogic';
 import LoginScreen from './components/LoginScreen';
 import MainLayout from './components/MainLayout';
 import { logger, LOG_LEVELS } from './utils/logging/logger';

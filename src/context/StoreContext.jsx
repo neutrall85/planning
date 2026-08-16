@@ -8,9 +8,6 @@ export const useStore = () => {
   return ctx;
 };
 
-// Селектор для предотвращения избыточных ре-рендеров
-const selectData = (state) => state;
-
 export const StoreProvider = ({ children }) => {
   const [store] = useState(() => new DataStore());
   const [data, setData] = useState(store.data);

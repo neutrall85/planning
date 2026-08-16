@@ -54,17 +54,17 @@ export default function Reports({ db, ur }) {
   const [filterName, setFilterName] = useState('');
   const [results, setResults] = useState([]);
 
-  const allProjects = (safeDb.projects || []);
   const visibleProjects = useMemo(() => {
-    if (scope.all) return allProjects;
-    return allProjects.filter(p => scope.projIds.has(p.id));
-  }, [allProjects, scope]);
+    const projects = safeDb.projects || [];
+    if (scope.all) return projects;
+    return projects.filter(p => scope.projIds.has(p.id));
+  }, [safeDb.projects, scope]);
 
-  const allEmployees = (safeDb.employees || []);
   const visibleEmployees = useMemo(() => {
-    if (scope.all) return allEmployees;
-    return allEmployees.filter(e => scope.empIds.has(e.id));
-  }, [allEmployees, scope]);
+    const employees = safeDb.employees || [];
+    if (scope.all) return employees;
+    return employees.filter(e => scope.empIds.has(e.id));
+  }, [safeDb.employees, scope]);
 
   const applyFilters = () => {
     const type = filters.type;
