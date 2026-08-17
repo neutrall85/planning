@@ -17,6 +17,10 @@ export { useToast } from './useToast';
 
 // Бизнес-хуки
 export { useTaskOperations } from './business/useTaskOperations';
+export { useProjectOperations } from './business/useProjectOperations';
+
+// Accessibility хуки
+export { useModalAccessibility } from './useModalAccessibility';
 
 // Остальные хуки удалены как избыточные обертки
 // Используйте напрямую функции из utils/string.ts и utils/permissions.js

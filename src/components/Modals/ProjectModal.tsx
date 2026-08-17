@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { Modal } from '../Modal';
 import { getTaskSpent } from '../../utils/dataHelpers';
 import {
@@ -12,6 +12,7 @@ import {
 } from '../../utils/permissions';
 import { Ic, ICONS } from '../Icons';
 import Discussion from './Discussion';
+import { useModalAccessibility } from '../../hooks/useModalAccessibility';
 
 const AIRCRAFT_TYPES = [
   'Су-57', 'МиГ-35', 'Ту-160', 'Ил-76', 'Ка-52', 'Другой'
@@ -22,6 +23,14 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
   const existing = projectId ? db.projects.find((p) => p.id === projectId) : null;
   const scope = computeScope(ur, db);
   const isExec = !scope.all && !hasRole(ur, 'director', 'economist', 'kb_chief', 'head', 'project_lead');
+  
+  // Хук доступности модального окна
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const { modalRef, handleKeyDown, getDialogProps } = useModalAccessibility({
+    isOpen: true,
+    onClose,
+    initialFocusRef: titleRef,
+  });
   
   const [f, setF] = useState(() => {
     const randomColor = ["#0ea5e9", "#8b5cf6", "#f43f5e", "#f59e0b", "#10b981", "#ec4899"][Math.floor(Math.random() * 6)];
@@ -160,7 +169,14 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
   };
 
   return (
-    <Modal title={existing ? (canEditFields ? "Проект (Редактирование)" : "Проект (Просмотр)") : "Новый проект"} onClose={onClose} width={900}>
+    <Modal 
+      title={existing ? (canEditFields ? "Проект (Редактирование)" : "Проект (Просмотр)") : "Новый проект"} 
+      onClose={onClose} 
+      width={900}
+      modalRef={modalRef}
+      onKeyDown={handleKeyDown}
+      {...getDialogProps()}
+    >
       {existing && existing.archived && <div className="info-box">Этот проект находится в архиве. Редактирование недоступно.</div>}
 
       <div className="tabs sm">
