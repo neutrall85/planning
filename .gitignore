@@ -1,41 +1,51 @@
-```
+```gitignore
 # Compiled and build artifacts
 *.pyc
 __pycache__/
 *.o
 *.obj
+dist/
+build/
+target/
 
 # Dependencies
-node_modules/
-venv/
 .venv/
+venv/
+node_modules/
+.julia/
+.zig-cache/
+deps/
 
 # Logs and temp files
 *.log
 *.tmp
 *.swp
+*.swo
 
 # Environment
 .env
 .env.local
-*.env.*
+.env.*
 
 # Editors
 .vscode/
 .idea/
+*.swp
+*.swo
 
-# Coverage reports
+# Coverage
 coverage/
 htmlcov/
-*.coverage
+.coverage
 
-# Distribution / build artifacts
-dist/
-build/
-target/
-*.tar
+# OS
+.DS_Store
+Thumbs.db
+
+# Compressed files
 *.zip
 *.gz
+*.tar
 *.tgz
 *.bz2
 *.xz

@@ -1,12 +1,7 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useState, useEffect, useCallback } from 'react';
 import DataStore from '../services/DataStore';
 
 const StoreContext = createContext(null);
-export const useStore = () => {
-  const ctx = useContext(StoreContext);
-  if (!ctx) throw new Error('useStore must be used within StoreProvider');
-  return ctx;
-};
 
 export const StoreProvider = ({ children }) => {
   const [store] = useState(() => new DataStore());
@@ -30,3 +25,5 @@ export const StoreProvider = ({ children }) => {
     </StoreContext.Provider>
   );
 };
+
+export default StoreContext;
