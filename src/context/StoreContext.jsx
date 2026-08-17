@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import DataStore from '../services/DataStore';
 
 const StoreContext = createContext(null);
@@ -8,15 +8,9 @@ export const useStore = () => {
   return ctx;
 };
 
-// Селектор для предотвращения избыточных ре-рендеров
-const selectData = (state) => state;
-
 export const StoreProvider = ({ children }) => {
   const [store] = useState(() => new DataStore());
   const [data, setData] = useState(store.data);
-
-  // Мемоизируем данные для предотвращения лишних ре-рендеров
-  const memoizedData = useMemo(() => data, [data]);
 
   useEffect(() => {
     const unsub = store.subscribe((newData) => {
@@ -31,7 +25,7 @@ export const StoreProvider = ({ children }) => {
   const logout = useCallback(() => store.logout(), [store]);
 
   return (
-    <StoreContext.Provider value={{ store, data: memoizedData, login, logout }}>
+    <StoreContext.Provider value={{ store, data, login, logout }}>
       {children}
     </StoreContext.Provider>
   );

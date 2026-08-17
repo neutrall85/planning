@@ -1,6 +1,8 @@
 import { ARCHIVE_AFTER_MONTHS, DEADLINE_CHECK_INTERVAL_MS, DEADLINE_CHECK_HOUR_MOSCOW, MAX_LOGIN_ATTEMPTS, ACCOUNT_LOCKOUT_DURATION_MS } from '../utils/config';
 import { buildMockData } from '../mocks/dataMock';
-import { iso, addMonths, TODAY, uid } from '../utils/date.ts';
+import { iso, addMonths, TODAY, uid, fmtDMY } from '../utils/date';
+import { sanitizeHtml } from '../utils/sanitization';
+import { VACATION_TYPES } from '../utils/constants';
 
 export default class DataStore {
   constructor(initialData = null) {
@@ -228,9 +230,10 @@ export default class DataStore {
         }
       }
 
-      // ... остальные сравнения (dependency и т.д.) без изменений
+      // ... остальные сравнения (dependency и т.д.) без изменения
 
       if (changes.length > 0) {
+        // Логирование изменений может быть добавлено здесь при необходимости
       }
       tasks = this._data.tasks.map(t => t.id === task.id ? task : t);
     } else {
@@ -266,7 +269,6 @@ export default class DataStore {
     const idx = this._data.projects.findIndex(p => p.id === project.id);
     let projects;
     if (idx >= 0) {
-      const changes = [];
       if (project.archived) {
         project.archivedAt = TODAY;
         this._data.tasks = this._data.tasks.map(t => {
@@ -555,6 +557,7 @@ export default class DataStore {
       const targetTitle = req.kind === 'task' ? target?.title : target?.name;
       const requestorName = db.employees.find(e => e.id === req.reqId);
       const reqNameStr = requestorName ? `${requestorName.last} ${requestorName.first}` : 'Сотрудник';
+      const msg = `Запрос на изменение часов от ${reqNameStr}: ${targetTitle}`;
       this.addNotification(approverId, msg, { targetType: 'hours', targetId: req.id });
     }
     
@@ -689,9 +692,7 @@ export default class DataStore {
     };
     
     // Уведомление получателю
-    const toName = this.empName(delegation.toId);
-    const rolesStr = delegation.roles.join(', ');
-    
+    this.addNotification(delegation.toId, `Делегирование ролей "${delegation.roles.join(', ')}" отозвано`, { targetType: 'roleDelegation', targetId: delegationId });
     
     this._notify();
   }
