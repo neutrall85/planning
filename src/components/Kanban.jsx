@@ -97,7 +97,7 @@ export default function Kanban({
       onAssigneeOptionsChange(options);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, db.employees, onAssigneeOptionsChange]);
+  }, [visible, onAssigneeOptionsChange]);
 
   // Drag‑and‑drop с проверкой прав при drop
   const { dragState, handlers } = useDragAndDrop((taskId, newStatus) => {
