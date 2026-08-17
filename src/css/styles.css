@@ -117,8 +117,8 @@ input[type="number"] {
   grid-template-columns: 1.1fr 1fr;
 }
 .login-hero {
-  background: radial-gradient(1200px 600px at 10% -10%, #1e3a8a 0%, transparent 55%),
-              radial-gradient(900px 500px at 90% 110%, #0e7490 0%, transparent 55%),
+  background: radial-gradient(800px 400px at 10% -10%, #1e3a8a 0%, transparent 50%),
+              radial-gradient(600px 350px at 90% 110%, #0e7490 0%, transparent 50%),
               #0c1526;
   color: #e2e8f0;
   padding: 48px;
@@ -481,7 +481,7 @@ input[type="number"] {
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 14px;
-  box-shadow: 0 20px 50px rgba(2,8,23,.25);
+  box-shadow: 0 12px 28px rgba(2,8,23,.18);
   z-index: 60;
   animation: popIn .2s cubic-bezier(0.16, 1, 0.3, 1);
   overflow: hidden;
@@ -2128,8 +2128,8 @@ input[type="number"] {
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(12,21,38,.55);
-  backdrop-filter: blur(4px);
+  background: rgba(12,21,38,.5);
+  backdrop-filter: blur(2px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2145,7 +2145,7 @@ input[type="number"] {
   width: 100%;
   background: #fff;
   border-radius: 16px;
-  box-shadow: 0 24px 60px rgba(2,8,23,.35);
+  box-shadow: 0 16px 40px rgba(2,8,23,.25);
   animation: popIn .35s cubic-bezier(0.16, 1, 0.3, 1);
   max-height: 92vh;
   display: flex;
@@ -2378,7 +2378,7 @@ input[type="number"] {
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.15);
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.12);
   min-width: 280px;
   max-width: 360px;
   z-index: 1001;
@@ -2462,7 +2462,7 @@ input[type="number"] {
   padding: 6px 14px;
   border-radius: 6px;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background 0.2s cubic-bezier(0.4, 0, 0.2, 1), color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .view-btn:hover {
   background: rgba(255, 255, 255, 0.5);
