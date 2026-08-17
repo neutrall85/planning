@@ -1,7 +1,43 @@
 ```
+# Build artifacts
+dist/
+build/
+*.css
+*.js
+*.html
+*.svg
+
 # Dependencies
 node_modules/
 
-# Package lock files
-.package-lock.json
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+*.pot
+*.pyc
+*.pyo
+*.pyd
+.MF
+tags
+TAGS
+*.tmproj
+*.sw*
+.DS_Store
+Thumbs.db
 ```
