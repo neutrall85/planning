@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useStore } from '../hooks';
+import { useTaskOperations } from '../hooks/business/useTaskOperations';
 import { hasRole, canCreateTask, canExport, canChangeTaskStatus } from '../utils/permissions';
 import { empName } from '../utils/dataHelpers';
 import { ICONS, Ic } from './Icons';
@@ -25,6 +26,20 @@ import {
 
 export default function MainLayout({ store, data, user, toast }) {
   const { logout } = useStore();
+  
+  // Интеграция useTaskOperations для инкапсуляции бизнес-логики задач
+  const taskOps = useTaskOperations({
+    tasks: data.tasks,
+    employees: data.employees,
+    projects: data.projects,
+    vacations: data.vacations,
+    currentUser: user,
+    onUpsertTask: (task) => store.upsertTask(task),
+    onDeleteTask: (id) => store.deleteTask(id),
+    onAddNotification: (userId, text, target, targetId) => store.addNotification(userId, text, target, targetId),
+    onAddAudit: (action, details, targetType, targetId) => store.addAudit(action, details, targetType, targetId),
+  });
+  
   const [view, setView] = useState('tasks');
   const [modal, setModal] = useState(null);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -108,11 +123,16 @@ export default function MainLayout({ store, data, user, toast }) {
       archivedAt: isClosing ? TODAY : task.archivedAt,
       history: [...task.history, { ts: Date.now(), who: user.id, text: `Статус → ${TASK_STATUSES[newStatus].label}` }]
     };
-    store.upsertTask(updatedTask);
-    store.addAudit('Изменение статуса задачи', {
-      task: task.title,
-      status: `${TASK_STATUSES[task.status].label} → ${TASK_STATUSES[newStatus].label}`
-    }, 'task', task.id);
+    // Используем taskOps.upsertTask вместо store.upsertTask для валидации и уведомлений
+    try {
+      taskOps.upsertTask(updatedTask);
+      store.addAudit('Изменение статуса задачи', {
+        task: task.title,
+        status: `${TASK_STATUSES[task.status].label} → ${TASK_STATUSES[newStatus].label}`
+      }, 'task', task.id);
+    } catch (error) {
+      showToast(error.message);
+    }
   };
 
   const handleNotificationNavigate = (notification) => {
@@ -277,7 +297,13 @@ export default function MainLayout({ store, data, user, toast }) {
               )}
             </>
           )}
-          {view === 'gantt' && <Gantt db={data} ur={user} openTask={openTask} openProject={openProject} patchTask={store.upsertTask} />}
+          {view === 'gantt' && <Gantt db={data} ur={user} openTask={openTask} openProject={openProject} patchTask={(task) => {
+            try {
+              taskOps.upsertTask(task);
+            } catch (error) {
+              showToast(error.message);
+            }
+          }} />}
           {view === 'calendar' && <Calendar db={data} ur={user} openTask={openTask} />}
           {view === 'projects' && (
             <>
@@ -362,13 +388,17 @@ export default function MainLayout({ store, data, user, toast }) {
           {view === 'archive' && <Archive db={data} ur={user} openTask={openTask} openProject={openProject} setArchiveMonths={(m) => { store.setData({ ...store.data, settings: { ...store.data.settings, archiveMonths: m } }); }} 
             restoreTask={(id) => { 
               const t = data.tasks.find(x => x.id === id); 
-              store.upsertTask({
-                ...t, 
-                archived: false, 
-                archivedAt: null,
-                closedAt: null,
-                status: 'new'
-              }); 
+              try {
+                taskOps.upsertTask({
+                  ...t, 
+                  archived: false, 
+                  archivedAt: null,
+                  closedAt: null,
+                  status: 'new'
+                });
+              } catch (error) {
+                showToast(error.message);
+              }
             }} 
             restoreProject={(id) => { 
               const p = data.projects.find(x => x.id === id); 
@@ -380,13 +410,17 @@ export default function MainLayout({ store, data, user, toast }) {
                 status: 'active'
               }); 
               data.tasks.filter(t => t.projectId === id).forEach(t => {
-                store.upsertTask({
-                  ...t, 
-                  archived: false, 
-                  archivedAt: null,
-                  closedAt: null,
-                  status: 'new'
-                });
+                try {
+                  taskOps.upsertTask({
+                    ...t, 
+                    archived: false, 
+                    archivedAt: null,
+                    closedAt: null,
+                    status: 'new'
+                  });
+                } catch (error) {
+                  showToast(error.message);
+                }
               });
             }} 
           />}
@@ -433,7 +467,13 @@ export default function MainLayout({ store, data, user, toast }) {
             store.addAudit('Административное изменение задачи (прямое)', `Задача "${t.title}": ${details}`, 'task', t.id);
           }
           
-          store.upsertTask(t);
+          // Используем taskOps.upsertTask для валидации и уведомлений
+          try {
+            taskOps.upsertTask(t);
+          } catch (error) {
+            showToast(error.message);
+            return;
+          }
           
           const actual = t.logs ? t.logs.reduce((s, l) => s + l.hours, 0) : 0;
           const projectCode = data.projects.find(p => p.id === t.projectId)?.code || '—';
@@ -450,13 +490,19 @@ export default function MainLayout({ store, data, user, toast }) {
         }} 
         onDelete={(id) => { 
           const task = data.tasks.find(t => t.id === id);
-          store.deleteTask(id); 
+          taskOps.deleteTask(id);
           store.addAudit('Удаление задачи', `Задача "${task?.title}"`, 'task', id);
           setModal(null); 
         }} 
         onHoursReq={openHoursReq} 
         toast={toast} 
-        patchTask={store.upsertTask} 
+        patchTask={(task) => {
+          try {
+            taskOps.upsertTask(task);
+          } catch (error) {
+            showToast(error.message);
+          }
+        }} 
         notify={(userId, text, target) => store.addNotification(userId, text, target)} 
         store={store} 
       />}
