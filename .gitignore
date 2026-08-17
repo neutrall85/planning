@@ -1,22 +1,25 @@
-# Examples
-
-## Project with artifacts:
-```
 # Compiled and build artifacts
 *.pyc
 __pycache__/
 *.o
 *.obj
+*.class
+*.exe
+*.dll
+*.so
+*.a
+*.out
 dist/
 build/
 target/
 
 # Dependencies
-.venv/
-venv/
 node_modules/
-.julia/
-.zig-cache/
+venv/
+.venv/
+.env
+.env.local
+.env.*
 
 # Logs and temp files
 *.log
@@ -24,18 +27,13 @@ node_modules/
 *.swp
 *.swo
 
-# Environment
-.env
-.env.local
-.env.*
-
 # Editors
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# OS
+# System files
 .DS_Store
 Thumbs.db
 
@@ -44,30 +42,33 @@ coverage/
 htmlcov/
 .coverage
 
-# Package manager caches
-.gradle/
+# Python specific
 .mypy_cache/
 .pytest_cache/
-```
 
-## Minimal changes:
-```
-src/main.py
-README.md
-config.json
-```
+# Java/Gradle
+.gradle/
 
-## With build artifacts:
-```
-app.py
-dist/bundle.js
-node_modules/lodash/index.js
-.pytest_cache/v/cache.db
-```
-
-## Image files (do not ignore):
-```
-logo.png
-screenshot.jpg
-icon.gif
-```
+# Compressed files
+*.zip
+*.gz
+*.tar
+*.tgz
+*.bz2
+*.xz
+*.7z
+*.rar
+*.zst
+*.lz4
+*.lzh
+*.cab
+*.arj
+*.rpm
+*.deb
+*.Z
+*.lz
+*.lzo
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.tar.zst
