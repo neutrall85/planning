@@ -86,7 +86,7 @@ export default function Kanban({
       }
     });
     return list;
-  }, [db.tasks, db.projects, db.employees, ur, scope, hideFilters, fProj, assigneeFilter, fPrio, fDept, q, showOnlyMy, sortBy]);
+  }, [db.tasks, db.projects, ur, scope, hideFilters, fProj, assigneeFilter, fPrio, fDept, q, showOnlyMy, sortBy]);
 
   useEffect(() => {
     if (onAssigneeOptionsChange) {
