@@ -711,12 +711,19 @@ input[type="number"] {
   font-size: 13px;
   font-weight: 700;
   color: var(--mut);
-  transition: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background 0.15s cubic-bezier(0.4, 0, 0.2, 1), color 0.15s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.15s cubic-bezier(0.4, 0, 0.2, 1), transform 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.tab:hover {
+  background: #f8fafc;
 }
 .tab.on {
   background: #0f172a;
   color: #fff;
   border-color: #0f172a;
+  transition: none;
+}
+.tab.on:hover {
+  background: #0f172a;
 }
 .tabs.sm .tab {
   padding: 5px 10px;
