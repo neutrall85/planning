@@ -1,5 +1,6 @@
 import { StoreProvider } from './context/StoreContext';
 import { useStore, useAuth, useToast } from './hooks';
+import { ToastContainer } from './hooks/useToast';
 import LoginScreen from './components/LoginScreen';
 import MainLayout from './components/MainLayout';
 import { logger, LOG_LEVELS } from './utils/logging/logger';
@@ -15,7 +16,7 @@ if (typeof window !== 'undefined') {
 function AppContent() {
   const { store, data, login } = useStore();
   const { user } = useAuth();
-  const { toast, ToastContainer } = useToast();
+  const { toast } = useToast();
 
   if (!user) {
     return (
