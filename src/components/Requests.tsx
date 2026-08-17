@@ -24,11 +24,18 @@ export default function Requests({ db, store, ur, initialTab = 'hours', addAudit
           ? db.tasks.find(t => t.id === r.targetId)?.title 
           : db.projects.find(p => p.id === r.targetId)?.name);
     
-    // Используем публичный API store вместо прямой мутации setDb
+    // Используем useTaskOperations для валидации и уведомлений
     if (ok) {
       if (r.kind === "task") {
         const task = db.tasks.find(t => t.id === r.targetId);
-        if (task) store.upsertTask({ ...task, plannedHours: r.newH });
+        if (task) {
+          try {
+            taskOps.upsertTask({ ...task, plannedHours: r.newH });
+          } catch (error) {
+            alert(`Ошибка при изменении часов: ${error.message}`);
+            return;
+          }
+        }
       } else {
         const project = db.projects.find(p => p.id === r.targetId);
         if (project) store.upsertProject({ ...project, budget: r.newH });
