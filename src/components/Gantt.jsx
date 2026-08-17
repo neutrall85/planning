@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { TODAY, iso, addDays, parseISO, fmtD, fmtDMY, isTaskActive } from '../utils/date';
 import { TASK_STATUSES, PROJECT_CATEGORIES, PRIORITIES } from '../utils/constants';
 import { getTaskSpent, vacOverlap } from '../utils/dataHelpers';
@@ -38,7 +38,7 @@ export default function Gantt({ db, ur, openTask, openProject }) {
     setAnchor(iso(newDate));
   };
 
-  const ganttData = useMemo(() => {
+  const ganttData = (() => {
     if (!tasks.length) return null;
     const days = [];
     const startDate = parseISO(anchor);
@@ -93,7 +93,7 @@ export default function Gantt({ db, ur, openTask, openProject }) {
       g.items = items;
     });
     return { days, months, groups: groups.filter(g => g.items.length > 0) };
-  }, [tasks, db.projects, anchor, range, scope]);
+  })();
 
   if (!ganttData || ganttData.groups.length === 0) {
     return (

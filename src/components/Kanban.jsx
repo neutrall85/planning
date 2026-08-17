@@ -94,7 +94,16 @@ export default function Kanban({
       const ids = new Set();
       visible.forEach(t => (t.assigneeIds || []).forEach(id => ids.add(id)));
       const options = [...ids].map(id => db.employees.find(e => e.id === id)).filter(Boolean);
-      onAssigneeOptionsChange(options);
+      
+      // Проверяем, изменились ли данные реально, чтобы избежать цикла
+      const prevOptions = window.__kanbanAssigneeOptions || [];
+      const hasChanged = prevOptions.length !== options.length || 
+        prevOptions.some((opt, i) => opt.id !== options[i]?.id);
+      
+      if (hasChanged) {
+        window.__kanbanAssigneeOptions = options;
+        onAssigneeOptionsChange(options);
+      }
     }
   }, [visible, db, onAssigneeOptionsChange]);
 

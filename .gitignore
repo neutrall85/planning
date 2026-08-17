@@ -1,13 +1,15 @@
 ```
+# Dependencies
+node_modules/
+
 # Build artifacts
 dist/
 build/
-*.css
-*.js
-*.html
+target/
 
-# Dependencies
-node_modules/
+# Logs and temp files
+*.log
+*.tmp
 
 # Environment
 .env
@@ -23,37 +25,38 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
-
-# Logs
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
 *.log
+.git/
+.mypy_cache/
+.pytest_cache/
+.hypothesis/
 
-# OS generated files
+# Compiled and binary files
+*.class
+*.o
+*.so
+*.dll
+*.exe
+*.out
+*.a
+*.obj
+
+# System files
 .DS_Store
 Thumbs.db
-
-# Coverage reports
-coverage/
-htmlcov/
-.coverage
-
-# IDE specific
-*.swp
-*.swo
-*.tmp
-
-# Package managers
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Distribution / packaging
-.Python
-*.egg-info/
-.eggs/
-
-# Testing
-.pytest_cache/
-.mypy_cache/
 
 # Compressed files
 *.zip

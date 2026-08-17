@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Modal } from '../Modal';
 import Discussion from './Discussion';
 import { empName, primaryDept, vacOverlap } from '../../utils/dataHelpers';
@@ -222,7 +222,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', planSum, onClos
   const sp = f.logs.reduce((s, l) => s + l.hours, 0);
   const remainProj = proj && proj.budget != null && !proj.archived ? proj.budget - (planSum(proj.id) - (existing ? (existing.plannedHours || 0) : 0)) : null;
 
-  const vacWarn = useMemo(() => {
+  const vacWarn = (() => {
     if (readOnly || !f.assigneeIds || f.assigneeIds.length === 0 || !f.deadline) return null;
 
     if (hasDelegate && originalAssignee) {
@@ -243,16 +243,16 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', planSum, onClos
       }
     }
     return null;
-  }, [readOnly, f.assigneeIds, f.start, f.deadline, hasDelegate, originalAssignee, db]);
+  })();
 
   const canLog = !readOnly && ((existing ? isExec : f.assigneeIds?.includes(ur.id)) || has(ur, "admin"));
 
-  const statusOptions = useMemo(() => {
+  const statusOptions = (() => {
     if (isExec && !canChangeTaskStatus(ur, f, 'closed', db) && !canChangeTaskStatus(ur, f, 'cancelled', db)) {
       return TASK_STATUS_ORDER.filter(s => ['new', 'inwork', 'review'].includes(s));
     }
     return TASK_STATUS_ORDER;
-  }, [isExec, ur, f, db]);
+  })();
 
   const localPatchTask = (updatedTask) => {
     setF(prev => ({ ...prev, ...updatedTask }));
@@ -270,7 +270,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', planSum, onClos
     const history = [...(f.history || [])];
     const statusToSave = newStatus || f.status;
     if (existing && existing.status !== statusToSave) {
-      history.push({ ts: Date.now(), who: ur.id, text: `Статус: ${TASK_STATUSES[existing.status].label} → ${TASK_STATUSES[statusToSave].label}` });
+      history.push({ ts: new Date().getTime(), who: ur.id, text: `Статус: ${TASK_STATUSES[existing.status].label} → ${TASK_STATUSES[statusToSave].label}` });
     }
 
     let finalStart = f.start;
@@ -478,9 +478,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', planSum, onClos
     setF(prev => ({ ...prev, assigneeIds: prev.assigneeIds.filter(x => x !== id) }));
   };
 
-  const availableCandidates = useMemo(() => {
-    return asOpts.filter(e => !f.assigneeIds.includes(e.id));
-  }, [asOpts, f.assigneeIds]);
+  const availableCandidates = asOpts.filter(e => !f.assigneeIds.includes(e.id));
 
   const handleAccept = () => {
     if (!isAuthor || !isReview) return;
