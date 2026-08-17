@@ -1,10 +1,10 @@
 ```
 # Dependencies
 node_modules/
-
 # Build artifacts
 dist/
-
-# TypeScript
-*.tsbuildinfo
+# Environment
+.env
+.env.local
+*.env.*
 ```
