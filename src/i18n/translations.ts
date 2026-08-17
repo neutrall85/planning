@@ -64,6 +64,9 @@ export interface Translation {
     showLess: string;
     expand: string;
     collapse: string;
+    and: string;
+    without: string;
+    session: string;
   };
   
   auth: {
@@ -310,6 +313,9 @@ export const translations: Record<Language, Translation> = {
       showLess: 'Показать меньше',
       expand: 'Развернуть',
       collapse: 'Свернуть',
+      and: 'и',
+      without: 'без',
+      session: 'Сессия хранится в cookie 30 дней (HttpOnly, Secure, SameSite=Lax — на стороне сервера).',
     },
     
     auth: {
@@ -555,6 +561,9 @@ export const translations: Record<Language, Translation> = {
       showLess: 'Show less',
       expand: 'Expand',
       collapse: 'Collapse',
+      and: 'and',
+      without: 'without',
+      session: 'Session is stored in cookie for 30 days (HttpOnly, Secure, SameSite=Lax — server-side).',
     },
     
     auth: {
