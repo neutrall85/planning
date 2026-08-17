@@ -227,16 +227,16 @@ export default function LoginScreen({ db, onLogin, toast, store }) {
   const issues = passIssues(reg.pass);
 
   const demos = [
-    { l: "sergey.adminov", p: "Admin2026!", t: "Суперадминистратор" },
-    { l: "aleksey.gendirov", p: "Director2026!", t: "Генеральный директор" },
-    { l: "erik.ekonomistov", p: "Econ2026!", t: "Главный экономист" },
-    { l: "ivan.konstruktorov", p: "KbLa2026!", t: "Гл. конструктор КБ «ЛА»" },
-    { l: "petr.konstruktorov", p: "KbAd2026!", t: "Гл. конструктор КБ АД" },
-    { l: "olga.personalova", p: "Hr2026!", t: "HR-менеджер" },
-    { l: "mikhail.otdelov", p: "Head2026!", t: "Руководитель отделов" },
-    { l: "nikolay.managerov", p: "Pm2026!", t: "Менеджер проектов" },
-    { l: "kirill.proektov", p: "Pm2026!", t: "Ответственный по проекту" },
-    { l: "isaev", p: "Exec2026!", t: "Исполнитель" }
+    { l: "sergey.adminov", p: "admin123", t: "Суперадминистратор" },
+    { l: "aleksey.gendirov", p: "director123", t: "Генеральный директор" },
+    { l: "erik.ekonomistov", p: "econ123", t: "Главный экономист" },
+    { l: "ivan.konstruktorov", p: "chief123", t: "Гл. конструктор КБ «ЛА»" },
+    { l: "petr.konstruktorov", p: "chief123", t: "Гл. конструктор КБ АД" },
+    { l: "olga.personalova", p: "hr123", t: "HR-менеджер" },
+    { l: "mikhail.otdelov", p: "head123", t: "Руководитель отделов" },
+    { l: "nikolay.managerov", p: "manager123", t: "Менеджер проектов" },
+    { l: "kirill.proektov", p: "project123", t: "Ответственный по проекту" },
+    { l: "isaev", p: "eng123", t: "Исполнитель" }
   ];
 
   return (
