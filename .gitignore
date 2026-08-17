@@ -1,46 +1,52 @@
-```gitignore
-# Compiled and build artifacts
-*.pyc
-__pycache__/
-*.o
-*.obj
-dist/
-build/
-target/
-
+```
 # Dependencies
-.venv/
-venv/
 node_modules/
-.julia/
-.zig-cache/
-deps/
 
-# Logs and temp files
-*.log
-*.tmp
-*.swp
-*.swo
+# Build outputs
+dist/
 
-# Environment
+# Development tools
+.vite/
+
+# Environment variables
 .env
 .env.local
-.env.*
+*.env.*
 
-# Editors
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.swp
+
+# IDE files
 .vscode/
 .idea/
-*.swp
-*.swo
 
-# Coverage
-coverage/
-htmlcov/
-.coverage
-
-# OS
+# OS generated files
 .DS_Store
 Thumbs.db
+
+# Coverage reports
+coverage/
+htmlcov/
+*.coverage
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Compiled binary files
+*.exe
+*.dll
+*.so
+*.a
+*.o
+*.obj
+*.out
 
 # Compressed files
 *.zip
@@ -61,8 +67,4 @@ Thumbs.db
 *.Z
 *.lz
 *.lzo
-*.tar.gz
-*.tar.bz2
-*.tar.xz
-*.tar.zst
 ```
