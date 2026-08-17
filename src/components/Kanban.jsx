@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Ic, ICONS } from './Icons';
 import { TASK_STATUSES, TASK_STATUS_ORDER, PRIORITIES } from '../utils/constants';
 import { TODAY, fmtD, daysDiff, initials, isTaskActive } from '../utils/date';
@@ -33,8 +33,7 @@ export default function Kanban({
   const canSeeAll = hasRole(ur, "admin", "director", "economist", "kb_chief", "head", "project_lead", "project_manager");
   const isOnlyExecutor = ur.roles.length === 1 && ur.roles[0] === 'executor';
 
-  // Фильтрация и сортировка
-  const visible = (() => {
+  const visible = useMemo(() => {
     let list = db.tasks.filter((t) => isTaskActive(t) && taskVisible(ur, scope, t, db));
     if (!hideFilters) {
       if (fProj !== "all") list = list.filter(t => t.projectId === fProj);
@@ -87,7 +86,7 @@ export default function Kanban({
       }
     });
     return list;
-  })();
+  }, [db.tasks, db.projects, db.employees, ur, scope, hideFilters, fProj, assigneeFilter, fPrio, fDept, q, showOnlyMy, sortBy]);
 
   useEffect(() => {
     if (onAssigneeOptionsChange) {
@@ -97,7 +96,7 @@ export default function Kanban({
       onAssigneeOptionsChange(options);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, onAssigneeOptionsChange]);
+  }, [visible.length, onAssigneeOptionsChange]);
 
   // Drag‑and‑drop с проверкой прав при drop
   const { dragState, handlers } = useDragAndDrop((taskId, newStatus) => {
