@@ -27,7 +27,7 @@ export default function ProjectsKanban({
   toast,
 }) {
   const scope = computeScope(ur, db);
-  const showToast = useToast(toast);
+  const { toast: showToast } = useToast();
   const [tooltip, setTooltip] = useState({ visible: false, employee: null, x: 0, y: 0 });
 
   const showOnlyMyProjects = parentShowOnlyMyProjects !== undefined ? parentShowOnlyMyProjects : false;

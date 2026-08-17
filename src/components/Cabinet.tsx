@@ -28,7 +28,7 @@ function downloadCSV(name, rows) {
 export default function Cabinet({ store, data, user, openTask, openVacation, openDelegation, openEmployeeEdit, openChangePassword, toast }) {
   const [tab, setTab] = useState('overview');
 
-  const showToast = useToast(toast);
+  const { toast: showToast } = useToast();
 
   const [expFrom, setExpFrom] = useState('');
   const [expTo, setExpTo] = useState('');
