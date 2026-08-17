@@ -5,7 +5,7 @@
  * @returns {Object} Функции и состояния для валидации формы
  */
 import { useState, useCallback } from 'react';
-import { validateData, sanitizeObject } from './validation';
+import { validateData, sanitizeObject } from '../utils/validation';
 
 export const useFormValidation = (schema) => {
   const [errors, setErrors] = useState([]);

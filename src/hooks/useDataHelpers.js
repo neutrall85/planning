@@ -1,4 +1,4 @@
-import { COMMENT_EDIT_WINDOW_MS, COMPANY_DOMAIN } from '../config';
+import { COMMENT_EDIT_WINDOW_MS, COMPANY_DOMAIN } from '../utils/config';
 
 export const useDataHelpers = (data) => {
   const empName = (id) => {
