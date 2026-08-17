@@ -319,14 +319,14 @@ export const notificationSchema = z.object({
  * @param {z.ZodSchema} schema - схема Zod
  * @returns {{ success: boolean, data?: any, errors?: Array }} результат валидации
  */
-export const validateData = (data, schema) => {
+export const validateData = (data: unknown, schema: z.ZodSchema) => {
   try {
     const validatedData = schema.parse(data);
     return { success: true, data: validatedData };
   } catch (error) {
     if (error instanceof z.ZodError) {
       // Надежная обработка ошибок Zod
-      const errorList = Array.isArray(error.errors) ? error.errors : [];
+      const errorList = Array.isArray(error.issues) ? error.issues : [];
       
       if (errorList.length === 0) {
         // Если массив ошибок пуст, но ошибка есть, создаем общую ошибку
@@ -356,7 +356,7 @@ export const validateData = (data, schema) => {
     }
     return { 
       success: false, 
-      errors: [{ field: 'unknown', message: error.message || 'Неизвестная ошибка' }] 
+      errors: [{ field: 'unknown', message: (error as Error).message || 'Неизвестная ошибка' }] 
     };
   }
 };

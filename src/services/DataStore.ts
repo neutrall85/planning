@@ -3,6 +3,7 @@ import { buildMockData } from '../mocks/dataMock';
 import { iso, addMonths, TODAY, uid, fmtDMY } from '../utils/date';
 import { sanitizeHtml } from '../utils/sanitization';
 import { VACATION_TYPES } from '../utils/constants';
+import { validateTask, validateProject, validateEmployee, validateVacation } from '../utils/validation';
 
 export default class DataStore {
   constructor(initialData = null) {
@@ -141,7 +142,21 @@ export default class DataStore {
 
   // === ЗАДАЧИ ===
   upsertTask(task) {
-    const idx = this._data.tasks.findIndex(t => t.id === task.id);
+    // Валидация задачи с помощью Zod перед сохранением
+    const validation = validateTask(task);
+    if (!validation.success) {
+      const errorMessages = validation.errors.map(e => `${e.field}: ${e.message}`).join('; ');
+      throw new Error(`Ошибка валидации задачи: ${errorMessages}`);
+    }
+
+    // Санитизация текстовых полей
+    const sanitizedTask = {
+      ...task,
+      title: sanitizeHtml(task.title),
+      description: task.description ? sanitizeHtml(task.description) : undefined,
+    };
+
+    const idx = this._data.tasks.findIndex(t => t.id === sanitizedTask.id);
     let tasks;
 
     // Проверка бюджета (без изменений)
@@ -167,58 +182,61 @@ export default class DataStore {
       const actorName = currentUser ? `${currentUser.last} ${currentUser.first}` : 'Система';
 
       // 1. Исполнитель отправляет задачу на проверку (inwork → review)
-      if (oldTask.status === 'inwork' && task.status === 'review') {
-        const assignees = task.assigneeIds || [];
-        const project = this._data.projects.find(p => p.id === task.projectId);
-        const message = `Задача "${task.title}" отправлена на проверку исполнителем ${actorName}`;
+      if (oldTask.status === 'inwork' && sanitizedTask.status === 'review') {
+        const assignees = sanitizedTask.assigneeIds || [];
+        const project = this._data.projects.find(p => p.id === sanitizedTask.projectId);
+        const safeTitle = sanitizeHtml(sanitizedTask.title);
+        const message = `Задача "${safeTitle}" отправлена на проверку исполнителем ${actorName}`;
 
         // Уведомить автора задачи (создателя)
-        if (task.creatorId && !assignees.includes(task.creatorId)) {
-          this.addNotification(task.creatorId, message, { targetType: 'task', targetId: task.id });
+        if (sanitizedTask.creatorId && !assignees.includes(sanitizedTask.creatorId)) {
+          this.addNotification(sanitizedTask.creatorId, message, { targetType: 'task', targetId: sanitizedTask.id });
         }
         // Уведомить ответственного по проекту, если он не совпадает с автором и не является исполнителем
-        if (project && project.managerId && project.managerId !== task.creatorId && !assignees.includes(project.managerId)) {
-          this.addNotification(project.managerId, message, { targetType: 'task', targetId: task.id });
+        if (project && project.managerId && project.managerId !== sanitizedTask.creatorId && !assignees.includes(project.managerId)) {
+          this.addNotification(project.managerId, message, { targetType: 'task', targetId: sanitizedTask.id });
         }
       }
 
       // 2. Автор/проверяющий возвращает задачу на доработку (review → inwork)
-      if (oldTask.status === 'review' && task.status === 'inwork') {
-        const assignees = task.assigneeIds || [];
-        const message = `Задача "${task.title}" возвращена на доработку пользователем ${actorName}`;
+      if (oldTask.status === 'review' && sanitizedTask.status === 'inwork') {
+        const assignees = sanitizedTask.assigneeIds || [];
+        const safeTitle = sanitizeHtml(sanitizedTask.title);
+        const message = `Задача "${safeTitle}" возвращена на доработку пользователем ${actorName}`;
 
         // Уведомить всех исполнителей
         assignees.forEach(id => {
           if (id !== currentUser?.id) {
-            this.addNotification(id, message, { targetType: 'task', targetId: task.id });
+            this.addNotification(id, message, { targetType: 'task', targetId: sanitizedTask.id });
           }
         });
         // Уведомить автора, если он не исполнитель и не текущий пользователь
-        if (task.creatorId && !assignees.includes(task.creatorId) && task.creatorId !== currentUser?.id) {
-          this.addNotification(task.creatorId, message, { targetType: 'task', targetId: task.id });
+        if (sanitizedTask.creatorId && !assignees.includes(sanitizedTask.creatorId) && sanitizedTask.creatorId !== currentUser?.id) {
+          this.addNotification(sanitizedTask.creatorId, message, { targetType: 'task', targetId: sanitizedTask.id });
         }
       }
 
       // 3. Закрытие/отмена задачи (любой статус → closed/cancelled)
-      if (task.status === 'closed' || task.status === 'cancelled') {
-        task.closedAt = TODAY;
-        const assignees = task.assigneeIds || [];
-        const message = `Задача "${task.title}" ${task.status === 'closed' ? 'закрыта' : 'отменена'} пользователем ${actorName}`;
+      if (sanitizedTask.status === 'closed' || sanitizedTask.status === 'cancelled') {
+        sanitizedTask.closedAt = TODAY;
+        const assignees = sanitizedTask.assigneeIds || [];
+        const safeTitle = sanitizeHtml(sanitizedTask.title);
+        const message = `Задача "${safeTitle}" ${sanitizedTask.status === 'closed' ? 'закрыта' : 'отменена'} пользователем ${actorName}`;
 
         // Уведомить всех исполнителей (кроме текущего)
         assignees.forEach(id => {
           if (id !== currentUser?.id) {
-            this.addNotification(id, message, { targetType: 'task', targetId: task.id });
+            this.addNotification(id, message, { targetType: 'task', targetId: sanitizedTask.id });
           }
         });
         // Уведомить автора, если он не исполнитель и не текущий пользователь
-        if (task.creatorId && !assignees.includes(task.creatorId) && task.creatorId !== currentUser?.id) {
-          this.addNotification(task.creatorId, message, { targetType: 'task', targetId: task.id });
+        if (sanitizedTask.creatorId && !assignees.includes(sanitizedTask.creatorId) && sanitizedTask.creatorId !== currentUser?.id) {
+          this.addNotification(sanitizedTask.creatorId, message, { targetType: 'task', targetId: sanitizedTask.id });
         }
         // Уведомить ответственного по проекту, если он не совпадает с автором/исполнителями
-        const project = this._data.projects.find(p => p.id === task.projectId);
-        if (project && project.managerId && project.managerId !== task.creatorId && !assignees.includes(project.managerId) && project.managerId !== currentUser?.id) {
-          this.addNotification(project.managerId, message, { targetType: 'task', targetId: task.id });
+        const project = this._data.projects.find(p => p.id === sanitizedTask.projectId);
+        if (project && project.managerId && project.managerId !== sanitizedTask.creatorId && !assignees.includes(project.managerId) && project.managerId !== currentUser?.id) {
+          this.addNotification(project.managerId, message, { targetType: 'task', targetId: sanitizedTask.id });
         }
       }
 
@@ -227,20 +245,20 @@ export default class DataStore {
       if (changes.length > 0) {
         // Логирование изменений может быть добавлено здесь при необходимости
       }
-      tasks = this._data.tasks.map(t => t.id === task.id ? task : t);
+      tasks = this._data.tasks.map(t => t.id === sanitizedTask.id ? sanitizedTask : t);
     } else {
       // Создание новой задачи (без изменений)
-      if (!task.createdAt) {
-        task.createdAt = new Date().toISOString();
+      if (!sanitizedTask.createdAt) {
+        sanitizedTask.createdAt = new Date().toISOString();
       }
-      tasks = [...this._data.tasks, task];
-      this.addAudit('Создание задачи', task.title, 'task', task.id);
-      (task.assigneeIds || []).forEach(id => {
+      tasks = [...this._data.tasks, sanitizedTask];
+      this.addAudit('Создание задачи', sanitizedTask.title, 'task', sanitizedTask.id);
+      (sanitizedTask.assigneeIds || []).forEach(id => {
         if (id !== this._currentUser?.id) {
-          this.addNotification(id, `Вам назначена задача "${task.title}"`, { targetType: 'task', targetId: task.id });
+          this.addNotification(id, `Вам назначена задача "${sanitizedTask.title}"`, { targetType: 'task', targetId: sanitizedTask.id });
         }
       });
-      this._checkDeadlineNotifications(task, null);
+      this._checkDeadlineNotifications(sanitizedTask, null);
     }
 
     this._data = { ...this._data, tasks };
