@@ -1,1 +1,23 @@
-Nothing should be ignored based on the provided file changes, as they only include source code files (.ts and .tsx) without any build artifacts, dependencies, or temporary files.
+```
+# Build artifacts
+dist/
+build/
+*.js
+
+# Dependencies
+node_modules/
+
+# Editors
+.vscode/
+.idea/
+
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+
+# Environment
+.env
+.env.local
+*.env.*
+```

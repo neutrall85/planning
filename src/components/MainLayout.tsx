@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useStore } from '../hooks';
 import { useTaskOperations } from '../hooks/business/useTaskOperations';
+import { useProjectOperations } from '../hooks/business/useProjectOperations';
 import { hasRole, canCreateTask, canExport, canChangeTaskStatus } from '../utils/permissions';
 import { empName } from '../utils/dataHelpers';
 import { ICONS, Ic } from './Icons';
@@ -40,6 +41,18 @@ export default function MainLayout({ store, data, user, toast }) {
     onAddAudit: (action, details, targetType, targetId) => store.addAudit(action, details, targetType, targetId),
   });
   
+  
+  // Интеграция useProjectOperations для инкапсуляции бизнес-логики проектов
+  const projectOps = useProjectOperations({
+    projects: data.projects,
+    tasks: data.tasks,
+    employees: data.employees,
+    currentUser: user,
+    onUpsertProject: (project) => store.upsertProject(project),
+    onDeleteProject: (id) => store.deleteProject(id),
+    onAddNotification: (userId, text, target, targetId) => store.addNotification(userId, text, target, targetId),
+    onAddAudit: (action, details, targetType, targetId) => store.addAudit(action, details, targetType, targetId),
+  });
   const [view, setView] = useState('tasks');
   const [modal, setModal] = useState(null);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -348,7 +361,7 @@ export default function MainLayout({ store, data, user, toast }) {
                   moveProject={(id, newStatus) => {
                     const project = data.projects.find(p => p.id === id);
                     if (project && project.status !== newStatus) {
-                      store.upsertProject({...project, status: newStatus});
+                      projectOps.upsertProject({...project, status: newStatus});
                     }
                   }}
                 />
@@ -402,7 +415,7 @@ export default function MainLayout({ store, data, user, toast }) {
             }} 
             restoreProject={(id) => { 
               const p = data.projects.find(x => x.id === id); 
-              store.upsertProject({
+              projectOps.upsertProject({
                 ...p, 
                 archived: false, 
                 archivedAt: null,
@@ -525,13 +538,13 @@ export default function MainLayout({ store, data, user, toast }) {
               store.addAudit('Административное изменение проекта (прямое)', `Проект "${p.name}": ${details}`, 'project', p.id);
             }
           }
-          store.upsertProject(p);
+          projectOps.upsertProject(p);
           const auditDetails = `Проект "${p.name}" (код ${p.code}), бюджет: ${p.budget ?? '—'} ч`;
           store.addAudit(isNew ? 'Создание проекта' : 'Изменение проекта', auditDetails, 'project', p.id);
           setModal(null);
         }} 
         onDelete={(p) => { 
-          store.deleteProject(p.id); 
+          projectOps.deleteProject(p.id); 
           store.addAudit('Удаление проекта', `Проект "${p.name}"`, 'project', p.id);
           setModal(null); 
         }} 
