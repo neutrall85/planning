@@ -96,7 +96,8 @@ export default function Kanban({
       const options = [...ids].map(id => db.employees.find(e => e.id === id)).filter(Boolean);
       onAssigneeOptionsChange(options);
     }
-  }, [visible, db, onAssigneeOptionsChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, db.employees, onAssigneeOptionsChange]);
 
   // Drag‑and‑drop с проверкой прав при drop
   const { dragState, handlers } = useDragAndDrop((taskId, newStatus) => {
