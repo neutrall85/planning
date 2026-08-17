@@ -1,7 +1,73 @@
-```
-# Dependencies
-node_modules/
+# Examples
 
-# Vite build artifacts
-node_modules/.vite/
+## Project with artifacts:
+```
+# Compiled and build artifacts
+*.pyc
+__pycache__/
+*.o
+*.obj
+dist/
+build/
+target/
+
+# Dependencies
+.venv/
+venv/
+node_modules/
+.julia/
+.zig-cache/
+
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+.env.*
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Coverage
+coverage/
+htmlcov/
+.coverage
+
+# Package manager caches
+.gradle/
+.mypy_cache/
+.pytest_cache/
+```
+
+## Minimal changes:
+```
+src/main.py
+README.md
+config.json
+```
+
+## With build artifacts:
+```
+app.py
+dist/bundle.js
+node_modules/lodash/index.js
+.pytest_cache/v/cache.db
+```
+
+## Image files (do not ignore):
+```
+logo.png
+screenshot.jpg
+icon.gif
 ```

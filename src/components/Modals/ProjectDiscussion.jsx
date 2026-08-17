@@ -2,7 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { uid, fmtDT, initials } from '../../utils/date';
 import { has } from '../../utils/permissions';
 import { Ic, ICONS } from '../Icons';
-import { COMMENT_EDIT_WINDOW } from '../../utils/config';
+import { COMMENT_EDIT_WINDOW_MS } from '../../utils/config';
+const COMMENT_EDIT_WINDOW = COMMENT_EDIT_WINDOW_MS;
 import { useDataHelpers } from '../../hooks';
 
 function renderMentionText(text) {

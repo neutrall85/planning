@@ -10,7 +10,7 @@ export const Modal = ({ title, onClose, children, width = 640 }) => {
 
   return (
     <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="modal" style={{ maxWidth: width }}>
+      <div className="modal modal-animate" style={{ maxWidth: width }}>
         <div className="modal-head">
           <h3>{title}</h3>
           <button className="icon-btn" onClick={onClose}><Ic d={ICONS.x} size={16} /></button>
