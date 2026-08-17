@@ -55,16 +55,16 @@ input, select, textarea {
 }
 
 @keyframes fadeUp {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: none; }
+  from { opacity: 0; transform: translate3d(0, 8px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 @keyframes popIn {
-  from { opacity: 0; transform: scale(.94); }
-  to { opacity: 1; transform: scale(1); }
+  from { opacity: 0; transform: translate3d(0, 0, 0) scale(.94); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
 }
 @keyframes popOut {
-  from { opacity: 1; transform: scale(1); }
-  to { opacity: 0; transform: scale(.94); }
+  from { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+  to { opacity: 0; transform: translate3d(0, 0, 0) scale(.94); }
 }
 @keyframes fadeIn {
   from { opacity: 0; }
@@ -75,11 +75,11 @@ input, select, textarea {
   to { opacity: 0; }
 }
 @keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  20% { transform: translateX(-8px); }
-  40% { transform: translateX(8px); }
-  60% { transform: translateX(-5px); }
-  80% { transform: translateX(5px); }
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  20% { transform: translate3d(-8px, 0, 0); }
+  40% { transform: translate3d(8px, 0, 0); }
+  60% { transform: translate3d(-5px, 0, 0); }
+  80% { transform: translate3d(5px, 0, 0); }
 }
 
 /* --- login --- */
@@ -204,12 +204,12 @@ input, select, textarea {
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 7px 10px;
-  transition: .15s;
+  transition: all 0.2s cubic-bezier(.4,0,.2,1);
 }
 .demo-chip:hover {
   border-color: var(--acc2);
   background: #f0f9ff;
-  transform: translateY(-1px);
+  transform: translate3d(0, -1px, 0);
 }
 .demo-login {
   font-weight: 700;
@@ -312,7 +312,7 @@ input, select, textarea {
   color: #94a3b8;
   font-size: 13px;
   font-weight: 600;
-  transition: .15s;
+  transition: all 0.2s cubic-bezier(.4,0,.2,1);
   text-align: left;
   width: 100%;
 }
@@ -418,7 +418,7 @@ input, select, textarea {
   padding: 7px;
   display: inline-flex;
   align-items: center;
-  transition: .15s;
+  transition: all 0.2s cubic-bezier(.4,0,.2,1);
   position: relative;
 }
 .icon-btn:hover {
@@ -506,7 +506,7 @@ input, select, textarea {
   padding: 8px 14px;
   font-size: 13px;
   font-weight: 700;
-  transition: .15s;
+  transition: all 0.2s cubic-bezier(.4,0,.2,1);
   white-space: nowrap;
 }
 .btn.primary {
@@ -515,7 +515,7 @@ input, select, textarea {
   box-shadow: 0 4px 12px rgba(37,99,235,.3);
 }
 .btn.primary:hover {
-  transform: translateY(-1px);
+  transform: translate3d(0, -1px, 0);
 }
 .btn.primary:disabled {
   opacity: .5;
@@ -552,7 +552,7 @@ input, select, textarea {
   padding: 8px 12px;
   outline: none;
   background: #fff;
-  transition: .15s;
+  transition: all 0.2s cubic-bezier(.4,0,.2,1);
 }
 .inp:focus {
   border-color: var(--acc2);
@@ -680,7 +680,7 @@ input, select, textarea {
   font-size: 13px;
   font-weight: 700;
   color: var(--mut);
-  transition: .15s;
+  transition: all 0.2s cubic-bezier(.4,0,.2,1);
 }
 .tab.on {
   background: #0f172a;
@@ -873,7 +873,7 @@ input, select, textarea {
   border-radius: 14px;
   display: flex;
   flex-direction: column;
-  transition: .15s;
+  transition: all 0.2s cubic-bezier(.4,0,.2,1);
 }
 .kcol.over {
   border-color: var(--acc2);
@@ -919,11 +919,11 @@ input, select, textarea {
   padding: 11px 11px 11px 15px;
   box-shadow: 0 1px 3px rgba(15,23,42,.05);
   cursor: pointer;
-  transition: .15s;
+  transition: all 0.2s cubic-bezier(.4,0,.2,1);
   overflow: hidden;
 }
 .kcard:hover {
-  transform: translateY(-2px);
+  transform: translate3d(0, -2px, 0);
   box-shadow: var(--sh);
 }
 .kcard.dim {
@@ -1323,7 +1323,7 @@ input, select, textarea {
   border-radius: 10px;
   padding: 6px;
   overflow: visible; /* содержимое не обрезается */
-  transition: .15s;
+  transition: all 0.2s cubic-bezier(.4,0,.2,1);
   height: auto; /* ячейка растягивается */
   display: flex;
   flex-direction: column;
@@ -1488,10 +1488,10 @@ input, select, textarea {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  transition: .15s;
+  transition: all 0.2s cubic-bezier(.4,0,.2,1);
 }
 .pj-card:hover {
-  transform: translateY(-2px);
+  transform: translate3d(0, -2px, 0);
   box-shadow: 0 8px 24px rgba(15,23,42,.1);
 }
 .pj-top {
@@ -1903,7 +1903,7 @@ input, select, textarea {
   border-radius: 99px;
   position: relative;
   cursor: pointer;
-  transition: .2s;
+  transition: all 0.2s cubic-bezier(.4,0,.2,1);
   flex: none;
 }
 .toggle.on {
@@ -1917,7 +1917,7 @@ input, select, textarea {
   height: 18px;
   background: #fff;
   border-radius: 99px;
-  transition: .2s;
+  transition: all 0.2s cubic-bezier(.4,0,.2,1);
 }
 .toggle.on .toggle-knob {
   left: 20px;
@@ -1939,7 +1939,7 @@ input, select, textarea {
   padding: 8px 12px;
   font-size: 13px;
   cursor: pointer;
-  transition: .15s;
+  transition: all 0.2s cubic-bezier(.4,0,.2,1);
 }
 .roles-item:hover {
   border-color: var(--acc2);
@@ -2063,6 +2063,7 @@ input, select, textarea {
   z-index: 50;
   padding: 20px;
   animation: fadeIn .2s ease;
+  will-change: opacity;
 }
 .modal {
   width: 100%;
@@ -2072,6 +2073,8 @@ input, select, textarea {
   max-height: 92vh;
   display: flex;
   flex-direction: column;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
 }
 .modal-animate {
   animation: popIn .25s cubic-bezier(.16,1,.3,1);
@@ -2378,7 +2381,7 @@ input, select, textarea {
   padding: 6px 14px;
   border-radius: 6px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.2s cubic-bezier(.4,0,.2,1);
 }
 .view-btn:hover {
   background: rgba(255, 255, 255, 0.5);
