@@ -181,7 +181,8 @@ input[type="number"] {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  animation: popIn .25s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: popIn .28s cubic-bezier(0.16, 1, 0.3, 1);
+  contain: layout style paint;
 }
 .login-card.shake {
   animation: shake .45s ease;
@@ -444,12 +445,15 @@ input[type="number"] {
   padding: 7px;
   display: inline-flex;
   align-items: center;
-  transition: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background 0.15s cubic-bezier(0.16, 1, 0.3, 1), color 0.15s cubic-bezier(0.16, 1, 0.3, 1), transform 0.1s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
 }
 .icon-btn:hover {
   background: #f1f5f9;
   color: var(--txt);
+}
+.icon-btn:active {
+  transform: scale(0.96);
 }
 .icon-btn.danger:hover {
   background: #fef2f2;
@@ -533,16 +537,20 @@ input[type="number"] {
   padding: 8px 14px;
   font-size: 13px;
   font-weight: 700;
-  transition: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background 0.15s cubic-bezier(0.16, 1, 0.3, 1), color 0.15s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.15s cubic-bezier(0.16, 1, 0.3, 1), transform 0.1s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.15s cubic-bezier(0.16, 1, 0.3, 1);
   white-space: nowrap;
 }
 .btn.primary {
   background: linear-gradient(135deg, #2563eb, #1d4ed8);
   color: #fff;
-  box-shadow: 0 4px 12px rgba(37,99,235,.3);
+  box-shadow: 0 3px 10px rgba(37,99,235,.25);
 }
 .btn.primary:hover {
   transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(37,99,235,.3);
+}
+.btn:active {
+  transform: scale(0.97);
 }
 .btn.primary:disabled {
   opacity: .5;
@@ -2159,7 +2167,6 @@ input[type="number"] {
   overflow: visible;
   position: relative;
   z-index: 1;
-  will-change: transform, opacity;
   contain: layout style paint;
 }
 .modal-head {
@@ -2389,11 +2396,12 @@ input[type="number"] {
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 12px;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.06);
   min-width: 280px;
   max-width: 360px;
   z-index: 1001;
-  animation: popIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: popIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  contain: layout style paint;
 }
 .popover-overlay {
   position: fixed;
