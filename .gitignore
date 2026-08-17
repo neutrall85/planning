@@ -68,3 +68,4 @@ __pycache__/
 *.lz
 *.lzo
 ```
+Nothing should be ignored based on the provided file changes. The changes only include source code files (.jsx) and no build artifacts, dependencies, or temporary files that would warrant adding to .gitignore.
