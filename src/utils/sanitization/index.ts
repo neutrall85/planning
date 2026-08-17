@@ -1,20 +1,27 @@
 /**
  * Sanitization Utilities
  * Prevents XSS attacks by sanitizing user input
+ * Uses DOMPurify for robust HTML sanitization
  */
+
+import DOMPurify from 'dompurify';
 
 /**
  * Sanitize HTML string to prevent XSS attacks
+ * Uses DOMPurify for comprehensive sanitization
  * Removes dangerous tags and attributes
  */
 export const sanitizeHtml = (input: string): string => {
   if (!input) return '';
   
-  // Create a temporary DOM element
-  const div = document.createElement('div');
-  div.textContent = input;
+  // Use DOMPurify for robust XSS protection
+  const sanitized = DOMPurify.sanitize(input, {
+    ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a', 'p', 'br', 'ul', 'ol', 'li', 'code', 'pre'],
+    ALLOWED_ATTR: ['href', 'target', 'rel'],
+  });
   
-  return div.innerHTML;
+  // DOMPurify returns TrustedHTML, convert to string
+  return sanitized.toString();
 };
 
 /**
