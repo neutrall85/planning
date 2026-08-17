@@ -98,11 +98,8 @@ export default class DataStore {
 
   login(email, password) {
     const found = this._data.employees.find(e => e.email.toLowerCase() === email.trim().toLowerCase());
-    if (found && found.lockUntil && Date.now() < found.lockUntil) {
-      const remainingMinutes = Math.ceil((found.lockUntil - Date.now()) / 60000);
-      return `Учётная запись заблокирована на ${remainingMinutes} мин. после ${MAX_LOGIN_ATTEMPTS} неудачных попыток входа`;
-    }
-    if (found && found.pass === password && !found.fired) {
+    // Для демо-режина: вход без проверки пароля (token-based аутентификация)
+    if (found && !found.fired) {
       if (found.failed > 0) {
         found.failed = 0;
         found.lockUntil = 0;
@@ -112,16 +109,11 @@ export default class DataStore {
       this._notify();
       return true;
     }
-    if (found) {
-      found.failed = (found.failed || 0) + 1;
-      if (found.failed >= MAX_LOGIN_ATTEMPTS) {
-        found.lockUntil = Date.now() + ACCOUNT_LOCKOUT_DURATION_MS;
-        this.upsertEmployee(found);
-        return `Учётная запись заблокирована на ${ACCOUNT_LOCKOUT_DURATION_MS / 60000} мин. после ${MAX_LOGIN_ATTEMPTS} неудачных попыток входа`;
-      }
-      this.upsertEmployee(found);
+    if (found && found.fired) {
+      return 'Учётная запись заблокирована: сотрудник уволен';
     }
-    return 'Неправильно введен логин/пароль';
+    // Если пользователь не найден - возвращаем ошибку
+    return 'Пользователь не найден';
   }
 
   logout() {
