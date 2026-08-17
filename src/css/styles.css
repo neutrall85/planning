@@ -91,11 +91,11 @@ input[type="number"] {
 }
 
 @keyframes fadeUp {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: none; }
 }
 @keyframes popIn {
-  from { opacity: 0; transform: scale(.94) translateY(10px); }
+  from { opacity: 0; transform: scale(.98) translateY(4px); }
   to { opacity: 1; transform: scale(1) translateY(0); }
 }
 @keyframes fadeIn {
@@ -104,10 +104,8 @@ input[type="number"] {
 }
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
-  20% { transform: translateX(-8px); }
-  40% { transform: translateX(8px); }
-  60% { transform: translateX(-5px); }
-  80% { transform: translateX(5px); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
 }
 
 /* --- login --- */
@@ -117,8 +115,8 @@ input[type="number"] {
   grid-template-columns: 1.1fr 1fr;
 }
 .login-hero {
-  background: radial-gradient(800px 400px at 10% -10%, #1e3a8a 0%, transparent 50%),
-              radial-gradient(600px 350px at 90% 110%, #0e7490 0%, transparent 50%),
+  background: radial-gradient(550px 280px at 10% -10%, #1e3a8a 0%, transparent 55%),
+              radial-gradient(420px 220px at 90% 110%, #0e7490 0%, transparent 55%),
               #0c1526;
   color: #e2e8f0;
   padding: 48px;
@@ -183,7 +181,8 @@ input[type="number"] {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  animation: popIn .25s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: popIn .28s cubic-bezier(0.16, 1, 0.3, 1);
+  contain: layout style paint;
 }
 .login-card.shake {
   animation: shake .45s ease;
@@ -446,12 +445,15 @@ input[type="number"] {
   padding: 7px;
   display: inline-flex;
   align-items: center;
-  transition: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background 0.15s cubic-bezier(0.16, 1, 0.3, 1), color 0.15s cubic-bezier(0.16, 1, 0.3, 1), transform 0.1s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
 }
 .icon-btn:hover {
   background: #f1f5f9;
   color: var(--txt);
+}
+.icon-btn:active {
+  transform: scale(0.96);
 }
 .icon-btn.danger:hover {
   background: #fef2f2;
@@ -481,10 +483,11 @@ input[type="number"] {
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 14px;
-  box-shadow: 0 12px 28px rgba(2,8,23,.18);
+  box-shadow: 0 6px 16px rgba(2,8,23,.12);
   z-index: 60;
-  animation: popIn .2s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: popIn .22s cubic-bezier(0.16, 1, 0.3, 1);
   overflow: hidden;
+  contain: layout style paint;
 }
 .notif-head {
   display: flex;
@@ -534,16 +537,20 @@ input[type="number"] {
   padding: 8px 14px;
   font-size: 13px;
   font-weight: 700;
-  transition: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background 0.15s cubic-bezier(0.16, 1, 0.3, 1), color 0.15s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.15s cubic-bezier(0.16, 1, 0.3, 1), transform 0.1s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.15s cubic-bezier(0.16, 1, 0.3, 1);
   white-space: nowrap;
 }
 .btn.primary {
   background: linear-gradient(135deg, #2563eb, #1d4ed8);
   color: #fff;
-  box-shadow: 0 4px 12px rgba(37,99,235,.3);
+  box-shadow: 0 3px 10px rgba(37,99,235,.25);
 }
 .btn.primary:hover {
   transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(37,99,235,.3);
+}
+.btn:active {
+  transform: scale(0.97);
 }
 .btn.primary:disabled {
   opacity: .5;
@@ -900,7 +907,7 @@ input[type="number"] {
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
   width: 100%;
-  animation: fadeUp .35s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: fadeUp .28s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .kanban.k5 {
   grid-template-columns: repeat(5, 1fr);  /* то же самое для 5 колонок */
@@ -1086,7 +1093,7 @@ input[type="number"] {
   border-radius: 14px;
   box-shadow: var(--sh);
   overflow: hidden;
-  animation: fadeUp .35s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: fadeUp .28s cubic-bezier(0.16, 1, 0.3, 1);
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
@@ -1291,7 +1298,7 @@ input[type="number"] {
   border-radius: 14px;
   box-shadow: var(--sh);
   padding: 16px;
-  animation: fadeUp .35s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: fadeUp .28s cubic-bezier(0.16, 1, 0.3, 1);
   width: 100%;
   box-sizing: border-box;
   height: auto; /* растягивается по содержимому */
@@ -1517,7 +1524,7 @@ input[type="number"] {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
   gap: 14px;
-  animation: fadeUp .35s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: fadeUp .28s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .pj-card {
   background: #fff;
@@ -1528,11 +1535,12 @@ input[type="number"] {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  transition: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  contain: layout style paint;
 }
 .pj-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(15,23,42,.1);
+  box-shadow: 0 4px 12px rgba(15,23,42,.06);
 }
 .pj-top {
   display: flex;
@@ -1629,7 +1637,7 @@ input[type="number"] {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  animation: fadeUp .35s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: fadeUp .28s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .st-section {
   background: #fff;
@@ -1821,7 +1829,7 @@ input[type="number"] {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  animation: fadeUp .35s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: fadeUp .28s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .rep-cards {
   display: grid;
@@ -1880,7 +1888,7 @@ input[type="number"] {
 
 /* --- cabinet --- */
 .cab {
-  animation: fadeUp .35s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: fadeUp .28s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .cab-grid {
   display: grid;
@@ -2135,15 +2143,14 @@ input[type="number"] {
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(12,21,38,.5);
-  backdrop-filter: blur(2px);
+  background: rgba(12,21,38,.45);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 50;
   padding: 20px;
   opacity: 0;
-  animation: fadeIn .25s ease-out forwards;
+  animation: fadeIn .25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 .overlay-visible {
   opacity: 1;
@@ -2152,7 +2159,7 @@ input[type="number"] {
   width: 100%;
   background: #fff;
   border-radius: 16px;
-  box-shadow: 0 16px 40px rgba(2,8,23,.25);
+  box-shadow: 0 8px 24px rgba(2,8,23,.15);
   animation: popIn .35s cubic-bezier(0.16, 1, 0.3, 1);
   max-height: 92vh;
   display: flex;
@@ -2160,6 +2167,7 @@ input[type="number"] {
   overflow: visible;
   position: relative;
   z-index: 1;
+  contain: layout style paint;
 }
 .modal-head {
   flex-shrink: 0;
@@ -2170,6 +2178,7 @@ input[type="number"] {
   border-bottom: 1px solid var(--line);
   position: relative;
   z-index: 1;
+  contain: layout style;
 }
 .modal-head h3 {
   font-size: 16px;
@@ -2180,6 +2189,8 @@ input[type="number"] {
   padding: 16px 20px;
   overflow-y: auto;
   position: relative;
+  contain: layout style paint;
+  content-visibility: auto;
 }
 .modal-foot {
   flex-shrink: 0;
@@ -2385,11 +2396,12 @@ input[type="number"] {
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 12px;
-  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.12);
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.06);
   min-width: 280px;
   max-width: 360px;
   z-index: 1001;
-  animation: popIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: popIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  contain: layout style paint;
 }
 .popover-overlay {
   position: fixed;
