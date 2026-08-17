@@ -4,6 +4,7 @@ import { validateRegistration, sanitizeObject } from '../utils/validation';
 import { logger } from '../utils/logging/logger';
 import { ALLOWED_EMAIL_DOMAINS, COMPANY_DOMAIN } from '../utils/config';
 import { uid } from '../utils/date';
+import { useI18n } from '../i18n';
 
 /**
  * Валидация пароля
@@ -21,6 +22,7 @@ function passIssues(p) {
 }
 
 export default function LoginScreen({ db, onLogin, toast, store }) {
+  const { t, tCommon } = useI18n();
   const [mode, setMode] = useState("login");
   const [lg, setLg] = useState("");
   const [pw, setPw] = useState("");
@@ -242,13 +244,13 @@ export default function LoginScreen({ db, onLogin, toast, store }) {
   return (
     <div className="login-wrap">
       <div className="login-hero">
-        <div className="logo lg"><div className="logo-mark">АП</div><div><div className="logo-name">АвиаГоризонт</div><div className="logo-sub">планирование и учёт времени</div></div></div>
-        <h2>Единая среда планирования организации</h2>
-        <p>Канбан, диаграмма Ганта и календарь. Проекты двух типов, обсуждения задач с @упоминаниями, отпуска с делегированием, HR-администрирование, архивация и журнал.</p>
+        <div className="logo lg"><div className="logo-mark">АП</div><div><div className="logo-name">АвиаГоризонт</div><div className="logo-sub">{t('tasks', 'title')} {t('common', 'and')} {t('vacations', 'title')}</div></div></div>
+        <h2>{t('projects', 'title')}</h2>
+        <p>{tCommon('description')}</p>
         <ul className="hero-list">
-          <li>9 ролей, включая HR-менеджера; временное делегирование полномочий</li>
-          <li>Архив закрытых задач и проектов</li>
-          <li>Комментарии с ветками ответов и @упоминаниями участников</li>
+          <li>{t('roles', 'hr')}: 9 {t('roles', 'executor')}</li>
+          <li>{t('tasks', 'archive')}</li>
+          <li>@{t('notifications', 'mention')}</li>
         </ul>
         <div className="hero-stack">React · Node.js · PostgreSQL · Ubuntu LTS · REST/JSON · OpenAPI · ООП/KISS/DRY</div>
       </div>
@@ -256,25 +258,25 @@ export default function LoginScreen({ db, onLogin, toast, store }) {
         <form className={"login-card" + (shake ? " shake" : "")} onSubmit={submit}>
           {mode !== "register" && (
             <>
-              <h3>{mode === "forgot" ? "Восстановление пароля" : "Вход в систему"}</h3>
-              <div className="login-sub">{mode === "forgot" ? "Ссылка будет отправлена на зарегистрированный e-mail" : "Логин — e-mail без домена " + "@" + COMPANY_DOMAIN}</div>
+              <h3>{mode === "forgot" ? t('auth', 'forgotPassword') : t('auth', 'loginTitle')}</h3>
+              <div className="login-sub">{mode === "forgot" ? t('auth', 'forgotPassword') : `${tCommon('login')} — e-mail ${tCommon('without')} @${COMPANY_DOMAIN}`}</div>
               {mode === "forgot" ? (
                 <>
-                  <label className="lbl">E-mail</label>
+                  <label className="lbl">{tCommon('email')}</label>
                   <div className="email-inp"><input className="inp" value={forgot} onChange={(e) => { setForgot(e.target.value); setErr(null); }} placeholder="ivanov" autoFocus /><span className="email-dom">{"@" + COMPANY_DOMAIN}</span></div>
                 </>
               ) : (
                 <>
-                  <label className="lbl">Логин (e-mail)</label>
+                  <label className="lbl">{tCommon('email')}</label>
                   <div className="email-inp"><input className="inp" value={lg} onChange={(e) => { setLg(e.target.value); setErr(null); }} placeholder="ivanov" autoFocus /><span className="email-dom">{"@" + COMPANY_DOMAIN}</span></div>
-                  <label className="lbl">Пароль</label>
+                  <label className="lbl">{tCommon('password')}</label>
                   <div style={{ position: 'relative' }}>
                     <input
                       className="inp"
                       type={showPassword ? "text" : "password"}
                       value={pw}
                       onChange={(e) => { setPw(e.target.value); setErr(null); }}
-                      placeholder="с учётом регистра"
+                      placeholder={tCommon('password')}
                     />
                     <button
                       type="button"
@@ -291,13 +293,13 @@ export default function LoginScreen({ db, onLogin, toast, store }) {
 
           {mode === "register" && (
             <>
-              <h3>Регистрация сотрудника</h3>
-              <div className="login-sub">После регистрации вы автоматически войдёте с ролью «Исполнитель». Суперадминистратор получит уведомление.</div>
+              <h3>{t('auth', 'register')}</h3>
+              <div className="login-sub">{t('auth', 'register')}</div>
               <div className="reg-row">
-                <div><label className="lbl">Имя *</label><input className="inp" value={reg.first} onChange={(e) => setReg({ ...reg, first: e.target.value })} /></div>
-                <div><label className="lbl">Фамилия *</label><input className="inp" value={reg.last} onChange={(e) => setReg({ ...reg, last: e.target.value })} /></div>
+                <div><label className="lbl">{t('employees', 'firstName')}</label><input className="inp" value={reg.first} onChange={(e) => setReg({ ...reg, first: e.target.value })} /></div>
+                <div><label className="lbl">{t('employees', 'lastName')}</label><input className="inp" value={reg.last} onChange={(e) => setReg({ ...reg, last: e.target.value })} /></div>
               </div>
-              <label className="lbl">E-mail *</label>
+              <label className="lbl">{tCommon('email')}</label>
               <div className="email-inp">
                 <input 
                   className="inp" 
@@ -307,9 +309,9 @@ export default function LoginScreen({ db, onLogin, toast, store }) {
                 />
               </div>
               <div className="login-sub" style={{fontSize: '0.85rem', marginTop: '4px'}}>
-                Введите полный e-mail с разрешённым доменом: {ALLOWED_EMAIL_DOMAINS.join(', ')}
+                {tCommon('email')}: {ALLOWED_EMAIL_DOMAINS.join(', ')}
               </div>
-              <label className="lbl">Пароль *</label>
+              <label className="lbl">{tCommon('password')}</label>
               <div style={{ position: 'relative' }}>
                 <input
                   className="inp"
@@ -326,22 +328,22 @@ export default function LoginScreen({ db, onLogin, toast, store }) {
                 </button>
               </div>
               <div className="pass-checks">{issues.map((i) => <span key={i.t} className={i.ok ? "ok" : ""}>✓ {i.t}</span>)}</div>
-              <label className="lbl">Подтверждение пароля *</label>
+              <label className="lbl">{t('errors', 'passwordsMismatch')}</label>
               <input className="inp" type="password" value={reg.pass2} onChange={(e) => setReg({ ...reg, pass2: e.target.value })} />
             </>
           )}
 
           {err && <div className="login-err">{err}</div>}
-          <button className="btn primary big" type="submit" disabled={busy}>{busy ? "Выполняется вход…" : mode === "login" ? "Войти" : mode === "register" ? "Зарегистрироваться" : "Отправить ссылку"}</button>
+          <button className="btn primary big" type="submit" disabled={busy}>{busy ? tCommon('loading') : mode === "login" ? tCommon('login') : mode === "register" ? t('auth', 'register') : t('auth', 'forgotPassword')}</button>
 
           {mode === "login" && (
             <>
               <div className="login-links">
-                <button type="button" className="link" onClick={() => { setMode("forgot"); setErr(null); }}>Забыли пароль?</button>
-                <button type="button" className="link" onClick={() => { setMode("register"); setErr(null); }}>Регистрация</button>
+                <button type="button" className="link" onClick={() => { setMode("forgot"); setErr(null); }}>{t('auth', 'forgotPassword')}</button>
+                <button type="button" className="link" onClick={() => { setMode("register"); setErr(null); }}>{t('auth', 'register')}</button>
               </div>
-              <div className="cookie-note">Сессия хранится в cookie 30 дней (HttpOnly, Secure, SameSite=Lax — на стороне сервера).</div>
-              <div className="demo-title">Демо-доступы — клик сразу выполняет вход</div>
+              <div className="cookie-note">{tCommon('session')}</div>
+              <div className="demo-title">{t('auth', 'loginButton')}</div>
               <div className="demo-grid">
                 {demos.map((d) => (
                   <button type="button" key={d.l} className="demo-chip" onClick={() => { setLg(d.l); setPw(d.p); setErr(null); doLogin(d.l, d.p); }}>
@@ -352,7 +354,7 @@ export default function LoginScreen({ db, onLogin, toast, store }) {
             </>
           )}
 
-          {mode !== "login" && <div className="login-links"><button type="button" className="link" onClick={() => { setMode("login"); setErr(null); }}>← Назад ко входу</button></div>}
+          {mode !== "login" && <div className="login-links"><button type="button" className="link" onClick={() => { setMode("login"); setErr(null); }}>← {t('auth', 'loginTitle')}</button></div>}
         </form>
       </div>
     </div>
