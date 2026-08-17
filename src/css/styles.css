@@ -72,7 +72,7 @@ input[type="number"] {
   padding: 6px 8px;
   outline: none;
   background: #fff;
-  transition: .15s;
+  transition: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
   text-align: center;
 }
 .rate-input:focus {
@@ -95,8 +95,12 @@ input[type="number"] {
   to { opacity: 1; transform: none; }
 }
 @keyframes popIn {
-  from { opacity: 0; transform: scale(.97); }
-  to { opacity: 1; transform: scale(1); }
+  from { opacity: 0; transform: scale(.94) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
@@ -179,7 +183,7 @@ input[type="number"] {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  animation: popIn .25s ease;
+  animation: popIn .25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .login-card.shake {
   animation: shake .45s ease;
@@ -228,7 +232,7 @@ input[type="number"] {
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 7px 10px;
-  transition: .15s;
+  transition: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .demo-chip:hover {
   border-color: var(--acc2);
@@ -336,7 +340,7 @@ input[type="number"] {
   color: #94a3b8;
   font-size: 13px;
   font-weight: 600;
-  transition: .15s;
+  transition: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
   text-align: left;
   width: 100%;
 }
@@ -442,7 +446,7 @@ input[type="number"] {
   padding: 7px;
   display: inline-flex;
   align-items: center;
-  transition: .15s;
+  transition: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
 }
 .icon-btn:hover {
@@ -479,7 +483,7 @@ input[type="number"] {
   border-radius: 14px;
   box-shadow: 0 20px 50px rgba(2,8,23,.25);
   z-index: 60;
-  animation: popIn .15s ease;
+  animation: popIn .2s cubic-bezier(0.16, 1, 0.3, 1);
   overflow: hidden;
 }
 .notif-head {
@@ -530,7 +534,7 @@ input[type="number"] {
   padding: 8px 14px;
   font-size: 13px;
   font-weight: 700;
-  transition: .15s;
+  transition: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
   white-space: nowrap;
 }
 .btn.primary {
@@ -576,7 +580,7 @@ input[type="number"] {
   padding: 8px 12px;
   outline: none;
   background: #fff;
-  transition: .15s;
+  transition: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .inp:focus {
   border-color: var(--acc2);
@@ -707,7 +711,7 @@ input[type="number"] {
   font-size: 13px;
   font-weight: 700;
   color: var(--mut);
-  transition: .15s;
+  transition: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .tab.on {
   background: #0f172a;
@@ -889,7 +893,7 @@ input[type="number"] {
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
   width: 100%;
-  animation: fadeUp .3s ease;
+  animation: fadeUp .35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .kanban.k5 {
   grid-template-columns: repeat(5, 1fr);  /* то же самое для 5 колонок */
@@ -900,7 +904,7 @@ input[type="number"] {
   border-radius: 14px;
   display: flex;
   flex-direction: column;
-  transition: .15s;
+  transition: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
   min-width: 0; /* чтобы дочерние элементы не вылезали */
 }
 .kcol.over {
@@ -947,7 +951,7 @@ input[type="number"] {
   padding: 12px 14px 12px 16px;
   box-shadow: 0 1px 3px rgba(15,23,42,.05);
   cursor: pointer;
-  transition: .15s;
+  transition: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: visible; /* чтобы текст не обрезался */
   word-break: break-word;
 }
@@ -1075,7 +1079,7 @@ input[type="number"] {
   border-radius: 14px;
   box-shadow: var(--sh);
   overflow: hidden;
-  animation: fadeUp .3s ease;
+  animation: fadeUp .35s cubic-bezier(0.16, 1, 0.3, 1);
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
@@ -1280,7 +1284,7 @@ input[type="number"] {
   border-radius: 14px;
   box-shadow: var(--sh);
   padding: 16px;
-  animation: fadeUp .3s ease;
+  animation: fadeUp .35s cubic-bezier(0.16, 1, 0.3, 1);
   width: 100%;
   box-sizing: border-box;
   height: auto; /* растягивается по содержимому */
@@ -1352,7 +1356,7 @@ input[type="number"] {
   border-radius: 10px;
   padding: 6px;
   overflow: visible; /* содержимое не обрезается */
-  transition: .15s;
+  transition: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
   height: auto; /* ячейка растягивается */
   display: flex;
   flex-direction: column;
@@ -1506,7 +1510,7 @@ input[type="number"] {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
   gap: 14px;
-  animation: fadeUp .3s ease;
+  animation: fadeUp .35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .pj-card {
   background: #fff;
@@ -1517,7 +1521,7 @@ input[type="number"] {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  transition: .15s;
+  transition: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .pj-card:hover {
   transform: translateY(-2px);
@@ -1618,7 +1622,7 @@ input[type="number"] {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  animation: fadeUp .3s ease;
+  animation: fadeUp .35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .st-section {
   background: #fff;
@@ -1810,7 +1814,7 @@ input[type="number"] {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  animation: fadeUp .3s ease;
+  animation: fadeUp .35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .rep-cards {
   display: grid;
@@ -1869,7 +1873,7 @@ input[type="number"] {
 
 /* --- cabinet --- */
 .cab {
-  animation: fadeUp .3s ease;
+  animation: fadeUp .35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .cab-grid {
   display: grid;
@@ -1971,7 +1975,7 @@ input[type="number"] {
   border-radius: 99px;
   position: relative;
   cursor: pointer;
-  transition: .2s;
+  transition: 0.22s cubic-bezier(0.4, 0, 0.2, 1);
   flex: none;
 }
 .toggle.on {
@@ -1985,7 +1989,7 @@ input[type="number"] {
   height: 18px;
   background: #fff;
   border-radius: 99px;
-  transition: .2s;
+  transition: 0.22s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .toggle.on .toggle-knob {
   left: 20px;
@@ -2007,7 +2011,7 @@ input[type="number"] {
   padding: 8px 12px;
   font-size: 13px;
   cursor: pointer;
-  transition: .15s;
+  transition: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .roles-item:hover {
   border-color: var(--acc2);
@@ -2125,19 +2129,24 @@ input[type="number"] {
   position: fixed;
   inset: 0;
   background: rgba(12,21,38,.55);
-  backdrop-filter: blur(3px);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 50;
   padding: 20px;
+  opacity: 0;
+  animation: fadeIn .25s ease-out forwards;
+}
+.overlay-visible {
+  opacity: 1;
 }
 .modal {
   width: 100%;
   background: #fff;
   border-radius: 16px;
   box-shadow: 0 24px 60px rgba(2,8,23,.35);
-  animation: popIn .2s ease;
+  animation: popIn .35s cubic-bezier(0.16, 1, 0.3, 1);
   max-height: 92vh;
   display: flex;
   flex-direction: column;
@@ -2221,7 +2230,7 @@ input[type="number"] {
   height: 100%;
   background: linear-gradient(90deg, #10b981, #0ea5e9);
   border-radius: 99px;
-  transition: width .3s ease;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .tm-logs {
   display: flex;
@@ -2357,7 +2366,7 @@ input[type="number"] {
   overflow: visible;
 }
 .dependency-arrow path {
-  transition: stroke 0.15s ease, fill 0.15s ease;
+  transition: stroke 0.18s cubic-bezier(0.4, 0, 0.2, 1), fill 0.18s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .dependency-arrow:hover path {
   stroke: #2563eb;
@@ -2373,7 +2382,7 @@ input[type="number"] {
   min-width: 280px;
   max-width: 360px;
   z-index: 1001;
-  animation: popIn 0.2s ease;
+  animation: popIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .popover-overlay {
   position: fixed;
@@ -2453,7 +2462,7 @@ input[type="number"] {
   padding: 6px 14px;
   border-radius: 6px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .view-btn:hover {
   background: rgba(255, 255, 255, 0.5);
@@ -2477,7 +2486,7 @@ input[type="number"] {
   border: 2px dashed #94a3b8;
   border-radius: 12px;
   background: #f1f5f9;
-  transition: background 0.15s;
+  transition: background 0.18s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .drag-placeholder:last-child {
   margin-bottom: 0;
