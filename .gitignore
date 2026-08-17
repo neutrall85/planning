@@ -2,62 +2,37 @@
 # Build artifacts
 dist/
 build/
-*.o
-*.obj
-*.out
 
 # Dependencies
 node_modules/
-.pnpm-store/
-.yarn/
-.yalc/
-.npm/
-
-# Cache directories
-.cache/
-.vite/
-.vercel/
 
 # Environment
 .env
 .env.local
-.env.*
-!*.env.example
+*.env.*
 
-# Logs
-*.log
-
-# IDE files
+# Editor/IDE
 .vscode/
 .idea/
 *.swp
 *.swo
-.DS_Store
-Thumbs.db
+*.tmp
 
-# Python specific
+# Logs
+*.log
+
+# Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-.Python
-*.so
-.coverage
-coverage/
-htmlcov/
-.pytest_cache/
-.mypy_cache/
-.tox/
-.eggs/
-*.egg-info/
-dist/
-sdist/
-wheels/
-*.whl
-*.egg
 
-# Temporary files
-*.tmp
-*.temp
-*~
+# TypeScript/JavaScript
+*.tsbuildinfo
+.nyc_output
+coverage/
+
+# OS
+.DS_Store
+Thumbs.db
 ```
