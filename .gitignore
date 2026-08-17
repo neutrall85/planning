@@ -11,7 +11,13 @@ target/
 *.log
 *.tmp
 
-# Environment
+# Build artifacts
+dist/
+build/
+*.min.js
+*.bundle.js
+
+# Environment variables
 .env
 .env.local
 *.env.*
