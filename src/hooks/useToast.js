@@ -1,9 +1,9 @@
-// ToastLogic.jsx - логика управления Toast
+// useToast.js - логика управления Toast
 // Экспортирует хук useToast и компонент ToastContainer
 // Fast Refresh работает корректно, так как файл экспортирует только хук
 
 import { useState } from 'react';
-import { ToastComponent } from './ToastComponent';
+import { ToastComponent } from '../components/ToastComponent';
 
 export const useToastLogic = () => {
   const [toasts, setToasts] = useState([]);
@@ -41,3 +41,7 @@ export const useToastLogic = () => {
 
   return { toast, ToastContainer };
 };
+
+// Экспорт для совместимости
+export const useToast = useToastLogic;
+export { ToastComponent };
