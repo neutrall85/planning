@@ -114,7 +114,7 @@ export const useProjectOperations = ({
       }
     } else {
       // Create new project
-      onAddAudit('Создание проекта', project.name, 'project', project.id);
+      // Журналирование перенесено в MainLayout.tsx для подробного описания
       
       // Notify project manager if not self
       if (project.managerId && project.managerId !== currentUser?.id) {
@@ -123,16 +123,13 @@ export const useProjectOperations = ({
     }
     
     onUpsertProject(project);
-  }, [projects, currentUser, validateBudget, notifyStatusChange, onUpsertProject, onAddNotification, onAddAudit]);
+  }, [projects, currentUser, validateBudget, notifyStatusChange, onUpsertProject, onAddNotification]);
 
   // Delete operation with audit logging
   const deleteProject = useCallback((id: string) => {
     const project = projects.find(p => p.id === id);
     if (project) {
-      onAddAudit('Удаление проекта', {
-        name: project.name,
-        status: typeof project.status === 'string' ? PROJECT_STATUSES[project.status as keyof typeof PROJECT_STATUSES] || project.status : project.status
-      }, 'project', id);
+      // Журналирование перенесено в MainLayout.tsx для подробного описания
       
       // Notify all stakeholders
       const message = `Проект "${sanitizeHtml(project.name)}" удалён`;
@@ -153,7 +150,7 @@ export const useProjectOperations = ({
       });
     }
     onDeleteProject(id);
-  }, [projects, tasks, currentUser, onDeleteProject, onAddNotification, onAddAudit]);
+  }, [projects, tasks, currentUser, onDeleteProject, onAddNotification]);
 
   return {
     upsertProject,
