@@ -1,4 +1,5 @@
 // Иконки приложения - единый файл с готовыми SVG-компонентами
+import type { JSX } from 'react';
 
 type IconProps = {
   size?: number;
@@ -99,7 +100,8 @@ export const ICONS = {
 export const Ic = ({ name, d, size, w, className }: { name?: keyof typeof ICONS; d?: IconComponent } & IconProps) => {
   // Поддержка старого интерфейса с prop "d"
   if (d) {
-    return <d size={size} w={w} className={className} />;
+    const IconComp = d;
+    return <IconComp size={size} w={w} className={className} />;
   }
   // Новый интерфейс с prop "name"
   const IconComponent = name ? ICONS[name] : null;

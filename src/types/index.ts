@@ -220,13 +220,15 @@ export interface Notification {
  */
 export interface Comment {
   id: string;
-  taskId: string;
+  taskId?: string;
+  projectId?: string;
   authorId: string;
   text: string;
   createdAt: string;
   updatedAt?: string;
   parentId?: string;
   mentions?: string[];
+  ts?: number;
 }
 
 /**
