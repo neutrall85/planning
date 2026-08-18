@@ -494,7 +494,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', planSum, onClos
     const newSp = sp + h;
     const projectCode = db.projects.find(p => p.id === f.projectId)?.code || '—';
     const assigneesStr = (f.assigneeIds || []).map(id => empName(id)).join(', ');
-    const auditDetails = `Задача "${f.title}" в проекте ${projectCode}, плановые часы: ${f.plannedHours ?? '—'}, фактические часы: ${newSp} (внесено ${h})${logNote.trim() ? `, комментарий: ${logNote.trim()}` : ''}${assigneesStr ? `, исполнители: ${assigneesStr}` : ''}`;
+    const auditDetails = `Задача "${f.title}" в проекте ${projectCode}, плановые часы: ${f.plannedHours ?? '—'}, фактические часы: ${newSp} (внесено ${h})${logNote.trim() ? `, комментарий: ${logNote.trim()}` : ''}${assigneesStr.length > 0 ? `, исполнители: ${assigneesStr}` : ''}`;
     // Передаём userId явно как пятый параметр
     store.addAudit('Внесение часов', auditDetails, 'task', f.id, ur.id);
 
