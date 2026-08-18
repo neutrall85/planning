@@ -271,7 +271,9 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', planSum, onClos
     const history = [...(f.history || [])];
     const statusToSave = newStatus || f.status;
     if (existing && existing.status !== statusToSave) {
-      history.push({ ts: Date.now(), who: ur.id, text: `Статус: ${TASK_STATUSES[existing.status].label} → ${TASK_STATUSES[statusToSave].label}` });
+      const oldStatusInfo = TASK_STATUSES.find(s => s.value === existing.status);
+      const newStatusInfo = TASK_STATUSES.find(s => s.value === statusToSave);
+      history.push({ ts: Date.now(), who: ur.id, text: `Статус: ${oldStatusInfo?.label || existing.status} → ${newStatusInfo?.label || statusToSave}` });
     }
 
     let finalStart = f.start;
