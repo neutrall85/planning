@@ -8,4 +8,3 @@ export { DelegationModal } from './DelegationModal';
 export { VacNowModal } from './VacNowModal';
 export { EmployeeEditModal } from './EmployeeEditModal';
 export { ChangePasswordModal } from './ChangePasswordModal';
-export { CreateEmployeeModal } from './CreateEmployeeModal';
