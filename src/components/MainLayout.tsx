@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { useStore } from '../hooks';
+import { useAuth } from '../hooks';
 import { useTaskOperations } from '../hooks/business/useTaskOperations';
 import { useProjectOperations } from '../hooks/business/useProjectOperations';
 import { hasRole, canCreateTask, canExport, canChangeTaskStatus } from '../utils/permissions';
@@ -26,7 +26,7 @@ import {
 } from './Modals';
 
 export default function MainLayout({ store, data, user, toast }) {
-  const { logout } = useStore();
+  const { logout } = useAuth();
   
   // Интеграция useTaskOperations для инкапсуляции бизнес-логики задач
   const taskOps = useTaskOperations({

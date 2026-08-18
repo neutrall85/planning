@@ -79,6 +79,7 @@ export interface EmployeeDepartment {
   deptId: string;
   primary?: boolean;
   roleId?: Role;
+  position?: string;
 }
 
 /**
@@ -278,10 +279,10 @@ export interface HoursRequest {
   employeeId: string;
   hours: number;
   comment?: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: HoursRequestStatus;
   createdAt: string;
   // Дополнительные поля для DataStore
-  kind?: string;
+  kind?: HoursRequestKind;
   targetId?: string;
   oldH?: number;
   newH?: number;
@@ -303,8 +304,8 @@ export interface RoleDelegation {
   // Дополнительные поля для DataStore
   fromId?: string;
   toId?: string;
-  roles?: string[];
-  status?: string;
+  roles?: Role[];
+  status?: 'pending' | 'approved' | 'rejected';
   end?: string;
 }
 
@@ -346,6 +347,16 @@ export interface StoreData {
   // Дополнительные поля для DataStore
   audit?: any[];
 }
+
+/**
+ * Статус заявки на часы
+ */
+export type HoursRequestStatus = 'pending' | 'approved' | 'rejected';
+
+/**
+ * Вид заявки на часы
+ */
+export type HoursRequestKind = 'change' | 'add' | 'correction';
 
 /**
  * Результат валидации
