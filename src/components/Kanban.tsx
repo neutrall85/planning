@@ -103,7 +103,8 @@ export default function Kanban({
     const task = db.tasks.find(t => t.id === taskId);
     if (!task) return;
     if (!canChangeTaskStatus(ur, task, newStatus, db)) {
-      alert(`У вас нет прав на перевод задачи в статус "${TASK_STATUSES[newStatus].label}"`);
+      const statusConfig = TASK_STATUSES.find(s => s.value === newStatus);
+      alert(`У вас нет прав на перевод задачи в статус "${statusConfig?.label || newStatus}"`);
       return;
     }
     onMove(taskId, newStatus);
@@ -160,6 +161,8 @@ export default function Kanban({
 
       <div className="kanban k5">
         {TASK_STATUS_ORDER.map((st) => {
+          const statusConfig = TASK_STATUSES.find(s => s.value === st);
+          if (!statusConfig) return null;
           const list = visible.filter(t => t.status === st);
 
           return (
@@ -171,8 +174,8 @@ export default function Kanban({
               onDragLeave={handlers.onDragEnd}
             >
               <div className="kcol-head">
-                <span className="kdot" style={{ background: TASK_STATUSES[st].color }} />
-                {TASK_STATUSES[st].label}
+                <span className="kdot" style={{ background: statusConfig.color }} />
+                {statusConfig.label}
                 <span className="kcount">{list.length}</span>
               </div>
               <div className="kcol-body">
