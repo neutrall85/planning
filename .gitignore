@@ -1,25 +1,11 @@
-```
+```gitignore
 # Dependencies
 node_modules/
 
 # Build outputs
 dist/
 build/
-*.js.map
-*.ts.map
-
-# Logs and temp files
-*.log
-*.tmp
-
-# Environment variables
-.env
-.env.local
-*.env.*
-
-# Editors
-.vscode/
-.idea/
+target/
 
 # Python
 __pycache__/
@@ -30,65 +16,46 @@ __pycache__/
 env/
 venv/
 .venv/
-pip-log.txt
-pip-delete-this-directory.txt
-.tox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.log
-.git/modules/
-*.sublime-workspace
+.ENV
+.env
+.env.*
+.env.local
+.env.production
+.env.development
+.mypy_cache/
 .pytest_cache/
-.hypothesis/
+.coverage
+coverage/
 
-# Compiled and binary files
-*.o
-*.obj
-*.exe
-*.dll
-*.so
-*.a
-*.out
-*.class
-*.jar
-*.war
-*.ear
-*.iml
-*.ipr
-*.iws
-*.swo
+# IDE
+.vscode/
+.idea/
 *.swp
+*.swo
+*~
 
-# OS generated files
+# OS
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
-Icon?
-desktop.ini
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
 
 # Compressed files
 *.zip
+*.tar.gz
+*.tar.bz2
+*.tar.xz
 *.gz
-*.tar
-*.tgz
 *.bz2
 *.xz
 *.7z
 *.rar
-*.Z
-*.lz
-*.lzo
-*.tar.gz
-*.tar.bz2
-*.tar.xz
 *.zst
 *.lz4
 *.lzh
@@ -96,16 +63,15 @@ desktop.ini
 *.arj
 *.rpm
 *.deb
+*.Z
+*.lz
+*.lzo
 
-# Coverage reports
-coverage/
-htmlcov/
-*.gcov
-*.lcov
+# Environment specific
+.env.local
+.env.*local
 
-# IDE specific
-.vs/
-*.swp
-*.swo
-*~
+# TypeScript/JavaScript build artifacts
+*.js.map
+*.tsbuildinfo
 ```

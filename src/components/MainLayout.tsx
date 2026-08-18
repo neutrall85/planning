@@ -496,9 +496,16 @@ export default function MainLayout({ store, data, user, toast }) {
             const details = Object.entries(changes).map(([k, v]) => `${k}: ${v}`).join('; ');
             store.addAudit('Изменение задачи', `Задача "${t.title}" в проекте ${projectCode}. Изменения: ${details}`, 'task', t.id);
           } else if (isNew) {
-            const actual = t.logs ? t.logs.reduce((s, l) => s + l.hours, 0) : 0;
             const projectCode = data.projects.find(p => p.id === t.projectId)?.code || '—';
-            const auditDetails = `Задача "${t.title}" в проекте ${projectCode}, плановые часы: ${t.plannedHours ?? '—'}, фактические часы: ${actual}`;
+            const assigneeIds = t.assigneeIds || [];
+            const assigneesStr = assigneeIds.length > 0 
+              ? assigneeIds.map(id => {
+                  const emp = data.employees.find(e => e.id === id);
+                  return emp ? `${emp.lastName} ${emp.firstName[0]}.`.replace(/\s+/g, ' ').trim() : '';
+                }).filter(Boolean).join(', ')
+              : 'не назначены';
+            const deadlineStr = t.deadline ? fmtDMY(new Date(t.deadline)) : '—';
+            const auditDetails = `Задача "${t.title}" в проекте ${projectCode}, плановые часы: ${t.plannedHours ?? '—'}, срок: ${deadlineStr}, исполнители: ${assigneesStr}`;
             store.addAudit('Создание задачи', auditDetails, 'task', t.id);
           }
           // Если изменений нет и задача не новая (только внесены часы) - ничего не журналируем здесь,
