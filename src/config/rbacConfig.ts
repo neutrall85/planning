@@ -43,6 +43,15 @@ export const RBAC_CONFIG = {
     vacation: ['approve', 'reject'],
     task: ['read', 'approve'],
   },
+  
+  // --- Главный экономист ---
+  economist: {
+    '*': ['read'], // Только чтение всех ресурсов
+    task: ['read', 'write', 'edit_fields'], // Может создавать и редактировать задачи
+    project: ['read', 'write'], // Может редактировать проекты
+    employee: ['read'], // Только просмотр сотрудников
+    vacation: ['read'],
+  },
 };
 
 // Роли по умолчанию для новых пользователей
