@@ -1,0 +1,8 @@
+export { TaskModal } from './TaskModal';
+export { ProjectModal } from './ProjectModal';
+export { HoursRequestModal } from './HoursRequestModal';
+export { RolesModal } from './RolesModal';
+export { DeptsModal } from './DeptsModal';
+export { VacationModal } from './VacationModal';
+export { DelegationModal } from './DelegationModal';
+export { VacNowModal } from './VacNowModal';
