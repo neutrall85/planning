@@ -3,12 +3,35 @@ import { Modal } from '../Modal';
 import { Ic, ICONS } from '../Icons';
 import { PASSWORD_AUTO_HIDE_MS } from '../../utils/config';
 
+interface User {
+  pass: string;
+  passwordHistory?: string[];
+  [key: string]: any;
+}
+
+interface FormData {
+  oldPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
+interface Errors {
+  oldPassword?: string;
+  newPassword?: string;
+  confirmPassword?: string;
+}
+
+interface CheckResult {
+  ok: boolean;
+  t: string;
+}
+
 /**
  * Валидация пароля (аналогично регистрации)
  * @param {string} p - пароль для проверки
  * @returns {Array<{ok: boolean, t: string}>} массив проверок
  */
-function passIssues(p) {
+function passIssues(p: string): CheckResult[] {
   return [
     { ok: p.length >= 8, t: "Минимум 8 символов" },
     { ok: /[A-ZА-ЯЁ]/.test(p), t: "Заглавная буква" },
@@ -18,25 +41,39 @@ function passIssues(p) {
   ];
 }
 
+interface ToastApi {
+  info: (msg: string, duration?: number) => void;
+  success: (msg: string, duration?: number) => void;
+  warning: (msg: string, duration?: number) => void;
+  error: (msg: string, duration?: number) => void;
+}
+
+interface ChangePasswordModalProps {
+  user: User;
+  store: any;
+  onClose: () => void;
+  toast: ToastApi;
+}
+
 /**
  * Модалка смены пароля с валидацией старого пароля и проверкой сложности нового
  */
-export const ChangePasswordModal = ({ user, store, onClose, toast }) => {
-  const [formData, setFormData] = useState({
+export const ChangePasswordModal = ({ user, store, onClose, toast }: ChangePasswordModalProps) => {
+  const [formData, setFormData] = useState<FormData>({
     oldPassword: '',
     newPassword: '',
     confirmPassword: '',
   });
-  const [errors, setErrors] = useState({});
+  const [errors, setErrors] = useState<Errors>({});
   const [loading, setLoading] = useState(false);
   const [showOldPass, setShowOldPass] = useState(false);
   const [showNewPass, setShowNewPass] = useState(false);
   const [showConfirmPass, setShowConfirmPass] = useState(false);
-  const oldPassTimerRef = useRef(null);
-  const newPassTimerRef = useRef(null);
-  const confirmPassTimerRef = useRef(null);
+  const oldPassTimerRef = useRef<number | null>(null);
+  const newPassTimerRef = useRef<number | null>(null);
+  const confirmPassTimerRef = useRef<number | null>(null);
 
-  const handleChange = (field, value) => {
+  const handleChange = (field: keyof FormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     // Очищаем ошибку при изменении поля
     if (errors[field]) {
@@ -44,27 +81,29 @@ export const ChangePasswordModal = ({ user, store, onClose, toast }) => {
     }
   };
 
-  const togglePasswordVisibility = (field, setState, timerRef) => {
+  const togglePasswordVisibility = (setState: React.Dispatch<React.SetStateAction<boolean>>, timerRef: React.RefObject<number | null>) => {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
     
-    if (setState()) {
-      // Уже видимый, скрываем
-      setState(false);
-    } else {
-      // Скрытый, показываем
-      setState(true);
-      timerRef.current = setTimeout(() => {
-        setState(false);
-        timerRef.current = null;
-      }, PASSWORD_AUTO_HIDE_MS);
-    }
+    setState(prev => {
+      if (prev) {
+        // Уже видимый, скрываем
+        return false;
+      } else {
+        // Скрытый, показываем
+        timerRef.current = window.setTimeout(() => {
+          setState(false);
+          timerRef.current = null;
+        }, PASSWORD_AUTO_HIDE_MS);
+        return true;
+      }
+    });
   };
 
   const handleSubmit = async () => {
-    const newErrors = {};
+    const newErrors: Errors = {};
 
     // Проверка старого пароля
     if (!formData.oldPassword) {
@@ -145,7 +184,7 @@ export const ChangePasswordModal = ({ user, store, onClose, toast }) => {
             />
             <button
               type="button"
-              onClick={() => togglePasswordVisibility('oldPassword', setShowOldPass, oldPassTimerRef)}
+              onClick={() => togglePasswordVisibility(setShowOldPass, oldPassTimerRef)}
               className="pass-toggle-btn"
               style={{
                 position: 'absolute',
@@ -181,7 +220,7 @@ export const ChangePasswordModal = ({ user, store, onClose, toast }) => {
             />
             <button
               type="button"
-              onClick={() => togglePasswordVisibility('newPassword', setShowNewPass, newPassTimerRef)}
+              onClick={() => togglePasswordVisibility(setShowNewPass, newPassTimerRef)}
               className="pass-toggle-btn"
               style={{
                 position: 'absolute',
@@ -224,7 +263,7 @@ export const ChangePasswordModal = ({ user, store, onClose, toast }) => {
             />
             <button
               type="button"
-              onClick={() => togglePasswordVisibility('confirmPassword', setShowConfirmPass, confirmPassTimerRef)}
+              onClick={() => togglePasswordVisibility(setShowConfirmPass, confirmPassTimerRef)}
               className="pass-toggle-btn"
               style={{
                 position: 'absolute',
