@@ -1,5 +1,5 @@
 import { } from 'react';
-import { TASK_STATUSES, PRIORITIES } from '../../../utils/constants';
+import { TASK_STATUSES_ARRAY, PRIORITIES_ARRAY } from '../../../utils/constants';
 import { fmtDMY, iso, parseISO } from '../../../utils/date';
 
 /**
@@ -79,7 +79,7 @@ export const TaskForm = ({
           onChange={(e) => onChange('status', e.target.value)}
           disabled={readOnly}
         >
-          {TASK_STATUSES.map(s => (
+          {TASK_STATUSES_ARRAY.map(s => (
             <option key={s.value} value={s.value}>{s.label}</option>
           ))}
         </select>
@@ -93,7 +93,7 @@ export const TaskForm = ({
           onChange={(e) => onChange('priority', e.target.value)}
           disabled={readOnly}
         >
-          {PRIORITIES.map(p => (
+          {PRIORITIES_ARRAY.map(p => (
             <option key={p.value} value={p.value}>{p.label}</option>
           ))}
         </select>
