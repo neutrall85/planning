@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useStore } from './useStore';
+import type { Employee } from '../types';
 
 export const useAuth = () => {
   const { store } = useStore();
-  const [user, setUser] = useState(store.getCurrentUser() || null);
+  const [user, setUser] = useState<Employee | null>(store.getCurrentUser() || null);
   
   // Используем useCallback для стабильной ссылки на функцию
   const checkUser = useCallback(() => {
@@ -21,7 +22,7 @@ export const useAuth = () => {
   }, [store, checkUser]);
 
   const roles = user ? user.roles : [];
-  const hasRole = (role) => roles.includes(role);
-  const hasAnyRole = (...rs) => rs.some(r => roles.includes(r));
+  const hasRole = (role: string) => roles.includes(role as any);
+  const hasAnyRole = (...rs: string[]) => rs.some(r => roles.includes(r as any));
   return { user, roles, hasRole, hasAnyRole };
 };
