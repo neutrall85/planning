@@ -12,6 +12,9 @@ export const ROLES = {
   executor:         { label: "Исполнитель", short: "ИСП", color: "#64748b" },
 } as const;
 
+export type RoleKey = keyof typeof ROLES;
+export type RoleDef = typeof ROLES[RoleKey];
+
 export const TASK_STATUSES = {
   new:      { label: "Новая", color: "#8b5cf6" },
   inwork:   { label: "В работе", color: "#0ea5e9" },
@@ -20,11 +23,17 @@ export const TASK_STATUSES = {
   cancelled:{ label: "Отменена", color: "#64748b" },
 } as const;
 
+export type TaskStatusKey = keyof typeof TASK_STATUSES;
+export type TaskStatusDef = typeof TASK_STATUSES[TaskStatusKey];
+
 export const TASK_STATUS_ORDER = ["new", "inwork", "review", "closed", "cancelled"] as const;
 
+// Тип для элемента массива статусов
+export type TaskStatusItem = { value: TaskStatusKey } & TaskStatusDef;
+
 // Массив для итерации в компонентах
-export const TASK_STATUSES_ARRAY = Object.entries(TASK_STATUSES).map(([value, def]) => ({
-  value: value as keyof typeof TASK_STATUSES,
+export const TASK_STATUSES_ARRAY: TaskStatusItem[] = Object.entries(TASK_STATUSES).map(([value, def]) => ({
+  value: value as TaskStatusKey,
   ...def,
 }));
 
@@ -35,9 +44,15 @@ export const PRIORITIES = {
   crit: { label: "Критический", color: "#dc2626" },
 } as const;
 
+export type PriorityKey = keyof typeof PRIORITIES;
+export type PriorityDef = typeof PRIORITIES[PriorityKey];
+
+// Тип для элемента массива приоритетов
+export type PriorityItem = { value: PriorityKey } & PriorityDef;
+
 // Массив для итерации в компонентах
-export const PRIORITIES_ARRAY = Object.entries(PRIORITIES).map(([value, def]) => ({
-  value: value as keyof typeof PRIORITIES,
+export const PRIORITIES_ARRAY: PriorityItem[] = Object.entries(PRIORITIES).map(([value, def]) => ({
+  value: value as PriorityKey,
   ...def,
 }));
 

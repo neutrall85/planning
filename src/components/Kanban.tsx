@@ -16,6 +16,7 @@ export default function Kanban({
   sortBy: parentSortBy,
   hideFilters = false,
   assigneeFilter,
+  onAssigneeFilterChange,
   onAssigneeOptionsChange,
 }) {
   const [fProj, setFProj] = useState("all");

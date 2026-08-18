@@ -5,7 +5,7 @@ import { getTaskSpent, vacOverlap } from '../utils/dataHelpers';
 import { computeScope, taskVisible } from '../utils/permissions';
 import { Ic, ICONS } from './Icons';
 
-export default function Gantt({ db, ur, openTask, openProject }) {
+export default function Gantt({ db, ur, openTask, openProject, patchTask }) {
   const scope = computeScope(ur, db);
   // Заменяем !t.archived на isTaskActive(t)
   const tasks = db.tasks.filter(t => isTaskActive(t) && taskVisible(ur, scope, t, db) && t.start && t.deadline);

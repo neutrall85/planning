@@ -13,7 +13,7 @@ function getCategoryColor(project) {
   return PROJECT_CATEGORIES[categoryKey]?.color || PROJECT_CATEGORIES.NORM.color;
 }
 
-export default function Archive({ db, ur, openTask, openProject, restoreTask, restoreProject }) {
+export default function Archive({ db, ur, openTask, openProject, restoreTask, restoreProject, setArchiveMonths }) {
   const [fFrom, setFFrom] = useState('');
   const [fTo, setFTo] = useState('');
   const [fProj, setFProj] = useState('all');
