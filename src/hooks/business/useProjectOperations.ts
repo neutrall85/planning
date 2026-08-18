@@ -102,9 +102,9 @@ export const useProjectOperations = ({
       // Handle status change to closed
       if ((project.status === 'closed' || project.archived) && 
           (existingProject.status !== 'closed' && !existingProject.archived)) {
-        onAddAudit('Закрытие проекта', {
+        onAddAudit('Изменение проекта', {
           name: project.name,
-          status: `${PROJECT_STATUSES[existingProject.status]?.label || existingProject.status} → Закрыт`
+          status: `${typeof existingProject.status === 'string' ? PROJECT_STATUSES[existingProject.status as keyof typeof PROJECT_STATUSES] || existingProject.status : existingProject.status} → Закрыт`
         }, 'project', project.id);
       } else {
         onAddAudit('Изменение проекта', {
@@ -131,7 +131,7 @@ export const useProjectOperations = ({
     if (project) {
       onAddAudit('Удаление проекта', {
         name: project.name,
-        status: PROJECT_STATUSES[project.status]?.label || project.status
+        status: typeof project.status === 'string' ? PROJECT_STATUSES[project.status as keyof typeof PROJECT_STATUSES] || project.status : project.status
       }, 'project', id);
       
       // Notify all stakeholders

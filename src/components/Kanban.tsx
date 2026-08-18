@@ -198,7 +198,7 @@ export default function Kanban({
                   const spent = t.logs.reduce((s, l) => s + l.hours, 0);
                   const overdue = t.deadline && !["closed", "cancelled"].includes(t.status) && t.deadline < TODAY;
                   const soon = t.deadline && !overdue && !["closed", "cancelled"].includes(t.status) && daysDiff(TODAY, t.deadline) <= 3;
-                  const prioColor = PRIORITIES[t.priority]?.color || PRIORITIES.mid.color;
+                  const prioColor = PRIORITIES.find(p => p.value === t.priority)?.color || PRIORITIES.find(p => p.value === 'mid').color;
 
                   return (
                     <React.Fragment key={t.id}>

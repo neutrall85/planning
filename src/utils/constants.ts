@@ -12,22 +12,22 @@ export const ROLES = {
   executor:         { label: "Исполнитель", short: "ИСП", color: "#64748b" },
 } as const;
 
-export const TASK_STATUSES = {
-  new:      { label: "Новая", color: "#8b5cf6" },
-  inwork:   { label: "В работе", color: "#0ea5e9" },
-  review:   { label: "На проверке", color: "#fbbf24" },
-  closed:   { label: "Закрыта", color: "#10b981" },
-  cancelled:{ label: "Отменена", color: "#64748b" },
-} as const;
+export const TASK_STATUSES = [
+  { value: 'new', label: "Новая", color: "#8b5cf6" },
+  { value: 'inwork', label: "В работе", color: "#0ea5e9" },
+  { value: 'review', label: "На проверке", color: "#fbbf24" },
+  { value: 'closed', label: "Закрыта", color: "#10b981" },
+  { value: 'cancelled', label: "Отменена", color: "#64748b" },
+] as const;
 
 export const TASK_STATUS_ORDER = ["new", "inwork", "review", "closed", "cancelled"] as const;
 
-export const PRIORITIES = {
-  low:  { label: "Низкий", color: "#3b82f6" },
-  mid:  { label: "Средний", color: "#f59e0b" },
-  high: { label: "Высокий", color: "#f97316" },
-  crit: { label: "Критический", color: "#dc2626" },
-} as const;
+export const PRIORITIES = [
+  { value: 'low', label: "Низкий", color: "#3b82f6" },
+  { value: 'mid', label: "Средний", color: "#f59e0b" },
+  { value: 'high', label: "Высокий", color: "#f97316" },
+  { value: 'crit', label: "Критический", color: "#dc2626" },
+] as const;
 
 // Типы зависимостей между задачами
 export const DEPENDENCY_TYPES = {

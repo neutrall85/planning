@@ -205,7 +205,7 @@ export default function Gantt({ db, ur, openTask, openProject }) {
                     // Показываем значок отпуска, если отпуск есть и он ещё не закончился (end >= TODAY)
                     const showVac = !hasDelegate && vac && (!vac.end || vac.end >= TODAY);
                     const tip = `${t.title}: ${fmtD(t.start)} — ${fmtD(t.deadline)}, план ${t.plannedHours ?? '—'} ч${showVac ? (vacValid ? `. Исполнитель в отпуске ${fmtDMY(vac.start)}–${fmtDMY(vac.end)}` : '. Внимание: исполнитель в отпуске, но даты отпуска не указаны корректно') : ''}`;
-                    const prioColor = PRIORITIES[t.priority]?.color || PRIORITIES.mid.color;
+                    const prioColor = PRIORITIES.find(p => p.value === t.priority)?.color || PRIORITIES.find(p => p.value === 'mid').color;
                     
                     // Расчет процента выполнения (факт / план)
                     const planned = t.plannedHours || 0;
