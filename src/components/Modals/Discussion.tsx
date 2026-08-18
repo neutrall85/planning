@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { uid, fmtDT, initials } from '../../utils/date';
 import { has } from '../../utils/permissions';
-import { Ic } from '../Icons';
+import { Ic, ICONS } from '../Icons';
 import { COMMENT_EDIT_WINDOW_MS } from '../../utils/config';
 import { primaryDept } from '../../utils/string';
 import { sanitizeHtml } from '../../utils/string';
@@ -283,7 +283,7 @@ export default function Discussion({
                 <div className="cm-edit">
                   <textarea
                     className="inp"
-                    rows="2"
+                    rows={2}
                     value={editText}
                     onChange={(e) => setEditText(e.target.value)}
                   />
