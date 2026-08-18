@@ -495,7 +495,8 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', planSum, onClos
     const projectCode = db.projects.find(p => p.id === f.projectId)?.code || '—';
     const assigneesStr = (f.assigneeIds || []).map(id => empName(id)).join(', ');
     const auditDetails = `Задача "${f.title}" в проекте ${projectCode}, плановые часы: ${f.plannedHours ?? '—'}, фактические часы: ${newSp} (внесено ${h})${logNote.trim() ? `, комментарий: ${logNote.trim()}` : ''}, исполнители: ${assigneesStr || 'не назначены'}`;
-    store.addAudit('Внесение часов', auditDetails, 'task', f.id);
+    // Передаём userId явно как пятый параметр
+    store.addAudit('Внесение часов', auditDetails, 'task', f.id, ur.id);
 
     // Очищаем поля и localStorage после успешного добавления
     setLogH("");

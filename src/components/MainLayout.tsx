@@ -482,11 +482,6 @@ export default function MainLayout({ store, data, user, toast }) {
             if (old.dependencyId !== t.dependencyId || old.dependencyType !== t.dependencyType) { hasChanges = true; changes.dependency = 'изменена зависимость'; }
           }
           
-          if (old && hasRole(user, 'admin') && hasChanges) {
-            const details = Object.entries(changes).map(([k, v]) => `${k}: ${v}`).join('; ');
-            store.addAudit('Административное изменение задачи (прямое)', `Задача "${t.title}": ${details}`, 'task', t.id);
-          }
-          
           // Используем taskOps.upsertTask для валидации и уведомлений
           try {
             taskOps.upsertTask(t);
@@ -495,16 +490,20 @@ export default function MainLayout({ store, data, user, toast }) {
             return;
           }
           
-          const actual = t.logs ? t.logs.reduce((s, l) => s + l.hours, 0) : 0;
-          const projectCode = data.projects.find(p => p.id === t.projectId)?.code || '—';
-          const assigneesStr = (t.assigneeIds || []).map(id => getEmpName(data, id)).join(', ');
-          const auditDetails = `Задача "${t.title}" в проекте ${projectCode}, плановые часы: ${t.plannedHours ?? '—'}, фактические часы: ${actual}, исполнители: ${assigneesStr || 'не назначены'}`;
-          
-          if (isNew) {
+          // Журналируем только реальные изменения задачи (не часы)
+          if (hasChanges) {
+            const projectCode = data.projects.find(p => p.id === t.projectId)?.code || '—';
+            const details = Object.entries(changes).map(([k, v]) => `${k}: ${v}`).join('; ');
+            store.addAudit('Изменение задачи', `Задача "${t.title}" в проекте ${projectCode}. Изменения: ${details}`, 'task', t.id);
+          } else if (isNew) {
+            const actual = t.logs ? t.logs.reduce((s, l) => s + l.hours, 0) : 0;
+            const projectCode = data.projects.find(p => p.id === t.projectId)?.code || '—';
+            const assigneesStr = (t.assigneeIds || []).map(id => getEmpName(data, id)).join(', ');
+            const auditDetails = `Задача "${t.title}" в проекте ${projectCode}, плановые часы: ${t.plannedHours ?? '—'}, фактические часы: ${actual}, исполнители: ${assigneesStr || 'не назначены'}`;
             store.addAudit('Создание задачи', auditDetails, 'task', t.id);
-          } else if (hasChanges) {
-            store.addAudit('Изменение задачи', auditDetails, 'task', t.id);
           }
+          // Если изменений нет и задача не новая (только внесены часы) - ничего не журналируем здесь,
+          // т.к. внесение часов уже залогировано в TaskModal.addLog()
           
           setModal(null);
         }} 
