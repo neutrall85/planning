@@ -2,9 +2,9 @@ import { useState, useRef, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { uid, fmtDT, initials } from '../../utils/date';
 import { has } from '../../utils/permissions';
-import { Ic, ICONS } from '../Icons';
+import { Ic } from '../Icons';
 import { COMMENT_EDIT_WINDOW_MS } from '../../utils/config';
-import { primaryDept } from '../../utils/dataHelpers';
+import { primaryDept } from '../../utils/string';
 import { sanitizeHtml } from '../../utils/string';
 
 function renderMentionText(text) {
