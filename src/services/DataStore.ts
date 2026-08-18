@@ -5,6 +5,20 @@ import { sanitizeHtml } from '../utils/sanitization';
 import { VACATION_TYPES } from '../utils/constants';
 import { validateTask, validateProject, validateEmployee, validateVacation } from '../utils/validation';
 import type { StoreData, Employee, Task, Project, Vacation, Notification, AuditLog, HoursRequestStatus, Role } from '../types';
+import { 
+  formatTaskCreate, 
+  formatTaskUpdate, 
+  formatTaskHoursLog,
+  formatProjectCreate, 
+  formatProjectUpdate,
+  formatEmployeeCreate,
+  formatEmployeeUpdate,
+  formatVacationCreate,
+  formatVacationUpdate,
+  formatRoleDelegate,
+  formatRoleRevoke,
+  formatUserRegister
+} from '../utils/journalService';
 
 interface LoginResult {
   success: boolean;
@@ -264,16 +278,33 @@ export default class DataStore {
       // ... остальные сравнения (dependency и т.д.) без изменения
 
       if (changes.length > 0) {
-        // Логирование изменений может быть добавлено здесь при необходимости
+        const detailsStr = formatTaskUpdate(oldTask, sanitizedTask, this._data.employees);
+        this.addAudit('Изменение задачи', detailsStr, 'task', sanitizedTask.id);
+        
+        // Уведомить всех исполнителей (кроме текущего)
+        assignees.forEach(id => {
+          if (id !== currentUser?.id) {
+            this.addNotification(id, message, { targetType: 'task', targetId: sanitizedTask.id });
+          }
+        });
+        // Уведомить автора, если он не исполнитель и не текущий пользователь
+        if (sanitizedTask.creatorId && !assignees.includes(sanitizedTask.creatorId) && sanitizedTask.creatorId !== currentUser?.id) {
+          this.addNotification(sanitizedTask.creatorId, message, { targetType: 'task', targetId: sanitizedTask.id });
+        }
+        // Уведомить ответственного по проекту, если он не совпадает с автором/исполнителями
+        const project = this._data.projects.find(p => p.id === sanitizedTask.projectId);
+        if (project && project.managerId && project.managerId !== sanitizedTask.creatorId && !assignees.includes(project.managerId) && project.managerId !== currentUser?.id) {
+          this.addNotification(project.managerId, message, { targetType: 'task', targetId: sanitizedTask.id });
+        }
       }
-      tasks = this._data.tasks.map(t => t.id === sanitizedTask.id ? sanitizedTask : t);
     } else {
-      // Создание новой задачи (без изменений)
+      // Создание новой задачи
       if (!sanitizedTask.createdAt) {
         sanitizedTask.createdAt = new Date().toISOString();
       }
       tasks = [...this._data.tasks, sanitizedTask];
-      this.addAudit('Создание задачи', sanitizedTask.title, 'task', sanitizedTask.id);
+      const detailsStr = formatTaskCreate(sanitizedTask, this._data.projects, this._data.employees);
+      this.addAudit('Создание задачи', detailsStr, 'task', sanitizedTask.id);
       (sanitizedTask.assigneeIds || []).forEach(id => {
         if (id !== this._currentUser?.id) {
           this.addNotification(id, `Вам назначена задача "${sanitizedTask.title}"`, { targetType: 'task', targetId: sanitizedTask.id });
@@ -289,7 +320,7 @@ export default class DataStore {
   deleteTask(id) {
     const task = this._data.tasks.find(t => t.id === id);
     if (task) {
-      this.addAudit('Удаление задачи', task.title);
+      this.addAudit('Удаление задачи', task.title, 'task', id);
     }
     this._data = { ...this._data, tasks: this._data.tasks.filter(t => t.id !== id) };
     this._notify();
@@ -300,6 +331,7 @@ export default class DataStore {
     const idx = this._data.projects.findIndex(p => p.id === project.id);
     let projects;
     if (idx >= 0) {
+      const oldProject = this._data.projects[idx];
       if (project.archived) {
         project.archivedAt = TODAY;
         this._data.tasks = this._data.tasks.map(t => {
@@ -315,9 +347,16 @@ export default class DataStore {
         this.addNotification(project.managerId || 'system', `Проект "${project.name}" архивирован`, { targetType: 'project', targetId: project.id });
       }
       projects = this._data.projects.map(p => p.id === project.id ? project : p);
+      
+      // Логирование изменений проекта
+      const detailsStr = formatProjectUpdate(oldProject, project);
+      if (detailsStr !== 'без изменений') {
+        this.addAudit('Изменение проекта', detailsStr, 'project', project.id);
+      }
     } else {
       projects = [...this._data.projects, project];
-      this.addAudit('Создание проекта', project.name, 'project', project.id);
+      const detailsStr = formatProjectCreate(project);
+      this.addAudit('Создание проекта', detailsStr, 'project', project.id);
     }
     this._data = { ...this._data, projects };
     this._notify();
@@ -327,7 +366,7 @@ export default class DataStore {
   deleteProject(id) {
     const project = this._data.projects.find(p => p.id === id);
     if (project) {
-      this.addAudit('Удаление проекта', project.name);
+      this.addAudit('Удаление проекта', `Проект "${project.name}" (${project.code})`, 'project', id);
     }
     this._data = {
       ...this._data,
@@ -342,11 +381,16 @@ export default class DataStore {
     const idx = this._data.vacations.findIndex(v => v.id === vac.id);
     let vacations;
     if (idx >= 0) {
-      this.addAudit('Изменение отпуска', `${vac.empId} ${fmtDMY(vac.start)}—${fmtDMY(vac.end)}`);
+      const oldVac = this._data.vacations[idx];
+      const emp = this._data.employees.find(e => e.id === vac.empId);
+      const detailsStr = formatVacationUpdate(oldVac, vac, emp);
+      this.addAudit('Изменение отпуска', detailsStr, 'vacation', vac.id);
       vacations = this._data.vacations.map(v => v.id === vac.id ? vac : v);
     } else {
       vacations = [...this._data.vacations, vac];
-      this.addAudit('Создание отпуска', `${vac.empId} ${fmtDMY(vac.start)}—${fmtDMY(vac.end)}`);
+      const emp = this._data.employees.find(e => e.id === vac.empId);
+      const detailsStr = formatVacationCreate(vac, emp);
+      this.addAudit('Создание отпуска', detailsStr, 'vacation', vac.id);
     }
     this._data = { ...this._data, vacations };
     this._notify();
@@ -358,7 +402,9 @@ export default class DataStore {
   deleteVacation(id) {
     const vac = this._data.vacations.find(v => v.id === id);
     if (vac) {
-      this.addAudit('Удаление отпуска', `${vac.empId} ${fmtDMY(vac.start)}—${fmtDMY(vac.end)}`);
+      const emp = this._data.employees.find(e => e.id === vac.empId);
+      const empName = emp ? `${emp.lastName} ${emp.firstName.charAt(0)}.` : 'Сотрудник';
+      this.addAudit('Удаление отпуска', `${empName}, период: ${fmtDMY(vac.start)}—${fmtDMY(vac.end)}`, 'vacation', id);
       if (vac.delegation.enabled) {
         this.revertDelegation(id);
       }
@@ -447,7 +493,13 @@ export default class DataStore {
       // Аудит изменений ролей (изменения подразделений логируются явно в компоненте DeptsModal)
       // skipRoleAudit=true используется при автоматическом добавлении роли "executor" системой
       if (!skipRoleAudit && JSON.stringify(oldEmp.roles) !== JSON.stringify(merged.roles)) {
-        this.addAudit('Изменение ролей сотрудника', `${merged.last} ${merged.first}`, 'employee', emp.id);
+        // Логирование изменения ролей убрано, чтобы избежать дублирования с DeptsModal
+      }
+
+      // Логирование изменений данных сотрудника
+      const detailsStr = formatEmployeeUpdate(oldEmp, merged);
+      if (detailsStr !== 'без изменений') {
+        this.addAudit('Изменение сотрудника', detailsStr, 'employee', emp.id);
       }
 
       employees = this._data.employees.map(e => e.id === emp.id ? merged : e);
@@ -458,7 +510,8 @@ export default class DataStore {
       }
     } else {
       employees = [...this._data.employees, emp];
-      this.addAudit('Создание сотрудника', `${emp.last} ${emp.first}`);
+      const detailsStr = formatEmployeeCreate(emp);
+      this.addAudit('Создание сотрудника', detailsStr, 'employee', emp.id);
     }
     this._data = { ...this._data, employees };
     this._notify();
@@ -695,6 +748,18 @@ export default class DataStore {
       : `Ваш запрос на передачу ролей (${rolesStr}) пользователю ${toName} отклонён`;
     this.addNotification(delegation.fromId, msg, { targetType: 'delegation', targetId: delegationId });
     
+    // Журналирование делегирования ролей
+    const fromEmp = this._data.employees.find(e => e.id === delegation.fromId);
+    const toEmp = this._data.employees.find(e => e.id === delegation.toId);
+    if (fromEmp && toEmp) {
+      if (approved) {
+        const detailsStr = formatRoleDelegate(toEmp, rolesStr, fromEmp);
+        this.addAudit('Делегирование роли', detailsStr, 'roleDelegation', delegationId);
+      } else {
+        this.addAudit('Отклонение делегирования роли', `Роли "${rolesStr}" не переданы сотруднику ${toEmp.lastName} ${toEmp.firstName.charAt(0)}.`, 'roleDelegation', delegationId);
+      }
+    }
+    
     this._notify();
   }
 
@@ -727,6 +792,15 @@ export default class DataStore {
     
     // Уведомление получателю
     this.addNotification(delegation.toId, `Делегирование ролей "${delegation.roles.join(', ')}" отозвано`, { targetType: 'roleDelegation', targetId: delegationId });
+    
+    // Журналирование отзыва роли
+    const fromEmp = this._data.employees.find(e => e.id === delegation.fromId);
+    const toEmp = this._data.employees.find(e => e.id === delegation.toId);
+    if (fromEmp && toEmp) {
+      const rolesStr = delegation.roles.join(', ');
+      const detailsStr = formatRoleRevoke(toEmp, rolesStr, fromEmp);
+      this.addAudit('Отзыв делегирования роли', detailsStr, 'roleDelegation', delegationId);
+    }
     
     this._notify();
   }
@@ -769,19 +843,20 @@ export default class DataStore {
           lockUntil: 0
         };
         updatedData.employees = [...updatedData.employees, newEmp];
-        this.addAudit('Регистрация нового сотрудника', `${newEmp.last} ${newEmp.first}`, 'employee', newEmp.id);
+        const detailsStr = formatUserRegister(newEmp, 'Исполнитель');
+        this.addAudit('Регистрация пользователя', detailsStr, 'employee', newEmp.id);
       }
     }
 
     this._data = updatedData;
     this._notify();
     
-    // Аудит
+    // Аудит одобрения/отклонения регистрации
     const empNameStr = `${request.last} ${request.first}`;
     if (approved) {
-      this.addAudit('Одобрение регистрации', { email: request.email, employee: empNameStr, position: request.position || 'Сотрудник' }, 'registration', requestId);
+      this.addAudit('Одобрение регистрации', `Пользователь ${empNameStr} (${request.email}) зарегистрирован в системе`, 'registration', requestId);
     } else {
-      this.addAudit('Отклонение регистрации', { email: request.email, employee: empNameStr, reason: request.rejectionReason || 'Не указана' }, 'registration', requestId);
+      this.addAudit('Отклонение регистрации', `Пользователь ${empNameStr} (${request.email}) отклонён. Причина: ${request.rejectionReason || 'Не указана'}`, 'registration', requestId);
     }
   }
 

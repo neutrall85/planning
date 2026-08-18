@@ -13,6 +13,7 @@ import {
   assigneeOptions, computeScope, canChangeTaskStatus,
 } from '../../utils/permissions';
 import { Ic, ICONS } from '../Icons';
+import { formatTaskHoursLog } from '../../utils/journalService';
 
 function generateRepeatDates(startDate, deadline, repeatConfig, endDate, maxCount = 100) {
   const { type, interval, days, endType, endValue } = repeatConfig;

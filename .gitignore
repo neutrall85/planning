@@ -1,57 +1,49 @@
-```gitignore
+```
+# Build artifacts
+dist/
+build/
+
 # Dependencies
 node_modules/
 
-# Build outputs
-dist/
-build/
-target/
+# Logs and temp files
+*.log
+*.tmp
+
+# Environment
+.env
+.env.local
+.env.*
+
+# Editors
+.vscode/
+.idea/
 
 # Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-.Python
-env/
-venv/
-.venv/
-.ENV
-.env
-.env.*
-.env.local
-.env.production
-.env.development
-.mypy_cache/
-.pytest_cache/
-.coverage
+
+# Compiled files
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.a
+*.out
+
+# Coverage
 coverage/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Logs
-*.log
-
-# Temporary files
-*.tmp
-*.temp
-*.bak
+htmlcov/
+.coverage
 
 # Compressed files
 *.zip
-*.tar.gz
-*.tar.bz2
-*.tar.xz
 *.gz
+*.tar
+*.tgz
 *.bz2
 *.xz
 *.7z
@@ -66,12 +58,18 @@ Thumbs.db
 *.Z
 *.lz
 *.lzo
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.tar.zst
 
-# Environment specific
-.env.local
-.env.*local
+# System files
+.DS_Store
+Thumbs.db
 
-# TypeScript/JavaScript build artifacts
-*.js.map
-*.tsbuildinfo
+# Caches
+.mypy_cache/
+.pytest_cache/
+.gradle/
+target/
 ```
