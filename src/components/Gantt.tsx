@@ -216,7 +216,7 @@ export default function Gantt({ db, ur, openTask, openProject }) {
                       <div key={t.id} className="gantt-row" style={{ position: 'relative' }}>
                         <div className="gantt-label" onClick={() => openTask(t.id)}>
                           <span className={`gtitle${t.status === 'cancelled' ? ' dim' : ''}`}>{t.title}</span>
-                          <span className="gsub">{a ? a.last : ''} · {t.plannedHours ?? '—'} ч · {TASK_STATUSES[t.status].label}</span>
+                          <span className="gsub">{a ? a.last : ''} · {t.plannedHours ?? '—'} ч · {TASK_STATUSES.find(s => s.value === t.status)?.label || 'Неизвестно'}</span>
                         </div>
                         <div className="gantt-track" style={{ width }}>
                           <div className="gbar" style={{ left, width: w, background: prioColor + '33', border: `2px solid ${prioColor}`, cursor: 'pointer', opacity: t.status === 'cancelled' ? 0.45 : 1 }} onClick={() => {
