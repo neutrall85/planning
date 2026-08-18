@@ -85,5 +85,13 @@ export const vacOverlap = (data, empId, from, to) => {
   ) || null;
 };
 
+// Обертка для обратной совместимости с Gantt.tsx (3 аргумента вместо 4)
+export const vacOverlapWrapper = (empId, from, to) => {
+  // Эта функция должна вызываться с контекстом или через замыкание
+  // В Gantt.tsx нужно передавать данные явно
+  console.warn('vacOverlap вызван без данных хранилища. Используйте vacOverlap(data, empId, from, to)');
+  return null;
+};
+
 // Экспортируем константу для окна редактирования комментариев
 export { COMMENT_EDIT_WINDOW_MS as COMMENT_EDIT_WINDOW };

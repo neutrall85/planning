@@ -200,7 +200,7 @@ export default function Gantt({ db, ur, openTask, openProject }) {
                     const hasDelegate = t.isDelegated && t.delegationEnd && new Date(t.delegationEnd) >= new Date(TODAY);
                     
                     // Показываем значок отпуска только если нет делегата
-                    const vac = (!hasDelegate && a) ? vacOverlap(a.id, t.start, t.deadline) : null;
+                    const vac = (!hasDelegate && a) ? vacOverlap(db, a.id, t.start, t.deadline) : null;
                     const vacValid = vac && vac.start && vac.end && vac.start <= vac.end;
                     // Показываем значок отпуска, если отпуск есть и он ещё не закончился (end >= TODAY)
                     const showVac = !hasDelegate && vac && (!vac.end || vac.end >= TODAY);

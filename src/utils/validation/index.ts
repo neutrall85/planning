@@ -210,7 +210,7 @@ export const vacationSchema = z.object({
   end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Формат даты: ГГГГ-ММ-ДД'),
   type: vacationTypeSchema,
   status: z.enum(['draft', 'submitted', 'approved', 'rejected']).default('draft'),
-  delegation: delegationSchema.default({ enabled: false }),
+  delegation: delegationSchema.default(() => ({ enabled: false, statuses: [] })),
   comment: z.string().max(1000).optional(),
 });
 
@@ -238,7 +238,7 @@ export const employeeSchema = z.object({
     deadlineEmail: z.boolean().default(true),
     overdueDigest: z.boolean().default(false),
     commentSub: z.boolean().default(true),
-  }).default({}),
+  }).default(() => ({ deadlineEmail: true, overdueDigest: false, commentSub: true })),
   failed: z.number().min(0).default(0),
   lockUntil: z.number().min(0).default(0),
   fired: z.boolean().default(false),

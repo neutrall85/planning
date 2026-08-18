@@ -52,3 +52,4 @@ export const StoreProvider = ({ children }: StoreProviderProps) => {
 };
 
 export default StoreContext;
+export type { StoreContextType };
