@@ -4,15 +4,34 @@ import { iso, addMonths, TODAY, uid, fmtDMY } from '../utils/date';
 import { sanitizeHtml } from '../utils/sanitization';
 import { VACATION_TYPES } from '../utils/constants';
 import { validateTask, validateProject, validateEmployee, validateVacation } from '../utils/validation';
+import type { StoreData, Employee, Task, Project, Vacation, Notification, AuditLog } from '../types';
+
+interface LoginResult {
+  success: boolean;
+  error?: string;
+}
+
+interface VacationRequest {
+  employee: string;
+  period: string;
+  type: any;
+  newStatus: string;
+  justification?: string;
+}
 
 export default class DataStore {
-  constructor(initialData = null) {
+  private _data: StoreData;
+  private _currentUser: Employee | null;
+  private _listeners: ((data: StoreData) => void)[];
+  private _deadlineIntervalId: number | null;
+
+  constructor(initialData: StoreData | null = null) {
     this._data = initialData || buildMockData();
     this._currentUser = null;
     this._listeners = [];
+    this._deadlineIntervalId = null;
     this._archiveOldTasks(ARCHIVE_AFTER_MONTHS);
     this._scheduleDeadlineCheck();
-    this._deadlineIntervalId = null;
   }
 
   _scheduleDeadlineCheck() {
@@ -97,7 +116,7 @@ export default class DataStore {
 
   getCurrentUser() { return this._currentUser; }
 
-  login(email, password) {
+  login(email: string, password: string): LoginResult {
     const found = this._data.employees.find(e => e.email.toLowerCase() === email.trim().toLowerCase());
     // Для демо-режина: вход без проверки пароля (token-based аутентификация)
     if (found && !found.fired) {
@@ -108,13 +127,13 @@ export default class DataStore {
       }
       this._currentUser = found;
       this._notify();
-      return true;
+      return { success: true };
     }
     if (found && found.fired) {
-      return 'Учётная запись заблокирована: сотрудник уволен';
+      return { success: false, error: 'Учётная запись заблокирована: сотрудник уволен' };
     }
     // Если пользователь не найден - возвращаем ошибку
-    return 'Пользователь не найден';
+    return { success: false, error: 'Пользователь не найден' };
   }
 
   logout() {

@@ -1,7 +1,5 @@
-// Custom hook for accessing store context (вынесен для Fast Refresh)
 import { useContext } from 'react';
-import StoreContext from '../context/StoreContext';
-import type { StoreContextType } from '../context/StoreContext';
+import StoreContext, { type StoreContextType } from '../context/StoreContext';
 
 export const useStore = () => {
   const ctx = useContext(StoreContext);

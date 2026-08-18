@@ -69,6 +69,7 @@ export interface Department {
   id: string;
   name: string;
   parentId: string | null;
+  kbId?: string;
 }
 
 /**
@@ -109,6 +110,8 @@ export interface Employee {
   photo?: string | null;
   createdAt?: string;
   updatedAt?: string;
+  passwordHistory?: string[];
+  delegatedTasksCount?: number;
 }
 
 /**
@@ -159,6 +162,7 @@ export interface Delegation {
   enabled?: boolean;
   subId?: string;
   statuses?: TaskStatus[];
+  state?: string;
 }
 
 /**
@@ -228,9 +232,52 @@ export interface RegRequest {
 }
 
 /**
+ * Конструкторское бюро
+ */
+export interface KB {
+  id: string;
+  name: string;
+  full: string;
+}
+
+/**
+ * Настройки системы
+ */
+export interface Settings {
+  archiveMonths: number;
+}
+
+/**
+ * Заявка на часы
+ */
+export interface HoursRequest {
+  id: string;
+  taskId: string;
+  employeeId: string;
+  hours: number;
+  comment?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+}
+
+/**
+ * Делегирование ролей
+ */
+export interface RoleDelegation {
+  id: string;
+  fromEmployeeId: string;
+  toEmployeeId: string;
+  roleId: string;
+  startDate: string;
+  endDate: string;
+}
+
+/**
  * Данные хранилища
  */
 export interface StoreData {
+  settings: Settings;
+  kbs: KB[];
   employees: Employee[];
   departments: Department[];
   tasks: Task[];
@@ -240,6 +287,8 @@ export interface StoreData {
   comments: Comment[];
   auditLog: AuditLog[];
   regRequests: RegRequest[];
+  hoursRequests: HoursRequest[];
+  roleDelegations: RoleDelegation[];
 }
 
 /**

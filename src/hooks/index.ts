@@ -6,6 +6,9 @@
 // Основный хук для работы с store
 export { useStore } from './useStore';
 
+// Хук для работы с данными
+export { useData } from './useData';
+
 // Хук аутентификации - единственный необходимый хук для auth
 export { useAuth } from './useAuth';
 
