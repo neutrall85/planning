@@ -4,7 +4,7 @@ import { iso, addMonths, TODAY, uid, fmtDMY } from '../utils/date';
 import { sanitizeHtml } from '../utils/sanitization';
 import { VACATION_TYPES } from '../utils/constants';
 import { validateTask, validateProject, validateEmployee, validateVacation } from '../utils/validation';
-import type { StoreData, Employee, Task, Project, Vacation, Notification, AuditLog } from '../types';
+import type { StoreData, Employee, Task, Project, Vacation, Notification, AuditLog, HoursRequestStatus, Role } from '../types';
 
 interface LoginResult {
   success: boolean;
@@ -18,6 +18,8 @@ interface VacationRequest {
   newStatus: string;
   justification?: string;
 }
+
+type AuditDetailsObj = VacationRequest & Record<string, any>;
 
 export default class DataStore {
   private _data: StoreData;
@@ -600,7 +602,7 @@ export default class DataStore {
     let updatedData = {
       ...this._data,
       hoursRequests: this._data.hoursRequests.map(r =>
-        r.id === requestId ? { ...r, status: approved ? 'approved' : 'rejected' } : r
+        r.id === requestId ? { ...r, status: (approved ? 'approved' : 'rejected') as HoursRequestStatus } : r
       )
     };
 
@@ -636,7 +638,7 @@ export default class DataStore {
     // Добавляем запись в аудит с обоснованием
     const empName = this.empName(vac.empId);
     const actionName = approved ? 'Утверждение отпуска' : 'Отклонение отпуска';
-    const detailsObj = {
+    const detailsObj: AuditDetailsObj = {
       employee: empName,
       period: `${fmtDMY(vac.start)} — ${fmtDMY(vac.end)}`,
       type: VACATION_TYPES[vac.type],
@@ -740,7 +742,7 @@ export default class DataStore {
     if (approved) {
       const existing = updatedData.employees.find(e => e.email === request.email);
       if (existing) {
-        const updated = { ...existing, roles: ['executor'] };
+        const updated = { ...existing, roles: ['executor' as Role] };
         updatedData.employees = updatedData.employees.map(e =>
           e.id === updated.id ? updated : e
         );
@@ -753,7 +755,7 @@ export default class DataStore {
           pass: request.pass,
           position: request.position || 'Сотрудник',
           departments: [],
-          roles: ['executor'],
+          roles: ['executor' as Role],
           kbIds: [],
           headDeptIds: [],
           phone: '',
@@ -792,7 +794,7 @@ export default class DataStore {
       pass: regData.pass,
       position: 'Сотрудник',
       departments: [],
-      roles: ['executor'],
+      roles: ['executor' as Role],
       kbIds: [],
       headDeptIds: [],
       phone: '',

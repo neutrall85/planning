@@ -60,7 +60,7 @@ export const parseISO = (s: string): Date => {
 /**
  * Текущая дата в ISO формате
  */
-export const TODAY = iso(new Date());
+export const TODAY: string = iso(new Date());
 
 /**
  * Разница между датами в днях
