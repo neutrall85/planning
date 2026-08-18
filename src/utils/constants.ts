@@ -22,24 +22,12 @@ export const TASK_STATUSES = {
 
 export const TASK_STATUS_ORDER = ["new", "inwork", "review", "closed", "cancelled"] as const;
 
-// Массив для итерации в компонентах
-export const TASK_STATUSES_ARRAY = Object.entries(TASK_STATUSES).map(([value, def]) => ({
-  value: value as keyof typeof TASK_STATUSES,
-  ...def,
-}));
-
 export const PRIORITIES = {
   low:  { label: "Низкий", color: "#3b82f6" },
   mid:  { label: "Средний", color: "#f59e0b" },
   high: { label: "Высокий", color: "#f97316" },
   crit: { label: "Критический", color: "#dc2626" },
 } as const;
-
-// Массив для итерации в компонентах
-export const PRIORITIES_ARRAY = Object.entries(PRIORITIES).map(([value, def]) => ({
-  value: value as keyof typeof PRIORITIES,
-  ...def,
-}));
 
 // Типы зависимостей между задачами
 export const DEPENDENCY_TYPES = {
