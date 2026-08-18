@@ -551,11 +551,16 @@ export default class DataStore {
   addHoursRequest(req, db) {
     this._data = { ...this._data, hoursRequests: [req, ...this._data.hoursRequests] };
     
-    // Определяем, кто утверждает запрос: ГК для своих КБ, иначе ГД
+    // Добавляем запись в аудит о создании запроса
+    const requestorName = db.employees.find(e => e.id === req.reqId);
+    const reqNameStr = requestorName ? `${requestorName.last} ${requestorName.first}` : 'Сотрудник';
     const target = req.kind === 'task' 
       ? db.tasks.find(t => t.id === req.targetId)
       : db.projects.find(p => p.id === req.targetId);
+    const targetTitle = req.kind === 'task' ? target?.title : target?.name;
+    this.addAudit('Запрос на изменение часов', `${reqNameStr}: ${targetTitle} — ${req.newH} ч`, 'hours', req.id);
     
+    // Определяем, кто утверждает запрос: ГК для своих КБ, иначе ГД
     let approverId = null;
     if (target) {
       const project = req.kind === 'task'
@@ -585,9 +590,6 @@ export default class DataStore {
     
     // Создаём уведомление для утверждающего
     if (approverId) {
-      const targetTitle = req.kind === 'task' ? target?.title : target?.name;
-      const requestorName = db.employees.find(e => e.id === req.reqId);
-      const reqNameStr = requestorName ? `${requestorName.last} ${requestorName.first}` : 'Сотрудник';
       const msg = `Запрос на изменение часов от ${reqNameStr}: ${targetTitle}`;
       this.addNotification(approverId, msg, { targetType: 'hours', targetId: req.id });
     }
