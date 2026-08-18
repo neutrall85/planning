@@ -1,50 +1,31 @@
-```gitignore
+```
+# Build artifacts
+dist/
+build/
+
 # Dependencies
 node_modules/
 
-# Build outputs
-dist/
-build/
-*.js.map
-*.ts.map
+# Logs and temp files
+*.log
+*.tmp
 
-# Environment variables
+# Environment
 .env
 .env.local
-*.env.*
+.env.*
 
 # Editors
 .vscode/
 .idea/
-
-# Logs
-*.log
 
 # Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-.Python
-env/
-venv/
-.venv/
 
-# Coverage reports
-coverage/
-htmlcov/
-.coverage
-
-# Temporary files
-*.tmp
-*.swp
-*.swo
-
-# OS generated files
-.DS_Store
-Thumbs.db
-
-# Compiled files
+# Compiled
 *.o
 *.obj
 *.exe
@@ -52,9 +33,17 @@ Thumbs.db
 *.so
 *.a
 *.out
-*.class
 
-# Compressed files
+# Coverage
+coverage/
+htmlcov/
+.coverage
+
+# System
+.DS_Store
+Thumbs.db
+
+# Compressed
 *.zip
 *.gz
 *.tar
@@ -77,251 +66,4 @@ Thumbs.db
 *.tar.bz2
 *.tar.xz
 *.tar.zst
-
-# Testing
-.pytest_cache/
-.mypy_cache/
-.nyc_output/
-coverage.xml
-junit.xml
-
-# Gradle
-.gradle/
-build/
-
-# Maven
-target/
-
-# Rust
-target/
-
-# Go
-*.mod
-*.sum
-bin/
-
-# Ruby
-vendor/bundle/
-*.gem
-*.rbc
-.bundle/
-
-# Java
-*.class
-*.jar
-*.war
-*.ear
-hs_err_pid*
-
-# C/C++
-*.i
-*.s
-*.ii
-*.hi
-*.ilk
-*.pdb
-*.lib
-*.la
-*.gch
-*.pch
-*.xpi
-*.whl
-*.crx
-*.xap
-*.apk
-*.aab
-*.app
-*.ipa
-*.msi
-*.deb
-*.rpm
-*.snap
-*.flatpak
-*.AppImage
-
-# Node.js
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-node_modules/
-jspm_packages/
-*.pem
-*.key
-*.crt
-*.cert
-
-# Bower
-bower_components/
-
-# Composer
-vendor/
-
-# Web
-public/assets/
-public/dist/
-public/build/
-
-# Database
-*.db
-*.db-journal
-
-# Cache
-.cache/
-.caches/
-*.cache
-
-# Lock files
-package-lock.json
-yarn.lock
-Gemfile.lock
-Pipfile.lock
-poetry.lock
-composer.lock
-
-# IDE
-.vs/
-*.swp
-*.swo
-*~
-.DS_Store
-ehthumbs.db
-Icon?
-Thumbs.db
-.directory
-*.sublime-workspace
-*.tm_properties
-*.tmTheme
-*.tmlanguage
-*.tmPreferences
-*.tmSnippet
-*.tmCommand
-*.tmMacro
-*.tmDragCommands
-*.tmLanguage
-*.tmTheme
-*.tmPreferences
-*.tmSnippet
-*.tmCommand
-*.tmMacro
-*.tmDragCommands
-*.tmLanguage
-*.tmTheme
-*.tmPreferences
-*.tmSnippet
-*.tmCommand
-*.tmMacro
-*.tmDragCommands
-*.tmLanguage
-*.tmTheme
-*.tmPreferences
-*.tmSnippet
-*.tmCommand
-*.tmMacro
-*.tmDragCommands
-*.tmLanguage
-*.tmTheme
-*.tmPreferences
-*.tmSnippet
-*.tmCommand
-*.tmMacro
-*.tmDragCommands
-*.tmLanguage
-*.tmTheme
-*.tmPreferences
-*.tmSnippet
-*.tmCommand
-*.tmMacro
-*.tmDragCommands
-*.tmLanguage
-*.tmTheme
-*.tmPreferences
-*.tmSnippet
-*.tmCommand
-*.tmMacro
-*.tmDragCommands
-*.tmLanguage
-*.tmTheme
-*.tmPreferences
-*.tmSnippet
-*.tmCommand
-*.tmMacro
-*.tmDragCommands
-*.tmLanguage
-*.tmTheme
-*.tmPreferences
-*.tmSnippet
-*.tmCommand
-*.tmMacro
-*.tmDragCommands
-*.tmLanguage
-*.tmTheme
-*.tmPreferences
-*.tmSnippet
-*.tmCommand
-*.tmMacro
-*.tmDragCommands
-*.tmLanguage
-*.tmTheme
-*.tmPreferences
-*.tmSnippet
-*.tmCommand
-*.tmMacro
-*.tmDragCommands
-*.tmLanguage
-*.tmTheme
-*.tmPreferences
-*.tmSnippet
-*.tmCommand
-*.tmMacro
-*.tmDragCommands
-*.tmLanguage
-*.tmTheme
-*.tmPreferences
-*.tmSnippet
-*.tmCommand
-*.tmMacro
-*.tmDragCommands
-*.tmLanguage
-*.tmTheme
-*.tmPreferences
-*.tmSnippet
-*.tmCommand
-*.tmMacro
-*.tmDragCommands
-*.tmLanguage
-*.tmTheme
-*.tmPreferences
-*.tmSnippet
-*.tmCommand
-*.tmMacro
-*.tmDragCommands
-*.tmLanguage
-*.tmTheme
-*.tmPreferences
-*.tmSnippet
-*.tmCommand
-*.tmMacro
-*.tmDragCommands
-*.tmLanguage
-*.tmTheme
-*.tmPreferences
-*.tmSnippet
-*.tmCommand
-*.tmMacro
-*.tmDragCommands
-*.tmLanguage
-*.tmTheme
-*.tmPreferences
-*.tmSnippet
-*.tmCommand
-*.tmMacro
-*.tmDragCommands
-*.tmLanguage
-*.tmTheme
-*.tmPreferences
-*.tmSnippet
-*.tmCommand
-*.tmMacro
-*.tmDragCommands
-*.tmLanguage......
 ```
