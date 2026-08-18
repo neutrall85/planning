@@ -490,7 +490,7 @@ export default class DataStore {
   }
 
   // === АУДИТ И УВЕДОМЛЕНИЯ ===
-  addAudit = (action, details, targetType = null, targetId = null) => {
+  addAudit = (action, details, targetType = null, targetId = null, userId = null) => {
     if (!this._data) {
       console.warn('addAudit called but _data is not initialized');
       return;
@@ -505,7 +505,7 @@ export default class DataStore {
         {
           id: uid(),
           ts: Date.now(),
-          userId: this._currentUser?.id || "system",
+          userId: userId || this._currentUser?.id || "system",
           action,
           details: detailsStr,
           targetType,
