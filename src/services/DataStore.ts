@@ -277,7 +277,7 @@ export default class DataStore {
           this.addNotification(id, `Вам назначена задача "${sanitizedTask.title}"`, { targetType: 'task', targetId: sanitizedTask.id });
         }
       });
-      this._checkDeadlineNotifications(sanitizedTask, null);
+      this._checkAllDeadlines();
     }
 
     this._data = { ...this._data, tasks };

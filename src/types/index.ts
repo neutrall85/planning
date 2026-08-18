@@ -305,8 +305,11 @@ export interface RoleDelegation {
   fromId?: string;
   toId?: string;
   roles?: Role[];
-  status?: 'pending' | 'approved' | 'rejected';
+  status?: 'pending' | 'approved' | 'rejected' | 'active' | 'revoked';
   end?: string;
+  approvedAt?: string;
+  revokedAt?: string;
+  revokedBy?: string;
 }
 
 /**
@@ -345,7 +348,7 @@ export interface StoreData {
   hoursRequests: HoursRequest[];
   roleDelegations: RoleDelegation[];
   // Дополнительные поля для DataStore
-  audit?: any[];
+  audit?: { id: string; ts: number; userId: string; action: string; details: string; targetType?: string | null; targetId?: string | null }[];
 }
 
 /**
@@ -356,7 +359,7 @@ export type HoursRequestStatus = 'pending' | 'approved' | 'rejected';
 /**
  * Вид заявки на часы
  */
-export type HoursRequestKind = 'change' | 'add' | 'correction';
+export type HoursRequestKind = 'change' | 'add' | 'correction' | 'task' | 'project';
 
 /**
  * Результат валидации
