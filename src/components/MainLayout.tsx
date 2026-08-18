@@ -460,28 +460,6 @@ export default function MainLayout({ store, data, user, toast }) {
         spent={spent}
         onClose={() => setModal(null)} 
         onSave={(t, isNew) => {
-          const old = data.tasks.find(x => x.id === t.id);
-          
-          let hasChanges = false;
-          const changes = {};
-          
-          if (old) {
-            if (old.title !== t.title) { hasChanges = true; changes.title = `${old.title} → ${t.title}`; }
-            if (old.description !== t.description) { hasChanges = true; changes.description = `${old.description || ''} → ${t.description || ''}`; }
-            if (old.projectId !== t.projectId) { hasChanges = true; changes.project = `${data.projects.find(p => p.id === old.projectId)?.code || '—'} → ${data.projects.find(p => p.id === t.projectId)?.code || '—'}`; }
-            if (old.plannedHours !== t.plannedHours) { hasChanges = true; changes.plannedHours = `${old.plannedHours ?? '—'} → ${t.plannedHours ?? '—'}`; }
-            if (old.status !== t.status) { 
-              const oldStatusInfo = TASK_STATUSES.find(s => s.value === old.status);
-              const newStatusInfo = TASK_STATUSES.find(s => s.value === t.status);
-              hasChanges = true; 
-              changes.status = `${oldStatusInfo?.label || old.status} → ${newStatusInfo?.label || t.status}`; 
-            }
-            if (JSON.stringify(old.assigneeIds || []) !== JSON.stringify(t.assigneeIds || [])) { hasChanges = true; changes.assignees = `${(old.assigneeIds || []).map(id => getEmpName(data, id)).join(', ')} → ${(t.assigneeIds || []).map(id => getEmpName(data, id)).join(', ')}`; }
-            if (old.deadline !== t.deadline) { hasChanges = true; changes.deadline = `${old.deadline ? fmtDMY(old.deadline) : '—'} → ${t.deadline ? fmtDMY(t.deadline) : '—'}`; }
-            if (old.priority !== t.priority) { hasChanges = true; changes.priority = `${PRIORITIES[old.priority]?.label} → ${PRIORITIES[t.priority]?.label}`; }
-            if (old.dependencyId !== t.dependencyId || old.dependencyType !== t.dependencyType) { hasChanges = true; changes.dependency = 'изменена зависимость'; }
-          }
-          
           // Используем taskOps.upsertTask для валидации и уведомлений
           try {
             taskOps.upsertTask(t);
@@ -490,27 +468,7 @@ export default function MainLayout({ store, data, user, toast }) {
             return;
           }
           
-          // Журналируем только реальные изменения задачи (не часы)
-          if (hasChanges) {
-            const projectCode = data.projects.find(p => p.id === t.projectId)?.code || '—';
-            const details = Object.entries(changes).map(([k, v]) => `${k}: ${v}`).join('; ');
-            store.addAudit('Изменение задачи', `Задача "${t.title}" в проекте ${projectCode}. Изменения: ${details}`, 'task', t.id);
-          } else if (isNew) {
-            const projectCode = data.projects.find(p => p.id === t.projectId)?.code || '—';
-            const assigneeIds = t.assigneeIds || [];
-            const assigneesStr = assigneeIds.length > 0 
-              ? assigneeIds.map(id => {
-                  const emp = data.employees.find(e => e.id === id);
-                  return emp ? `${emp.lastName} ${emp.firstName[0]}.`.replace(/\s+/g, ' ').trim() : '';
-                }).filter(Boolean).join(', ')
-              : 'не назначены';
-            const deadlineStr = t.deadline ? fmtDMY(new Date(t.deadline)) : '—';
-            const auditDetails = `Задача "${t.title}" в проекте ${projectCode}, плановые часы: ${t.plannedHours ?? '—'}, срок: ${deadlineStr}, исполнители: ${assigneesStr}`;
-            store.addAudit('Создание задачи', auditDetails, 'task', t.id);
-          }
-          // Если изменений нет и задача не новая (только внесены часы) - ничего не журналируем здесь,
-          // т.к. внесение часов уже залогировано в TaskModal.addLog()
-          
+          // Журналирование выполняется внутри DataStore.upsertTask через formatTaskCreate/formatTaskUpdate
           setModal(null);
         }} 
         onDelete={(id) => { 
@@ -539,20 +497,19 @@ export default function MainLayout({ store, data, user, toast }) {
         onClose={() => setModal(null)} 
         onSave={(p, isNew) => {
           const old = data.projects.find(x => x.id === p.id);
-          if (old && hasRole(user, 'admin')) {
-            const changes = {};
-            if (old.budget !== p.budget) changes.budget = `${old.budget ?? '—'} → ${p.budget ?? '—'}`;
-            if (old.name !== p.name) changes.name = `${old.name} → ${p.name}`;
-            if (old.managerId !== p.managerId) changes.manager = `${getEmpName(data, old.managerId)} → ${getEmpName(data, p.managerId)}`;
-            if (old.status !== p.status) changes.status = `${PROJECT_STATUSES[old.status]} → ${PROJECT_STATUSES[p.status]}`;
-            if (Object.keys(changes).length) {
-              const details = Object.entries(changes).map(([k, v]) => `${k}: ${v}`).join('; ');
-              store.addAudit('Административное изменение проекта (прямое)', `Проект "${p.name}": ${details}`, 'project', p.id);
-            }
+          
+          // Используем projectOps.upsertProject для валидации и уведомлений
+          try {
+            projectOps.upsertProject(p);
+          } catch (error) {
+            showToast(error.message);
+            return;
           }
-          projectOps.upsertProject(p);
-          const auditDetails = `Проект "${p.name}" (код ${p.code}), бюджет: ${p.budget ?? '—'} ч`;
+          
+          // Журналирование только одно с подробными деталями
+          const auditDetails = `Проект "${p.name}" (код ${p.code}), бюджет: ${p.budget ?? '—'} ч, статус: ${PROJECT_STATUSES[p.status]}, руководитель: ${getEmpName(data, p.managerId) || 'не назначен'}`;
           store.addAudit(isNew ? 'Создание проекта' : 'Изменение проекта', auditDetails, 'project', p.id);
+          
           setModal(null);
         }} 
         onDelete={(p) => { 
