@@ -263,7 +263,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', planSum, onClos
     const emp = db.employees.find(e => e.id === empId);
     if (emp && !emp.roles.includes('executor')) {
       const updated = { ...emp, roles: [...emp.roles, 'executor'] };
-      store.upsertEmployee(updated);
+      store.upsertEmployee(updated, true); // skipRoleAudit=true для системного добавления роли
     }
   };
 
