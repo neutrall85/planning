@@ -24,7 +24,7 @@ export const ALLOWED_EMAIL_DOMAINS = [
   "volga-dnepr.com",
   "volgadnepr.com",
   "vd-aviation.com",
-] as const;
+];
 
 // ===== НАСТРОЙКИ ПРОВЕРКИ ДЕДЛАЙНОВ =====
 export const DEADLINE_CHECK_HOUR_MOSCOW = 7; // Час проверки дедлайнов (по Москве)

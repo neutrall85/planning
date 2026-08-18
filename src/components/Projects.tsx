@@ -35,7 +35,7 @@ export default function Projects({ db, ur, openProject, openHoursReq, showOnlyMy
       case 'nameDesc':
         return b.name.localeCompare(a.name, 'ru');
       case 'created':
-        return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+        return Number(new Date(b.createdAt || 0)) - Number(new Date(a.createdAt || 0));
       case 'budget':
         return (a.budget || 0) - (b.budget || 0);
       case 'budgetDesc':

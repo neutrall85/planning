@@ -1,22 +1,37 @@
-import { useState } from 'react';
+import { useState, Dispatch, SetStateAction } from 'react';
 import { TASK_STATUSES, PRIORITIES } from '../utils/constants';
 import { fmtD, initials, isTaskActive, daysDiff, TODAY } from '../utils/date';
-
 import { computeScope, taskVisible } from '../utils/permissions';
 import EmployeeTooltip from './EmployeeTooltip';
+import { Task, Employee, Project } from '../types';
+
+interface TaskListProps {
+  db: any;
+  ur: any;
+  openTask: (taskId?: string, initialTab?: string, initialProjectId?: string, vacationData?: any) => void;
+  onMove?: (taskId: string, newStatus: string) => void;
+  onNew?: () => void;
+  showOnlyMyTasks?: boolean;
+  sortBy?: string;
+  assigneeFilter?: string;
+  onAssigneeFilterChange?: Dispatch<SetStateAction<string>>;
+  onAssigneeOptionsChange?: Dispatch<SetStateAction<any>>;
+  hideFilters?: boolean;
+}
 
 export default function TaskList({
   db,
   ur,
   openTask,
-  
-  
+  onMove,
+  onNew,
   showOnlyMyTasks: parentShowOnlyMyTasks,
   sortBy: parentSortBy,
   assigneeFilter,
-  
-  
-}) {
+  onAssigneeFilterChange,
+  onAssigneeOptionsChange,
+  hideFilters,
+}: TaskListProps) {
   const scope = computeScope(ur, db);
 
   const [tooltip, setTooltip] = useState({ visible: false, employee: null, x: 0, y: 0 });
@@ -40,14 +55,14 @@ export default function TaskList({
         if (!a.deadline && !b.deadline) return 0;
         if (!a.deadline) return 1;
         if (!b.deadline) return -1;
-        return new Date(a.deadline) - new Date(b.deadline);
+        return Number(new Date(a.deadline)) - Number(new Date(b.deadline));
       case 'deadlineDesc':
         if (!a.deadline && !b.deadline) return 0;
         if (!a.deadline) return 1;
         if (!b.deadline) return -1;
-        return new Date(b.deadline) - new Date(a.deadline);
+        return Number(new Date(b.deadline)) - Number(new Date(a.deadline));
       case 'created':
-        return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+        return Number(new Date(b.createdAt || 0)) - Number(new Date(a.createdAt || 0));
       case 'alpha':
         return a.title.localeCompare(b.title, 'ru');
       case 'alphaDesc':
