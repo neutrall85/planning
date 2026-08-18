@@ -440,12 +440,12 @@ export default class DataStore {
     const idx = this._data.employees.findIndex(e => e.id === emp.id);
     let employees;
     if (idx >= 0) {
-      // Слияние: сохраняем все поля старого и обновляем переданными
+      // Слияние: сохраняем все поля старого и обновляем только переданные поля
       const oldEmp = this._data.employees[idx];
-      const merged = { ...oldEmp, ...emp };
+      const merged = { ...oldEmp, ...Object.fromEntries(Object.entries(emp).filter(([_, v]) => v !== undefined)) };
 
       // Аудит изменений ролей (изменения подразделений логируются явно в компоненте DeptsModal)
-      if (JSON.stringify(oldEmp.roles) !== JSON.stringify(emp.roles)) {
+      if (JSON.stringify(oldEmp.roles) !== JSON.stringify(merged.roles)) {
         this.addAudit('Изменение ролей сотрудника', `${merged.last} ${merged.first}`, 'employee', emp.id);
       }
 
