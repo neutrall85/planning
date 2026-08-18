@@ -499,7 +499,7 @@ export default function MainLayout({ store, data, user, toast }) {
             const actual = t.logs ? t.logs.reduce((s, l) => s + l.hours, 0) : 0;
             const projectCode = data.projects.find(p => p.id === t.projectId)?.code || '—';
             const assigneesStr = (t.assigneeIds || []).map(id => getEmpName(data, id)).join(', ');
-            const auditDetails = `Задача "${t.title}" в проекте ${projectCode}, плановые часы: ${t.plannedHours ?? '—'}, фактические часы: ${actual}, исполнители: ${assigneesStr || 'не назначены'}`;
+            const auditDetails = `Задача "${t.title}" в проекте ${projectCode}, плановые часы: ${t.plannedHours ?? '—'}, фактические часы: ${actual}${assigneesStr ? `, исполнители: ${assigneesStr}` : ''}`;
             store.addAudit('Создание задачи', auditDetails, 'task', t.id);
           }
           // Если изменений нет и задача не новая (только внесены часы) - ничего не журналируем здесь,
