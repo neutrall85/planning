@@ -239,7 +239,11 @@ export default function Discussion({
       ],
     };
     onUpdate(updatedEntity);
-    toast("Комментарий удалён", "warning");
+    if (toast?.warning) {
+      toast.warning("Комментарий удалён");
+    } else if (typeof toast === 'function') {
+      toast("Комментарий удалён", "warning");
+    }
   };
 
   const saveEdit = (c) => {

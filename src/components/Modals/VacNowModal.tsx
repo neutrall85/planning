@@ -20,8 +20,10 @@ export const VacNowModal = ({ db, onClose, toast }) => {
 
   const handleRefresh = () => {
     setTick((x) => x + 1);
-    if (toast && typeof toast.info === 'function') {
+    if (toast?.info) {
       toast.info("Список обновлён");
+    } else if (typeof toast === 'function') {
+      toast("Список обновлён", "info");
     }
   };
 
