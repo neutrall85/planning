@@ -240,6 +240,23 @@ export const canExport = (user) => hasRole(user, "admin", "director", "economist
 export const canEditRoles = (user) => hasRole(user, "admin");
 export const canFireEmployee = (user) => hasRole(user, "admin", "director", "hr");
 
+/**
+ * Проверка права на удаление задачи
+ * @param {Object} user - Пользователь
+ * @param {Object} task - Задача (для контекста, например архивная ли она)
+ * @param {Object} data - База данных
+ * @returns {boolean}
+ */
+export const canDeleteTask = (user, task, data) => {
+  if (!user || !task || !data) return false;
+  
+  // Архивные задачи нельзя удалять
+  if (task.archived) return false;
+  
+  // Используем универсальную функцию can для проверки права 'delete' на ресурсе 'task'
+  return can(user, 'task', 'delete', task, data);
+};
+
 export const canEditTaskFields = (user, task, data) => {
   if (!user || !task || !data) return false;
   return can(user, 'task', 'edit_fields', task, data);

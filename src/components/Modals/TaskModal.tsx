@@ -9,7 +9,7 @@ import {
   TODAY, fmtDMY, fmtDT, iso, addDays, addMonths, addYears, uid, fmtD, parseISO,
 } from '../../utils/date';
 import {
-  canCreateTask, canEditTaskFields, hasRole, has,
+  canCreateTask, canEditTaskFields, canDeleteTask, hasRole, has,
   assigneeOptions, computeScope, canChangeTaskStatus,
 } from '../../utils/permissions';
 import { Ic, ICONS } from '../Icons';
@@ -153,6 +153,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', planSum, onClos
   const isExec = existing && (existing.assigneeIds || []).includes(ur.id);
   const canEditFields = !readOnly && (existing ? canEditTaskFields(ur, existing, db) : canCreateTask(ur));
   const canChangeStatus = !readOnly && existing && canChangeTaskStatus(ur, existing, null, db);
+  const canDelete = existing && canDeleteTask(ur, existing, db);
   const canEditPlannedHours = !readOnly && hasRole(ur, 'admin', 'director');
   // Кнопка запроса изменения часов доступна только исполнителям своих задач (не админу), и только для неархивных задач
   const canRequestHours = !readOnly && !has(ur, 'admin') && isExec && !existing.archived;
@@ -775,7 +776,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', planSum, onClos
         ) : (
           <button className="btn ghost" onClick={onClose}>Закрыть</button>
         )}
-        {existing && canEditFields && !readOnly && (
+        {existing && canDelete && !readOnly && (
           <button className="btn danger" onClick={() => onDelete(existing.id)}>
             <Ic d={ICONS.trash} size={14} /> Удалить
           </button>
