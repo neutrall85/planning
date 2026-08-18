@@ -85,3 +85,4 @@ dmypy.json
 *.tar.xz
 *.tar.zst
 ```
+Nothing needs to be added to .gitignore since only a TypeScript React component file (.tsx) was modified and no build artifacts, dependencies, or temporary files were included in the changes.
