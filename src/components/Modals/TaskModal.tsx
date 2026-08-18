@@ -388,12 +388,39 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', planSum, onClos
   };
 
   const save = () => {
-    if (!f.title.trim()) return toast.error("Введите название задачи");
-    if (!f.projectId) return toast.error("Выберите проект для задачи");
-    if (!f.assigneeIds || f.assigneeIds.length === 0) return toast.error("Выберите хотя бы одного исполнителя");
+    console.log('[TaskModal] save called', { 
+      title: f.title?.trim(), 
+      projectId: f.projectId, 
+      assigneeIds: f.assigneeIds, 
+      plannedHours: f.plannedHours, 
+      deadline: f.deadline,
+      isAdminProj,
+      canEditFields,
+      isExec,
+      readOnly 
+    });
+    
+    if (!f.title.trim()) {
+      console.log('[TaskModal] Validation failed: no title');
+      return toast.error("Введите название задачи");
+    }
+    if (!f.projectId) {
+      console.log('[TaskModal] Validation failed: no projectId');
+      return toast.error("Выберите проект для задачи");
+    }
+    if (!f.assigneeIds || f.assigneeIds.length === 0) {
+      console.log('[TaskModal] Validation failed: no assigneeIds');
+      return toast.error("Выберите хотя бы одного исполнителя");
+    }
     if (!isAdminProj) {
-      if (!f.plannedHours || +f.plannedHours <= 0) return toast.error("Укажите плановые часы для задачи");
-      if (!f.deadline) return toast.error("Укажите срок выполнения задачи");
+      if (!f.plannedHours || +f.plannedHours <= 0) {
+        console.log('[TaskModal] Validation failed: invalid plannedHours', f.plannedHours);
+        return toast.error("Укажите плановые часы для задачи");
+      }
+      if (!f.deadline) {
+        console.log('[TaskModal] Validation failed: no deadline');
+        return toast.error("Укажите срок выполнения задачи");
+      }
     }
 
     const projForBudget = db.projects.find(p => p.id === f.projectId);
@@ -401,6 +428,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', planSum, onClos
       const currentPlanSum = planSum(projForBudget.id);
       const newTotal = currentPlanSum + (+f.plannedHours || 0);
       if (newTotal > projForBudget.budget) {
+        console.log('[TaskModal] Budget validation failed', { budget: projForBudget.budget, currentPlanSum, newTotal });
         toast.error(
           `Превышен бюджет проекта. Бюджет: ${projForBudget.budget} ч, уже запланировано: ${currentPlanSum} ч, требуется: ${f.plannedHours || 0} ч. Необходимо увеличить бюджет проекта.`
         );
@@ -410,15 +438,19 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', planSum, onClos
 
     if (f.repeatType !== 'none') {
       if (f.repeatType === 'weekly_days' && (!f.repeatDays || f.repeatDays.length === 0)) {
+        console.log('[TaskModal] Repeat validation failed: no weekly days');
         return toast.error("Выберите дни недели для повторения");
       }
       if (f.repeatEndType === 'date' && !f.repeatEndValue) {
+        console.log('[TaskModal] Repeat validation failed: no end date');
         return toast.error("Укажите дату окончания повторения");
       }
       if (f.repeatEndType === 'count' && (!f.repeatEndValue || parseInt(f.repeatEndValue, 10) <= 0)) {
+        console.log('[TaskModal] Repeat validation failed: invalid count');
         return toast.error("Укажите количество повторений");
       }
       if (f.repeatEndType === 'date' && f.repeatEndValue && f.repeatEndValue <= f.start) {
+        console.log('[TaskModal] Repeat validation failed: end date before start');
         return toast.error("Дата окончания должна быть позже даты начала");
       }
     }
@@ -426,7 +458,15 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', planSum, onClos
     if (f.assigneeIds && f.assigneeIds.length > 0) {
       f.assigneeIds.forEach(id => ensureExecutorRole(id));
     }
-    if (vacWarn) { setConfirmVac(vacWarn); return; }
+    
+    console.log('[TaskModal] All validations passed, checking vacation warning', { vacWarn });
+    if (vacWarn) { 
+      console.log('[TaskModal] Vacation warning present, showing confirmation');
+      setConfirmVac(vacWarn); 
+      return; 
+    }
+    
+    console.log('[TaskModal] Calling doSave with status', f.status);
     doSave(f.status);
   };
 
