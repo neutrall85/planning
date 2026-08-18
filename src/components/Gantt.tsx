@@ -175,7 +175,7 @@ export default function Gantt({ db, ur, openTask, openProject }) {
               {todayIdx >= 0 && <div className="gtoday" style={{ left: todayIdx * DW + DW/2 }} />}
             </div>
             {groups.map(g => {
-              const category = PROJECT_CATEGORIES[g.project.category || 'NORM'] || PROJECT_CATEGORIES.NORM;
+              const category = PROJECT_CATEGORIES[g.project.category] || PROJECT_CATEGORIES.NORM;
               return (
                 <div key={g.project.id}>
                   <div className="gantt-group">

@@ -88,12 +88,15 @@ export const VacationModal = ({ db, ur, vacationId, forEmpId, onClose, onSave })
           )}
           <label className="lbl">Какие задачи делегировать</label>
           <div className="sub-picks">
-            {["new", "inwork", "review"].map((st) => (
-              <label key={st} className="dept-pick">
-                <input type="checkbox" checked={f.delegation.statuses.includes(st)} onChange={() => set("delegation", { ...f.delegation, statuses: f.delegation.statuses.includes(st) ? f.delegation.statuses.filter((x) => x !== st) : [...f.delegation.statuses, st] })} />
-                {TASK_STATUSES[st].label}
-              </label>
-            ))}
+            {["new", "inwork", "review"].map((st) => {
+              const statusInfo = TASK_STATUSES.find(s => s.value === st);
+              return (
+                <label key={st} className="dept-pick">
+                  <input type="checkbox" checked={f.delegation.statuses.includes(st)} onChange={() => set("delegation", { ...f.delegation, statuses: f.delegation.statuses.includes(st) ? f.delegation.statuses.filter((x) => x !== st) : [...f.delegation.statuses, st] })} />
+                  {statusInfo?.label || st}
+                </label>
+              );
+            })}
             <span className="mut sm">пусто = все активные задачи</span>
           </div>
           <p className="mut sm">Делегирование утверждает руководитель до начала отпуска. Задачи вернутся автоматически после окончания отпуска. Задачи, где сотрудник — ответственный по проекту, передаются только через делегирование ролей.</p>

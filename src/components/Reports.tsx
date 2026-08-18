@@ -246,8 +246,8 @@ export default function Reports({ db, ur }) {
       rows = [['№', 'Задача', 'Проект', 'Исполнители', 'Статус', 'Приоритет', 'План (ч)', 'Факт (ч)', 'Создано', 'Срок выполнения']];
       results.forEach((t, idx) => {
         const project = (safeDb.projects || []).find(p => p.id === t.projectId);
-        const statusDef = TASK_STATUSES[t.status] || { label: t.status || 'Неизвестно', color: '#64748b' };
-        const priorityDef = PRIORITIES[t.priority] || { label: t.priority || 'Неизвестно', color: '#64748b' };
+        const statusDef = TASK_STATUSES.find(s => s.value === t.status) || { label: t.status || 'Неизвестно', color: '#64748b' };
+        const priorityDef = PRIORITIES.find(p => p.value === t.priority) || { label: t.priority || 'Неизвестно', color: '#64748b' };
         rows.push([
           idx + 1, t.title, project?.code || '—',
           (t.assigneeIds || []).map(id => empName(id)).join(', '),
@@ -327,8 +327,8 @@ export default function Reports({ db, ur }) {
             <tbody>
               {results.map((t, idx) => {
                 const project = (safeDb.projects || []).find(p => p.id === t.projectId);
-                const statusDef = TASK_STATUSES[t.status] || { label: t.status || 'Неизвестно', color: '#64748b' };
-                const priorityDef = PRIORITIES[t.priority] || { label: t.priority || 'Неизвестно', color: '#64748b' };
+                const statusDef = TASK_STATUSES.find(s => s.value === t.status) || { label: t.status || 'Неизвестно', color: '#64748b' };
+                const priorityDef = PRIORITIES.find(p => p.value === t.priority) || { label: t.priority || 'Неизвестно', color: '#64748b' };
                 return (
                   <tr key={t.id}>
                     <td>{idx + 1}</td>
@@ -617,7 +617,7 @@ export default function Reports({ db, ur }) {
                 style={{ width: '140px' }}
               >
                 <option value="all">Все</option>
-                {Object.keys(TASK_STATUSES).map(st => <option key={st} value={st}>{TASK_STATUSES[st].label}</option>)}
+                {TASK_STATUSES.map(st => <option key={st.value} value={st.value}>{st.label}</option>)}
               </select>
 
               <label className="lbl" style={{ margin: 0 }}>Приоритет:</label>
@@ -628,7 +628,7 @@ export default function Reports({ db, ur }) {
                 style={{ width: '140px' }}
               >
                 <option value="all">Все</option>
-                {Object.keys(PRIORITIES).map(pr => <option key={pr} value={pr}>{PRIORITIES[pr].label}</option>)}
+                {PRIORITIES.map(pr => <option key={pr.value} value={pr.value}>{pr.label}</option>)}
               </select>
             </>
           )}

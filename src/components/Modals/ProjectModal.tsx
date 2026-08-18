@@ -278,7 +278,12 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
                     >
                       <td><b>{t.title}</b></td>
                       <td>{assignees.map(a => `${a.last} ${a.first}`).join(', ') || '—'}</td>
-                      <td><span className="st-chip" style={{ background: TASK_STATUSES[t.status].color + '22', color: TASK_STATUSES[t.status].color }}>{TASK_STATUSES[t.status].label}</span></td>
+                      <td>{(() => {
+                        const status = TASK_STATUSES.find(s => s.value === t.status);
+                        return status ? (
+                          <span className="st-chip" style={{ background: status.color + '22', color: status.color }}>{status.label}</span>
+                        ) : '—';
+                      })()}</td>
                       <td>{t.plannedHours ?? '—'}</td>
                       <td>{spent}</td>
                       <td style={{ color: remaining < 0 ? '#dc2626' : 'var(--mut)' }}>{t.plannedHours ? remaining : '—'}</td>

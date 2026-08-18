@@ -9,10 +9,8 @@ import EmployeeTooltip from './EmployeeTooltip';
 
 function getCategoryColor(project) {
   if (!project || project.ptype === 'admin') return '#6b7280';
-  const categoryKey = Object.keys(PROJECT_CATEGORIES).find(
-    key => PROJECT_CATEGORIES[key].label === project.category
-  );
-  return PROJECT_CATEGORIES[categoryKey]?.color || PROJECT_CATEGORIES.NORM.color;
+  const category = PROJECT_CATEGORIES[project.category] || PROJECT_CATEGORIES.NORM;
+  return category.color;
 }
 
 function downloadCSV(name, rows) {
@@ -180,13 +178,14 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
           <div className="rep-panel">
             <div className="rep-panel-title">Мои задачи по статусам</div>
             {TASK_STATUS_ORDER.map(st => {
+              const statusInfo = TASK_STATUSES.find(s => s.value === st);
               const list = myTasks.filter(t => t.status === st);
               if (!list.length) return null;
               return (
                 <div key={st} className="cab-stat">
                   <div className="cab-stat-head">
-                    <span className="kdot" style={{ background: TASK_STATUSES[st].color }} />
-                    {TASK_STATUSES[st].label}
+                    <span className="kdot" style={{ background: statusInfo?.color }} />
+                    {statusInfo?.label}
                     <span className="kcount">{list.length}</span>
                   </div>
                   {list.map(t => (

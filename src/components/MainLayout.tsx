@@ -128,20 +128,22 @@ export default function MainLayout({ store, data, user, toast }) {
       return;
     }
     const isClosing = (newStatus === 'closed' || newStatus === 'cancelled') && task.status !== newStatus;
+    const oldStatusInfo = TASK_STATUSES.find(s => s.value === task.status);
+    const newStatusInfo = TASK_STATUSES.find(s => s.value === newStatus);
     const updatedTask = {
       ...task,
       status: newStatus,
       closedAt: isClosing ? TODAY : task.closedAt,
       archived: isClosing ? true : task.archived,
       archivedAt: isClosing ? TODAY : task.archivedAt,
-      history: [...task.history, { ts: Date.now(), who: user.id, text: `Статус → ${TASK_STATUSES[newStatus].label}` }]
+      history: [...task.history, { ts: Date.now(), who: user.id, text: `Статус → ${newStatusInfo?.label || newStatus}` }]
     };
     // Используем taskOps.upsertTask вместо store.upsertTask для валидации и уведомлений
     try {
       taskOps.upsertTask(updatedTask);
       store.addAudit('Изменение статуса задачи', {
         task: task.title,
-        status: `${TASK_STATUSES[task.status].label} → ${TASK_STATUSES[newStatus].label}`
+        status: `${oldStatusInfo?.label || task.status} → ${newStatusInfo?.label || newStatus}`
       }, 'task', task.id);
     } catch (error) {
       showToast(error.message);
@@ -468,7 +470,12 @@ export default function MainLayout({ store, data, user, toast }) {
             if (old.description !== t.description) { hasChanges = true; changes.description = `${old.description || ''} → ${t.description || ''}`; }
             if (old.projectId !== t.projectId) { hasChanges = true; changes.project = `${data.projects.find(p => p.id === old.projectId)?.code || '—'} → ${data.projects.find(p => p.id === t.projectId)?.code || '—'}`; }
             if (old.plannedHours !== t.plannedHours) { hasChanges = true; changes.plannedHours = `${old.plannedHours ?? '—'} → ${t.plannedHours ?? '—'}`; }
-            if (old.status !== t.status) { hasChanges = true; changes.status = `${TASK_STATUSES[old.status].label} → ${TASK_STATUSES[t.status].label}`; }
+            if (old.status !== t.status) { 
+              const oldStatusInfo = TASK_STATUSES.find(s => s.value === old.status);
+              const newStatusInfo = TASK_STATUSES.find(s => s.value === t.status);
+              hasChanges = true; 
+              changes.status = `${oldStatusInfo?.label || old.status} → ${newStatusInfo?.label || t.status}`; 
+            }
             if (JSON.stringify(old.assigneeIds || []) !== JSON.stringify(t.assigneeIds || [])) { hasChanges = true; changes.assignees = `${(old.assigneeIds || []).map(id => getEmpName(data, id)).join(', ')} → ${(t.assigneeIds || []).map(id => getEmpName(data, id)).join(', ')}`; }
             if (old.deadline !== t.deadline) { hasChanges = true; changes.deadline = `${old.deadline ? fmtDMY(old.deadline) : '—'} → ${t.deadline ? fmtDMY(t.deadline) : '—'}`; }
             if (old.priority !== t.priority) { hasChanges = true; changes.priority = `${PRIORITIES[old.priority]?.label} → ${PRIORITIES[t.priority]?.label}`; }
