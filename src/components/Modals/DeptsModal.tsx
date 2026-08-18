@@ -24,8 +24,10 @@ export const DeptsModal = ({ db, store, empId, onClose, toast, audit }) => {
   const save = () => {
     // Проверка основного подразделения только если есть выбранные отделы
     if (sel.length > 0 && !sel.some((x) => x.primary)) {
-      if (toast && typeof toast.error === 'function') {
+      if (toast?.error) {
         toast.error("Укажите основное подразделение");
+      } else if (typeof toast === 'function') {
+        toast("Укажите основное подразделение", "error");
       } else {
         alert("Укажите основное подразделение");
       }
@@ -46,8 +48,10 @@ export const DeptsModal = ({ db, store, empId, onClose, toast, audit }) => {
     store.updateEmployee(updatedEmp);
     audit("Изменение подразделений", `${emp.last} ${emp.first}: ${beforeList || '–'} → ${afterList || '–'}`);
     
-    if (toast && typeof toast.success === 'function') {
+    if (toast?.success) {
       toast.success("Подразделения обновлены");
+    } else if (typeof toast === 'function') {
+      toast("Подразделения обновлены", "success");
     } else {
       alert("Подразделения обновлены");
     }
