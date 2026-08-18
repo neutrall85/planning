@@ -6,6 +6,8 @@ type IconProps = {
   className?: string;
 };
 
+type IconComponent = (props: IconProps) => JSX.Element;
+
 const createIcon = (d: string) => ({ size = 18, w = 1.8, className }: IconProps) => (
   <svg 
     width={size} 
@@ -54,6 +56,7 @@ export const IcFilter = createIcon("M4 6h16M6 12h14M8 18h12");
 export const IcClose = createIcon("M6 6l12 12M18 6L6 18");
 export const IcLock = createIcon("M7 11V7a5 5 0 0 1 10 0v4h1v10H6V11h1zm2 0h6V7a3 3 0 0 0-6 0v4z");
 export const IcFile = createIcon("M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM13 2v7h7");
+export const IcRefresh = createIcon("M21 12a9 9 0 1 1-9-9c2.5 0 4.8.8 6.6 2.2M21 3v6h-6M3 12a9 9 0 0 1 9-9c-2.5 0-4.8.8-6.6 2.2M3 21v-6h6");
 
 // Для обратной совместимости - старый интерфейс через маппинг
 export const ICONS = {
@@ -89,10 +92,16 @@ export const ICONS = {
   close: IcClose,
   lock: IcLock,
   file: IcFile,
+  refresh: IcRefresh,
 };
 
 // Универсальный компонент для динамического использования по имени
-export const Ic = ({ name, size, w, className }: { name: keyof typeof ICONS } & IconProps) => {
-  const IconComponent = ICONS[name];
+export const Ic = ({ name, d, size, w, className }: { name?: keyof typeof ICONS; d?: IconComponent } & IconProps) => {
+  // Поддержка старого интерфейса с prop "d"
+  if (d) {
+    return <d size={size} w={w} className={className} />;
+  }
+  // Новый интерфейс с prop "name"
+  const IconComponent = name ? ICONS[name] : null;
   return IconComponent ? <IconComponent size={size} w={w} className={className} /> : null;
 };
