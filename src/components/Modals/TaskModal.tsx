@@ -591,7 +591,10 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', planSum, onClos
           </div>
           <label className="lbl">Статус *</label>
           <select className="inp sel" disabled={!canChangeStatus && !isAuthor && !isExec} value={f.status} onChange={(e) => set("status", e.target.value)}>
-            {statusOptions.map((s) => <option key={s} value={s}>{TASK_STATUSES[s].label}</option>)}
+            {statusOptions.map((s) => {
+              const statusConfig = TASK_STATUSES.find(st => st.value === s);
+              return <option key={s} value={s}>{statusConfig?.label || s}</option>;
+            })}
           </select>
           {isExec && !canEditFields && !readOnly && <div className="mut sm" style={{ gridColumn: "1 / -1" }}>Исполнитель может переводить задачу в «В работе» и «На проверке»; закрытие и отмена — у ответственного/руководителя.</div>}
 

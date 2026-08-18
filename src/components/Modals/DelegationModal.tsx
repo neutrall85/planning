@@ -27,7 +27,7 @@ export const DelegationModal = ({ db, ur, onClose, onSubmit }) => {
         <label className="lbl">Дата начала *</label><input className="inp" type="date" value={start} onChange={(e) => setStart(e.target.value)} />
         <label className="lbl">Дата окончания</label>
         <div className="duo"><input className="inp" type="date" disabled={openEnd} value={end} onChange={(e) => setEnd(e.target.value)} /><label className="dept-pick"><input type="checkbox" checked={openEnd} onChange={(e) => setOpenEnd(e.target.checked)} /> до отмены</label></div>
-        <label className="lbl">Обоснование *</label><textarea className="inp" rows="2" value={reason} onChange={(e) => setReason(e.target.value)} />
+        <label className="lbl">Обоснование *</label><textarea className="inp" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} />
       </div>
       <div className="modal-foot">
         <div className="spacer" />
