@@ -558,7 +558,9 @@ export default function MainLayout({ store, data, user, toast }) {
         toast={toast} 
         store={store}
       />}
-      {modal?.type === 'hours' && <HoursRequestModal db={data} ur={user} kind={modal.kind} targetId={modal.targetId} onClose={() => setModal(null)} onSubmit={(r) => { store.addHoursRequest(r, data); 
+      {modal?.type === 'hours' && <HoursRequestModal db={data} ur={user} kind={modal.kind} targetId={modal.targetId} onClose={() => setModal(null)} onSubmit={(r) => { 
+        console.log('[HoursRequest] onSubmit called with:', r);
+        store.addHoursRequest(r, data); 
         const target = modal.kind === 'task' ? data.tasks.find(t => t.id === modal.targetId) : null;
         const project = modal.kind === 'task' ? data.projects.find(p => p.id === target?.projectId) : target;
         
@@ -581,6 +583,7 @@ export default function MainLayout({ store, data, user, toast }) {
           newH: r.newH,
           justification: r.reason || 'Не указана'
         }, 'hoursRequest', r.id);
+        console.log('[HoursRequest] Closing modal');
         setModal(null); 
       }} />}
       {modal?.type === 'roles' && <RolesModal db={data} store={store} empId={modal.empId} onClose={() => setModal(null)} toast={toast} audit={store.addAudit} />}
