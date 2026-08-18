@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { TASK_STATUSES, TASK_STATUS_ORDER, VACATION_TYPES, PROJECT_CATEGORIES } from '../utils/constants';
 import { TODAY, fmtDMY, fmtD, iso, addDays, isTaskActive } from '../utils/date';
-import { empName } from '../utils/dataHelpers';
+import { empName as empNameHelper } from '../utils/dataHelpers';
 import { hasRole } from '../utils/permissions';
 import { Ic, ICONS } from './Icons';
 import { useToast } from '../hooks/useToast';
@@ -28,7 +28,8 @@ function downloadCSV(name, rows) {
 export default function Cabinet({ store, data, user, openTask, openVacation, openDelegation, openEmployeeEdit, openChangePassword, toast }) {
   const [tab, setTab] = useState('overview');
 
-  const { toast: showToast } = useToast();
+  // Используем переданный toast из пропсов, а не создаем новый через useToast
+  const showToast = toast || (() => {});
 
   const [expFrom, setExpFrom] = useState('');
   const [expTo, setExpTo] = useState('');
@@ -234,7 +235,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
                     <td>{fmtDMY(v.start)}</td><td>{fmtDMY(v.end)}</td>
                     <td>{VACATION_TYPES[v.type]}</td>
                     <td>{v.comment || '—'}</td>
-                    <td>{v.delegation.enabled ? `→ ${empName(v.delegation.subId)}` : '—'}</td>
+                    <td>{v.delegation.enabled ? `→ ${empNameHelper(data, v.delegation.subId)}` : '—'}</td>
                     <td><span className={`st-chip ${v.status}`}>
                       {{ pending: 'На утверждении', approved: 'Утверждён', rejected: 'Отклонён' }[v.status]}
                     </span></td>
@@ -249,7 +250,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
                   </tr>
                 );
               })}
-              {myVacs.length === 0 && <tr><td colSpan="7" className="mut">Отпусков нет</td></tr>}
+              {myVacs.length === 0 && <tr><td colSpan={7} className="mut">Отпусков нет</td></tr>}
             </tbody>
           </table>
         </div>
@@ -269,7 +270,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
             <tbody>
               {myDeleg.map(r => (
                 <tr key={r.id}>
-                  <td>{empName(r.fromId)}</td><td>{empName(r.toId)}</td>
+                  <td>{empNameHelper(data, r.fromId)}</td><td>{empNameHelper(data, r.toId)}</td>
                   <td>{r.roles.join(', ')}</td>
                   <td>{fmtDMY(r.start)} — {r.end ? fmtDMY(r.end) : 'до отмены'}</td>
                   <td><span className={`st-chip ${r.status}`}>
@@ -298,7 +299,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
                   </td>
                 </tr>
               ))}
-              {myDeleg.length === 0 && <tr><td colSpan="6" className="mut">Делегирований нет</td></tr>}
+              {myDeleg.length === 0 && <tr><td colSpan={6} className="mut">Делегирований нет</td></tr>}
             </tbody>
           </table>
         </div>
@@ -421,7 +422,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
 
             <div className="rep-panel-title" style={{ marginTop: 16 }}>История делегирований</div>
             {data.roleDelegations.filter(r => r.fromId === user.id).map(r => (
-              <div key={r.id} className="mut sm">→ {empName(r.toId)}: {r.roles.join(', ')} ({fmtDMY(r.start)} — {r.end ? fmtDMY(r.end) : 'до отмены'})</div>
+              <div key={r.id} className="mut sm">→ {empNameHelper(data, r.toId)}: {r.roles.join(', ')} ({fmtDMY(r.start)} — {r.end ? fmtDMY(r.end) : 'до отмены'})</div>
             ))}
             {data.roleDelegations.filter(r => r.fromId === user.id).length === 0 && <div className="mut sm">Передач ролей не было</div>}
           </div>

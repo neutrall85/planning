@@ -65,14 +65,14 @@ export default function Kanban({
           if (!a.deadline && !b.deadline) return 0;
           if (!a.deadline) return 1;
           if (!b.deadline) return -1;
-          return new Date(a.deadline) - new Date(b.deadline);
+          return new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime();
         case 'deadlineDesc':
           if (!a.deadline && !b.deadline) return 0;
           if (!a.deadline) return 1;
           if (!b.deadline) return -1;
-          return new Date(b.deadline) - new Date(a.deadline);
+          return new Date(b.deadline!).getTime() - new Date(a.deadline!).getTime();
         case 'created':
-          return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+          return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
         case 'alpha':
           return a.title.localeCompare(b.title, 'ru');
         case 'alphaDesc':

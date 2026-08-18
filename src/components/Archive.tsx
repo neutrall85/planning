@@ -3,7 +3,7 @@ import { PROJECT_TYPES, PROJECT_CATEGORIES, TASK_STATUSES } from '../utils/const
 import { fmtDMY, TODAY } from '../utils/date';
 import { canRestore } from '../utils/permissions';
 import { Ic, ICONS } from './Icons';
-import { empName, getTaskSpent } from '../utils/dataHelpers';
+import { empName as empNameHelper, getTaskSpent } from '../utils/dataHelpers';
 
 function getCategoryColor(project) {
   if (!project || project.ptype === 'admin') return '#6b7280';
@@ -92,7 +92,7 @@ export default function Archive({ db, ur, openTask, openProject, restoreTask, re
               <tr key={t.id}>
                 <td><b>{t.title}</b></td>
                 <td>{db.projects.find(x => x.id === t.projectId)?.code}</td>
-                <td>{(t.assigneeIds || []).map(id => empName(id)).join(', ')}</td>
+                <td>{(t.assigneeIds || []).map(id => empNameHelper(db, id)).join(', ')}</td>
                 <td>{fmtDMY(t.archivedAt)}</td>
                 <td>
                   <button className="btn ghost sm" onClick={() => openTask(t.id)}>Открыть</button>

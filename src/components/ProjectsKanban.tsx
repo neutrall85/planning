@@ -24,10 +24,9 @@ export default function ProjectsKanban({
   moveProject,
   showOnlyMyProjects: parentShowOnlyMyProjects,
   sortBy: parentSortBy,
-  toast,
 }) {
   const scope = computeScope(ur, db);
-  const { toast: showToast } = useToast();
+  const { toast } = useToast();
   const [tooltip, setTooltip] = useState({ visible: false, employee: null, x: 0, y: 0 });
 
   const showOnlyMyProjects = parentShowOnlyMyProjects !== undefined ? parentShowOnlyMyProjects : false;
@@ -47,7 +46,7 @@ export default function ProjectsKanban({
     switch (sortBy) {
       case 'name': return a.name.localeCompare(b.name, 'ru');
       case 'nameDesc': return b.name.localeCompare(a.name, 'ru');
-      case 'created': return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+      case 'created': return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
       case 'budget': return (a.budget || 0) - (b.budget || 0);
       case 'budgetDesc': return (b.budget || 0) - (a.budget || 0);
       default: return 0;
@@ -58,7 +57,7 @@ export default function ProjectsKanban({
     const project = db.projects.find(p => p.id === projectId);
     if (!project) return;
     if (!canChangeProjectStatus(ur, project, newStatus)) {
-      showToast(`У вас нет прав на перевод проекта в статус "${PROJECT_STATUS_CONFIG[newStatus]?.label || newStatus}"`);
+      toast.error(`У вас нет прав на перевод проекта в статус "${PROJECT_STATUS_CONFIG[newStatus]?.label || newStatus}"`);
       return;
     }
     moveProject(projectId, newStatus);
@@ -99,7 +98,7 @@ export default function ProjectsKanban({
                 const tasks = db.tasks.filter(t => t.projectId === p.id && isTaskActive(t));
                 const fact = tasks.reduce((s, t) => s + t.logs.reduce((lsum, l) => lsum + l.hours, 0), 0);
                 const usePct = p.budget ? Math.round((fact / Math.max(1, p.budget)) * 100) : 0;
-                const uniqueAssignees = [...new Set(tasks.flatMap(t => t.assigneeIds || []))];
+                const uniqueAssignees = [...new Set(tasks.flatMap(t => t.assigneeIds || []))] as string[];
                 const categoryColor = PROJECT_CATEGORIES[p.category || 'NORM']?.color || '#10b981';
 
                 return (

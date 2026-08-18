@@ -15,7 +15,7 @@ interface UseModalAccessibilityReturn {
   handleKeyDown: (event: React.KeyboardEvent) => void;
   getDialogProps: () => {
     role: string;
-    'aria-modal': string;
+    'aria-modal': boolean;
     'aria-labelledby'?: string;
   };
 }
@@ -94,11 +94,11 @@ export function useModalAccessibility({
   const getDialogProps = useCallback(() => {
     const props: {
       role: string;
-      'aria-modal': string;
+      'aria-modal': boolean;
       'aria-labelledby'?: string;
     } = {
       role: 'dialog',
-      'aria-modal': 'true',
+      'aria-modal': true,
     };
 
     // Добавляем aria-labelledby если есть заголовок

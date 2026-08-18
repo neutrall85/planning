@@ -1,9 +1,23 @@
 import { useEffect, useState, useRef } from 'react';
 import { initials } from '../utils/date';
 
-export default function MentionPopup({ candidates, onSelect, anchorRef, renderItem }) {
+interface Employee {
+  id: string;
+  first: string;
+  last: string;
+  photo?: string;
+}
+
+interface MentionPopupProps {
+  candidates: Employee[];
+  onSelect: (item: Employee) => void;
+  anchorRef: React.RefObject<HTMLElement>;
+  renderItem?: (item: Employee) => React.ReactNode;
+}
+
+export default function MentionPopup({ candidates, onSelect, anchorRef, renderItem }: MentionPopupProps) {
   const [position, setPosition] = useState({ top: 0, left: 0, maxHeight: 200 });
-  const popupRef = useRef();
+  const popupRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!anchorRef.current || candidates.length === 0) return;
