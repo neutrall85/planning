@@ -135,6 +135,13 @@ export interface Task {
   closedAt?: string;
   archived?: boolean;
   archivedAt?: string;
+  // Дополнительные поля для моков
+  desc?: string;
+  start?: string;
+  logs?: any[];
+  comments?: any[];
+  history?: any[];
+  delegatedFrom?: string | null;
 }
 
 /**
@@ -153,6 +160,21 @@ export interface Project {
   endDate?: string;
   archived?: boolean;
   archivedAt?: string;
+  // Дополнительные поля для моков
+  desc?: string;
+  kbId?: string;
+  start?: string;
+  end?: string;
+  closedAt?: string;
+  creatorId?: string;
+  customer?: string;
+  aircraftType?: string;
+  projectType?: string;
+  stage?: string;
+  comments?: any[];
+  history?: any[];
+  files?: any[];
+  longterm?: boolean;
 }
 
 /**
@@ -258,6 +280,14 @@ export interface HoursRequest {
   comment?: string;
   status: 'pending' | 'approved' | 'rejected';
   createdAt: string;
+  // Дополнительные поля для DataStore
+  kind?: string;
+  targetId?: string;
+  oldH?: number;
+  newH?: number;
+  reason?: string;
+  reqId?: string;
+  ts?: number;
 }
 
 /**
@@ -270,6 +300,30 @@ export interface RoleDelegation {
   roleId: string;
   startDate: string;
   endDate: string;
+  // Дополнительные поля для DataStore
+  fromId?: string;
+  toId?: string;
+  roles?: string[];
+  status?: string;
+  end?: string;
+}
+
+/**
+ * Заявка на регистрацию
+ */
+export interface RegRequest {
+  id: string;
+  email: string;
+  first: string;
+  last: string;
+  token: string;
+  createdAt: string;
+  // Дополнительные поля для DataStore
+  pass?: any;
+  position?: any;
+  status?: string;
+  ts?: number;
+  rejectionReason?: string;
 }
 
 /**
@@ -289,6 +343,8 @@ export interface StoreData {
   regRequests: RegRequest[];
   hoursRequests: HoursRequest[];
   roleDelegations: RoleDelegation[];
+  // Дополнительные поля для DataStore
+  audit?: any[];
 }
 
 /**
