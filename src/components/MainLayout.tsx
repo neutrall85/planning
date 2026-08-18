@@ -3,7 +3,7 @@ import { useAuth } from '../hooks';
 import { useTaskOperations } from '../hooks/business/useTaskOperations';
 import { useProjectOperations } from '../hooks/business/useProjectOperations';
 import { hasRole, canCreateTask, canExport, canChangeTaskStatus } from '../utils/permissions';
-import { empName } from '../utils/dataHelpers';
+import { empName as getEmpName } from '../utils/dataHelpers';
 import { ICONS, Ic } from './Icons';
 import { initials, TODAY, fmtDMY, fmtFullDate } from '../utils/date';
 import { TASK_STATUSES, ROLES, PROJECT_STATUSES, PRIORITIES } from '../utils/constants';
@@ -469,7 +469,7 @@ export default function MainLayout({ store, data, user, toast }) {
             if (old.projectId !== t.projectId) { hasChanges = true; changes.project = `${data.projects.find(p => p.id === old.projectId)?.code || '—'} → ${data.projects.find(p => p.id === t.projectId)?.code || '—'}`; }
             if (old.plannedHours !== t.plannedHours) { hasChanges = true; changes.plannedHours = `${old.plannedHours ?? '—'} → ${t.plannedHours ?? '—'}`; }
             if (old.status !== t.status) { hasChanges = true; changes.status = `${TASK_STATUSES[old.status].label} → ${TASK_STATUSES[t.status].label}`; }
-            if (JSON.stringify(old.assigneeIds || []) !== JSON.stringify(t.assigneeIds || [])) { hasChanges = true; changes.assignees = `${(old.assigneeIds || []).map(id => empName(id)).join(', ')} → ${(t.assigneeIds || []).map(id => empName(id)).join(', ')}`; }
+            if (JSON.stringify(old.assigneeIds || []) !== JSON.stringify(t.assigneeIds || [])) { hasChanges = true; changes.assignees = `${(old.assigneeIds || []).map(id => getEmpName(data, id)).join(', ')} → ${(t.assigneeIds || []).map(id => getEmpName(data, id)).join(', ')}`; }
             if (old.deadline !== t.deadline) { hasChanges = true; changes.deadline = `${old.deadline ? fmtDMY(old.deadline) : '—'} → ${t.deadline ? fmtDMY(t.deadline) : '—'}`; }
             if (old.priority !== t.priority) { hasChanges = true; changes.priority = `${PRIORITIES[old.priority]?.label} → ${PRIORITIES[t.priority]?.label}`; }
             if (old.dependencyId !== t.dependencyId || old.dependencyType !== t.dependencyType) { hasChanges = true; changes.dependency = 'изменена зависимость'; }
@@ -490,7 +490,7 @@ export default function MainLayout({ store, data, user, toast }) {
           
           const actual = t.logs ? t.logs.reduce((s, l) => s + l.hours, 0) : 0;
           const projectCode = data.projects.find(p => p.id === t.projectId)?.code || '—';
-          const assigneesStr = (t.assigneeIds || []).map(id => empName(id)).join(', ');
+          const assigneesStr = (t.assigneeIds || []).map(id => getEmpName(data, id)).join(', ');
           const auditDetails = `Задача "${t.title}" в проекте ${projectCode}, плановые часы: ${t.plannedHours ?? '—'}, фактические часы: ${actual}, исполнители: ${assigneesStr || 'не назначены'}`;
           
           if (isNew) {
@@ -531,7 +531,7 @@ export default function MainLayout({ store, data, user, toast }) {
             const changes = {};
             if (old.budget !== p.budget) changes.budget = `${old.budget ?? '—'} → ${p.budget ?? '—'}`;
             if (old.name !== p.name) changes.name = `${old.name} → ${p.name}`;
-            if (old.managerId !== p.managerId) changes.manager = `${empName(old.managerId)} → ${empName(p.managerId)}`;
+            if (old.managerId !== p.managerId) changes.manager = `${getEmpName(data, old.managerId)} → ${getEmpName(data, p.managerId)}`;
             if (old.status !== p.status) changes.status = `${PROJECT_STATUSES[old.status]} → ${PROJECT_STATUSES[p.status]}`;
             if (Object.keys(changes).length) {
               const details = Object.entries(changes).map(([k, v]) => `${k}: ${v}`).join('; ');
@@ -578,9 +578,9 @@ export default function MainLayout({ store, data, user, toast }) {
       }} />}
       {modal?.type === 'roles' && <RolesModal db={data} store={store} empId={modal.empId} onClose={() => setModal(null)} toast={toast} audit={store.addAudit} />}
       {modal?.type === 'depts' && <DeptsModal db={data} store={store} empId={modal.empId} onClose={() => setModal(null)} toast={toast} audit={store.addAudit} />}
-      {modal?.type === 'vacation' && <VacationModal db={data} ur={user} vacationId={modal.vacationId} forEmpId={modal.forEmpId || null} onClose={() => setModal(null)} onSave={(v, isNew) => { store.upsertVacation(v); store.addAudit(isNew ? 'Создание отпуска' : 'Изменение отпуска', { employee: empName(v.empId), period: `${fmtDMY(v.start)}—${fmtDMY(v.end)}` }, 'vacation', v.id); setModal(null); }} />}
+      {modal?.type === 'vacation' && <VacationModal db={data} ur={user} vacationId={modal.vacationId} forEmpId={modal.forEmpId || null} onClose={() => setModal(null)} onSave={(v, isNew) => { store.upsertVacation(v); store.addAudit(isNew ? 'Создание отпуска' : 'Изменение отпуска', { employee: getEmpName(data, v.empId), period: `${fmtDMY(v.start)}—${fmtDMY(v.end)}` }, 'vacation', v.id); setModal(null); }} />}
       {modal?.type === 'vacnow' && <VacNowModal db={data} onClose={() => setModal(null)} toast={toast} />}
-      {modal?.type === 'delegation' && <DelegationModal db={data} ur={user} onClose={() => setModal(null)} onSubmit={(rd) => { store.upsertRoleDelegation(rd); store.addNotification(rd.toId, `Вам предложено временное принятие ролей: ${rd.roles.map(r => ROLES[r].label).join(", ")}.`, { targetType: 'delegation', targetId: rd.id }); store.addAudit('Создание делегирования ролей', { from: empName(rd.fromId), to: empName(rd.toId), roles: rd.roles.join(', ') }, 'delegation', rd.id); setModal(null); }} />}
+      {modal?.type === 'delegation' && <DelegationModal db={data} ur={user} onClose={() => setModal(null)} onSubmit={(rd) => { store.upsertRoleDelegation(rd); store.addNotification(rd.toId, `Вам предложено временное принятие ролей: ${rd.roles.map(r => ROLES[r].label).join(", ")}.`, { targetType: 'delegation', targetId: rd.id }); store.addAudit('Создание делегирования ролей', { from: getEmpName(data, rd.fromId), to: getEmpName(data, rd.toId), roles: rd.roles.join(', ') }, 'delegation', rd.id); setModal(null); }} />}
       {modal?.type === 'employeeEdit' && (
         <EmployeeEditModal
           db={data}
