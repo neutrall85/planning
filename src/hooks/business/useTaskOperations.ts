@@ -166,20 +166,20 @@ export const useTaskOperations = ({
         }
       });
       
-      onAddAudit('Создание задачи', task.title, 'task', task.id);
+      // Журналирование перенесено в MainLayout.tsx для подробного описания
     }
     
     onUpsertTask(task);
-  }, [tasks, currentUser, validateBudget, notifyStatusChange, onUpsertTask, onAddNotification, onAddAudit]);
+  }, [tasks, currentUser, validateBudget, notifyStatusChange, onUpsertTask, onAddNotification]);
 
   // Delete operation with audit logging
   const deleteTask = useCallback((id: string) => {
     const task = tasks.find(t => t.id === id);
     if (task) {
-      onAddAudit('Удаление задачи', task.title, 'task', id);
+      // Журналирование перенесено в MainLayout.tsx для подробного описания
     }
     onDeleteTask(id);
-  }, [tasks, onDeleteTask, onAddAudit]);
+  }, [tasks, onDeleteTask]);
 
   // Memoized statistics
   const stats = useMemo(() => {
