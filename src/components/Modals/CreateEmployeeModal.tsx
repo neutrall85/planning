@@ -70,7 +70,7 @@ export const CreateEmployeeModal = ({ db, store, onClose, toast, audit }) => {
     }
 
     // Создание сотрудника
-    const newEmp = {
+    const newEmp: any = {
       id: 'emp_' + Math.random().toString(36).slice(2, 8),
       last: f.last.trim(),
       first: f.first.trim(),
@@ -85,8 +85,8 @@ export const CreateEmployeeModal = ({ db, store, onClose, toast, audit }) => {
       createdAt: Date.now(),
     };
 
-    // Хеширование пароля (упрощённо)
-    newEmp.pass = btoa(f.password);
+    // Добавляем pass в объект перед сохранением
+    (newEmp as any).pass = btoa(f.password);
 
     store.upsertEmployee(newEmp);
 
@@ -145,7 +145,7 @@ export const CreateEmployeeModal = ({ db, store, onClose, toast, audit }) => {
         <label className="lbl">Роль</label>
         <select className="inp sel" value={f.roles[0]} onChange={(e) => set('roles', [e.target.value])}>
           {Object.entries(ROLES).map(([k, v]) => (
-            <option key={k} value={k}>{v}</option>
+            <option key={k} value={k}>{String(v.label)}</option>
           ))}
         </select>
       </div>
