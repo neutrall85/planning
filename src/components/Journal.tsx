@@ -303,7 +303,7 @@ export default function Journal({ db }) {
                     <React.Fragment key={entry.id}>
                       {showMonth && (
                         <tr>
-                          <td colSpan="4" style={{ 
+                          <td colSpan={4} style={{ 
                             background: 'linear-gradient(90deg, #f8fafc, transparent)', 
                             padding: '12px 10px 8px',
                             borderTop: index === 0 ? 'none' : '2px solid var(--line)',
@@ -322,7 +322,7 @@ export default function Journal({ db }) {
                       )}
                       {showDay && (
                         <tr>
-                          <td colSpan="4" style={{ 
+                          <td colSpan={4} style={{ 
                             padding: '8px 10px 6px',
                             borderTop: '1px dashed #e2e8f0',
                           }}>

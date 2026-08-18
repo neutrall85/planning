@@ -2,51 +2,140 @@
 # Dependencies
 node_modules/
 
-# Build outputs
+# Build artifacts
 dist/
+build/
+target/
 
-# Vite cache
-.vite/
-
-# Environment files
-.env
-.env.local
-.env.*
-
-# IDE files
-.vscode/
-.idea/
-
-# Logs
-*.log
-
-# Temporary files
-*.tmp
-*.swp
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# Python cache
+# Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.py~
+*.py.class
+*.py.backup
+*.py.swp
+*.py.swo
+*.py.tmp
+*.py.log
+*.py.out
+*.py.err
+*.py.pid
+*.py.lock
+*.py.cache
+*.py.compiled
+*.py.bak
+*.py~*
+*.py#*
+*.py$*
+*.py%*
+*.py@*
+*.py^*
+*.py&*
+*.py|*
+*.py`*
+*.py'*
+*.py"*
+*.py;*
+*.py:*
+*.py<*
+*.py>*
+*.py?*
+*.py/*
+*.py.~
+*.py.#
+*.py.$
+*.py.%
+*.py.@
+*.py.^
+*.py.&
+*.py.|
+*.py.`
+*.py.'
+*.py."
+*.py.;
+*.py.:
+*.py.<
+*.py.>
+*.py.?
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+ENV/
+
+# IDE specific
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Environment variables
+.env
+.env.local
+*.env
+*.env.local
 
 # Coverage reports
 coverage/
 htmlcov/
 .coverage
 
-# Compiled files
-*.o
-*.obj
-*.out
+# Testing
+.pytest_cache/
+.mypy_cache/
+.tox/
+.nox/
+
+# Distribution / packaging
+*.egg-info/
+*.egg
+*.whl
+dist/
+build/
+*.tar.gz
+*.zip
+
+# Runtime data
+*.pid
+*.seed
+*.pid.lock
+
+# Transient / temporary files
+*.~lock
+*.bak
+*.backup
+*.tmp
+*.temp
+*.log.*
+
+# Node.js
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Compiled binary files
 *.exe
 *.dll
 *.so
+*.dylib
+*.class
+*.o
 *.a
+*.obj
+*.out
+*.app
 
 # Compressed files
 *.zip
@@ -67,8 +156,60 @@ htmlcov/
 *.Z
 *.lz
 *.lzo
-*.tar.gz
-*.tar.bz2
-*.tar.xz
-*.tar.zst
+
+# Image files (if accidentally added)
+*.png
+*.jpg
+*.jpeg
+*.bmp
+*.gif
+*.webm
+*.svg
+*.ico
+*.tiff
+*.tif
+*.webp
+*.avif
+*.apng
+
+# Video files
+*.mp4
+*.avi
+*.mov
+*.wmv
+*.flv
+*.mkv
+*.webm
+*.m4v
+*.3gp
+*.3g2
+*.mxf
+*.roq
+*.nsv
+*.f4v
+*.f4p
+*.f4a
+*.f4b
+
+# Audio files
+*.mp3
+*.wav
+*.aac
+*.flac
+*.ogg
+*.wma
+*.m4a
+*.opus
+*.aiff
+*.au
+*.snd
+*.mid
+*.midi
+*.rmi
+*.kar
+*.mpga
+*.mp2
+*.mp2a
+*.m2a
+*.m3a
 ```
