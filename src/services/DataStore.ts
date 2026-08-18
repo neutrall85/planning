@@ -436,7 +436,7 @@ export default class DataStore {
   }
 
   // === СОТРУДНИКИ ===
-  upsertEmployee(emp) {
+  upsertEmployee(emp, skipRoleAudit = false) {
     const idx = this._data.employees.findIndex(e => e.id === emp.id);
     let employees;
     if (idx >= 0) {
@@ -445,7 +445,8 @@ export default class DataStore {
       const merged = { ...oldEmp, ...Object.fromEntries(Object.entries(emp).filter(([_, v]) => v !== undefined)) };
 
       // Аудит изменений ролей (изменения подразделений логируются явно в компоненте DeptsModal)
-      if (JSON.stringify(oldEmp.roles) !== JSON.stringify(merged.roles)) {
+      // skipRoleAudit=true используется при автоматическом добавлении роли "executor" системой
+      if (!skipRoleAudit && JSON.stringify(oldEmp.roles) !== JSON.stringify(merged.roles)) {
         this.addAudit('Изменение ролей сотрудника', `${merged.last} ${merged.first}`, 'employee', emp.id);
       }
 
@@ -748,6 +749,7 @@ export default class DataStore {
         updatedData.employees = updatedData.employees.map(e =>
           e.id === updated.id ? updated : e
         );
+        // Не логируем изменение роли при одобрении регистрации - это системное действие
       } else {
         const newEmp = {
           id: 'e_' + Math.random().toString(36).slice(2, 6),
@@ -767,6 +769,7 @@ export default class DataStore {
           lockUntil: 0
         };
         updatedData.employees = [...updatedData.employees, newEmp];
+        this.addAudit('Регистрация нового сотрудника', `${newEmp.last} ${newEmp.first}`, 'employee', newEmp.id);
       }
     }
 
@@ -818,6 +821,9 @@ export default class DataStore {
       ]
     };
     this._notify();
+
+    // Аудит регистрации нового сотрудника
+    this.addAudit('Регистрация нового сотрудника', `${newEmployee.last} ${newEmployee.first}`, 'employee', newEmployee.id);
 
     return newEmployee;
   }
