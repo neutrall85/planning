@@ -268,6 +268,8 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', planSum, onClos
   };
 
   const doSave = (newStatus) => {
+    console.log('[TaskModal] doSave started', { newStatus, existingId: existing?.id });
+    
     const history = [...(f.history || [])];
     const statusToSave = newStatus || f.status;
     if (existing && existing.status !== statusToSave) {
@@ -280,6 +282,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', planSum, onClos
     let finalDeadline = f.deadline;
 
     if (f.dependencyId && f.dependencyType) {
+      console.log('[TaskModal] Processing dependency', { dependencyId: f.dependencyId, dependencyType: f.dependencyType });
       const depTask = db.tasks.find(t => t.id === f.dependencyId);
       if (depTask) {
         switch (f.dependencyType) {
@@ -322,6 +325,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', planSum, onClos
       }
     }
 
+    console.log('[TaskModal] Building taskToSave', { start: finalStart, deadline: finalDeadline, status: statusToSave });
     const newClosed = statusToSave === "closed" && (!existing || existing.status !== "closed");
     const taskToSave = {
       ...f,
@@ -341,7 +345,9 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', planSum, onClos
     delete taskToSave.repeatEndValue;
 
     try {
+      console.log('[TaskModal] Inside try block, checking repeat', { repeatType: f.repeatType, existing: !!existing });
       if (!existing && f.repeatType !== 'none') {
+        console.log('[TaskModal] Creating repeated tasks');
         const repeatConfig = {
           type: f.repeatType,
           interval: parseInt(f.repeatInterval, 10) || 1,
@@ -352,6 +358,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', planSum, onClos
         const startDate = f.start;
         const deadline = f.deadline;
         const dates = generateRepeatDates(startDate, deadline, repeatConfig, f.repeatEndValue, 50);
+        console.log('[TaskModal] Generated dates', dates.length);
 
         dates.forEach((d, index) => {
           const taskCopy = {
@@ -360,6 +367,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', planSum, onClos
             start: d.start,
             deadline: d.deadline,
           };
+          console.log('[TaskModal] Saving repeated task', index);
           if (index === 0) {
             onSave({ ...taskCopy, id: taskToSave.id }, true);
           } else {
@@ -374,6 +382,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', planSum, onClos
         }
         onClose();
       } else {
+        console.log('[TaskModal] Calling onSave for single task', { taskId: taskToSave.id, isNew: !existing });
         onSave(taskToSave, !existing);
         // Очищаем localStorage после успешного сохранения
         if (!existing) {
@@ -381,8 +390,11 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', planSum, onClos
           localStorage.removeItem('taskModal_showAssigneeSelector');
           localStorage.removeItem('taskModal_newAssigneeId');
         }
+        console.log('[TaskModal] onSave completed, calling onClose');
+        onClose();
       }
     } catch (error) {
+      console.error('[TaskModal] Error in doSave', error);
       toast.error(error.message || 'Ошибка сохранения задачи');
     }
   };
