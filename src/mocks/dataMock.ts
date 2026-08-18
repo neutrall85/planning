@@ -3,7 +3,7 @@
  * Этот файл можно безопасно удалить при переходе на реальное API
  */
 
-import type { Employee, Department, KB, Project, Task, Vacation, Notification, Settings } from '../types';
+import type { Employee, Department, KB, Project, Task, Vacation, Notification, Settings, TaskStatus, Priority, VacationStatus, NotificationTargetType } from '../types';
 
 // Вспомогательные функции
 const iso = (d: Date): string => d.toISOString();
@@ -32,18 +32,18 @@ export function buildMockData() {
   ];
 
   const departments: Department[] = [
-    { id: "d_kb_la", name: "Конструкторское бюро «ЛА»", kbId: "kb_la" },
-    { id: "d_kb_ad", name: "Конструкторское бюро «АД»", kbId: "kb_ad" },
-    { id: "d_aero", name: "Отдел аэродинамики", kbId: "kb_la" },
-    { id: "d_strla", name: "Отдел прочности", kbId: "kb_la" },
-    { id: "d_comp", name: "Отдел компоновки и весовых балансов", kbId: "kb_la" },
-    { id: "d_gas", name: "Отдел газодинамики", kbId: "kb_ad" },
-    { id: "d_stren", name: "Отдел прочности двигателей", kbId: "kb_ad" },
-    { id: "d_sau", name: "Отдел систем автоматического управления", kbId: "kb_ad" },
-    { id: "d_av1", name: "Отдел бортового радиоэлектронного оборудования (ОБРЭО)", kbId: "kb_la" },
-    { id: "d_okk", name: "Отдел контроля качества инженерного центра", kbId: null },
-    { id: "d_hr", name: "Отдел управления персоналом", kbId: null },
-    { id: "d_management", name: "Группа управления и развития", kbId: null },
+    { id: "d_kb_la", name: "Конструкторское бюро «ЛА»", kbId: "kb_la", parentId: null },
+    { id: "d_kb_ad", name: "Конструкторское бюро «АД»", kbId: "kb_ad", parentId: null },
+    { id: "d_aero", name: "Отдел аэродинамики", kbId: "kb_la", parentId: "d_kb_la" },
+    { id: "d_strla", name: "Отдел прочности", kbId: "kb_la", parentId: "d_kb_la" },
+    { id: "d_comp", name: "Отдел компоновки и весовых балансов", kbId: "kb_la", parentId: "d_kb_la" },
+    { id: "d_gas", name: "Отдел газодинамики", kbId: "kb_ad", parentId: "d_kb_ad" },
+    { id: "d_stren", name: "Отдел прочности двигателей", kbId: "kb_ad", parentId: "d_kb_ad" },
+    { id: "d_sau", name: "Отдел систем автоматического управления", kbId: "kb_ad", parentId: "d_kb_ad" },
+    { id: "d_av1", name: "Отдел бортового радиоэлектронного оборудования (ОБРЭО)", kbId: "kb_la", parentId: "d_kb_la" },
+    { id: "d_okk", name: "Отдел контроля качества инженерного центра", kbId: null, parentId: null },
+    { id: "d_hr", name: "Отдел управления персоналом", kbId: null, parentId: null },
+    { id: "d_management", name: "Группа управления и развития", kbId: null, parentId: null },
   ];
 
   // Полный список сотрудников
@@ -461,7 +461,7 @@ export function buildMockData() {
   ];
 
   // Задачи
-  const T = (id, title, projectId, assigneeIds, planned, s, dl, status, priority, desc, extra = {}) => {
+  const T = (id: string, title: string, projectId: string, assigneeIds: string[] | string, planned: number, s: number, dl: number | null, status: TaskStatus, priority: Priority, desc: string, extra: any = {}) => {
     const history = extra.history || [{ ts: now - 86400000 * 6, who: extra.creatorId || "aleksey.gendirov", text: "Задача создана" }];
     const creatorId = extra.creatorId || (history.length > 0 ? history[0].who : "aleksey.gendirov");
     const startDate = makeDate(s);
@@ -475,8 +475,8 @@ export function buildMockData() {
       status, priority, logs: [], comments: [], history,
       creatorId,
       createdAt: extra.createdAt || createdAtStr,
-      delegatedFrom: null, archived: false, archivedAt: null, closedAt: null, ...extra,
-    };
+      delegatedFrom: null as string | null, archived: false, archivedAt: null, closedAt: null, ...extra,
+    } as Task;
   };
 
   const tasks: Task[] = [
@@ -522,11 +522,11 @@ export function buildMockData() {
 
   // Отпуска
   const vacations: Vacation[] = [
-    { id: "v1", empId: "e_somova", start: D(-2), end: D(5), type: "annual", comment: "Отдых, Сочи", status: "approved", delegation: { enabled: true, subId: "e_anokhin", statuses: ["inwork", "review"], state: "applied" } },
-    { id: "v2", empId: "e_tihonov", start: D(3), end: D(14), type: "annual", comment: "Плановый отпуск", status: "pending", delegation: { enabled: true, subId: "e_melnik", statuses: ["inwork"], state: null } },
-    { id: "v3", empId: "e_gusev", start: D(-20), end: D(-8), type: "sick", comment: "Больничный лист", status: "approved", delegation: { enabled: false, subId: null, statuses: [], state: null } },
-    { id: "v4", empId: "isaev", start: D(10), end: D(17), type: "annual", comment: "Отпуск", status: "pending", delegation: { enabled: false, subId: null, statuses: [], state: null } },
-    { id: "v5", empId: "e_anokhin", start: D(-15), end: D(-3), type: "annual", comment: "Уже был", status: "approved", delegation: { enabled: false, subId: null, statuses: [], state: null } },
+    { id: "v1", empId: "e_somova", start: D(-2), end: D(5), type: "annual", comment: "Отдых, Сочи", status: "approved" as VacationStatus, delegation: { enabled: true, subId: "e_anokhin", statuses: ["inwork", "review"], state: "applied" } },
+    { id: "v2", empId: "e_tihonov", start: D(3), end: D(14), type: "annual", comment: "Плановый отпуск", status: "submitted" as VacationStatus, delegation: { enabled: true, subId: "e_melnik", statuses: ["inwork"], state: null } },
+    { id: "v3", empId: "e_gusev", start: D(-20), end: D(-8), type: "sick", comment: "Больничный лист", status: "approved" as VacationStatus, delegation: { enabled: false, subId: null, statuses: [], state: null } },
+    { id: "v4", empId: "isaev", start: D(10), end: D(17), type: "annual", comment: "Отпуск", status: "submitted" as VacationStatus, delegation: { enabled: false, subId: null, statuses: [], state: null } },
+    { id: "v5", empId: "e_anokhin", start: D(-15), end: D(-3), type: "annual", comment: "Уже был", status: "approved" as VacationStatus, delegation: { enabled: false, subId: null, statuses: [], state: null } },
   ];
 
   // Запросы на изменение часов
@@ -542,9 +542,9 @@ export function buildMockData() {
 
   // Уведомления
   const notifications: Notification[] = [
-    { id: uid(), userId: "aleksey.gendirov", text: "Запрос на изменение плановых часов по задаче «Отчёт по прочности фюзеляжа» ожидает решения.", ts: now - 3600000 * 5, read: false, targetType: 'hours', targetId: 'hr1' },
-    { id: uid(), userId: "e_fedorov", text: "Тихонов Е. подал заявку на отпуск с делегированием задач — требуется утверждение.", ts: now - 3600000 * 8, read: false, targetType: 'vacation', targetId: 'v2' },
-    { id: uid(), userId: "e_anokhin", text: "Вам переданы задачи Сомовой Е. на период отпуска.", ts: now - 3600000 * 30, read: false, targetType: 'task', targetId: 't08' },
+    { id: uid(), userId: "aleksey.gendirov", text: "Запрос на изменение плановых часов по задаче «Отчёт по прочности фюзеляжа» ожидает решения.", ts: now - 3600000 * 5, read: false, targetType: 'task' as NotificationTargetType, targetId: 'hr1' },
+    { id: uid(), userId: "e_fedorov", text: "Тихонов Е. подал заявку на отпуск с делегированием задач — требуется утверждение.", ts: now - 3600000 * 8, read: false, targetType: 'vacation' as NotificationTargetType, targetId: 'v2' },
+    { id: uid(), userId: "e_anokhin", text: "Вам переданы задачи Сомовой Е. на период отпуска.", ts: now - 3600000 * 30, read: false, targetType: 'task' as NotificationTargetType, targetId: 't08' },
   ];
 
   // Аудит
