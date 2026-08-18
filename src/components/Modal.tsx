@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { Ic, ICONS } from './Icons';
+import { Ic } from './Icons';
 import { useModalAccessibility } from '../hooks';
 
 interface ModalProps {
@@ -47,7 +47,7 @@ export const Modal = ({ title, onClose, children, width = 640 }: ModalProps) => 
             onClick={onClose}
             aria-label="Закрыть"
           >
-            <Ic d={ICONS.x} size={16} />
+            <Ic name="x" size={16} />
           </button>
         </div>
         <div className="modal-body">{children}</div>

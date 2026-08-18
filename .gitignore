@@ -1,16 +1,68 @@
 ```
-# Build artifacts
-dist/
-build/
-
 # Dependencies
 node_modules/
 
-# Logs and temp files
-*.log
-*.tmp
+# Build artifacts
+dist/
+build/
+target/
 
-# Editors
+# Package lock files
+package-lock.json
+yarn.lock
+
+# Environment variables
+.env
+.env.local
+.env.*
+
+# IDE files
 .vscode/
 .idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# Temp files
+*.tmp
+
+# Coverage
+coverage/
+htmlcov/
+.coverage
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Testing
+.nyc_output/
+coverage/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Babel runtime (since it's in node_modules which we're already ignoring)
+@babel/
+
+# MyPy cache
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pytest cache
+.pytest_cache/
+
+# Gradle
+.gradle/
+build/
+
+# Svelte
+.svelte-kit/
+.copal/
 ```
