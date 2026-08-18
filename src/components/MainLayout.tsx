@@ -25,7 +25,9 @@ import {
   VacationModal, DelegationModal, EmployeeEditModal, ChangePasswordModal, VacNowModal
 } from './Modals';
 
-export default function MainLayout({ store, data, user, toast, logout }) {
+export default function MainLayout({ store, data, user, toast }) {
+  const { logout } = useAuth();
+  
   // Интеграция useTaskOperations для инкапсуляции бизнес-логики задач
   const taskOps = useTaskOperations({
     tasks: data.tasks,

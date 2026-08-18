@@ -1,9 +1,11 @@
-import { StoreProvider } from './context/StoreContext';
-import { useStore, useAuth, useToast } from './hooks';
+import { DataProvider } from './context/DataContext';
+import { AuthProvider } from './context/AuthContext';
+import { useData, useAuth, useToast } from './hooks';
 import { ToastContainer } from './hooks/useToast';
 import LoginScreen from './components/LoginScreen';
 import MainLayout from './components/MainLayout';
 import { logger, LOG_LEVELS } from './utils/logging/logger';
+import DataStore from './services/DataStore';
 
 // Инициализация уровня логирования при запуске приложения
 if (typeof window !== 'undefined') {
@@ -14,8 +16,8 @@ if (typeof window !== 'undefined') {
 }
 
 function AppContent() {
-  const { store, data, login, logout } = useStore();
-  const { user, isAuthenticated } = useAuth();
+  const { store, data } = useData();
+  const { user, login, logout, isAuthenticated } = useAuth();
   const { toast } = useToast();
 
   if (!isAuthenticated) {
@@ -28,16 +30,20 @@ function AppContent() {
   }
   return (
     <>
-      <MainLayout store={store} data={data} user={user!} toast={toast} logout={logout} />
+      <MainLayout store={store} data={data} user={user!} toast={toast} />
       <ToastContainer />
     </>
   );
 }
 
 export default function App() {
+  const store = new DataStore();
+  
   return (
-    <StoreProvider>
-      <AppContent />
-    </StoreProvider>
+    <DataProvider>
+      <AuthProvider store={store}>
+        <AppContent />
+      </AuthProvider>
+    </DataProvider>
   );
 }

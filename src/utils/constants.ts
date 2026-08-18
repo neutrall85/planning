@@ -28,33 +28,12 @@ export type TaskStatusDef = typeof TASK_STATUSES[TaskStatusKey];
 
 export const TASK_STATUS_ORDER = ["new", "inwork", "review", "closed", "cancelled"] as const;
 
-// Тип для элемента массива статусов
-export type TaskStatusItem = { value: TaskStatusKey } & TaskStatusDef;
-
-// Массив для итерации в компонентах
-export const TASK_STATUSES_ARRAY: TaskStatusItem[] = Object.entries(TASK_STATUSES).map(([value, def]) => ({
-  value: value as TaskStatusKey,
-  ...def,
-}));
-
 export const PRIORITIES = {
   low:  { label: "Низкий", color: "#3b82f6" },
   mid:  { label: "Средний", color: "#f59e0b" },
   high: { label: "Высокий", color: "#f97316" },
   crit: { label: "Критический", color: "#dc2626" },
 } as const;
-
-export type PriorityKey = keyof typeof PRIORITIES;
-export type PriorityDef = typeof PRIORITIES[PriorityKey];
-
-// Тип для элемента массива приоритетов
-export type PriorityItem = { value: PriorityKey } & PriorityDef;
-
-// Массив для итерации в компонентах
-export const PRIORITIES_ARRAY: PriorityItem[] = Object.entries(PRIORITIES).map(([value, def]) => ({
-  value: value as PriorityKey,
-  ...def,
-}));
 
 // Типы зависимостей между задачами
 export const DEPENDENCY_TYPES = {
