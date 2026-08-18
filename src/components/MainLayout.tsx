@@ -558,7 +558,7 @@ export default function MainLayout({ store, data, user, toast }) {
         toast={toast} 
         store={store}
       />}
-      {modal?.type === 'hours' && <HoursRequestModal db={data} ur={user} kind={modal.kind} targetId={modal.targetId} onClose={() => setModal(null)} onSubmit={(r) => { store.addHoursRequest(r); 
+      {modal?.type === 'hours' && <HoursRequestModal db={data} ur={user} kind={modal.kind} targetId={modal.targetId} onClose={() => setModal(null)} onSubmit={(r) => { store.addHoursRequest(r, data); 
         const target = modal.kind === 'task' ? data.tasks.find(t => t.id === modal.targetId) : null;
         const project = modal.kind === 'task' ? data.projects.find(p => p.id === target?.projectId) : target;
         
