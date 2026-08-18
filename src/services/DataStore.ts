@@ -70,7 +70,7 @@ export default class DataStore {
       if (!task.deadline || ['closed', 'cancelled'].includes(task.status)) return;
 
       const deadlineDate = new Date(task.deadline);
-      const daysUntilDeadline = Math.ceil((deadlineDate - now) / (1000 * 60 * 60 * 24));
+      const daysUntilDeadline = Math.ceil((deadlineDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
       if (daysUntilDeadline === 3 || daysUntilDeadline === 1) {
         const assigneeIds = task.assigneeIds || [];

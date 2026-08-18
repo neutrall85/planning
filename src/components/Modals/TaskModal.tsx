@@ -283,7 +283,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', planSum, onClos
           case 'SS':
             finalStart = depTask.start;
             if (f.deadline && depTask.start) {
-              const diffDays = Math.round((new Date(f.deadline) - new Date(f.start || TODAY)) / (1000 * 60 * 60 * 24));
+              const diffDays = Math.round((new Date(f.deadline).getTime() - new Date(f.start || TODAY).getTime()) / (1000 * 60 * 60 * 24));
               finalDeadline = iso(addDays(parseISO(depTask.start), diffDays));
             }
             break;
@@ -291,7 +291,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', planSum, onClos
             if (depTask.deadline) {
               finalDeadline = depTask.deadline;
               if (f.start && f.deadline) {
-                const duration = Math.round((new Date(f.deadline) - new Date(f.start)) / (1000 * 60 * 60 * 24));
+                const duration = Math.round((new Date(f.deadline).getTime() - new Date(f.start).getTime()) / (1000 * 60 * 60 * 24));
                 finalStart = iso(addDays(parseISO(depTask.deadline), -duration));
               }
             }
@@ -300,7 +300,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', planSum, onClos
             if (depTask.start) {
               finalDeadline = depTask.start;
               if (f.start && f.deadline) {
-                const duration = Math.round((new Date(f.deadline) - new Date(f.start)) / (1000 * 60 * 60 * 24));
+                const duration = Math.round((new Date(f.deadline).getTime() - new Date(f.start).getTime()) / (1000 * 60 * 60 * 24));
                 finalStart = iso(addDays(parseISO(depTask.start), -duration));
               }
             }
@@ -310,7 +310,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', planSum, onClos
             if (depTask.deadline) {
               finalStart = depTask.deadline;
               if (f.deadline) {
-                const diffDays = Math.round((new Date(f.deadline) - new Date(f.start || TODAY)) / (1000 * 60 * 60 * 24));
+                const diffDays = Math.round((new Date(f.deadline).getTime() - new Date(f.start || TODAY).getTime()) / (1000 * 60 * 60 * 24));
                 finalDeadline = iso(addDays(parseISO(depTask.deadline), diffDays));
               }
             }
