@@ -152,13 +152,13 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
       <div className="login-hero">
         <div className="logo lg"><div className="logo-mark">АП</div><div><div className="logo-name">АэроПлан</div><div className="logo-sub">планирование и учёт времени</div></div></div>
         <h2>Единая среда планирования КБ</h2>
-        <p>Канбан, диаграмма Ганта и календарь. Проекты двух типов, обсуждения задач с @упоминаниями, отпуска с делегированием, HR-администрирование, архивация и журнал аудита.</p>
+        <p>Канбан, диаграмма Ганта и календарь. Производственные проекты двух типов, административные проекты, отпуска с делегированием, HR-администрирование и журнал аудита.</p>
         <ul className="hero-list">
-          <li>8 ролей, включая HR-менеджера; временное делегирование полномочий</li>
-          <li>Архив закрытых задач и проектов (по умолчанию 6 месяцев, настройка 3–24)</li>
-          <li>Комментарии с ветками ответов и @упоминаниями участников</li>
+          <li>9 ролей, включая HR-менеджера; временное делегирование полномочий</li>
+          <li>Архив закрытых задач и проектов при попадании в завершенные или отмененные</li>
+          <li>Комментарии с ветками ответов и @упоминаниями участников в задачах и проектах</li>
         </ul>
-        <div className="hero-stack">React · Java (Spring Boot) · PostgreSQL · Ubuntu LTS · REST/JSON · OpenAPI · ООП/KISS/DRY</div>
+        <div className="hero-stack">React · Vite · Node.js · PostgreSQL · Ubuntu LTS · ООП/KISS/DRY</div>
       </div>
       <div className="login-panel">
         <form className={"login-card" + (shake ? " shake" : "")} onSubmit={submit}>

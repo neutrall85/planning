@@ -5,7 +5,7 @@ import { hasRole, canApproveVacation } from "../utils/permissions";
 import { Ic, ICONS } from "./Icons";
 import { useDataHelpers } from "../hooks";
 
-export default function Requests({ db, setDb, ur, initialTab = 'hours', addAudit }) {
+export default function Requests({ db, setDb, ur, initialTab = 'hours', addAudit, notify }) {
   const { empName } = useDataHelpers(db);
   const [tab, setTab] = useState(initialTab);
 
@@ -49,6 +49,16 @@ export default function Requests({ db, setDb, ur, initialTab = 'hours', addAudit
         }, 'hoursRequest', r.id);
       }
     }, 0);
+
+    // Отправляем уведомление автору запроса
+    if (notify) {
+      const statusText = ok ? 'утверждён' : 'отклонён';
+      notify(
+        r.reqId,
+        `Ваш запрос на изменение часов по ${r.kind === 'task' ? 'задаче' : 'проекту'} "${targetTitle}" ${statusText}.`,
+        { targetType: 'hours', targetId: r.id }
+      );
+    }
   };
 
   const decideVac = (v, ok) => {

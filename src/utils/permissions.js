@@ -78,14 +78,16 @@ export const canChangeTaskStatus = (user, task, newStatus, data) => {
     // Менеджер проектов не может менять статус задач (только проектов)
     if (hasRole(user, "project_manager")) return false;
     
-    // Исполнитель может переводить только:
+    // Исполнитель может переводить:
     // - из "new" в "inwork"
     // - из "inwork" в "review"
+    // - из "review" в "inwork" (возврат на доработку)
     // НЕ может закрывать задачу
     if (task.assigneeIds && task.assigneeIds.includes(user.id)) {
       if (newStatus === 'closed' || newStatus === 'cancelled') return false;
       if (task.status === 'new' && newStatus === 'inwork') return true;
       if (task.status === 'inwork' && newStatus === 'review') return true;
+      if (task.status === 'review' && newStatus === 'inwork') return true; // <-- ДОБАВЛЕНО
       return false;
     }
     

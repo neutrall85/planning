@@ -1,14 +1,15 @@
 import React, { useState, useMemo } from 'react';
 import { TODAY, iso, addDays, parseISO, fmtD, fmtDMY, isTaskActive } from '../utils/date';
-import { TASK_STATUSES, DEPENDENCY_TYPES } from '../utils/constants';
+import { TASK_STATUSES, DEPENDENCY_TYPES, PRIORITIES } from '../utils/constants';
 import { useDataHelpers } from '../hooks';
 import { computeScope, taskVisible } from '../utils/permissions';
 import { Ic, ICONS } from './Icons';
+import Avatar from './Avatar';
+import { getProjectColor } from '../utils/projectHelpers';
 
 export default function Gantt({ db, ur, openTask, openProject }) {
   const { empName, getTaskSpent, vacOverlap } = useDataHelpers(db);
   const scope = useMemo(() => computeScope(ur, db), [ur, db]);
-  // Заменяем !t.archived на isTaskActive(t)
   const tasks = db.tasks.filter(t => isTaskActive(t) && taskVisible(ur, scope, t, db) && t.start && t.deadline);
 
   const [mode, setMode] = useState('month');
@@ -17,26 +18,51 @@ export default function Gantt({ db, ur, openTask, openProject }) {
     return iso(new Date(d.getFullYear(), d.getMonth(), 1));
   });
 
-  const range = { month: 30, quarter: 90, year: 365 }[mode] || 30;
   const DW = 34;
 
-  const shift = (dir) => {
-    const newAnchor = addDays(parseISO(anchor), range * dir);
-    setAnchor(iso(newAnchor));
+  const getDaysInRange = (anchorDate, mode) => {
+    const start = parseISO(anchorDate);
+    const days = [];
+    if (mode === 'month') {
+      const year = start.getFullYear();
+      const month = start.getMonth();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      for (let i = 0; i < daysInMonth; i++) {
+        days.push(iso(new Date(year, month, i + 1)));
+      }
+    } else if (mode === 'quarter') {
+      for (let i = 0; i < 90; i++) {
+        days.push(iso(addDays(start, i)));
+      }
+    } else {
+      for (let i = 0; i < 365; i++) {
+        days.push(iso(addDays(start, i)));
+      }
+    }
+    return days;
   };
 
-  const resetToday = () => {
-    const d = new Date();
-    setAnchor(iso(new Date(d.getFullYear(), d.getMonth(), 1)));
+  const shift = (dir) => {
+    let newAnchor;
+    if (mode === 'month') {
+      const d = parseISO(anchor);
+      d.setMonth(d.getMonth() + dir);
+      newAnchor = iso(d);
+    } else if (mode === 'quarter') {
+      const d = parseISO(anchor);
+      d.setMonth(d.getMonth() + dir * 3);
+      newAnchor = iso(d);
+    } else {
+      const d = parseISO(anchor);
+      d.setFullYear(d.getFullYear() + dir);
+      newAnchor = iso(d);
+    }
+    setAnchor(newAnchor);
   };
 
   const ganttData = useMemo(() => {
     if (!tasks.length) return null;
-    const days = [];
-    const startDate = parseISO(anchor);
-    for (let i = 0; i < range; i++) {
-      days.push(iso(addDays(startDate, i)));
-    }
+    const days = getDaysInRange(anchor, mode);
     const months = [];
     days.forEach((day, i) => {
       const d = parseISO(day);
@@ -81,7 +107,7 @@ export default function Gantt({ db, ur, openTask, openProject }) {
       g.items = items;
     });
     return { days, months, groups: groups.filter(g => g.items.length > 0) };
-  }, [tasks, db.projects, anchor, mode, range, scope]);
+  }, [tasks, db.projects, anchor, mode, scope]);
 
   if (!ganttData || ganttData.groups.length === 0) {
     return (
@@ -93,7 +119,6 @@ export default function Gantt({ db, ur, openTask, openProject }) {
             <button className="icon-btn" onClick={() => shift(1)}><Ic d={ICONS.right} size={16} /></button>
           </div>
           <div className="cal-right">
-            <button className="btn ghost sm" onClick={resetToday}>Сегодня</button>
             <div className="seg">
               {[['month','Месяц'], ['quarter','Квартал'], ['year','Год']].map(([m,l]) => (
                 <button key={m} className={`seg-btn${mode === m ? ' on' : ''}`} onClick={() => setMode(m)}>{l}</button>
@@ -109,26 +134,19 @@ export default function Gantt({ db, ur, openTask, openProject }) {
   const { days, months, groups } = ganttData;
   const todayIdx = days.indexOf(TODAY);
   const width = days.length * DW;
-  
-  // Функция для получения координат в зависимости от типа зависимости
+  const totalWidth = width + 240;
+
   const getDepCoords = (t, depTask, depItem) => {
     if (!depTask || !depItem) return null;
-    
     const tLeft = t.sIdx * DW + DW/2;
     const tRight = t.eIdx * DW + DW/2;
     const depLeft = depItem.sIdx * DW + DW/2;
     const depRight = depItem.eIdx * DW + DW/2;
-    
     switch (t.dependencyType) {
-      case 'SS': // Начало-Начало
-        return { fromX: depLeft, toX: tLeft, fromY: -25, toY: -10 };
-      case 'FF': // Окончание-Окончание
-        return { fromX: depRight, toX: tRight, fromY: -25, toY: -10 };
-      case 'SF': // Начало-Окончание
-        return { fromX: depLeft, toX: tRight, fromY: -25, toY: -10 };
-      case 'FS': // Окончание-Начало (по умолчанию)
-      default:
-        return { fromX: depRight, toX: tLeft, fromY: -25, toY: -10 };
+      case 'SS': return { fromX: depLeft, toX: tLeft, fromY: -25, toY: -10 };
+      case 'FF': return { fromX: depRight, toX: tRight, fromY: -25, toY: -10 };
+      case 'SF': return { fromX: depLeft, toX: tRight, fromY: -25, toY: -10 };
+      default: return { fromX: depRight, toX: tLeft, fromY: -25, toY: -10 };
     }
   };
 
@@ -137,13 +155,10 @@ export default function Gantt({ db, ur, openTask, openProject }) {
       <div className="cal-head" style={{ padding: '12px 16px', borderBottom: '1px solid var(--line)' }}>
         <div className="cal-nav">
           <button className="icon-btn" onClick={() => shift(-1)}><Ic d={ICONS.left} size={16} /></button>
-          <div className="cal-title" style={{ minWidth: '120px', fontSize: '15px', fontWeight: 700 }}>
-            {fmtDMY(anchor)}
-          </div>
+          <div className="cal-title" style={{ minWidth: '120px', fontSize: '15px', fontWeight: 700 }}>{fmtDMY(anchor)}</div>
           <button className="icon-btn" onClick={() => shift(1)}><Ic d={ICONS.right} size={16} /></button>
         </div>
         <div className="cal-right">
-          <button className="btn ghost sm" onClick={resetToday}>Сегодня</button>
           <div className="seg">
             {[['month','Месяц'], ['quarter','Квартал'], ['year','Год']].map(([m,l]) => (
               <button key={m} className={`seg-btn${mode === m ? ' on' : ''}`} onClick={() => setMode(m)}>{l}</button>
@@ -151,9 +166,9 @@ export default function Gantt({ db, ur, openTask, openProject }) {
           </div>
         </div>
       </div>
-      
+
       <div className="gantt-scroll">
-        <div className="gantt" style={{ width: width + 240 }}>
+        <div className="gantt" style={{ '--gantt-width': totalWidth + 'px' }}>
           <div className="gantt-top">
             <div className="gantt-corner">Проект / задача</div>
             <div className="gantt-axis" style={{ width }}>
@@ -187,14 +202,12 @@ export default function Gantt({ db, ur, openTask, openProject }) {
               {todayIdx >= 0 && <div className="gtoday" style={{ left: todayIdx * DW + DW/2 }} />}
             </div>
             {groups.map(g => {
-              // Находим все зависимости для задач этого проекта
               const taskDeps = g.items.reduce((acc, t) => {
-                if (t.dependencyId) {
-                  acc[t.id] = db.tasks.find(dt => dt.id === t.dependencyId);
-                }
+                if (t.dependencyId) acc[t.id] = db.tasks.find(dt => dt.id === t.dependencyId);
                 return acc;
               }, {});
-              
+              const projectColor = getProjectColor(g.project);
+
               return (
                 <div key={g.project.id}>
                   <div className="gantt-group">
@@ -204,7 +217,7 @@ export default function Gantt({ db, ur, openTask, openProject }) {
                       onClick={() => openProject && openProject(g.project.id)}
                       title="Открыть проект"
                     >
-                      <span className="pdot" style={{ background: g.project.color }} />{g.project.code} · {g.project.name}
+                      <span className="pdot" style={{ background: projectColor }} />{g.project.code} · {g.project.name}
                     </div>
                     <div style={{ width }} />
                   </div>
@@ -215,9 +228,9 @@ export default function Gantt({ db, ur, openTask, openProject }) {
                     const w = Math.max((t.eIdx - t.sIdx + 1) * DW - 4, DW - 8);
                     const sp = getTaskSpent(t);
                     const pct = Math.min(100, (sp / Math.max(1, t.plannedHours || 0)) * 100);
+                    const fillWidth = pct > 0 ? Math.max(pct, 2) : 0;
                     const vac = a ? vacOverlap(a.id, t.start, t.deadline) : null;
                     const tip = `${t.title}: ${fmtD(t.start)} — ${fmtD(t.deadline)}, план ${t.plannedHours ?? '—'} ч${vac ? `. Исполнитель в отпуске ${fmtDMY(vac.start)}–${fmtDMY(vac.end)}` : ''}`;
-                    // Проверяем, есть ли зависимость от другой задачи
                     const depTask = taskDeps[t.id];
                     let depLine = null;
                     if (depTask) {
@@ -225,7 +238,6 @@ export default function Gantt({ db, ur, openTask, openProject }) {
                       if (depItem) {
                         const coords = getDepCoords(t, depTask, depItem);
                         if (coords) {
-                          // Рисуем линию от зависимой задачи к текущей с учётом типа зависимости
                           depLine = (
                             <svg
                               style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}
@@ -238,7 +250,6 @@ export default function Gantt({ db, ur, openTask, openProject }) {
                                 strokeDasharray="4 2"
                                 markerEnd="url(#arrowhead)"
                               />
-                              {/* Добавляем метку типа зависимости */}
                               <text
                                 x={(coords.fromX + coords.toX) / 2}
                                 y={coords.fromY - 5}
@@ -253,18 +264,35 @@ export default function Gantt({ db, ur, openTask, openProject }) {
                         }
                       }
                     }
-                    
+
+                    const priorityColor = PRIORITIES[t.priority]?.color || '#64748b';
+                    const bgColor = priorityColor + '33';
+
                     return (
                       <div key={t.id} className="gantt-row" style={{ position: 'relative' }}>
                         {depLine}
                         <div className="gantt-label" onClick={() => openTask(t.id)}>
                           <span className={`gtitle${t.status === 'cancelled' ? ' dim' : ''}`}>{t.title}</span>
-                          <span className="gsub">{a ? a.last : ''} · {t.plannedHours ?? '—'} ч · {TASK_STATUSES[t.status].label}</span>
+                          <span className="gsub">
+                            {a && <Avatar employee={a} size="xs" />} · {t.plannedHours ?? '—'} ч · {TASK_STATUSES[t.status].label}
+                          </span>
                         </div>
-                        <div className="gantt-track" style={{ width }}>
-                          <div className="gbar" style={{ left, width: w, background: g.project.color + '33', border: `1px solid ${g.project.color}66`, cursor: 'pointer', opacity: t.status === 'cancelled' ? 0.45 : 1 }} onClick={() => openTask(t.id)} title={tip}>
-                            <div className="gbar-fill" style={{ width: pct + '%', background: t.status === 'closed' ? '#10b981' : g.project.color }} />
-                            {vac && <span className="gbar-vac" title="Исполнитель в отпуске в эти даты">🏖</span>}
+                        <div className="gantt-track">
+                          <div
+                            className="gbar"
+                            style={{
+                              '--bar-left': left + 'px',
+                              '--bar-width': w + 'px',
+                              '--bar-bg': bgColor,
+                              '--bar-opacity': t.status === 'cancelled' ? 0.45 : 1,
+                              '--fill-width': fillWidth + '%',
+                              '--fill-color': t.status === 'closed' ? '#10b981' : priorityColor
+                            }}
+                            onClick={() => openTask(t.id)}
+                            title={tip}
+                          >
+                            <div className="gbar-fill" />
+                            {vac && <span className="gbar-vac">🏖</span>}
                           </div>
                         </div>
                       </div>

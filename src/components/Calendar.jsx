@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { iso, addDays, fmtDMY, isTaskActive } from '../utils/date';
 import { taskVisible, computeScope, hasRole } from '../utils/permissions';
 import { Ic, ICONS } from './Icons';
+import Avatar from './Avatar';
 
 const DayCell = ({ d, big, byDay, db, openTask }) => {
   const dayIso = iso(d);
@@ -13,15 +14,27 @@ const DayCell = ({ d, big, byDay, db, openTask }) => {
       <div className="cal-chips">
         {tasks.slice(0, big ? 12 : 3).map(t => {
           const p = db.projects.find(x => x.id === t.projectId);
-          const assignees = (t.assigneeIds || []).map(id => db.employees.find(e => e.id === id)).filter(Boolean);
-          const execNames = assignees.map(a => a.last).join(', ');
+          const assignees = (t.assigneeIds || [])
+            .map(id => db.employees.find(e => e.id === id))
+            .filter(Boolean);
+
           return (
-            <div key={t.id} className="cal-chip" style={{ borderColor: p?.color }} onClick={() => openTask(t.id)}>
+            <div
+              key={t.id}
+              className="cal-chip"
+              style={{ borderColor: p?.color }} // borderColor оставляем, т.к. это динамический цвет
+              onClick={() => openTask(t.id)}
+              title={`${t.title} (${p?.code || 'без проекта'})`}
+            >
               <div className="cal-task-title">
-                <span className="pdot" style={{ background: p?.color }} />
+                <span className="pdot" style={{ background: p?.color }} /> {/* pdot тоже динамический */}
                 <span>{t.title}</span>
               </div>
-              <div className="cal-executor">{execNames}</div>
+              <div className="cal-executors">
+                {assignees.map(emp => (
+                  <Avatar key={emp.id} employee={emp} size="xs" />
+                ))}
+              </div>
             </div>
           );
         })}
@@ -96,7 +109,7 @@ export default function Calendar({ db, ur, openTask }) {
           )}
         </div>
       </div>
-      <div className="cal-note">Только задачи с дедлайнами.</div>
+      <div className="cal-note">Только задачи со сроком выполнения.</div>
       {body}
     </div>
   );

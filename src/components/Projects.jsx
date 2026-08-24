@@ -1,25 +1,12 @@
-import React, { useMemo, useState } from 'react';
-import { PROJECT_STATUSES, PROJECT_TYPES } from '../utils/constants';
+import React from 'react';
+import { PROJECT_STATUSES, PROJECT_TYPES, PROJECT_PRIORITIES } from '../utils/constants';
 import { fmtDMY, initials, isTaskActive } from '../utils/date';
 import { Ic, ICONS } from './Icons';
-import { computeScope, hasRole } from '../utils/permissions';
+import { hasRole } from '../utils/permissions';
+import { getProjectColor } from '../utils/projectHelpers';
+import ProjectProgress from './ProjectProgress';
 
-export default function Projects({ db, ur, openProject, openHoursReq, closeProject, cancelProject }) {
-  const scope = useMemo(() => computeScope(ur, db), [ur, db]);
-  const [showOnlyMyProjects, setShowOnlyMyProjects] = useState(false);
-  const canSeeAllProjects = hasRole(ur, "admin", "director", "economist", "kb_chief", "head", "project_lead", "project_manager");
-
-  let list = scope.all 
-    ? db.projects.filter(p => !p.archived || p.status === 'closed' || p.status === 'cancelled') 
-    : db.projects.filter(p => (!p.archived || p.status === 'closed' || p.status === 'cancelled') && scope.projIds.has(p.id));
-
-  // Фильтр "проекты с моими задачами"
-  if (showOnlyMyProjects) {
-    const myTasks = db.tasks.filter(t => (t.assigneeIds || []).includes(ur.id) && !t.archived);
-    const myProjectIds = new Set(myTasks.map(t => t.projectId));
-    list = list.filter(p => myProjectIds.has(p.id));
-  }
-
+export default function Projects({ db, ur, openProject, openHoursReq, closeProject, cancelProject, projects }) {
   const canCloseProject = (project) => {
     const creatorId = project.creatorId || (project.history?.find(h => h.who !== 'system')?.who);
     return hasRole(ur, 'admin') || hasRole(ur, 'director') || (creatorId && creatorId === ur.id);
@@ -27,29 +14,14 @@ export default function Projects({ db, ur, openProject, openHoursReq, closeProje
 
   return (
     <div>
-      <div className="sec-head">
-        <div className="sec-note">Производственные и административные проекты.</div>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          {canSeeAllProjects && (
-            <label className="dept-pick">
-              <input type="checkbox" checked={showOnlyMyProjects} onChange={(e) => setShowOnlyMyProjects(e.target.checked)} />
-              <span style={{ fontSize: 13 }}>Показать проекты с моими задачами</span>
-            </label>
-          )}
-          {hasRole(ur, 'admin', 'director', 'kb_chief', 'project_manager') && (
-            <button className="btn primary" onClick={() => openProject(null)}>
-              <Ic d={ICONS.plus} size={15} /> Проект
-            </button>
-          )}
-        </div>
-      </div>
       <div className="pj-grid">
-        {list.map(p => {
+        {projects.map(p => {
           const tasks = db.tasks.filter(t => t.projectId === p.id && isTaskActive(t));
           const plan = tasks.reduce((s, t) => s + (t.plannedHours || 0), 0);
           const fact = tasks.reduce((s, t) => s + t.logs.reduce((lsum, l) => lsum + l.hours, 0), 0);
           const usePct = p.budget ? Math.round((fact / Math.max(1, p.budget)) * 100) : 0;
           const overPlan = p.budget != null && plan > p.budget;
+          const projectColor = getProjectColor(p);
 
           return (
             <div 
@@ -59,27 +31,20 @@ export default function Projects({ db, ur, openProject, openHoursReq, closeProje
               style={{ cursor: 'pointer' }}
             >
               <div className="pj-top">
-                <span className="pj-code" style={{ background: p.color + '22', color: p.color }}>{p.code}</span>
+                <span className="pj-code" style={{ background: projectColor + '22', color: projectColor }}>
+                  {p.code}
+                </span>
                 <span className={`pj-st ${p.status}`}>{PROJECT_STATUSES[p.status]}</span>
                 <span style={{ fontSize: '11px', color: '#64748b' }}>{PROJECT_TYPES[p.ptype || 'prod']}</span>
+                <span className="pj-priority" style={{ color: PROJECT_PRIORITIES[p.priority]?.color || '#64748b', fontWeight: 600 }}>
+                  {p.priority || 'NORM'}
+                </span>
               </div>
               <div className="pj-name">{p.name}</div>
               <div className="pj-row">
                 <span className="mut">Сроки:</span> {fmtDMY(p.start)} — {p.end ? fmtDMY(p.end) : 'не задан'}
               </div>
-              {p.ptype !== 'admin' && p.budget != null && (
-                <div className="pj-budget">
-                  <div className="pj-budget-row">
-                    <span>Бюджет: <b>{p.budget} ч</b></span>
-                    <span>План: <b className={overPlan ? 'red' : ''}>{plan} ч</b></span>
-                    <span>Факт: <b>{fact} ч</b></span>
-                    <span>Использовано: <b>{usePct}%</b></span>
-                  </div>
-                  <div className="pj-progress">
-                    <div className={`pj-progress-fill${usePct > 100 ? ' over' : ''}`} style={{ width: Math.min(100, usePct) + '%', background: p.color }} />
-                  </div>
-                </div>
-              )}
+              <ProjectProgress project={p} plan={plan} fact={fact} />
               <div className="pj-foot">
                 <div className="pj-avatars">
                   {tasks.slice(0, 6).flatMap(t =>
@@ -87,7 +52,7 @@ export default function Projects({ db, ur, openProject, openHoursReq, closeProje
                       const a = db.employees.find(e => e.id === id);
                       return a && (
                         <span
-                          key={`${t.id}-${a.id}`}  // <--- УНИКАЛЬНЫЙ КЛЮЧ
+                          key={`${t.id}-${a.id}`}
                           className="avatar xs"
                           title={`${a.last} ${a.first}`}
                         >

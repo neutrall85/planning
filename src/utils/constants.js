@@ -5,7 +5,7 @@ export const ROLES = {
   kb_chief:         { label: "Главный конструктор КБ", short: "ГК", color: "#0ea5e9" },
   head:             { label: "Руководитель отдела", short: "РО", color: "#3b82f6" },
   project_lead:     { label: "Ответственный по проекту", short: "ОП", color: "#ec4899" },
-  project_manager:  { label: "Менеджер проектов", short: "МП", color: "#f97316" }, // новая роль
+  project_manager:  { label: "Менеджер проектов", short: "МП", color: "#f97316" },
   hr:               { label: "HR-менеджер", short: "HR", color: "#14b8a6" },
   executor:         { label: "Исполнитель", short: "ИСП", color: "#64748b" },
 };
@@ -20,13 +20,18 @@ export const TASK_STATUSES = {
 export const TASK_STATUS_ORDER = ["new", "inwork", "review", "closed", "cancelled"];
 
 export const PRIORITIES = {
-  low:  { label: "Низкий", color: "#94a3b8" },
-  mid:  { label: "Средний", color: "#f59e0b" },
-  high: { label: "Высокий", color: "#f97316" },
-  crit: { label: "Критический", color: "#dc2626" },
+  low:  { label: "Низкий", color: "#10b981" },   // зелёный
+  mid:  { label: "Средний", color: "#f59e0b" },  // жёлтый
+  high: { label: "Высокий", color: "#f97316" },  // оранжевый
+  crit: { label: "Критический", color: "#dc2626" }, // красный
 };
 
-// Типы зависимостей между задачами
+export const PROJECT_PRIORITIES = {
+  AOG:  { label: 'AOG',  color: '#dc2626', order: 1 },   // красный
+  CRIT: { label: 'CRIT', color: '#f59e0b', order: 2 },   // жёлтый
+  NORM: { label: 'NORM', color: '#10b981', order: 3 },   // зелёный
+};
+
 export const DEPENDENCY_TYPES = {
   FS: { label: "Окончание-Начало (FS)", desc: "Задача начнётся после завершения предыдущей" },
   SS: { label: "Начало-Начало (SS)", desc: "Задача начнётся одновременно с началом предыдущей" },
@@ -47,6 +52,14 @@ export const PROJECT_STATUSES = {
   closed:    "Закрыт",
   cancelled: "Отменён"
 };
+
+export const PROJECT_STATUS_CONFIG = {
+  active:    { label: 'Активный', color: '#10b981' },
+  inactive:  { label: 'Неактивный', color: '#94a3b8' },
+  closed:    { label: 'Закрыт', color: '#3b82f6' },
+  cancelled: { label: 'Отменён', color: '#ef4444' },
+};
+export const PROJECT_STATUS_ORDER = ['inactive', 'active', 'closed', 'cancelled'];
 
 export const PROJECT_TYPES = { prod: "Производственный", admin: "Административный" };
 export const COMMENT_EDIT_WINDOW = 15 * 60000; // 15 минут

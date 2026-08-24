@@ -36,4 +36,6 @@ export const ICONS = {
   close: "M6 6l12 12M18 6L6 18",
   lock: "M7 11V7a5 5 0 0 1 10 0v4h1v10H6V11h1zm2 0h6V7a3 3 0 0 0-6 0v4z",
   file: "M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM13 2v7h7",
+  list: "M3 6h18M3 12h18M3 18h18",
+  tasks: "M3 6h12M3 12h16M3 18h14M7 6l2 2 4-4M7 12l2 2 4-4M7 18l2 2 4-4",
 };

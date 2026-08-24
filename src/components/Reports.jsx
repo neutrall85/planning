@@ -246,7 +246,7 @@ export default function Reports({ db, ur }) {
     const type = filters.type;
     let rows = [];
     if (type === 'tasks') {
-      rows = [['№', 'Задача', 'Проект', 'Исполнители', 'Статус', 'Приоритет', 'План (ч)', 'Факт (ч)', 'Создано', 'Дедлайн']];
+      rows = [['№', 'Задача', 'Проект', 'Исполнители', 'Статус', 'Приоритет', 'План (ч)', 'Факт (ч)', 'Создано', 'Срок исполнения']];
       results.forEach((t, idx) => {
         const project = (safeDb.projects || []).find(p => p.id === t.projectId);
         const statusDef = TASK_STATUSES[t.status] || { label: t.status || 'Неизвестно', color: '#64748b' };
@@ -324,7 +324,7 @@ export default function Reports({ db, ur }) {
                 <th>Приоритет</th>
                 <th>План (ч)</th>
                 <th>Факт (ч)</th>
-                <th>Дедлайн</th>
+                <th>Срок исполнения</th>
               </tr>
             </thead>
             <tbody>
@@ -528,7 +528,7 @@ export default function Reports({ db, ur }) {
           {showDeadlineRange && (
             <>
               <label className="lbl" style={{ margin: 0 }}>
-                {showProjectDates ? 'Окончание:' : 'Дедлайн:'}
+                {showProjectDates ? 'Окончание:' : 'Срок исполнения:'}
               </label>
               <input
                 className="inp"
@@ -674,7 +674,7 @@ export default function Reports({ db, ur }) {
               if (f.filters.deadlineFrom || f.filters.deadlineTo) {
                 const from = f.filters.deadlineFrom ? fmtDMY(f.filters.deadlineFrom) : '';
                 const to = f.filters.deadlineTo ? fmtDMY(f.filters.deadlineTo) : '';
-                criteria.push(`Дедлайн: ${from} — ${to}`);
+                criteria.push(`Срок исполнения: ${from} — ${to}`);
               }
               if (f.filters.projectId !== 'all') {
                 const proj = (safeDb.projects || []).find(p => p.id === f.filters.projectId);

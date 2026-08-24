@@ -140,7 +140,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
                     <div key={t.id} className="cab-task" onClick={() => openTask(t.id)}>
                       <span className="pdot" style={{ background: data.projects.find(p => p.id === t.projectId)?.color }} />
                       {t.title}
-                      <span className="mut sm"> · {t.deadline ? `до ${fmtD(t.deadline)}` : 'без дедлайна'} · {t.plannedHours ?? '—'} ч</span>
+                      <span className="mut sm"> · {t.deadline ? `до ${fmtD(t.deadline)}` : 'без срока исполнения'} · {t.plannedHours ?? '—'} ч</span>
                     </div>
                   ))}
                 </div>
@@ -369,7 +369,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
           <div className="rep-panel">
             <div className="rep-panel-title">Уведомления</div>
             {[
-              ['deadlineEmail', 'E-mail о сроках — за 3 дня до дедлайна задачи'],
+              ['deadlineEmail', 'E-mail о сроках — за 3 дня до срока исполнения задачи'],
               ['overdueDigest', 'Контроль просрочек — ежедневная сводка'],
               ['commentSub', 'Подписка на обсуждение задач, где я исполнитель или ответственный']
             ].map(([k, label]) => (

@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { Modal } from '../Modal';
+import Discussion from '../Discussion';
 import { useDataHelpers } from '../../hooks';
 import {
-  PROJECT_STATUSES, PROJECT_TYPES, TASK_STATUSES,
+  PROJECT_STATUSES, PROJECT_TYPES, TASK_STATUSES, PROJECT_PRIORITIES,
 } from '../../utils/constants';
 import {
   TODAY, iso, addDays, uid, fmtDT, fmtDMY,
@@ -11,7 +12,7 @@ import {
   hasRole, computeScope, canEditProjectFields, canChangeProjectStatus, canCreateProject,
 } from '../../utils/permissions';
 import { Ic, ICONS } from '../Icons';
-import ProjectDiscussion from './ProjectDiscussion';
+import { getProjectColor } from '../../utils/projectHelpers';
 
 const AIRCRAFT_TYPES = [
   'Су-57', 'МиГ-35', 'Ту-160', 'Ил-76', 'Ка-52', 'Другой'
@@ -35,7 +36,7 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
     end: iso(addDays(new Date(), 30)),
     status: "active",
     budget: 100,
-    color: ["#0ea5e9", "#8b5cf6", "#f43f5e", "#f59e0b", "#10b981", "#ec4899"][Math.floor(Math.random() * 6)],
+    color: PROJECT_PRIORITIES['NORM'].color,
     ptype: "prod",
     longterm: false,
     archived: false,
@@ -45,6 +46,7 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
     customer: "",
     aircraftType: "",
     projectType: "",
+    priority: "NORM",
     comments: existing?.comments || [],
     history: existing?.history || [{ ts: Date.now(), who: ur.id, text: "Проект создан" }],
     files: existing?.files || [],
@@ -57,6 +59,14 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
   const canChangeStatus = isNew ? canCreateProject(ur) : canChangeProjectStatus(ur, f, f.status);
 
   const [tab, setTab] = useState('info');
+
+  // --- Состояния для сортировки задач ---
+  const [taskSortField, setTaskSortField] = useState('created');
+  const [taskSortDir, setTaskSortDir] = useState('desc');
+
+  const handlePriorityChange = (val) => {
+    setF(prev => ({ ...prev, priority: val, color: PROJECT_PRIORITIES[val]?.color || '#64748b' }));
+  };
 
   const statusOptions = [
     { value: 'active', label: 'Активный' },
@@ -76,15 +86,18 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
     if (!f.customer?.trim()) return toast("Укажите заказчика", "err");
     if (!f.aircraftType) return toast("Выберите тип ВС", "err");
     if (!f.projectType) return toast("Выберите тип проекта", "err");
+    if (!f.priority) return toast("Выберите приоритет проекта", "err");
 
     if (!isAdminType) {
       if (!f.managerId) return toast("Для производственного проекта ответственный обязателен", "err");
       if (!f.end) return toast("Для производственного проекта дата окончания обязательна", "err");
       if (!f.budget || +f.budget <= 0) return toast("Для производственного проекта бюджет обязателен", "err");
     }
-    onSave({ ...f, kbId: f.kbId || null, budget: isAdminType ? null : +f.budget, managerId: isAdminType ? (f.managerId || "") : f.managerId, end: isAdminType ? (f.end || null) : f.end, longterm: isAdminType ? !!f.longterm : false, files: f.files }, !existing);
+    const finalColor = getProjectColor(f);
+    onSave({ ...f, color: finalColor, kbId: f.kbId || null, budget: isAdminType ? null : +f.budget, managerId: isAdminType ? (f.managerId || "") : f.managerId, end: isAdminType ? (f.end || null) : f.end, longterm: isAdminType ? !!f.longterm : false, files: f.files }, !existing);
   };
 
+  // --- Список задач с сортировкой ---
   const taskList = useMemo(() => {
     if (!existing) return [];
     let list = db.tasks.filter(t => t.projectId === projectId);
@@ -94,8 +107,71 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
     if (isExec) {
       list = list.filter(t => (t.assigneeIds || []).includes(ur.id));
     }
+
+    // Сортировка
+    const sortFn = (a, b) => {
+      let valA, valB;
+      switch (taskSortField) {
+        case 'title':
+          valA = a.title.toLowerCase();
+          valB = b.title.toLowerCase();
+          break;
+        case 'assignees':
+          valA = (a.assigneeIds || []).map(id => db.employees.find(e => e.id === id)?.last || '').join(', ').toLowerCase();
+          valB = (b.assigneeIds || []).map(id => db.employees.find(e => e.id === id)?.last || '').join(', ').toLowerCase();
+          break;
+        case 'status':
+          valA = a.status;
+          valB = b.status;
+          break;
+        case 'planned':
+          valA = a.plannedHours ?? -1;
+          valB = b.plannedHours ?? -1;
+          break;
+        case 'fact':
+          valA = a.logs.reduce((s, l) => s + l.hours, 0);
+          valB = b.logs.reduce((s, l) => s + l.hours, 0);
+          break;
+        case 'remaining':
+          valA = (a.plannedHours || 0) - a.logs.reduce((s, l) => s + l.hours, 0);
+          valB = (b.plannedHours || 0) - b.logs.reduce((s, l) => s + l.hours, 0);
+          break;
+        case 'creator':
+          const getCreator = (task) => {
+            const id = task.history?.find(h => h.who !== 'system')?.who || task.history?.[0]?.who;
+            return id ? db.employees.find(e => e.id === id)?.last || '' : '';
+          };
+          valA = getCreator(a).toLowerCase();
+          valB = getCreator(b).toLowerCase();
+          break;
+        case 'deadline':
+          valA = a.deadline || '';
+          valB = b.deadline || '';
+          break;
+        case 'created':
+        default:
+          valA = a.history?.[0]?.ts || 0;
+          valB = b.history?.[0]?.ts || 0;
+          break;
+      }
+      if (valA < valB) return taskSortDir === 'asc' ? -1 : 1;
+      if (valA > valB) return taskSortDir === 'asc' ? 1 : -1;
+      return 0;
+    };
+
+    list.sort(sortFn);
     return list;
-  }, [db, projectId, ur.id, isExec, existing]);
+  }, [db, projectId, ur.id, isExec, existing, taskSortField, taskSortDir]);
+
+  // Обработчик клика по заголовку
+  const handleSort = (field) => {
+    if (taskSortField === field) {
+      setTaskSortDir(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setTaskSortField(field);
+      setTaskSortDir('asc');
+    }
+  };
 
   const canComment = hasRole(ur, 'admin', 'director', 'kb_chief', 'project_lead', 'project_manager');
   const isProjectManager = existing && existing.managerId === ur.id;
@@ -103,31 +179,28 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
 
   const canUploadFiles = hasRole(ur, 'admin', 'director', 'project_manager') || (existing && existing.managerId === ur.id);
 
-  const handleAddComment = (text, parentId, updatedComments) => {
-    if (updatedComments) {
-      setF(prev => ({ ...prev, comments: updatedComments }));
-      if (existing && store) {
-        const updatedProject = { ...f, comments: updatedComments };
-        store.upsertProject(updatedProject);
-      }
-      return;
-    }
-    if (!text?.trim()) return;
-    const newComment = {
-      id: uid(),
-      authorId: ur.id,
-      ts: Date.now(),
-      text: text.trim(),
-      parentId: parentId || null,
-    };
-    const updatedCommentsList = [...(f.comments || []), newComment];
-    setF(prev => ({ ...prev, comments: updatedCommentsList }));
+  const candidates = useMemo(() => {
+    const ids = new Set(
+      db.tasks
+        .filter((t) => t.projectId === f.id)
+        .map((t) => t.assigneeIds || [])
+        .flat()
+    );
+    if (f.managerId) ids.add(f.managerId);
+    return [...ids]
+      .map((id) => db.employees.find((e) => e.id === id))
+      .filter(Boolean);
+  }, [db, f.id, f.managerId]);
+
+  const handleUpdateComments = (newComments) => {
+    setF(prev => ({ ...prev, comments: newComments }));
     if (existing && store) {
-      const updatedProject = { ...f, comments: updatedCommentsList };
+      const updatedProject = { ...f, comments: newComments };
       store.upsertProject(updatedProject);
     }
-    toast("Комментарий добавлен");
   };
+
+  const handleCommentAdded = () => {};
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
@@ -203,6 +276,12 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
             <option value="">— выберите —</option>
             {PROJECT_TYPE_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
+          <label className="lbl">Приоритет</label>
+          <select className="inp sel" disabled={!canEditFields} value={f.priority} onChange={(e) => handlePriorityChange(e.target.value)}>
+            {Object.entries(PROJECT_PRIORITIES).map(([k, v]) => (
+              <option key={k} value={k}>{v.label}</option>
+            ))}
+          </select>
           <label className="lbl">Подразделение</label>
           <select className="inp sel" disabled={!canEditFields} value={f.kbId || ""} onChange={(e) => set("kbId", e.target.value)}>
             <option value="">Общеорганизационный</option>
@@ -241,14 +320,30 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
             <table className="tbl" style={{ minWidth: 800, fontSize: 13 }}>
               <thead>
                 <tr>
-                  <th>Задача</th>
-                  <th>Исполнители</th>
-                  <th>Статус</th>
-                  <th>План (ч)</th>
-                  <th>Факт (ч)</th>
-                  <th>Остаток</th>
-                  <th>Создал</th>
-                  <th>Дедлайн</th>
+                  <th style={{ cursor: 'pointer' }} onClick={() => handleSort('title')}>
+                    Задача {taskSortField === 'title' && (taskSortDir === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th style={{ cursor: 'pointer' }} onClick={() => handleSort('assignees')}>
+                    Исполнители {taskSortField === 'assignees' && (taskSortDir === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th style={{ cursor: 'pointer' }} onClick={() => handleSort('status')}>
+                    Статус {taskSortField === 'status' && (taskSortDir === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th style={{ cursor: 'pointer' }} onClick={() => handleSort('planned')}>
+                    План (ч) {taskSortField === 'planned' && (taskSortDir === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th style={{ cursor: 'pointer' }} onClick={() => handleSort('fact')}>
+                    Факт (ч) {taskSortField === 'fact' && (taskSortDir === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th style={{ cursor: 'pointer' }} onClick={() => handleSort('remaining')}>
+                    Остаток {taskSortField === 'remaining' && (taskSortDir === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th style={{ cursor: 'pointer' }} onClick={() => handleSort('creator')}>
+                    Создал {taskSortField === 'creator' && (taskSortDir === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th style={{ cursor: 'pointer' }} onClick={() => handleSort('deadline')}>
+                    Дедлайн {taskSortField === 'deadline' && (taskSortDir === 'asc' ? '↑' : '↓')}
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -265,7 +360,7 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
                       onClick={() => { onClose(); openTask(t.id); }}
                     >
                       <td><b>{t.title}</b></td>
-                      <td>{assignees.map(a => `${a.last} ${a.first}`).join(', ') || '—'}</td>
+                      <td>{assignees.length ? assignees.map(a => `${a.last} ${a.first}`).join(', ') : '—'}</td>
                       <td><span className="st-chip" style={{ background: TASK_STATUSES[t.status].color + '22', color: TASK_STATUSES[t.status].color }}>{TASK_STATUSES[t.status].label}</span></td>
                       <td>{t.plannedHours ?? '—'}</td>
                       <td>{spent}</td>
@@ -290,14 +385,16 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
       )}
 
       {tab === 'discussion' && (
-        <ProjectDiscussion
-          project={f}
+        <Discussion
+          comments={f.comments || []}
           currentUser={ur}
-          onAddComment={handleAddComment}
-          canComment={canCommentFinal}
-          db={db}
-          toast={toast}
+          candidates={candidates}
+          onUpdateComments={handleUpdateComments}
+          onCommentAdded={handleCommentAdded}
           readOnly={existing?.archived}
+          canComment={canCommentFinal}
+          toast={toast}
+          employees={db.employees}
         />
       )}
 
@@ -305,9 +402,11 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
         <div className="tm-block" style={{ marginTop: 0 }}>
           <div className="rep-panel-title">Файлы проекта</div>
           {!existing?.archived && canUploadFiles && (
-            <div style={{ marginBottom: '12px' }}>
-              <input type="file" onChange={handleFileUpload} />
-              <span className="mut sm" style={{ marginLeft: '8px' }}>(максимум 10 МБ)</span>
+            <div className="toolbar">
+              <input type="file" id="file-upload-input" className="file-input-hidden" onChange={handleFileUpload} />
+              <label htmlFor="file-upload-input" className="btn primary sm">
+                <Ic d={ICONS.file} size={14} /> Выбрать файл
+              </label>
             </div>
           )}
           {(!f.files || f.files.length === 0) && (
