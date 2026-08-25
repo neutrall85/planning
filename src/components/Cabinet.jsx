@@ -1,8 +1,10 @@
+// Cabinet.jsx
 import React, { useState, useMemo, useRef } from 'react';
 import { TASK_STATUSES, TASK_STATUS_ORDER, VACATION_TYPES } from '../utils/constants';
 import { TODAY, fmtDMY, fmtD, iso, addDays, initials, isTaskActive } from '../utils/date';
 import { useDataHelpers } from '../hooks';
 import { Ic, ICONS } from './Icons';
+import { getPrimaryDeptName } from '../utils/helpers'; // <-- добавлен импорт
 
 function downloadCSV(name, rows) {
   const csv = '\uFEFF' + rows.map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(';')).join('\r\n');
@@ -26,7 +28,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
   const myVacs = data.vacations.filter(v => v.empId === user.id);
   const myDeleg = data.roleDelegations.filter(r => r.fromId === user.id || r.toId === user.id);
 
-  const range = 14;
+  const range = 20;
   const days = [];
   for (let i = range - 1; i >= 0; i--) days.push(iso(addDays(new Date(), -i)));
 
@@ -123,7 +125,57 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
       </div>
 
       {tab === 'overview' && (
-        <div className="cab-grid">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          {/* 1. Затраченные часы */}
+          <div className="rep-panel">
+            <div className="rep-panel-title">Затраченные часы по задачам (последние 20 дней)</div>
+            <div className="toolbar" style={{ marginBottom: 12, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+              <span className="mut sm">Экспорт:</span>
+              <input className="inp" type="date" style={{ width: 150 }} value={expFrom} onChange={e => setExpFrom(e.target.value)} />
+              <span className="mut sm">—</span>
+              <input className="inp" type="date" style={{ width: 150 }} value={expTo} onChange={e => setExpTo(e.target.value)} />
+              <button className="btn primary sm" onClick={exportMyReport}>
+                <Ic d={ICONS.download} size={13} /> Выгрузить в Excel (CSV)
+              </button>
+            </div>
+
+            <div style={{ width: '100%', overflowX: 'auto' }}>
+              <table className="tbl" style={{ width: '100%', minWidth: '700px', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th style={{ minWidth: '200px', textAlign: 'left', borderBottom: '1px solid var(--line)' }}>Задача</th>
+                    {days.map(d => (
+                      <th key={d} style={{ textAlign: 'center', minWidth: '60px', borderBottom: '1px solid var(--line)', fontSize: '11px', color: 'var(--mut)' }}>
+                        {fmtD(d)}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {taskTableData.map(({ task, logMap }) => (
+                    <tr key={task.id} style={{ cursor: 'pointer' }} onClick={() => openTask(task.id)}>
+                      <td style={{ textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #f1f5f9' }}>
+                        {task.title}
+                        <span className="mut sm" style={{ marginLeft: 8, fontWeight: 400 }}>
+                          ({data.projects.find(p => p.id === task.projectId)?.code || '—'})
+                        </span>
+                      </td>
+                      {days.map(d => (
+                        <td key={d} style={{ textAlign: 'center', borderBottom: '1px solid #f1f5f9' }}>
+                          {logMap[d] ? <b>{logMap[d]} ч</b> : ''}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                  {taskTableData.length === 0 && (
+                    <tr><td colSpan={days.length + 1} className="mut" style={{ textAlign: 'center', padding: 20 }}>Нет учтённых часов</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* 2. Мои задачи по статусам */}
           <div className="rep-panel">
             <div className="rep-panel-title">Мои задачи по статусам</div>
             {TASK_STATUS_ORDER.map(st => {
@@ -149,66 +201,17 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
             {myTasks.length === 0 && <div className="mut">Задач пока нет</div>}
           </div>
 
-          <div className="stack-col">
-            <div className="rep-panel">
-              <div className="rep-panel-title">Мои проекты</div>
-              {myProjects.map(p => (
-                <div key={p.id} className="cab-proj">
-                  <span className="pdot" style={{ background: p.color }} />
-                  {p.code} — {p.name}
-                  {p.ptype === 'admin' && <span className="adm-badge" style={{ marginLeft: 8 }}>адм</span>}
-                </div>
-              ))}
-              {myProjects.length === 0 && <div className="mut">Нет участия в проектах</div>}
-            </div>
-
-            <div className="rep-panel">
-              <div className="rep-panel-title">Затраченные часы по задачам (последние 14 дней)</div>
-              <div className="toolbar" style={{ marginBottom: 12, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                <span className="mut sm">Экспорт:</span>
-                <input className="inp" type="date" style={{ width: 150 }} value={expFrom} onChange={e => setExpFrom(e.target.value)} />
-                <span className="mut sm">—</span>
-                <input className="inp" type="date" style={{ width: 150 }} value={expTo} onChange={e => setExpTo(e.target.value)} />
-                <button className="btn primary sm" onClick={exportMyReport}>
-                  <Ic d={ICONS.download} size={13} /> Выгрузить в Excel (CSV)
-                </button>
+          {/* 3. Мои проекты */}
+          <div className="rep-panel">
+            <div className="rep-panel-title">Мои проекты</div>
+            {myProjects.map(p => (
+              <div key={p.id} className="cab-proj">
+                <span className="pdot" style={{ background: p.color }} />
+                {p.code} — {p.name}
+                {p.ptype === 'admin' && <span className="adm-badge" style={{ marginLeft: 8 }}>адм</span>}
               </div>
-
-              <div style={{ width: '100%', overflowX: 'auto' }}>
-                <table className="tbl" style={{ width: '100%', minWidth: '700px', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr>
-                      <th style={{ minWidth: '200px', textAlign: 'left', borderBottom: '1px solid var(--line)' }}>Задача</th>
-                      {days.map(d => (
-                        <th key={d} style={{ textAlign: 'center', minWidth: '60px', borderBottom: '1px solid var(--line)', fontSize: '11px', color: 'var(--mut)' }}>
-                          {fmtD(d)}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {taskTableData.map(({ task, logMap }) => (
-                      <tr key={task.id} style={{ cursor: 'pointer' }} onClick={() => openTask(task.id)}>
-                        <td style={{ textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #f1f5f9' }}>
-                          {task.title}
-                          <span className="mut sm" style={{ marginLeft: 8, fontWeight: 400 }}>
-                             ({data.projects.find(p => p.id === task.projectId)?.code || '—'})
-                          </span>
-                        </td>
-                        {days.map(d => (
-                          <td key={d} style={{ textAlign: 'center', borderBottom: '1px solid #f1f5f9' }}>
-                            {logMap[d] ? <b>{logMap[d]} ч</b> : ''}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                    {taskTableData.length === 0 && (
-                      <tr><td colSpan={days.length + 1} className="mut" style={{ textAlign: 'center', padding: 20 }}>Нет учтённых часов</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            ))}
+            {myProjects.length === 0 && <div className="mut">Нет участия в проектах</div>}
           </div>
         </div>
       )}
@@ -285,9 +288,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
         <div className="cab-grid">
           <div className="rep-panel">
             <div className="rep-panel-title">Личные данные</div>
-            {/* Двухколоночный макет: слева фото, справа форма */}
             <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-              {/* Левая колонка – фото и кнопки */}
               <div style={{ flex: '0 0 140px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
                 {user.photo ? (
                   <img src={user.photo} alt="Аватар" style={{ width: 120, height: 120, borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--line)' }} />
@@ -299,10 +300,8 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
                 {user.photo && <button className="btn ghost sm" onClick={handlePhotoDelete}>Удалить фото</button>}
               </div>
 
-              {/* Правая колонка – форма с данными */}
               <div style={{ flex: 1, minWidth: 300 }}>
                 <div className="form-grid">
-                  {/* Фамилия и Имя разделены */}
                   <label className="lbl">Фамилия</label>
                   <input className="inp" disabled value={user.last} />
                   <label className="lbl">Имя</label>

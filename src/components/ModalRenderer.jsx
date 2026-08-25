@@ -56,17 +56,6 @@ export default function ModalRenderer({
               }
             }
             store.upsertTask(task);
-            store.addAudit(
-              isNew ? 'Создание задачи' : 'Изменение задачи',
-              {
-                title: task.title,
-                project: db.projects.find(p => p.id === task.projectId)?.code,
-                plannedHours: task.plannedHours,
-                assignees: (task.assigneeIds || []).map(id => empName(id)).join(', '),
-              },
-              'task',
-              task.id
-            );
             if (isNew) {
               (task.assigneeIds || []).forEach(id => {
                 if (id !== ur.id) {

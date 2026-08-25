@@ -2490,3 +2490,6 @@ input, select, textarea {
   font-family: system-ui, -apple-system, sans-serif;
   transition: opacity 0.15s;
 }
+.file-input-hidden {
+  display: none;
+}

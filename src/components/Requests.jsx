@@ -33,13 +33,13 @@ export default function Requests({ db, setDb, ur, initialTab = 'hours', addAudit
       return st;
     });
     
-    // Вызываем addAudit ПОСЛЕ обновления состояния
     setTimeout(() => {
       if (ok) {
         addAudit('Утверждение запроса часов', { 
           task: targetTitle, 
           previousHours: r.oldH, 
-          newHours: r.newH 
+          newHours: r.newH,
+          reason: r.reason          // <-- добавлено поле reason
         }, 'hoursRequest', r.id);
       } else {
         addAudit('Отклонение запроса часов', { 
@@ -50,7 +50,6 @@ export default function Requests({ db, setDb, ur, initialTab = 'hours', addAudit
       }
     }, 0);
 
-    // Отправляем уведомление автору запроса
     if (notify) {
       const statusText = ok ? 'утверждён' : 'отклонён';
       notify(

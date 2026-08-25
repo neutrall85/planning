@@ -59,6 +59,13 @@ export const PROJECT_STATUS_CONFIG = {
   closed:    { label: 'Закрыт', color: '#3b82f6' },
   cancelled: { label: 'Отменён', color: '#ef4444' },
 };
+
+export const ADMIN_PROJECT_PRIORITIES = {
+  high: { label: 'Высокий', color: '#f97316', order: 1 },
+  mid:  { label: 'Средний', color: '#f59e0b', order: 2 },
+  low:  { label: 'Низкий',  color: '#10b981', order: 3 },
+};
+
 export const PROJECT_STATUS_ORDER = ['inactive', 'active', 'closed', 'cancelled'];
 
 export const PROJECT_TYPES = { prod: "Производственный", admin: "Административный" };

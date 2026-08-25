@@ -130,7 +130,8 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
   
   const canEditFields = !readOnly && (existing ? canEditTaskFields(ur, existing, db) : canCreateTask(ur));
   const canChangeStatus = !readOnly && existing && canChangeTaskStatus(ur, existing, null, db);
-  const canEditPlannedHours = hasRole(ur, 'admin');
+  const isAssignee = existing && (existing.assigneeIds || []).includes(ur.id);
+  const canEditPlannedHours = hasRole(ur, 'admin') && !isAssignee;
   const isAuthor = existing && existing.creatorId === ur.id;
   const isReview = existing && existing.status === 'review';
   
@@ -138,7 +139,11 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
   const projs = (scope.all ? db.projects : db.projects.filter((p) => scope.projIds.has(p.id))).filter((p) => p.status === "active" && !p.archived);
   const asOpts = assigneeOptions(ur, db);
   
-  const [f, setF] = useState(existing ? { ...existing, comments: existing.comments || [] } : {
+  const [f, setF] = useState(existing ? { 
+    ...existing, 
+    comments: existing.comments || [], 
+    files: existing.files || [] 
+  } : {
     id: "t_" + uid(), title: "", desc: "", projectId: "", assigneeIds: [], priority: "mid",
     plannedHours: 8, start: TODAY, deadline: iso(addDays(new Date(), 14)), status: "new", logs: [], comments: [], history: [], delegatedFrom: null, archived: false, archivedAt: null, closedAt: null,
     creatorId: ur.id,
@@ -149,9 +154,11 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
     repeatDays: [],
     repeatEndType: 'date',
     repeatEndValue: '',
+    files: [],
   });
   const [logH, setLogH] = useState("");
   const [logNote, setLogNote] = useState("");
+  const [logDate, setLogDate] = useState(TODAY);
   const [tab, setTab] = useState(initialTab);
   const [confirmVac, setConfirmVac] = useState(null);
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
@@ -162,7 +169,8 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
   const remainProj = proj && proj.budget != null && !proj.archived ? proj.budget - (planSum(proj.id) - (existing ? (existing.plannedHours || 0) : 0)) : null;
   const vacWarn = !readOnly && f.assigneeIds && f.assigneeIds.length > 0 && f.deadline ? f.assigneeIds.map(id => vacOverlap(id, f.start || f.deadline, f.deadline)).find(v => v !== null) : null;
   const isExec = existing && (existing.assigneeIds || []).includes(ur.id);
-  const canLog = !readOnly && ((existing ? isExec : f.assigneeIds?.includes(ur.id)) || has(ur, "admin"));
+  
+  const canLog = !readOnly && (existing ? isExec : f.assigneeIds?.includes(ur.id));
 
   const statusOptions = useMemo(() => {
     if (isExec && !canChangeTaskStatus(ur, f, 'closed', db) && !canChangeTaskStatus(ur, f, 'cancelled', db)) {
@@ -184,7 +192,6 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
   };
 
   // --- Интеграция Discussion ---
-  // Участники проекта для @упоминаний
   const candidates = useMemo(() => {
     const ids = new Set(
       db.tasks
@@ -202,7 +209,6 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
   const handleUpdateComments = (newComments) => {
     const updatedTask = { ...f, comments: newComments };
     localPatchTask(updatedTask);
-    // Если задача существует в хранилище, обновляем через patchTask (для сохранения)
     if (existing) {
       patchTask(updatedTask);
     }
@@ -228,7 +234,51 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
       )
     );
   };
-  // --- Конец интеграции Discussion ---
+  // --- Конец Discussion ---
+
+  // --- Файлы ---
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      toast("Файл слишком большой (максимум 10 МБ)", "err");
+      e.target.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const fileData = ev.target.result;
+      const newFile = {
+        id: uid(),
+        name: file.name,
+        size: file.size,
+        url: fileData,
+        uploadedBy: ur.id,
+        uploadedAt: new Date().toISOString(),
+      };
+      const updatedFiles = [...(f.files || []), newFile];
+      setF(prev => ({ ...prev, files: updatedFiles }));
+      if (existing && patchTask) {
+        const updatedTask = { ...f, files: updatedFiles };
+        patchTask(updatedTask);
+      }
+      toast("Файл загружен");
+      e.target.value = '';
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleFileDelete = (fileId) => {
+    if (!window.confirm("Удалить файл?")) return;
+    const updatedFiles = (f.files || []).filter(file => file.id !== fileId);
+    setF(prev => ({ ...prev, files: updatedFiles }));
+    if (existing && patchTask) {
+      const updatedTask = { ...f, files: updatedFiles };
+      patchTask(updatedTask);
+    }
+    toast("Файл удалён");
+  };
+  // --- Конец файлов ---
 
   const doSave = (newStatus) => {
     const history = [...(f.history || [])];
@@ -292,7 +342,8 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
       plannedHours: f.plannedHours === "" || f.plannedHours == null ? null : +f.plannedHours,
       closedAt: newClosed ? TODAY : (existing ? existing.closedAt : null),
       history,
-      creatorId: existing ? existing.creatorId : ur.id
+      creatorId: existing ? existing.creatorId : ur.id,
+      files: f.files || [],
     };
 
     delete taskToSave.repeatType;
@@ -383,9 +434,11 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
     const h = parseFloat(String(logH).replace(",", "."));
     if (!h || h <= 0) return toast("Введите корректное количество часов", "err");
     if (f.plannedHours && sp + h > f.plannedHours) return toast(`Нельзя внести больше плановых: доступно ещё ${Math.max(0, f.plannedHours - sp)} ч`, "err");
-    const newLogs = [...f.logs, { id: uid(), userId: ur.id, date: TODAY, hours: h, note: logNote.trim() }];
+    const newLogs = [...f.logs, { id: uid(), userId: ur.id, date: logDate, hours: h, note: logNote.trim() }];
     setF((s) => ({ ...s, logs: newLogs }));
-    setLogH(""); setLogNote("");
+    setLogH("");
+    setLogNote("");
+    setLogDate(TODAY);
     toast("Часы учтены");
   };
 
@@ -423,7 +476,11 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
   return (
     <Modal title={(readOnly ? "Архивная задача — только чтение" : existing ? "Карточка задачи" : "Новая задача")} onClose={onClose} width={720}>
       {readOnly && <div className="info-box">Задача в архиве с {fmtDMY(existing.archivedAt)}. Редактирование, изменение статусов и комментирование запрещены.</div>}
-      <div className="tabs sm">{[["form", "Данные"], ["time", `Учёт времени (${sp}/${f.plannedHours ?? "—"})`], ...(existing ? [["chat", `Обсуждение (${f.comments.length})`], ["hist", "История"]] : [])].map(([id, l]) => <button key={id} className={"tab" + (tab === id ? " on" : "")} onClick={() => setTab(id)}>{l}</button>)}</div>
+      <div className="tabs sm">
+        {[["form", "Данные"], ["time", `Учёт времени (${sp}/${f.plannedHours ?? "—"})`], ...(existing ? [["chat", `Обсуждение (${f.comments.length})`], ["files", `Файлы (${f.files?.length || 0})`], ["hist", "История"]] : [])].map(([id, l]) => 
+          <button key={id} className={"tab" + (tab === id ? " on" : "")} onClick={() => setTab(id)}>{l}</button>
+        )}
+      </div>
 
       {tab === "form" && (<>
         {vacWarn && <div className="warn-box"><Ic d={ICONS.beach} size={15} /> Один из исполнителей находится в отпуске с {fmtDMY(vacWarn.start)} по {fmtDMY(vacWarn.end)}. Даты пересекаются с периодом задачи.</div>}
@@ -487,13 +544,26 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
           <label className="lbl">Срок исполнения {!isAdminProj && "*"}</label><input className="inp" type="date" disabled={!canEditFields} value={f.deadline || ""} onChange={(e) => set("deadline", e.target.value)} />
           <label className="lbl">Плановые часы {!isAdminProj && "*"}</label>
           <div className="duo">
-            <input className="inp" type="number" min="0.5" step="0.5" disabled={!canEditPlannedHours} value={f.plannedHours ?? ""} onChange={(e) => set("plannedHours", e.target.value)} />
-            {!readOnly && !hasRole(ur, 'admin') && existing ? (
-              <button className="btn ghost sm" type="button" onClick={() => onHoursReq("task", existing.id)}>
+            <input 
+              className="inp" 
+              type="number" 
+              min="0.5" 
+              step="0.5" 
+              disabled={!canEditPlannedHours} 
+              value={f.plannedHours ?? ""} 
+              onChange={(e) => set("plannedHours", e.target.value)} 
+            />
+            {!readOnly && existing && !canEditPlannedHours && (
+              <button 
+                className="btn ghost sm" 
+                type="button" 
+                onClick={() => onHoursReq("task", existing.id)}
+              >
                 <Ic d={ICONS.clock} size={13} /> Запросить изменение часов
               </button>
-            ) : (
-              <span className="duo-note">{isAdminProj ? "опционально" : "отдельно от срока исполнения"}</span>
+            )}
+            {!existing && isAdminProj && (
+              <span className="duo-note">опционально</span>
             )}
           </div>
           <label className="lbl">Статус *</label>
@@ -625,13 +695,43 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
             </div>
           )}
           {canLog ? (
-            <div className="tm-add">
-              <input className="inp" style={{ width: 90 }} type="number" min="0.5" step="0.5" placeholder="часы" value={logH} onChange={(e) => setLogH(e.target.value)} />
-              <input className="inp" placeholder="комментарий" value={logNote} onChange={(e) => setLogNote(e.target.value)} />
-              <button className="btn ghost" onClick={addLog}><Ic d={ICONS.clock} size={14} /> Внести часы</button>
-            </div>
+            <>
+              <div className="tm-add">
+                <input
+                  className="inp"
+                  type="date"
+                  value={logDate}
+                  onChange={(e) => setLogDate(e.target.value)}
+                  max={TODAY}
+                  style={{ width: '150px' }}
+                />
+                <input
+                  className="inp"
+                  style={{ width: 90 }}
+                  type="number"
+                  min="0.5"
+                  step="0.5"
+                  placeholder="часы"
+                  value={logH}
+                  onChange={(e) => setLogH(e.target.value)}
+                />
+                <input
+                  className="inp"
+                  placeholder="комментарий"
+                  value={logNote}
+                  onChange={(e) => setLogNote(e.target.value)}
+                />
+                <button className="btn ghost" onClick={addLog}>
+                  <Ic d={ICONS.clock} size={14} /> Внести часы
+                </button>
+              </div>
+              <div className="mut sm" style={{ marginTop: 8 }}>
+                {f.plannedHours ? `Часы не могут превышать плановые: доступно ещё ${Math.max(0, f.plannedHours - sp)} ч.` : "Плановые часы не заданы — ограничение не применяется."}
+                <br />
+                <span style={{ fontSize: '13px', color: 'var(--mut)' }}>Выберите дату за прошлые дни или сегодня (будущие даты недоступны).</span>
+              </div>
+            </>
           ) : <div className="mut sm">{readOnly ? "Учёт часов для архивных задач недоступен." : "Часы вносит только исполнитель задачи."}</div>}
-          <div className="mut sm" style={{ marginTop: 8 }}>{f.plannedHours ? `Часы не могут превышать плановые: доступно ещё ${Math.max(0, f.plannedHours - sp)} ч.` : "Плановые часы не заданы — ограничение не применяется."}</div>
         </div>
       )}
 
@@ -647,6 +747,82 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
           toast={toast}
           employees={db.employees}
         />
+      )}
+
+      {tab === "files" && (
+        <div className="tm-block" style={{ marginTop: 0 }}>
+          <div className="rep-panel-title">Файлы задачи</div>
+          {!readOnly && (canEditFields || f.assigneeIds?.includes(ur.id) || f.creatorId === ur.id) && (
+            <div className="toolbar">
+              <input
+                type="file"
+                id="task-file-upload-input"
+                className="file-input-hidden"
+                onChange={handleFileUpload}
+                style={{ display: 'none' }}
+              />
+              <label htmlFor="task-file-upload-input" className="btn primary sm">
+                <Ic d={ICONS.file} size={14} /> Выбрать файл
+              </label>
+            </div>
+          )}
+          {(!f.files || f.files.length === 0) && (
+            <div className="mut sm">Файлы не загружены</div>
+          )}
+          {f.files && f.files.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {f.files.map(file => {
+                const uploader = db.employees.find(e => e.id === file.uploadedBy);
+                const fileSize = file.size < 1024
+                  ? file.size + ' Б'
+                  : file.size < 1048576
+                    ? (file.size / 1024).toFixed(1) + ' КБ'
+                    : (file.size / 1048576).toFixed(1) + ' МБ';
+                return (
+                  <div
+                    key={file.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      background: '#f8fafc',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--line)'
+                    }}
+                  >
+                    <Ic d={ICONS.file} size={24} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600 }}>{file.name}</div>
+                      <div className="mut sm">
+                        {fileSize} · загрузил {uploader ? `${uploader.last} ${uploader.first}` : '—'}{' '}
+                        {file.uploadedAt ? fmtDMY(file.uploadedAt) : ''}
+                      </div>
+                    </div>
+                    <a
+                      href={file.url}
+                      download={file.name}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn ghost sm"
+                    >
+                      Скачать
+                    </a>
+                    {!readOnly && (canEditFields || f.assigneeIds?.includes(ur.id) || f.creatorId === ur.id) && (
+                      <button
+                        className="icon-btn danger"
+                        onClick={() => handleFileDelete(file.id)}
+                        title="Удалить файл"
+                      >
+                        <Ic d={ICONS.trash} size={14} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       )}
 
       {tab === "hist" && existing && (

@@ -1,9 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Modal } from '../Modal';
 import Discussion from '../Discussion';
 import { useDataHelpers } from '../../hooks';
 import {
   PROJECT_STATUSES, PROJECT_TYPES, TASK_STATUSES, PROJECT_PRIORITIES,
+  ADMIN_PROJECT_PRIORITIES,
 } from '../../utils/constants';
 import {
   TODAY, iso, addDays, uid, fmtDT, fmtDMY,
@@ -17,7 +18,14 @@ import { getProjectColor } from '../../utils/projectHelpers';
 const AIRCRAFT_TYPES = [
   'Су-57', 'МиГ-35', 'Ту-160', 'Ил-76', 'Ка-52', 'Другой'
 ];
-const PROJECT_TYPE_OPTIONS = ['Ремонт', 'Модификация'];
+const PROJECT_TYPE_OPTIONS = ['Ремонт', 'Модификация', 'КС', 'ИКУ'];
+
+// Маппинг старых приоритетов для админ-проектов на новые
+const ADMIN_PRIORITY_MAP = {
+  AOG: 'high',
+  CRIT: 'mid',
+  NORM: 'low',
+};
 
 export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toast, openTask, store }) => {
   const existing = projectId ? db.projects.find((p) => p.id === projectId) : null;
@@ -25,7 +33,16 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
   const scope = computeScope(ur, db);
   const isExec = !scope.all && !hasRole(ur, 'director', 'economist', 'kb_chief', 'head', 'project_lead');
 
-  const [f, setF] = useState(existing ? { ...existing } : {
+  // Функция для начального приоритета с учётом типа проекта
+  const getInitialPriority = (proj) => {
+    if (!proj) return 'NORM';
+    if (proj.ptype === 'admin' && ADMIN_PRIORITY_MAP[proj.priority]) {
+      return ADMIN_PRIORITY_MAP[proj.priority];
+    }
+    return proj.priority || 'NORM';
+  };
+
+  const [f, setF] = useState(existing ? { ...existing, priority: getInitialPriority(existing) } : {
     id: "p_" + uid(),
     code: "",
     name: "",
@@ -51,21 +68,33 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
     history: existing?.history || [{ ts: Date.now(), who: ur.id, text: "Проект создан" }],
     files: existing?.files || [],
   });
+
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
   const isAdminType = f.ptype === "admin";
+
+  // Автоматически корректируем приоритет при смене типа проекта
+  useEffect(() => {
+    if (isAdminType) {
+      if (!ADMIN_PRIORITY_MAP[f.priority] && !Object.keys(ADMIN_PROJECT_PRIORITIES).includes(f.priority)) {
+        setF(prev => ({ ...prev, priority: 'high' }));
+      }
+    } else {
+      if (!PROJECT_PRIORITIES[f.priority]) {
+        setF(prev => ({ ...prev, priority: 'NORM' }));
+      }
+    }
+  }, [isAdminType, f.priority]);
 
   const isNew = !existing;
   const canEditFields = isNew ? canCreateProject(ur) : canEditProjectFields(ur, f);
   const canChangeStatus = isNew ? canCreateProject(ur) : canChangeProjectStatus(ur, f, f.status);
 
   const [tab, setTab] = useState('info');
-
-  // --- Состояния для сортировки задач ---
   const [taskSortField, setTaskSortField] = useState('created');
   const [taskSortDir, setTaskSortDir] = useState('desc');
 
   const handlePriorityChange = (val) => {
-    setF(prev => ({ ...prev, priority: val, color: PROJECT_PRIORITIES[val]?.color || '#64748b' }));
+    setF(prev => ({ ...prev, priority: val, color: getProjectColor({ ...prev, priority: val }) }));
   };
 
   const statusOptions = [
@@ -84,20 +113,28 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
     if (!f.code.trim()) return toast("Укажите код проекта", "err");
     if (!f.start) return toast("Укажите дату начала", "err");
     if (!f.customer?.trim()) return toast("Укажите заказчика", "err");
-    if (!f.aircraftType) return toast("Выберите тип ВС", "err");
-    if (!f.projectType) return toast("Выберите тип проекта", "err");
-    if (!f.priority) return toast("Выберите приоритет проекта", "err");
-
     if (!isAdminType) {
+      if (!f.aircraftType) return toast("Выберите тип ВС", "err");
+      if (!f.projectType) return toast("Выберите тип проекта", "err");
       if (!f.managerId) return toast("Для производственного проекта ответственный обязателен", "err");
       if (!f.end) return toast("Для производственного проекта дата окончания обязательна", "err");
       if (!f.budget || +f.budget <= 0) return toast("Для производственного проекта бюджет обязателен", "err");
+      if (!f.kbId) return toast("Для производственного проекта необходимо выбрать подразделение (КБ)", "err");
     }
+    if (!f.priority) return toast("Выберите приоритет проекта", "err");
+
     const finalColor = getProjectColor(f);
-    onSave({ ...f, color: finalColor, kbId: f.kbId || null, budget: isAdminType ? null : +f.budget, managerId: isAdminType ? (f.managerId || "") : f.managerId, end: isAdminType ? (f.end || null) : f.end, longterm: isAdminType ? !!f.longterm : false, files: f.files }, !existing);
+    onSave({ 
+      ...f, 
+      color: finalColor, 
+      kbId: f.kbId || null, 
+      budget: isAdminType ? null : +f.budget, 
+      managerId: isAdminType ? "" : f.managerId, 
+      end: isAdminType ? null : f.end, 
+      longterm: false 
+    }, !existing);
   };
 
-  // --- Список задач с сортировкой ---
   const taskList = useMemo(() => {
     if (!existing) return [];
     let list = db.tasks.filter(t => t.projectId === projectId);
@@ -108,7 +145,6 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
       list = list.filter(t => (t.assigneeIds || []).includes(ur.id));
     }
 
-    // Сортировка
     const sortFn = (a, b) => {
       let valA, valB;
       switch (taskSortField) {
@@ -158,12 +194,10 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
       if (valA > valB) return taskSortDir === 'asc' ? 1 : -1;
       return 0;
     };
-
     list.sort(sortFn);
     return list;
   }, [db, projectId, ur.id, isExec, existing, taskSortField, taskSortDir]);
 
-  // Обработчик клика по заголовку
   const handleSort = (field) => {
     if (taskSortField === field) {
       setTaskSortDir(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -244,6 +278,8 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
     toast("Файл удалён");
   };
 
+  const priorityOptions = isAdminType ? ADMIN_PROJECT_PRIORITIES : PROJECT_PRIORITIES;
+
   return (
     <Modal title={existing ? (canEditFields ? "Проект (Редактирование)" : "Проект (Просмотр)") : "Новый проект"} onClose={onClose} width={900}>
       {existing && existing.archived && <div className="info-box">Этот проект находится в архиве. Редактирование недоступно.</div>}
@@ -266,27 +302,35 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
           <label className="lbl">Описание</label><textarea className="inp" rows="2" disabled={!canEditFields} value={f.desc} onChange={(e) => set("desc", e.target.value)} />
           <label className="lbl">Заказчик *</label>
           <input className="inp" disabled={!canEditFields} value={f.customer} onChange={(e) => set("customer", e.target.value)} placeholder="Наименование заказчика" />
-          <label className="lbl">Тип ВС *</label>
-          <select className="inp sel" disabled={!canEditFields} value={f.aircraftType} onChange={(e) => set("aircraftType", e.target.value)}>
-            <option value="">— выберите —</option>
-            {AIRCRAFT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
-          <label className="lbl">Тип проекта *</label>
-          <select className="inp sel" disabled={!canEditFields} value={f.projectType} onChange={(e) => set("projectType", e.target.value)}>
-            <option value="">— выберите —</option>
-            {PROJECT_TYPE_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
+
+          {!isAdminType && (
+            <>
+              <label className="lbl">Тип ВС *</label>
+              <select className="inp sel" disabled={!canEditFields} value={f.aircraftType} onChange={(e) => set("aircraftType", e.target.value)}>
+                <option value="">— выберите —</option>
+                {AIRCRAFT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+              <label className="lbl">Тип проекта *</label>
+              <select className="inp sel" disabled={!canEditFields} value={f.projectType} onChange={(e) => set("projectType", e.target.value)}>
+                <option value="">— выберите —</option>
+                {PROJECT_TYPE_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </>
+          )}
+
           <label className="lbl">Приоритет</label>
           <select className="inp sel" disabled={!canEditFields} value={f.priority} onChange={(e) => handlePriorityChange(e.target.value)}>
-            {Object.entries(PROJECT_PRIORITIES).map(([k, v]) => (
+            {Object.entries(priorityOptions).map(([k, v]) => (
               <option key={k} value={k}>{v.label}</option>
             ))}
           </select>
+
           <label className="lbl">Подразделение</label>
           <select className="inp sel" disabled={!canEditFields} value={f.kbId || ""} onChange={(e) => set("kbId", e.target.value)}>
-            <option value="">Общеорганизационный</option>
+            {isAdminType && <option value="">Общеорганизационный</option>}
             {db.kbs.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
           </select>
+
           <label className="lbl">Ответственный {!isAdminType && "*"}</label>
           <select className="inp sel" disabled={!canEditFields} value={f.managerId || ""} onChange={(e) => set("managerId", e.target.value)}>
             <option value="">— {isAdminType ? "не требуется" : "выберите"} —</option>
@@ -301,10 +345,6 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>
-          {isAdminType && (<> 
-            <label className="lbl">Долгосрочный</label>
-            <label className="dept-pick" style={{ gridColumn: 2 }}><input type="checkbox" disabled={!canEditFields} checked={!!f.longterm} onChange={(e) => set("longterm", e.target.checked)} /> исключить из автоматической архивации</label>
-          </>)}
         </div>
       )}
 

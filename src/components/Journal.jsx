@@ -3,6 +3,21 @@ import { fmtDT, fmtDMY } from '../utils/date';
 import { useDataHelpers } from '../hooks';
 import { Ic, ICONS } from './Icons';
 
+// Безопасная проверка даты
+const safeDate = (ts) => {
+  const d = new Date(ts);
+  return isNaN(d.getTime()) ? null : d;
+};
+
+// Правильный парсинг строки "дд.мм.гггг" в объект Date
+const parseDayKey = (dayKey) => {
+  const parts = dayKey.split('.');
+  if (parts.length !== 3) return null;
+  const [day, month, year] = parts.map(Number);
+  if (!day || !month || !year) return null;
+  return new Date(year, month - 1, day);
+};
+
 const ACTIONS = [
   { value: 'all', label: 'Все действия' },
   { value: 'Создание задачи', label: 'Создание задачи' },
@@ -57,6 +72,9 @@ export default function Journal({ db }) {
 
   const filteredEntries = useMemo(() => {
     return allEntries.filter(entry => {
+      const dateObj = safeDate(entry.ts);
+      if (!dateObj) return false; // пропускаем записи с некорректной датой
+      
       const entryDate = fmtDMY(entry.ts);
       if (filters.dateFrom && entryDate < filters.dateFrom) return false;
       if (filters.dateTo && entryDate > filters.dateTo) return false;
@@ -72,11 +90,13 @@ export default function Journal({ db }) {
     });
   }, [allEntries, filters]);
 
-  // Группировка по датам (день/месяц)
+  // Группировка по датам (день/месяц) - используем parseDayKey
   const groupedEntries = useMemo(() => {
     const groups = {};
     filteredEntries.forEach(entry => {
-      const d = new Date(entry.ts);
+      const d = safeDate(entry.ts);
+      if (!d) return; // пропускаем
+      
       const dayKey = fmtDMY(entry.ts);
       const monthKey = `${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
       
@@ -106,13 +126,47 @@ export default function Journal({ db }) {
     return result;
   }, [filteredEntries]);
 
-  const totalEntries = filteredEntries.length;
-  const paginated = useMemo(() => {
-    const flat = [];
-    groupedEntries.forEach(g => g.entries.forEach(e => flat.push(e)));
-    return flat.slice((page - 1) * pageSize, page * pageSize);
-  }, [groupedEntries, page]);
+  // Плоский список для пагинации (без дубликатов)
+  const flatEntries = useMemo(() => {
+    const result = [];
+    let lastMonth = null;
+    
+    groupedEntries.forEach(group => {
+      const monthDate = parseDayKey(group.date);
+      const monthLabel = monthDate && !isNaN(monthDate.getTime()) 
+        ? monthDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' }) 
+        : 'Неизвестный месяц';
+      
+      group.entries.forEach((entry, idx) => {
+        const isFirstInDay = idx === 0;
+        const dayObj = safeDate(entry.ts);
+        const dayLabel = isFirstInDay && dayObj 
+          ? dayObj.toLocaleDateString('ru-RU', { 
+              weekday: 'long', 
+              day: 'numeric' 
+            }) 
+          : null;
+        
+        result.push({
+          ...entry,
+          _monthLabel: lastMonth !== monthLabel ? monthLabel : null,
+          _dayLabel: dayLabel,
+        });
+        
+        if (lastMonth !== monthLabel) {
+          lastMonth = monthLabel;
+        }
+      });
+    });
+    
+    return result;
+  }, [groupedEntries]);
 
+  const paginatedFlat = useMemo(() => {
+    return flatEntries.slice((page - 1) * pageSize, page * pageSize);
+  }, [flatEntries, page]);
+
+  const totalEntries = filteredEntries.length;
   const totalPages = Math.ceil(totalEntries / pageSize);
 
   const handleFilterChange = (key, value) => {
@@ -142,9 +196,9 @@ export default function Journal({ db }) {
   const exportToCSV = () => {
     const headers = ['Дата', 'Время', 'Пользователь', 'Действие', 'Детали'];
     const rows = filteredEntries.map(e => {
-      const d = new Date(e.ts);
-      const date = fmtDMY(e.ts);
-      const time = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+      const d = safeDate(e.ts);
+      const date = d ? fmtDMY(e.ts) : 'неизвестно';
+      const time = d ? d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '—';
       const user = e.userId === 'system' ? 'Система' : empName(e.userId) || e.userId;
       const details = typeof e.details === 'string' ? e.details.replace(/"/g, '""') : '';
       return [date, time, user, e.action, `"${details}"`].join(';');
@@ -158,41 +212,6 @@ export default function Journal({ db }) {
     link.click();
     URL.revokeObjectURL(url);
   };
-
-  // Плоский список для пагинации
-  const flatEntries = useMemo(() => {
-    const result = [];
-    let lastMonth = null;
-    
-    groupedEntries.forEach(group => {
-      const monthDate = new Date(group.date.split('.').reverse().join('-') + '-01');
-      const monthLabel = monthDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
-      
-      group.entries.forEach((entry, idx) => {
-        const isFirstInDay = idx === 0;
-        const dayLabel = isFirstInDay ? new Date(entry.ts).toLocaleDateString('ru-RU', { 
-          weekday: 'long', 
-          day: 'numeric' 
-        }) : null;
-        
-        result.push({
-          ...entry,
-          _monthLabel: lastMonth !== monthLabel ? monthLabel : null,
-          _dayLabel: dayLabel,
-        });
-        
-        if (lastMonth !== monthLabel) {
-          lastMonth = monthLabel;
-        }
-      });
-    });
-    
-    return result;
-  }, [groupedEntries]);
-
-  const paginatedFlat = useMemo(() => {
-    return flatEntries.slice((page - 1) * pageSize, page * pageSize);
-  }, [flatEntries, page]);
 
   return (
     <div className="rep">
@@ -343,7 +362,7 @@ export default function Journal({ db }) {
                           color: 'var(--mut)',
                           fontFamily: 'monospace',
                         }}>
-                          {fmtDT(entry.ts)}
+                          {safeDate(entry.ts) ? fmtDT(entry.ts) : '—'}
                         </td>
                         <td>
                           <div style={{ 

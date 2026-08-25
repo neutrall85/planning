@@ -1,6 +1,7 @@
+// Staff.jsx
 import React, { useState, useMemo, useCallback } from "react";
 import { ROLES, VACATION_TYPES } from "../utils/constants";
-import { TODAY, fmtDMY, initials, uid } from "../utils/date";
+import { TODAY, fmtDMY, uid } from "../utils/date";
 import {
   canEditDepartments,
   canEditRoles,
@@ -12,7 +13,8 @@ import { Ic, ICONS } from "./Icons";
 import { useDataHelpers } from "../hooks";
 import EditEmployeeModal from "./EditEmployeeModal";
 import CreateEmployeeModal from "./CreateEmployeeModal";
-import Avatar from './Avatar';
+import Avatar from "./Avatar";
+import { getPrimaryDeptName } from "../utils/helpers"; // <-- добавлен импорт
 
 // ---- Строка сотрудника ----
 const EmployeeRow = React.memo(({
@@ -25,8 +27,6 @@ const EmployeeRow = React.memo(({
   setDb,
   canFire,
   getEmployeeLoad,
-  empName,
-  primaryDept,
   openEditEmployee,
 }) => {
   const l = getEmployeeLoad(employee.id);
@@ -43,39 +43,6 @@ const EmployeeRow = React.memo(({
     }));
   }, [employee, setDb, ur]);
 
-  // Отображение должностей:
-  // - Основная должность (employee.position)
-  // - Для каждого совмещаемого отдела (d.primary === false) – его название и его должность (d.position), если задана
-  const renderDeptPositions = () => {
-    const primaryDept = employee.departments.find(d => d.primary);
-    const extraDepts = employee.departments.filter(d => !d.primary);
-
-    // Если нет отделов – ничего не показываем
-    if (!primaryDept && extraDepts.length === 0) return null;
-
-    return (
-      <>
-        {/* Основная должность */}
-        {employee.position && <span>{employee.position}</span>}
-        {/* Разделитель, если есть совмещаемые отделы */}
-        {extraDepts.length > 0 && employee.position && <span style={{ marginLeft: '4px' }}> · </span>}
-        {/* Совмещаемые отделы с их должностями */}
-        {extraDepts.map(d => {
-          const dept = db.departments.find(x => x.id === d.deptId);
-          if (!dept) return null;
-          const deptPosition = d.position?.trim(); // должность в этом отделе
-          return (
-            <span key={d.deptId} className="dept-chip">
-              {dept.name}
-              {deptPosition && `: ${deptPosition}`}
-              <span className="mut sm" style={{ marginLeft: '4px' }}>(совм.)</span>
-            </span>
-          );
-        }).filter(Boolean)}
-      </>
-    );
-  };
-
   return (
     <div className="st-row">
       <Avatar employee={employee} size="sm" />
@@ -86,7 +53,7 @@ const EmployeeRow = React.memo(({
           {vacNow && <span className="vac-badge">в отпуске до {fmtDMY(vacNow.end)}</span>}
         </div>
         <div className="st-pos">
-          {renderDeptPositions()}
+          {getPrimaryDeptName(employee, db)} {/* <-- упрощено */}
         </div>
       </div>
       <div className="st-roles">
@@ -103,14 +70,14 @@ const EmployeeRow = React.memo(({
       <div className="st-nums"><b>{isFired ? '—' : l.cnt}</b><span>{isFired ? 'задач' : 'задач'}</span></div>
       {canEditDepartments(ur) && !isFired && <button className="btn ghost sm" title="Подразделения" onClick={() => openDepts(employee.id)}><Ic d={ICONS.users} size={13} /> Отделы</button>}
       {canEditRoles(ur) && !isFired && <button className="btn ghost sm" onClick={() => openRoles(employee.id)}><Ic d={ICONS.shield} size={13} /> Роли</button>}
-      {canEditDepartments(ur) && (
-        <button className="icon-btn" title="Редактировать сотрудника" onClick={() => openEditEmployee(employee.id)}>
-          <Ic d={ICONS.edit} size={15} />
-        </button>
-      )}
       {canFire && (
         <button className={`btn ghost sm${isFired ? '' : ' danger'}`} onClick={handleFireToggle}>
           <Ic d={isFired ? ICONS.restore : ICONS.x} size={13} /> {isFired ? 'Восстановить' : 'Уволить'}
+        </button>
+      )}
+      {canEditDepartments(ur) && (
+        <button className="icon-btn" title="Редактировать сотрудника" onClick={() => openEditEmployee(employee.id)}>
+          <Ic d={ICONS.edit} size={15} />
         </button>
       )}
     </div>
@@ -119,7 +86,7 @@ const EmployeeRow = React.memo(({
 
 // ---- Основной компонент Staff ----
 export default function Staff({ db, setDb, ur, openRoles, openDepts, openVacation }) {
-  const { getEmployeeLoad, empName, primaryDept } = useDataHelpers(db);
+  const { getEmployeeLoad, empName } = useDataHelpers(db);
   const [showFired, setShowFired] = useState(false);
   const [editEmployeeId, setEditEmployeeId] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -188,14 +155,12 @@ export default function Staff({ db, setDb, ur, openRoles, openDepts, openVacatio
             setDb={setDb}
             canFire={canFire}
             getEmployeeLoad={getEmployeeLoad}
-            empName={empName}
-            primaryDept={primaryDept}
             openEditEmployee={openEditEmployee}
           />
         ))}
       </div>
     );
-  }, [deptMap, db, ur, openDepts, openRoles, setDb, canFire, getEmployeeLoad, empName, primaryDept, openEditEmployee]);
+  }, [deptMap, db, ur, openDepts, openRoles, setDb, canFire, getEmployeeLoad, openEditEmployee]);
 
   return (
     <div className="staff">
@@ -260,8 +225,6 @@ export default function Staff({ db, setDb, ur, openRoles, openDepts, openVacatio
               setDb={setDb}
               canFire={canFire}
               getEmployeeLoad={getEmployeeLoad}
-              empName={empName}
-              primaryDept={primaryDept}
               openEditEmployee={openEditEmployee}
             />
           ))}
@@ -292,8 +255,6 @@ export default function Staff({ db, setDb, ur, openRoles, openDepts, openVacatio
                   setDb={setDb}
                   canFire={canFire}
                   getEmployeeLoad={getEmployeeLoad}
-                  empName={empName}
-                  primaryDept={primaryDept}
                   openEditEmployee={openEditEmployee}
                 />
               ))}
@@ -321,14 +282,15 @@ export default function Staff({ db, setDb, ur, openRoles, openDepts, openVacatio
           </div>
           <div style={{ padding: 14 }}>
             <table className="tbl">
-              <thead><tr><th>Сотрудник</th><th>Период</th><th>Тип</th><th>Делегирование</th><th>Статус</th><th></th></tr></thead>
+              <thead><tr><th>Сотрудник</th><th>Отдел</th><th>Период</th><th>Тип</th><th>Делегирование</th><th>Статус</th><th></th></tr></thead>
               <tbody>
                 {allVacs.map(v => {
                   const e = db.employees.find(x => x.id === v.empId);
                   if (e && e.fired) return null;
                   return (
                     <tr key={v.id}>
-                      <td><b>{empName(v.empId)}</b><div className="mut sm">{primaryDept(db.employees.find(e => e.id === v.empId))?.name || ''}</div></td>
+                      <td><b>{empName(v.empId)}</b></td>
+                      <td>{getPrimaryDeptName(e, db)}</td> {/* <-- добавлено */}
                       <td>{fmtDMY(v.start)} — {fmtDMY(v.end)}</td>
                       <td>{VACATION_TYPES[v.type]}</td>
                       <td>{v.delegation.enabled ? `→ ${empName(v.delegation.subId)}` : '—'}</td>
@@ -342,7 +304,7 @@ export default function Staff({ db, setDb, ur, openRoles, openDepts, openVacatio
                     </tr>
                   );
                 })}
-                {allVacs.length === 0 && <tr><td colSpan="6" className="mut">Отпусков нет</td></tr>}
+                {allVacs.length === 0 && <tr><td colSpan="7" className="mut">Отпусков нет</td></tr>}
               </tbody>
             </table>
           </div>
@@ -371,8 +333,6 @@ export default function Staff({ db, setDb, ur, openRoles, openDepts, openVacatio
                   setDb={setDb}
                   canFire={canFire}
                   getEmployeeLoad={getEmployeeLoad}
-                  empName={empName}
-                  primaryDept={primaryDept}
                   openEditEmployee={openEditEmployee}
                 />
               ))}

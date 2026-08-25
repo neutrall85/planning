@@ -110,11 +110,9 @@ export default function TasksView({ db, ur, openTask, store }) {
       archivedAt: isClosing ? TODAY : task.archivedAt,
       history: [...task.history, { ts: Date.now(), who: ur.id, text: `Статус → ${TASK_STATUSES[newStatus].label}` }]
     };
+    
+    // ИСПРАВЛЕНИЕ: убрано дублирование addAudit, так как store.upsertTask сам добавляет запись в журнал при изменении статуса
     store.upsertTask(updatedTask);
-    store.addAudit('Изменение статуса задачи', {
-      task: task.title,
-      status: `${TASK_STATUSES[task.status].label} → ${TASK_STATUSES[newStatus].label}`
-    }, 'task', task.id);
   };
 
   return (

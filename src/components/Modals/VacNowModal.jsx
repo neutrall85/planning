@@ -77,7 +77,6 @@ export const VacNowModal = ({ db, onClose, toast }) => {
           )}
         </tbody>
       </table>
-      <p className="mut sm">Список доступен всем сотрудникам без ограничений по ролям (п. 6.6 ТЗ).</p>
     </Modal>
   );
 };

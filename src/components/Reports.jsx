@@ -1,13 +1,11 @@
+// Reports.jsx
 import React, { useState, useMemo, useEffect } from 'react';
-import { TASK_STATUSES, PRIORITIES, PROJECT_STATUSES, PROJECT_TYPES } from '../utils/constants';
+import { TASK_STATUSES, PRIORITIES, PROJECT_STATUSES } from '../utils/constants';
 import { TODAY, fmtDMY, fmtDT } from '../utils/date';
 import { hasRole, computeScope, taskVisible } from '../utils/permissions';
 import { Ic, ICONS } from './Icons';
 import { useDataHelpers } from '../hooks';
-
-const AIRCRAFT_TYPES = ['Все', 'Су-57', 'МиГ-35', 'Ту-160', 'Ил-76', 'Ка-52', 'Другой'];
-const PROJECT_TYPE_OPTIONS = ['Все', 'Ремонт', 'Модификация'];
-const STAGES = ['Все', 'Эскизный проект', 'Рабочая документация', 'Изготовление', 'Испытания', 'Сдача'];
+import { getPrimaryDeptName } from '../utils/helpers';
 
 const REPORT_TYPES = [
   { value: 'tasks', label: 'Задачи' },
@@ -20,7 +18,6 @@ export default function Reports({ db, ur }) {
   const { empName, getTaskSpent, getProjectStats } = useDataHelpers(db);
   const scope = useMemo(() => computeScope(ur, db), [ur, db]);
 
-  // Защита от отсутствия данных
   const safeDb = useMemo(() => {
     if (!db) return { projects: [], tasks: [], employees: [], departments: [], kbs: [], vacations: [] };
     return db;
@@ -36,9 +33,6 @@ export default function Reports({ db, ur }) {
     assigneeId: 'all',
     status: 'all',
     priority: 'all',
-    aircraftType: 'all',
-    projectType: 'all',
-    stage: 'all',
     customer: '',
   });
 
@@ -94,15 +88,12 @@ export default function Reports({ db, ur }) {
       if (filters.assigneeId !== 'all') tasks = tasks.filter(t => (t.assigneeIds || []).includes(filters.assigneeId));
       if (filters.status !== 'all') tasks = tasks.filter(t => t.status === filters.status);
       if (filters.priority !== 'all') tasks = tasks.filter(t => t.priority === filters.priority);
-      tasks = tasks.filter(t => {
-        const project = projectsList.find(p => p.id === t.projectId);
-        if (!project) return false;
-        if (filters.aircraftType !== 'all' && project.aircraftType !== filters.aircraftType) return false;
-        if (filters.projectType !== 'all' && project.projectType !== filters.projectType) return false;
-        if (filters.stage !== 'all' && project.stage !== filters.stage) return false;
-        if (filters.customer && !project.customer?.toLowerCase().includes(filters.customer.toLowerCase())) return false;
-        return true;
-      });
+      if (filters.customer) {
+        tasks = tasks.filter(t => {
+          const project = projectsList.find(p => p.id === t.projectId);
+          return project && project.customer?.toLowerCase().includes(filters.customer.toLowerCase());
+        });
+      }
       tasks = tasks.filter(t => taskVisible(ur, scope, t, safeDb));
       setResults(tasks);
     } else if (type === 'projects') {
@@ -112,9 +103,6 @@ export default function Reports({ db, ur }) {
       if (filters.deadlineFrom) projects = projects.filter(p => p.end && p.end >= filters.deadlineFrom);
       if (filters.deadlineTo) projects = projects.filter(p => p.end && p.end <= filters.deadlineTo);
       if (filters.projectId !== 'all') projects = projects.filter(p => p.id === filters.projectId);
-      if (filters.aircraftType !== 'all') projects = projects.filter(p => p.aircraftType === filters.aircraftType);
-      if (filters.projectType !== 'all') projects = projects.filter(p => p.projectType === filters.projectType);
-      if (filters.stage !== 'all') projects = projects.filter(p => p.stage === filters.stage);
       if (filters.customer) projects = projects.filter(p => p.customer?.toLowerCase().includes(filters.customer.toLowerCase()));
       if (!scope.all) projects = projects.filter(p => scope.projIds.has(p.id));
       setResults(projects);
@@ -127,20 +115,13 @@ export default function Reports({ db, ur }) {
         );
       }
       if (filters.assigneeId !== 'all') employees = employees.filter(e => e.id === filters.assigneeId);
-      // Фильтры по типу ВС, типу проекта, стадии, заказчику применяем через задачи
-      if (filters.aircraftType !== 'all' || filters.projectType !== 'all' || filters.stage !== 'all' || filters.customer) {
+      if (filters.customer) {
         employees = employees.filter(e => {
           const userTasks = tasksList.filter(t => t.assigneeIds?.includes(e.id));
           if (userTasks.length === 0) return false;
-          // Проверяем, есть ли хотя бы одна задача, соответствующая фильтрам по проекту
           return userTasks.some(t => {
             const project = projectsList.find(p => p.id === t.projectId);
-            if (!project) return false;
-            if (filters.aircraftType !== 'all' && project.aircraftType !== filters.aircraftType) return false;
-            if (filters.projectType !== 'all' && project.projectType !== filters.projectType) return false;
-            if (filters.stage !== 'all' && project.stage !== filters.stage) return false;
-            if (filters.customer && !project.customer?.toLowerCase().includes(filters.customer.toLowerCase())) return false;
-            return true;
+            return project && project.customer?.toLowerCase().includes(filters.customer.toLowerCase());
           });
         });
       }
@@ -161,15 +142,10 @@ export default function Reports({ db, ur }) {
       if (filters.dateTo) logs = logs.filter(l => l.date <= filters.dateTo);
       if (filters.projectId !== 'all') logs = logs.filter(l => l.projectId === filters.projectId);
       if (filters.assigneeId !== 'all') logs = logs.filter(l => l.userId === filters.assigneeId);
-      if (filters.aircraftType !== 'all' || filters.projectType !== 'all' || filters.stage !== 'all' || filters.customer) {
+      if (filters.customer) {
         logs = logs.filter(l => {
           const project = projectsList.find(p => p.id === l.projectId);
-          if (!project) return false;
-          if (filters.aircraftType !== 'all' && project.aircraftType !== filters.aircraftType) return false;
-          if (filters.projectType !== 'all' && project.projectType !== filters.projectType) return false;
-          if (filters.stage !== 'all' && project.stage !== filters.stage) return false;
-          if (filters.customer && !project.customer?.toLowerCase().includes(filters.customer.toLowerCase())) return false;
-          return true;
+          return project && project.customer?.toLowerCase().includes(filters.customer.toLowerCase());
         });
       }
       if (!scope.all) {
@@ -204,9 +180,6 @@ export default function Reports({ db, ur }) {
       assigneeId: 'all',
       status: 'all',
       priority: 'all',
-      aircraftType: 'all',
-      projectType: 'all',
-      stage: 'all',
       customer: '',
     });
   };
@@ -263,12 +236,12 @@ export default function Reports({ db, ur }) {
         ]);
       });
     } else if (type === 'projects') {
-      rows = [['№', 'Код', 'Проект', 'Статус', 'Заказчик', 'Тип ВС', 'Тип проекта', 'Стадия', 'Бюджет (ч)', 'План (ч)', 'Факт (ч)', 'Ответственный']];
+      rows = [['№', 'Код', 'Проект', 'Статус', 'Заказчик', 'Бюджет (ч)', 'План (ч)', 'Факт (ч)', 'Ответственный']];
       results.forEach((p, idx) => {
         const stats = getProjectStats(p.id);
         rows.push([
           idx + 1, p.code, p.name, PROJECT_STATUSES[p.status] || p.status,
-          p.customer || '—', p.aircraftType || '—', p.projectType || '—', p.stage || '—',
+          p.customer || '—',
           p.budget ?? '—', stats.plan, stats.fact,
           empName(p.managerId)
         ]);
@@ -276,8 +249,7 @@ export default function Reports({ db, ur }) {
     } else if (type === 'employees') {
       rows = [['№', 'Сотрудник', 'Отдел (основной)', 'План (ч)', 'Факт (ч)', 'Кол-во задач']];
       results.forEach((e, idx) => {
-        const dept = (e.departments || []).find(d => d.primary);
-        const deptName = dept ? (safeDb.departments || []).find(d => d.id === dept.deptId)?.name : '—';
+        const deptName = getPrimaryDeptName(e, safeDb);
         const tasks = (safeDb.tasks || []).filter(t => t.assigneeIds?.includes(e.id));
         const plan = tasks.reduce((s, t) => s + (t.plannedHours || 0), 0);
         const fact = tasks.reduce((s, t) => s + getTaskSpent(t), 0);
@@ -353,7 +325,7 @@ export default function Reports({ db, ur }) {
     } else if (type === 'projects') {
       return (
         <div style={{ width: '100%', overflowX: 'auto' }}>
-          <table className="tbl" style={{ minWidth: '800px', fontSize: '13px' }}>
+          <table className="tbl" style={{ minWidth: '600px', fontSize: '13px' }}>
             <thead>
               <tr>
                 <th>#</th>
@@ -361,9 +333,6 @@ export default function Reports({ db, ur }) {
                 <th>Проект</th>
                 <th>Статус</th>
                 <th>Заказчик</th>
-                <th>Тип ВС</th>
-                <th>Тип проекта</th>
-                <th>Стадия</th>
                 <th>Бюджет (ч)</th>
                 <th>План (ч)</th>
                 <th>Факт (ч)</th>
@@ -380,9 +349,6 @@ export default function Reports({ db, ur }) {
                     <td>{p.name}</td>
                     <td><span className={`st-chip ${p.status === 'active' ? 'active' : ''}`}>{PROJECT_STATUSES[p.status] || p.status}</span></td>
                     <td>{p.customer || '—'}</td>
-                    <td>{p.aircraftType || '—'}</td>
-                    <td>{p.projectType || '—'}</td>
-                    <td>{p.stage || '—'}</td>
                     <td>{p.budget ?? '—'}</td>
                     <td>{stats.plan}</td>
                     <td>{stats.fact}</td>
@@ -410,8 +376,7 @@ export default function Reports({ db, ur }) {
             </thead>
             <tbody>
               {results.map((e, idx) => {
-                const dept = (e.departments || []).find(d => d.primary);
-                const deptName = dept ? (safeDb.departments || []).find(d => d.id === dept.deptId)?.name : '—';
+                const deptName = getPrimaryDeptName(e, safeDb);
                 const tasks = (safeDb.tasks || []).filter(t => t.assigneeIds?.includes(e.id));
                 const plan = tasks.reduce((s, t) => s + (t.plannedHours || 0), 0);
                 const fact = tasks.reduce((s, t) => s + getTaskSpent(t), 0);
@@ -468,17 +433,9 @@ export default function Reports({ db, ur }) {
     }
   };
 
-  // Определение, какие фильтры показывать
   const type = filters.type;
-  const showTaskSpecific = type === 'tasks';
-  const showProjectDates = type === 'projects';
-  const showWorklogDates = type === 'worklog';
-  const showEmployeeFilters = type === 'employees';
-  // Для сотрудников даты не показываем
   const showDateRange = type !== 'employees';
-  // Для проектов и задач показываем дедлайн/окончание
   const showDeadlineRange = type === 'tasks' || type === 'projects';
-  // Для сотрудников и трудозатрат не показываем статус/приоритет
   const showStatusPriority = type === 'tasks';
 
   return (
@@ -505,7 +462,7 @@ export default function Reports({ db, ur }) {
           {showDateRange && (
             <>
               <label className="lbl" style={{ margin: 0 }}>
-                {showWorklogDates ? 'Дата записи:' : showProjectDates ? 'Начало:' : 'Создан с:'}
+                {type === 'worklog' ? 'Дата записи:' : type === 'projects' ? 'Начало:' : 'Создан с:'}
               </label>
               <input
                 className="inp"
@@ -528,7 +485,7 @@ export default function Reports({ db, ur }) {
           {showDeadlineRange && (
             <>
               <label className="lbl" style={{ margin: 0 }}>
-                {showProjectDates ? 'Окончание:' : 'Срок исполнения:'}
+                {type === 'projects' ? 'Окончание:' : 'Срок исполнения:'}
               </label>
               <input
                 className="inp"
@@ -568,38 +525,6 @@ export default function Reports({ db, ur }) {
           >
             <option value="all">Все</option>
             {visibleEmployees.map(e => <option key={e.id} value={e.id}>{e.last} {e.first}</option>)}
-          </select>
-        </div>
-
-        <div className="toolbar" style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
-          <label className="lbl" style={{ margin: 0 }}>Тип ВС:</label>
-          <select
-            className="inp sel"
-            value={filters.aircraftType}
-            onChange={e => handleFilterChange('aircraftType', e.target.value)}
-            style={{ width: '140px' }}
-          >
-            {AIRCRAFT_TYPES.map(t => <option key={t} value={t === 'Все' ? 'all' : t}>{t}</option>)}
-          </select>
-
-          <label className="lbl" style={{ margin: 0 }}>Тип проекта:</label>
-          <select
-            className="inp sel"
-            value={filters.projectType}
-            onChange={e => handleFilterChange('projectType', e.target.value)}
-            style={{ width: '140px' }}
-          >
-            {PROJECT_TYPE_OPTIONS.map(t => <option key={t} value={t === 'Все' ? 'all' : t}>{t}</option>)}
-          </select>
-
-          <label className="lbl" style={{ margin: 0 }}>Стадия:</label>
-          <select
-            className="inp sel"
-            value={filters.stage}
-            onChange={e => handleFilterChange('stage', e.target.value)}
-            style={{ width: '160px' }}
-          >
-            {STAGES.map(s => <option key={s} value={s === 'Все' ? 'all' : s}>{s}</option>)}
           </select>
 
           <label className="lbl" style={{ margin: 0 }}>Заказчик:</label>
@@ -686,9 +611,6 @@ export default function Reports({ db, ur }) {
               }
               if (f.filters.status !== 'all') criteria.push(`Статус: ${TASK_STATUSES[f.filters.status]?.label || f.filters.status}`);
               if (f.filters.priority !== 'all') criteria.push(`Приоритет: ${PRIORITIES[f.filters.priority]?.label || f.filters.priority}`);
-              if (f.filters.aircraftType !== 'all') criteria.push(`Тип ВС: ${f.filters.aircraftType}`);
-              if (f.filters.projectType !== 'all') criteria.push(`Тип проекта: ${f.filters.projectType}`);
-              if (f.filters.stage !== 'all') criteria.push(`Стадия: ${f.filters.stage}`);
               if (f.filters.customer) criteria.push(`Заказчик: ${f.filters.customer}`);
               const displayText = criteria.length ? criteria.join(' · ') : 'Все';
 
