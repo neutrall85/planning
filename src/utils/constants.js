@@ -70,4 +70,4 @@ export const PROJECT_STATUS_ORDER = ['inactive', 'active', 'closed', 'cancelled'
 
 export const PROJECT_TYPES = { prod: "Производственный", admin: "Административный" };
 export const COMMENT_EDIT_WINDOW = 15 * 60000; // 15 минут
-export const DOMAIN = "volga-dnepr.com";
+export const DOMAIN = "aviahorizont.ru";

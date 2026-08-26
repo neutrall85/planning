@@ -12,12 +12,11 @@ export default function Archive({ db, ur, openTask, openProject, restoreTask, re
   const [fProj, setFProj] = useState('all');
   const [fExec, setFExec] = useState('all');
   const [fDept, setFDept] = useState('all');
-  
-  // ОШИБКА БЫЛА ЗДЕСЬ: отсутствовало объявление openProj
-  const [openProj, setOpenProj] = useState(null);
 
-  const archProjects = db.projects.filter(p => p.archived);
-  const archTasks = db.tasks.filter(t => t.archived);
+  // ---- ИЗМЕНЕНИЕ: показываем все закрытые/отменённые + уже архивированные ----
+  const archProjects = db.projects.filter(p => p.archived || p.status === 'closed' || p.status === 'cancelled');
+  const archTasks = db.tasks.filter(t => t.archived || t.status === 'closed' || t.status === 'cancelled');
+
   const fit = (archivedAt) => (!fFrom || archivedAt >= fFrom) && (!fTo || archivedAt <= fTo);
   const projList = archProjects.filter(p => fit(p.archivedAt || TODAY));
   const taskList = archTasks.filter(t => {
@@ -66,9 +65,13 @@ export default function Archive({ db, ur, openTask, openProject, restoreTask, re
                 <td>{PROJECT_TYPES[p.ptype || 'prod']}</td>
                 <td>{fmtDMY(p.archivedAt)}</td>
                 <td>
-                  {/* ИЗМЕНЕНИЕ: вызываем openProject вместо локального окна */}
                   <button className="btn ghost sm" onClick={() => openProject(p.id)}>Открыть</button>
-                  {canRestore(ur) && <button className="btn ghost sm" onClick={() => restoreProject(p.id)}><Ic d={ICONS.restore} size={12} /> Восстановить</button>}
+                  {/* ---- ИЗМЕНЕНИЕ: показываем восстановление только для действительно архивированных ---- */}
+                  {canRestore(ur) && p.archived && (
+                    <button className="btn ghost sm" onClick={() => restoreProject(p.id)}>
+                      <Ic d={ICONS.restore} size={12} /> Восстановить
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -89,36 +92,18 @@ export default function Archive({ db, ur, openTask, openProject, restoreTask, re
                 <td>{fmtDMY(t.archivedAt)}</td>
                 <td>
                   <button className="btn ghost sm" onClick={() => openTask(t.id)}>Открыть</button>
-                  {canRestore(ur) && <button className="btn ghost sm" onClick={() => restoreTask(t.id)}><Ic d={ICONS.restore} size={12} /> Восстановить</button>}
+                  {/* ---- ИЗМЕНЕНИЕ: показываем восстановление только для действительно архивированных ---- */}
+                  {canRestore(ur) && t.archived && (
+                    <button className="btn ghost sm" onClick={() => restoreTask(t.id)}>
+                      <Ic d={ICONS.restore} size={12} /> Восстановить
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-
-      {openProj && (
-        <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setOpenProj(null); }}>
-          <div className="modal" style={{ maxWidth: 720 }}>
-            <div className="modal-head"><h3>{openProj.code} — {openProj.name}</h3><button className="icon-btn" onClick={() => setOpenProj(null)}><Ic d={ICONS.x} size={16} /></button></div>
-            <div className="modal-body">
-              <div className="info-box">Режим «только чтение».</div>
-              <table className="tbl">
-                <thead><tr><th>Задача</th><th>Статус</th><th>План / факт</th></tr></thead>
-                <tbody>
-                  {db.tasks.filter(t => t.projectId === openProj.id).map(t => (
-                    <tr key={t.id}>
-                      <td><b>{t.title}</b></td>
-                      <td>{TASK_STATUSES[t.status]?.label || t.status}</td>
-                      <td>{t.plannedHours ?? '—'} / {getTaskSpent(t)} ч</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

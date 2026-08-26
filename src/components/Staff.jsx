@@ -14,7 +14,7 @@ import { useDataHelpers } from "../hooks";
 import EditEmployeeModal from "./EditEmployeeModal";
 import CreateEmployeeModal from "./CreateEmployeeModal";
 import Avatar from "./Avatar";
-import { getPrimaryDeptName } from "../utils/helpers"; // <-- добавлен импорт
+import { getPrimaryDeptName } from "../utils/helpers";
 
 // ---- Строка сотрудника ----
 const EmployeeRow = React.memo(({
@@ -43,6 +43,10 @@ const EmployeeRow = React.memo(({
     }));
   }, [employee, setDb, ur]);
 
+  // ---- ИЗМЕНЕНИЕ: отображаем должность и отдел ----
+  const mainDept = getPrimaryDeptName(employee, db);
+  const displayPosition = employee.position || 'Сотрудник';
+
   return (
     <div className="st-row">
       <Avatar employee={employee} size="sm" />
@@ -53,7 +57,7 @@ const EmployeeRow = React.memo(({
           {vacNow && <span className="vac-badge">в отпуске до {fmtDMY(vacNow.end)}</span>}
         </div>
         <div className="st-pos">
-          {getPrimaryDeptName(employee, db)} {/* <-- упрощено */}
+          {displayPosition}
         </div>
       </div>
       <div className="st-roles">
@@ -277,7 +281,7 @@ export default function Staff({ db, setDb, ur, openRoles, openDepts, openVacatio
       {canManageAllVacations(ur) && (
         <div className="st-section">
           <div className="st-sec-head">
-            <div className="st-sec-title">Все отпуска (управление HR / ГД / суперадминистратор)</div>
+            <div className="st-sec-title">Все отпуска</div>
             <button className="btn primary sm" onClick={() => openVacation(null, null)}><Ic d={ICONS.plus} size={13} /> Отпуск сотруднику</button>
           </div>
           <div style={{ padding: 14 }}>
@@ -290,7 +294,7 @@ export default function Staff({ db, setDb, ur, openRoles, openDepts, openVacatio
                   return (
                     <tr key={v.id}>
                       <td><b>{empName(v.empId)}</b></td>
-                      <td>{getPrimaryDeptName(e, db)}</td> {/* <-- добавлено */}
+                      <td>{getPrimaryDeptName(e, db)}</td>
                       <td>{fmtDMY(v.start)} — {fmtDMY(v.end)}</td>
                       <td>{VACATION_TYPES[v.type]}</td>
                       <td>{v.delegation.enabled ? `→ ${empName(v.delegation.subId)}` : '—'}</td>

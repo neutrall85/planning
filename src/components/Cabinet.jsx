@@ -1,10 +1,11 @@
 // Cabinet.jsx
 import React, { useState, useMemo, useRef } from 'react';
-import { TASK_STATUSES, TASK_STATUS_ORDER, VACATION_TYPES } from '../utils/constants';
+import { DOMAIN, TASK_STATUSES, TASK_STATUS_ORDER, VACATION_TYPES } from '../utils/constants';
 import { TODAY, fmtDMY, fmtD, iso, addDays, initials, isTaskActive } from '../utils/date';
 import { useDataHelpers } from '../hooks';
 import { Ic, ICONS } from './Icons';
-import { getPrimaryDeptName } from '../utils/helpers'; // <-- добавлен импорт
+import { getPrimaryDeptName } from '../utils/helpers';
+import { Modal } from './Modal';
 
 function downloadCSV(name, rows) {
   const csv = '\uFEFF' + rows.map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(';')).join('\r\n');
@@ -16,12 +17,80 @@ function downloadCSV(name, rows) {
   setTimeout(() => URL.revokeObjectURL(a.href), 500);
 }
 
+// ---- Модалка смены пароля ----
+const PasswordChangeModal = ({ user, store, onClose, toast }) => {
+  const [oldPass, setOldPass] = useState('');
+  const [newPass, setNewPass] = useState('');
+  const [confirmPass, setConfirmPass] = useState('');
+  const [error, setError] = useState('');
+
+  const handleSubmit = () => {
+    setError('');
+    // 1. Проверка старого пароля
+    if (user.pass !== oldPass) {
+      setError('Неверный старый пароль');
+      return;
+    }
+    // 2. Сложность нового пароля
+    if (newPass.length < 8 || !/[A-ZА-ЯЁ]/.test(newPass) || !/[a-zа-яё]/.test(newPass) || !/\d/.test(newPass) || !/[^A-Za-zА-Яа-яЁё0-9]/.test(newPass)) {
+      setError('Пароль должен содержать минимум 8 символов, заглавные и строчные буквы, цифру и спецсимвол');
+      return;
+    }
+    // 3. Совпадение подтверждения
+    if (newPass !== confirmPass) {
+      setError('Пароли не совпадают');
+      return;
+    }
+    // 4. Проверка истории (последние 4 пароля)
+    const history = user.passwordHistory || [];
+    if (history.some(p => p === newPass)) {
+      setError('Этот пароль уже использовался ранее. Выберите другой.');
+      return;
+    }
+    // 5. Обновление
+    const updated = {
+      ...user,
+      pass: newPass,
+      passwordHistory: [...history.slice(-4), newPass],
+    };
+    store.upsertEmployee(updated);
+    toast('Пароль успешно изменён');
+    onClose();
+  };
+
+  return (
+    <Modal title="Смена пароля" onClose={onClose} width={460}>
+      <div className="form-grid">
+        <label className="lbl">Старый пароль *</label>
+        <input className="inp" type="password" value={oldPass} onChange={e => setOldPass(e.target.value)} />
+        <label className="lbl">Новый пароль *</label>
+        <input className="inp" type="password" value={newPass} onChange={e => setNewPass(e.target.value)} />
+        <label className="lbl">Подтверждение *</label>
+        <input className="inp" type="password" value={confirmPass} onChange={e => setConfirmPass(e.target.value)} />
+      </div>
+      {error && <div className="login-err" style={{ marginTop: 8 }}>{error}</div>}
+      <div className="modal-foot">
+        <div className="spacer" />
+        <button className="btn ghost" onClick={onClose}>Отмена</button>
+        <button className="btn primary" onClick={handleSubmit}>Сменить пароль</button>
+      </div>
+    </Modal>
+  );
+};
+
+// ---- Основной компонент Cabinet ----
 export default function Cabinet({ store, data, user, openTask, openVacation, openDelegation }) {
   const { empName, getEmployeeLoad } = useDataHelpers(data);
   const [tab, setTab] = useState('overview');
 
   const [expFrom, setExpFrom] = useState('');
   const [expTo, setExpTo] = useState('');
+
+  // ---- Состояния для редактирования профиля ----
+  const [editMode, setEditMode] = useState(false);
+  const [phone, setPhone] = useState(user.phone || '');
+  const [extension, setExtension] = useState(user.extension || '');
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   const myTasks = data.tasks.filter(t => isTaskActive(t) && (t.assigneeIds || []).includes(user.id) && !user.fired);
   const myProjects = [...new Set(myTasks.map(t => t.projectId))].map(id => data.projects.find(p => p.id === id)).filter(Boolean);
@@ -77,32 +146,30 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
     ['profile', 'Профиль и уведомления']
   ];
 
-  // Функция смены пароля
-  const changePassword = () => {
-    const newPass = window.prompt('Введите новый пароль:');
-    if (!newPass) return;
-    if (newPass.length < 8 || !/[A-ZА-ЯЁ]/.test(newPass) || !/[a-zа-яё]/.test(newPass) || !/\d/.test(newPass) || !/[^A-Za-zА-Яа-яЁё0-9]/.test(newPass)) {
-      alert('Пароль не соответствует требованиям безопасности (минимум 8 символов, заглавные и строчные буквы, цифры, спецсимволы)');
+  // ---- Функция сохранения изменений профиля ----
+  const handleSaveProfile = () => {
+    if (!extension.trim()) {
+      alert('Внутренний номер телефона не может быть пустым');
       return;
     }
-    const history = user.passwordHistory || [];
-    if (history.some(p => p === newPass)) {
-      alert('Этот пароль уже использовался ранее. Выберите другой.');
-      return;
-    }
-    const updated = { ...user, pass: newPass, passwordHistory: [...history.slice(-4), newPass] };
+    const updated = {
+      ...user,
+      phone: phone.trim(),
+      extension: extension.trim(),
+    };
     store.upsertEmployee(updated);
-    alert('Пароль изменён. На вашу почту отправлено подтверждение.');
+    setEditMode(false);
+    alert('Данные обновлены');
   };
 
-  // Загрузка фото
+  // ---- Загрузка фото ----
   const fileInputRef = useRef(null);
   const handlePhotoUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
-      const photoData = ev.target.result; // base64
+      const photoData = ev.target.result;
       const updated = { ...user, photo: photoData };
       store.upsertEmployee(updated);
       alert('Фото загружено');
@@ -285,110 +352,137 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
       )}
 
       {tab === 'profile' && (
-        <div className="cab-grid">
-          <div className="rep-panel">
-            <div className="rep-panel-title">Личные данные</div>
-            <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-              <div style={{ flex: '0 0 140px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-                {user.photo ? (
-                  <img src={user.photo} alt="Аватар" style={{ width: 120, height: 120, borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--line)' }} />
-                ) : (
-                  <div style={{ width: 120, height: 120, borderRadius: '50%', background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 12 }}>Нет фото</div>
-                )}
-                <input type="file" accept="image/*" ref={fileInputRef} style={{ display: 'none' }} onChange={handlePhotoUpload} />
-                <button className="btn primary sm" onClick={() => fileInputRef.current?.click()}>Загрузить фото</button>
-                {user.photo && <button className="btn ghost sm" onClick={handlePhotoDelete}>Удалить фото</button>}
-              </div>
+        <>
+          <div className="cab-grid">
+            <div className="rep-panel">
+              <div className="rep-panel-title">Личные данные</div>
+              <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+                <div style={{ flex: '0 0 140px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                  {user.photo ? (
+                    <img src={user.photo} alt="Аватар" style={{ width: 120, height: 120, borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--line)' }} />
+                  ) : (
+                    <div style={{ width: 120, height: 120, borderRadius: '50%', background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 12 }}>Нет фото</div>
+                  )}
+                  <input type="file" accept="image/*" ref={fileInputRef} style={{ display: 'none' }} onChange={handlePhotoUpload} />
+                  <button className="btn primary sm" onClick={() => fileInputRef.current?.click()}>Загрузить фото</button>
+                  {user.photo && <button className="btn ghost sm" onClick={handlePhotoDelete}>Удалить фото</button>}
+                </div>
 
-              <div style={{ flex: 1, minWidth: 300 }}>
-                <div className="form-grid">
-                  <label className="lbl">Фамилия</label>
-                  <input className="inp" disabled value={user.last} />
-                  <label className="lbl">Имя</label>
-                  <input className="inp" disabled value={user.first} />
-                  
-                  <label className="lbl">E-mail</label>
-                  <div className="duo">
-                    <input className="inp" disabled value={user.email + '@aeroplan.ru'} />
-                    <button className="btn ghost sm" onClick={() => alert('Письмо подтверждения отправлено на новый адрес (заглушка)')}>изменить</button>
-                  </div>
-                  
-                  <label className="lbl">Мобильный телефон</label>
-                  <input className="inp" value={user.phone} onChange={e => {
-                    const updated = { ...user, phone: e.target.value };
-                    store.upsertEmployee(updated);
-                  }} />
+                <div style={{ flex: 1, minWidth: 300 }}>
+                  <div className="form-grid">
+                    <label className="lbl">Фамилия</label>
+                    <input className="inp" disabled value={user.last} />
 
-                  <label className="lbl">Внутренний номер телефона *</label>
-                  <input
-                    className="inp"
-                    value={user.extension || ''}
-                    onChange={e => {
-                      const val = e.target.value;
-                      if (val.trim() === '') {
-                        alert('Внутренний номер телефона не может быть пустым');
-                        return;
-                      }
-                      const updated = { ...user, extension: val.trim() };
-                      store.upsertEmployee(updated);
-                    }}
-                    onBlur={e => {
-                      if (!e.target.value.trim()) {
-                        alert('Внутренний номер телефона обязателен');
-                      }
-                    }}
-                  />
-                  
-                  <label className="lbl">Табельный №</label>
-                  <input className="inp" value={user.tab} onChange={e => {
-                    const updated = { ...user, tab: e.target.value };
-                    store.upsertEmployee(updated);
-                  }} />
-                  
-                  <label className="lbl">Подразделения</label>
-                  <div className="depts-readonly">
-                    {user.departments.map(d => {
-                      const dd = data.departments.find(x => x.id === d.deptId);
-                      return dd ? <span key={d.deptId} className={`dept-chip${d.primary ? ' prim' : ''}`}>{dd.name}{d.primary ? ' · основное' : ''}</span> : null;
-                    })}
-                    {user.departments.length === 0 && <span className="mut sm">не назначены</span>}
-                    <div className="mut sm" style={{ marginTop: 6 }}>Подразделения изменяют только HR-менеджер, суперадминистратор и генеральный директор.</div>
+                    <label className="lbl">Имя</label>
+                    <input className="inp" disabled value={user.first} />
+
+                    <label className="lbl">Должность</label>
+                    <input className="inp" disabled value={user.position || 'Сотрудник'} />
+
+                    <label className="lbl">E-mail</label>
+                    <input className="inp" disabled value={user.email + '@' + DOMAIN} />
+
+                    <label className="lbl">Мобильный телефон</label>
+                    <input
+                      className="inp"
+                      disabled={!editMode}
+                      value={phone}
+                      onChange={e => setPhone(e.target.value)}
+                    />
+
+                    <label className="lbl">Внутренний номер телефона *</label>
+                    <input
+                      className="inp"
+                      disabled={!editMode}
+                      value={extension}
+                      onChange={e => setExtension(e.target.value)}
+                      onBlur={() => {
+                        if (!extension.trim()) {
+                          alert('Внутренний номер телефона обязателен');
+                        }
+                      }}
+                    />
+
+                    <label className="lbl">Табельный №</label>
+                    <input className="inp" disabled value={user.tab || ''} />
+
+                    <label className="lbl">Подразделения</label>
+                    <div className="depts-readonly">
+                      {user.departments.map(d => {
+                        const dd = data.departments.find(x => x.id === d.deptId);
+                        if (!dd) return null;
+                        const isPrimary = d.primary;
+                        // Для основного отдела – не показываем должность, т.к. она уже есть в поле "Должность"
+                        // Для дополнительного – показываем должность, если она задана в d.position
+                        let positionDisplay = '';
+                        if (!isPrimary && d.position) {
+                          positionDisplay = ` (${d.position})`;
+                        }
+                        return (
+                          <span key={d.deptId} className={`dept-chip${isPrimary ? ' prim' : ''}`}>
+                            {dd.name}
+                            {isPrimary ? ' · основное' : ' · (совм)'}
+                            {positionDisplay}
+                          </span>
+                        );
+                      })}
+                      {user.departments.length === 0 && <span className="mut sm">не назначены</span>}
+                    </div>
                   </div>
-                  
-                  <label className="lbl">Пароль</label>
-                  <div className="duo">
-                    <input className="inp" disabled value="••••••••" />
-                    <button className="btn ghost sm" onClick={changePassword}>сменить</button>
+
+                  <div style={{ marginTop: 16, display: 'flex', gap: 10, justifyContent: 'flex-end', alignItems: 'center' }}>
+                    <button className="btn danger" onClick={() => setShowPasswordModal(true)}>Изменить пароль</button>
+                    {editMode ? (
+                      <>
+                        <button className="btn ghost" onClick={() => {
+                          setEditMode(false);
+                          setPhone(user.phone || '');
+                          setExtension(user.extension || '');
+                        }}>Отмена</button>
+                        <button className="btn primary" onClick={handleSaveProfile}>Сохранить</button>
+                      </>
+                    ) : (
+                      <button className="btn primary" onClick={() => setEditMode(true)}>Изменить данные</button>
+                    )}
                   </div>
                 </div>
               </div>
             </div>
+
+            <div className="rep-panel">
+              <div className="rep-panel-title">Уведомления</div>
+              {[
+                ['deadlineEmail', 'E-mail о сроках — за 3 дня до срока исполнения задачи'],
+                ['overdueDigest', 'Контроль просрочек — ежедневная сводка'],
+                ['commentSub', 'Подписка на обсуждение задач, где я исполнитель или ответственный']
+              ].map(([k, label]) => (
+                <label key={k} className="toggle-row">
+                  <span>{label}</span>
+                  <span className={`toggle${user.notif[k] ? ' on' : ''}`} onClick={() => {
+                    const updated = { ...user, notif: { ...user.notif, [k]: !user.notif[k] } };
+                    store.upsertEmployee(updated);
+                  }}><span className="toggle-knob" /></span>
+                </label>
+              ))}
+              <p className="mut sm">Критичные уведомления (восстановление пароля, утверждения) отключить нельзя.</p>
+
+              <div className="rep-panel-title" style={{ marginTop: 16 }}>История делегирований</div>
+              {data.roleDelegations.filter(r => r.fromId === user.id).map(r => (
+                <div key={r.id} className="mut sm">→ {empName(r.toId)}: {r.roles.join(', ')} ({fmtDMY(r.start)} — {r.end ? fmtDMY(r.end) : 'до отмены'})</div>
+              ))}
+              {data.roleDelegations.filter(r => r.fromId === user.id).length === 0 && <div className="mut sm">Передач ролей не было</div>}
+            </div>
           </div>
 
-          <div className="rep-panel">
-            <div className="rep-panel-title">Уведомления</div>
-            {[
-              ['deadlineEmail', 'E-mail о сроках — за 3 дня до срока исполнения задачи'],
-              ['overdueDigest', 'Контроль просрочек — ежедневная сводка'],
-              ['commentSub', 'Подписка на обсуждение задач, где я исполнитель или ответственный']
-            ].map(([k, label]) => (
-              <label key={k} className="toggle-row">
-                <span>{label}</span>
-                <span className={`toggle${user.notif[k] ? ' on' : ''}`} onClick={() => {
-                  const updated = { ...user, notif: { ...user.notif, [k]: !user.notif[k] } };
-                  store.upsertEmployee(updated);
-                }}><span className="toggle-knob" /></span>
-              </label>
-            ))}
-            <p className="mut sm">Критичные уведомления (восстановление пароля, утверждения) отключить нельзя.</p>
-
-            <div className="rep-panel-title" style={{ marginTop: 16 }}>История делегирований</div>
-            {data.roleDelegations.filter(r => r.fromId === user.id).map(r => (
-              <div key={r.id} className="mut sm">→ {empName(r.toId)}: {r.roles.join(', ')} ({fmtDMY(r.start)} — {r.end ? fmtDMY(r.end) : 'до отмены'})</div>
-            ))}
-            {data.roleDelegations.filter(r => r.fromId === user.id).length === 0 && <div className="mut sm">Передач ролей не было</div>}
-          </div>
-        </div>
+          {showPasswordModal && (
+            <PasswordChangeModal
+              user={user}
+              store={store}
+              onClose={() => setShowPasswordModal(false)}
+              toast={(msg) => alert(msg)}
+            />
+          )}
+        </>
       )}
     </div>
   );
