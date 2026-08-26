@@ -1,4 +1,5 @@
 import { StoreProvider } from './context/StoreContext';
+import { ToastProvider } from './context/ToastContext';
 import { useStore, useAuth } from './hooks';
 import LoginScreen from './components/LoginScreen';
 import MainLayout from './components/MainLayout';
@@ -8,7 +9,7 @@ function AppContent() {
   const { user } = useAuth();
 
   if (!user) {
-    return <LoginScreen db={data} setDb={(fn) => { store._data = fn(store._data); store._notify(); }} onLogin={login} toast={(msg) => alert(msg)} />;
+    return <LoginScreen db={data} setDb={(fn) => { store._data = fn(store._data); store._notify(); }} onLogin={login} />;
   }
   return <MainLayout store={store} data={data} user={user} />;
 }
@@ -16,7 +17,9 @@ function AppContent() {
 export default function App() {
   return (
     <StoreProvider>
-      <AppContent />
+      <ToastProvider>
+        <AppContent />
+      </ToastProvider>
     </StoreProvider>
   );
 }

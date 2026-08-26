@@ -2493,3 +2493,71 @@ input, select, textarea {
 .file-input-hidden {
   display: none;
 }
+/* ===== ProjectModal: поля без сетки, единое выравнивание ===== */
+.project-info-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0;
+  width: 100%;
+}
+
+.field-row {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.field-label {
+  min-width: 100px;
+  text-align: left;
+  font-weight: 700;
+  color: var(--mut);
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.field-row .inp,
+.field-row .inp.sel {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Парные строки — в одну линию */
+.pj-pair-row {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 16px;
+  align-items: center;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+}
+
+.pj-pair-item {
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.pj-pair-label {
+  min-width: 100px;
+  text-align: left;
+  font-weight: 700;
+  color: var(--mut);
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.pj-pair-input {
+  flex: 1;
+  min-width: 0;
+}

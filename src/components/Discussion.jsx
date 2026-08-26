@@ -1,3 +1,4 @@
+// src/components/Discussion.jsx
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { uid, fmtDT, initials } from '../utils/date';
@@ -30,7 +31,6 @@ function renderMentionText(text) {
 
 /**
  * Извлекает ID сотрудников, упомянутых через @фамилия
- * Экспортируется для использования в родительских компонентах (например, для уведомлений)
  */
 export function extractMentions(text, employees) {
   const found = [];
@@ -49,13 +49,13 @@ export function extractMentions(text, employees) {
 export default function Discussion({
   comments,
   currentUser,
-  candidates = [],           // сотрудники, доступные для @упоминаний
-  onUpdateComments,          // (newComments) => void – вызывается при любом изменении
-  onCommentAdded,            // (comment) => void – опционально, вызывается после добавления нового комментария
+  candidates = [],
+  onUpdateComments,
+  onCommentAdded,
   readOnly = false,
   canComment = true,
   toast,
-  employees = [],            // все сотрудники для поиска авторов
+  employees = [],
 }) {
   const [text, setText] = useState("");
   const [replyTo, setReplyTo] = useState(null);
@@ -64,6 +64,7 @@ export default function Discussion({
   const [mentionQ, setMentionQ] = useState(null);
   const [mentionPopup, setMentionPopup] = useState({ visible: false, x: 0, y: 0 });
   const textareaRef = useRef(null);
+  const cursorPosRef = useRef(null);
 
   const allEmployees = employees;
 
@@ -89,6 +90,14 @@ export default function Discussion({
     }
   }, [mentionQ]);
 
+  // Восстановление курсора после обновления text
+  useEffect(() => {
+    if (cursorPosRef.current !== null && textareaRef.current) {
+      textareaRef.current.setSelectionRange(cursorPosRef.current, cursorPosRef.current);
+      cursorPosRef.current = null;
+    }
+  }, [text]);
+
   // Поиск автора по ID
   const getAuthor = (id) => allEmployees.find((e) => e.id === id);
 
@@ -111,8 +120,24 @@ export default function Discussion({
   // Выбор упоминания из всплывающего списка
   const pickMention = (emp) => {
     const lastAt = text.lastIndexOf("@");
-    setText(text.slice(0, lastAt + 1) + `${emp.last} ${emp.first} `);
+    if (lastAt === -1) return;
+
+    const prefix = text.slice(0, lastAt + 1);
+    const suffix = text.slice(lastAt + 1);
+    const insert = `${emp.last} ${emp.first}, `;
+    const newText = prefix + insert + suffix;
+
+    // Позиция курсора – сразу после вставленного имени (включая запятую и пробел)
+    const cursorPos = prefix.length + insert.length;
+    cursorPosRef.current = cursorPos;
+
+    setText(newText);
     setMentionQ(null);
+
+    // Возвращаем фокус в текстовое поле
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+    }
   };
 
   // Отправка комментария
@@ -285,35 +310,34 @@ export default function Discussion({
           )}
 
           <div className="cm-input-wrap">
-            {/* Список упоминаний рендерится через портал */}
-            {mentionPopup.visible && filteredCandidates.length > 0 && createPortal(
-              <div
-                className="mention-pop"
-                style={{
-                  position: 'fixed',
-                  left: mentionPopup.x,
-                  top: mentionPopup.y,
-                  zIndex: 10001,
-                }}
-              >
-                {filteredCandidates.slice(0, 6).map((e) => (
-                  <div
-                    key={e.id}
-                    className="mention-item"
-                    onClick={() => pickMention(e)}
-                  >
-                    <span className="avatar xs">
-                      {initials(e.first, e.last)}
-                    </span>
-                    {e.last} {e.first}
-                    <span className="mut sm">
-                      {/* можно добавить отдел, если нужен */}
-                    </span>
-                  </div>
-                ))}
-              </div>,
-              document.body
-            )}
+            {/* Список упоминаний рендерится через портал с динамическим позиционированием */}
+            {mentionPopup.visible && filteredCandidates.length > 0 &&
+              createPortal(
+                <div
+                  className="mention-pop"
+                  style={{
+                    position: 'fixed',
+                    left: mentionPopup.x,
+                    top: mentionPopup.y,
+                    zIndex: 10001,
+                  }}
+                >
+                  {filteredCandidates.slice(0, 6).map((e) => (
+                    <div
+                      key={e.id}
+                      className="mention-item"
+                      onClick={() => pickMention(e)}
+                    >
+                      <span className="avatar xs">
+                        {initials(e.first, e.last)}
+                      </span>
+                      {e.last} {e.first}
+                    </div>
+                  ))}
+                </div>,
+                document.body
+              )
+            }
 
             <textarea
               ref={textareaRef}

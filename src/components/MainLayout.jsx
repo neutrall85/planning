@@ -36,7 +36,6 @@ export default function MainLayout({ store, data, user }) {
     { id: 'gantt', label: 'Диаграмма Ганта', icon: ICONS.gantt },
     { id: 'calendar', label: 'Календарь', icon: ICONS.cal },
     { id: 'projects', label: 'Проекты', icon: ICONS.folder },
-    // Персонал теперь виден всем
     { id: 'staff', label: 'Персонал', icon: ICONS.users },
     ...(canExport(user) || hasRole(user, 'kb_chief', 'head', 'project_lead', 'hr')
       ? [{ id: 'reports', label: 'Отчёты', icon: ICONS.chart }]
@@ -160,7 +159,6 @@ export default function MainLayout({ store, data, user }) {
 
   return (
     <div className="shell">
-      {/* Боковая панель */}
       <aside className="sidebar">
         <div className="logo">
           <div className="logo-mark">АП</div>
@@ -218,7 +216,6 @@ export default function MainLayout({ store, data, user }) {
         </div>
       </aside>
 
-      {/* Основная область */}
       <main className="main">
         <header className="topbar">
           <div>
@@ -256,7 +253,6 @@ export default function MainLayout({ store, data, user }) {
         <div className="content">{renderView()}</div>
       </main>
 
-      {/* Рендеринг модальных окон */}
       {modal && (
         <ModalRenderer
           modal={modal}
@@ -271,7 +267,6 @@ export default function MainLayout({ store, data, user }) {
           openDepts={openDepts}
           openVacation={openVacation}
           openDelegation={openDelegation}
-          toast={(msg, type) => alert(msg)}
         />
       )}
     </div>

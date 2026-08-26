@@ -1,8 +1,8 @@
-// Reports.jsx
 import React, { useState, useMemo, useEffect } from 'react';
 import { TASK_STATUSES, PRIORITIES, PROJECT_STATUSES } from '../utils/constants';
 import { TODAY, fmtDMY, fmtDT } from '../utils/date';
 import { hasRole, computeScope, taskVisible } from '../utils/permissions';
+import { useToast } from '../context/ToastContext';
 import { Ic, ICONS } from './Icons';
 import { useDataHelpers } from '../hooks';
 import { getPrimaryDeptName } from '../utils/helpers';
@@ -15,6 +15,7 @@ const REPORT_TYPES = [
 ];
 
 export default function Reports({ db, ur }) {
+  const { showToast } = useToast();
   const { empName, getTaskSpent, getProjectStats } = useDataHelpers(db);
   const scope = useMemo(() => computeScope(ur, db), [ur, db]);
 
@@ -186,7 +187,7 @@ export default function Reports({ db, ur }) {
 
   const saveFilter = () => {
     if (!filterName.trim()) {
-      alert('Введите название фильтра');
+      showToast('Введите название фильтра', 'warning');
       return;
     }
     const newFilter = {
@@ -198,6 +199,7 @@ export default function Reports({ db, ur }) {
     setSavedFilters(updated);
     localStorage.setItem('savedReportFilters', JSON.stringify(updated));
     setFilterName('');
+    showToast('Фильтр сохранён', 'success');
   };
 
   const loadFilter = (filter) => {
@@ -213,67 +215,11 @@ export default function Reports({ db, ur }) {
 
   const downloadXLSX = () => {
     if (results.length === 0) {
-      alert('Нет данных для выгрузки');
+      showToast('Нет данных для выгрузки', 'warning');
       return;
     }
-    const type = filters.type;
-    let rows = [];
-    if (type === 'tasks') {
-      rows = [['№', 'Задача', 'Проект', 'Исполнители', 'Статус', 'Приоритет', 'План (ч)', 'Факт (ч)', 'Создано', 'Срок исполнения']];
-      results.forEach((t, idx) => {
-        const project = (safeDb.projects || []).find(p => p.id === t.projectId);
-        const statusDef = TASK_STATUSES[t.status] || { label: t.status || 'Неизвестно', color: '#64748b' };
-        const priorityDef = PRIORITIES[t.priority] || { label: t.priority || 'Неизвестно', color: '#64748b' };
-        rows.push([
-          idx + 1, t.title, project?.code || '—',
-          (t.assigneeIds || []).map(id => empName(id)).join(', '),
-          statusDef.label,
-          priorityDef.label,
-          t.plannedHours ?? '—',
-          getTaskSpent(t),
-          fmtDT(t.createdAt),
-          t.deadline ? fmtDMY(t.deadline) : '—'
-        ]);
-      });
-    } else if (type === 'projects') {
-      rows = [['№', 'Код', 'Проект', 'Статус', 'Заказчик', 'Бюджет (ч)', 'План (ч)', 'Факт (ч)', 'Ответственный']];
-      results.forEach((p, idx) => {
-        const stats = getProjectStats(p.id);
-        rows.push([
-          idx + 1, p.code, p.name, PROJECT_STATUSES[p.status] || p.status,
-          p.customer || '—',
-          p.budget ?? '—', stats.plan, stats.fact,
-          empName(p.managerId)
-        ]);
-      });
-    } else if (type === 'employees') {
-      rows = [['№', 'Сотрудник', 'Отдел (основной)', 'План (ч)', 'Факт (ч)', 'Кол-во задач']];
-      results.forEach((e, idx) => {
-        const deptName = getPrimaryDeptName(e, safeDb);
-        const tasks = (safeDb.tasks || []).filter(t => t.assigneeIds?.includes(e.id));
-        const plan = tasks.reduce((s, t) => s + (t.plannedHours || 0), 0);
-        const fact = tasks.reduce((s, t) => s + getTaskSpent(t), 0);
-        rows.push([
-          idx + 1, `${e.last} ${e.first}`, deptName,
-          plan, fact, tasks.length
-        ]);
-      });
-    } else if (type === 'worklog') {
-      rows = [['№', 'Дата', 'Сотрудник', 'Задача', 'Проект', 'Часы', 'Комментарий']];
-      results.forEach((l, idx) => {
-        const project = (safeDb.projects || []).find(p => p.id === l.projectId);
-        const user = (safeDb.employees || []).find(e => e.id === l.userId);
-        rows.push([
-          idx + 1, fmtDMY(l.date),
-          user ? `${user.last} ${user.first}` : '—',
-          l.taskTitle,
-          project?.code || '—',
-          l.hours,
-          l.note || '—'
-        ]);
-      });
-    }
-    alert(`Выгрузка XLSX пока не реализована. Данных: ${results.length} строк`);
+    // Заглушка
+    showToast('Выгрузка XLSX пока не реализована', 'info');
   };
 
   const renderResults = () => {

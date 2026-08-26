@@ -43,7 +43,6 @@ export function buildMockData() {
     { id: "e_otk_head", last: "Отков", first: "Олег", email: "otk.head", pass: "Head2026!", position: "Руководитель отдела контроля качества", departments: [{ deptId: "d_otk", primary: true }], roles: ["head", "executor"], kbIds: [], headDeptIds: ["d_otk"], phone: "+7 900 000-00-00", extension: "201", tab: "2001", notif: { deadlineEmail: true, overdueDigest: false, commentSub: true }, failed: 0, lockUntil: 0, fired: false, passwordHistory: [], photo: null },
     { id: "e_otk_spec", last: "Специалистов", first: "Сергей", email: "otk.spec", pass: "Exec2026!", position: "Специалист по контролю качества", departments: [{ deptId: "d_otk", primary: true }], roles: ["executor"], kbIds: [], headDeptIds: [], phone: "+7 900 000-00-00", extension: "202", tab: "2002", notif: { deadlineEmail: true, overdueDigest: false, commentSub: true }, failed: 0, lockUntil: 0, fired: false, passwordHistory: [], photo: null },
     { id: "isaev", last: "Исаев", first: "Роман", email: "isaev", pass: "Exec2026!", position: "Инженер-аэродинамик", departments: [{ deptId: "d_aero", primary: true }], roles: ["executor"], kbIds: [], headDeptIds: [], phone: "+7 900 000-00-00", extension: "118", tab: "1018", notif: { deadlineEmail: true, overdueDigest: false, commentSub: true }, failed: 0, lockUntil: 0, fired: false, passwordHistory: [], photo: null },
-    // e_romanov закомментирован (дублирует Ивана Конструкторова)
     { id: "e_fedorov", last: "Фёдоров", first: "Игорь", email: "fedorov", pass: "Head2026!", position: "Начальник отдела аэродинамики", departments: [{ deptId: "d_aero", primary: true }], roles: ["head", "executor", "project_lead"], kbIds: [], headDeptIds: ["d_aero", "d_comp"], phone: "+7 900 000-00-00", extension: "107", tab: "1007", notif: { deadlineEmail: true, overdueDigest: false, commentSub: true }, failed: 0, lockUntil: 0, fired: false, passwordHistory: [], photo: null },
     { id: "e_gromov", last: "Громов", first: "Сергей", email: "gromov", pass: "Head2026!", position: "Начальник отдела прочности", departments: [{ deptId: "d_strla", primary: true }], roles: ["head", "executor", "project_lead"], kbIds: [], headDeptIds: ["d_strla"], phone: "+7 900 000-00-00", extension: "108", tab: "1008", notif: { deadlineEmail: true, overdueDigest: false, commentSub: true }, failed: 0, lockUntil: 0, fired: false, passwordHistory: [], photo: null },
     { id: "e_ilina", last: "Ильина", first: "Анна", email: "ilina", pass: "Exec2026!", position: "Ведущий инженер-компоновщик", departments: [{ deptId: "d_comp", primary: true }], roles: ["executor"], kbIds: [], headDeptIds: [], phone: "+7 900 000-00-00", extension: "109", tab: "1009", notif: { deadlineEmail: true, overdueDigest: false, commentSub: true }, failed: 0, lockUntil: 0, fired: false, passwordHistory: [], photo: null },
@@ -470,7 +469,10 @@ export function buildMockData() {
       status, priority, logs: [], comments: [], history,
       creatorId,
       createdAt: extra.createdAt || createdAtStr,
-      delegatedFrom: null, archived: false, archivedAt: null, closedAt: null, ...extra,
+      delegatedFrom: null, archived: false, archivedAt: null, closedAt: null,
+      isSummary: false,
+      parentTaskId: null,
+      ...extra,
     };
   };
 

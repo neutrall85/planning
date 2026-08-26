@@ -1,7 +1,9 @@
+// src/components/modals/TaskModal.jsx
 import React, { useState, useMemo } from 'react';
 import { Modal } from '../Modal';
 import Discussion, { extractMentions } from '../Discussion';
 import { useDataHelpers } from '../../hooks';
+import { useToast } from '../../context/ToastContext';
 import {
   TASK_STATUSES, TASK_STATUS_ORDER, PRIORITIES, DEPENDENCY_TYPES,
 } from '../../utils/constants';
@@ -15,7 +17,6 @@ import {
 import { Ic, ICONS } from '../Icons';
 import Avatar from '../Avatar';
 
-// Вспомогательные функции для генерации дат повторения
 function generateRepeatDates(startDate, deadline, repeatConfig, endDate, maxCount = 100) {
   const { type, interval, days, endType, endValue } = repeatConfig;
   const result = [];
@@ -29,11 +30,6 @@ function generateRepeatDates(startDate, deadline, repeatConfig, endDate, maxCoun
 
   const endDateObj = endType === 'date' ? new Date(endValue) : null;
   const maxCountLimit = endType === 'count' ? parseInt(endValue, 10) : null;
-
-  let diffDays = 0;
-  if (currentDeadline) {
-    diffDays = Math.round((currentDeadline - currentStart) / (1000 * 60 * 60 * 24));
-  }
 
   while (count < maxCount) {
     result.push({
@@ -123,9 +119,18 @@ function generateRepeatDates(startDate, deadline, repeatConfig, endDate, maxCoun
   return result;
 }
 
-export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum, onClose, onSave, onDelete, onHoursReq, toast, patchTask, notify, store }) => {
+export const TaskModal = ({ 
+  db, ur, taskId, initialTab = 'form', parentTaskId,
+  onClose, onSave, onDelete, onHoursReq, patchTask, notify, store,
+  openTask,
+  spent, planSum, 
+}) => {
+  const { showToast } = useToast();
   const { empName, getTaskSpent, vacOverlap, primaryDept } = useDataHelpers(db);
   const existing = taskId ? db.tasks.find((t) => t.id === taskId) : null;
+  const isNew = !existing;
+  const isSubtask = !isNew ? !!existing.parentTaskId : !!parentTaskId;
+  
   const readOnly = !!(existing && existing.archived);
   
   const canEditFields = !readOnly && (existing ? canEditTaskFields(ur, existing, db) : canCreateTask(ur));
@@ -139,13 +144,24 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
   const projs = (scope.all ? db.projects : db.projects.filter((p) => scope.projIds.has(p.id))).filter((p) => p.status === "active" && !p.archived);
   const asOpts = assigneeOptions(ur, db);
   
-  const [f, setF] = useState(existing ? { 
-    ...existing, 
-    comments: existing.comments || [], 
-    files: existing.files || [] 
-  } : {
-    id: "t_" + uid(), title: "", desc: "", projectId: "", assigneeIds: [], priority: "mid",
-    plannedHours: 8, start: TODAY, deadline: iso(addDays(new Date(), 14)), status: "new", logs: [], comments: [], history: [], delegatedFrom: null, archived: false, archivedAt: null, closedAt: null,
+  const initialForm = existing ? { ...existing } : {
+    id: "t_" + uid(),
+    title: "",
+    desc: "",
+    projectId: "",
+    assigneeIds: [],
+    priority: "mid",
+    plannedHours: 8,
+    start: TODAY,
+    deadline: iso(addDays(new Date(), 14)),
+    status: "new",
+    logs: [],
+    comments: [],
+    history: [],
+    delegatedFrom: null,
+    archived: false,
+    archivedAt: null,
+    closedAt: null,
     creatorId: ur.id,
     dependencyId: null,
     dependencyType: 'FS',
@@ -155,7 +171,20 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
     repeatEndType: 'date',
     repeatEndValue: '',
     files: [],
-  });
+    isSummary: false,
+    parentTaskId: null,
+  };
+
+  if (parentTaskId && isNew) {
+    const parent = db.tasks.find(t => t.id === parentTaskId);
+    if (parent) {
+      initialForm.parentTaskId = parentTaskId;
+      initialForm.isSummary = false;
+      initialForm.projectId = parent.projectId || '';
+    }
+  }
+
+  const [f, setF] = useState(initialForm);
   const [logH, setLogH] = useState("");
   const [logNote, setLogNote] = useState("");
   const [logDate, setLogDate] = useState(TODAY);
@@ -191,7 +220,6 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
     }
   };
 
-  // --- Интеграция Discussion ---
   const candidates = useMemo(() => {
     const ids = new Set(
       db.tasks
@@ -234,14 +262,12 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
       )
     );
   };
-  // --- Конец Discussion ---
 
-  // --- Файлы ---
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
     if (file.size > 10 * 1024 * 1024) {
-      toast("Файл слишком большой (максимум 10 МБ)", "err");
+      showToast('Файл слишком большой (максимум 10 МБ)', 'error');
       e.target.value = '';
       return;
     }
@@ -262,23 +288,26 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
         const updatedTask = { ...f, files: updatedFiles };
         patchTask(updatedTask);
       }
-      toast("Файл загружен");
+      showToast('Файл загружен', 'success');
       e.target.value = '';
     };
     reader.readAsDataURL(file);
   };
 
   const handleFileDelete = (fileId) => {
-    if (!window.confirm("Удалить файл?")) return;
+    if (!window.confirm('Удалить файл?')) return;
     const updatedFiles = (f.files || []).filter(file => file.id !== fileId);
     setF(prev => ({ ...prev, files: updatedFiles }));
     if (existing && patchTask) {
       const updatedTask = { ...f, files: updatedFiles };
       patchTask(updatedTask);
     }
-    toast("Файл удалён");
+    showToast('Файл удалён', 'info');
   };
-  // --- Конец файлов ---
+
+  const hasSubtasks = useMemo(() => {
+    return db.tasks.some(t => t.parentTaskId === f.id);
+  }, [db.tasks, f.id]);
 
   const doSave = (newStatus) => {
     const history = [...(f.history || [])];
@@ -334,7 +363,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
     }
     
     const newClosed = statusToSave === "closed" && (!existing || existing.status !== "closed");
-    const taskToSave = {
+    let taskToSave = {
       ...f,
       start: finalStart,
       deadline: finalDeadline,
@@ -345,6 +374,10 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
       creatorId: existing ? existing.creatorId : ur.id,
       files: f.files || [],
     };
+
+    if (hasSubtasks) {
+      taskToSave.isSummary = true;
+    }
 
     delete taskToSave.repeatType;
     delete taskToSave.repeatInterval;
@@ -382,17 +415,32 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
         onSave(taskToSave, !existing);
       }
     } catch (error) {
-      toast(error.message || 'Ошибка сохранения задачи', 'err');
+      showToast(error.message || 'Ошибка сохранения задачи', 'error');
     }
   };
 
   const save = () => {
-    if (!f.title.trim()) return toast("Укажите название задачи", "err");
-    if (!f.projectId) return toast("Задача обязательно назначается в рамках проекта", "err");
-    if (!f.assigneeIds || f.assigneeIds.length === 0) return toast("Выберите хотя бы одного исполнителя", "err");
+    if (!f.title.trim()) {
+      showToast('Укажите название задачи', 'error');
+      return;
+    }
+    if (!f.projectId) {
+      showToast('Задача обязательно назначается в рамках проекта', 'error');
+      return;
+    }
+    if (!f.assigneeIds || f.assigneeIds.length === 0) {
+      showToast('Выберите хотя бы одного исполнителя', 'error');
+      return;
+    }
     if (!isAdminProj) {
-      if (!f.plannedHours || +f.plannedHours <= 0) return toast("Для производственного проекта плановые часы обязательны", "err");
-      if (!f.deadline) return toast("Для производственного проекта срок исполнения обязателен", "err");
+      if (!f.plannedHours || +f.plannedHours <= 0) {
+        showToast('Для производственного проекта плановые часы обязательны', 'error');
+        return;
+      }
+      if (!f.deadline) {
+        showToast('Для производственного проекта срок исполнения обязателен', 'error');
+        return;
+      }
     }
 
     const projForBudget = db.projects.find(p => p.id === f.projectId);
@@ -400,9 +448,9 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
       const currentPlanSum = planSum(projForBudget.id);
       const newTotal = currentPlanSum + (+f.plannedHours || 0);
       if (newTotal > projForBudget.budget) {
-        toast(
+        showToast(
           `Превышение бюджета проекта! Бюджет: ${projForBudget.budget} ч, текущая сумма задач: ${currentPlanSum} ч, запрошено: ${f.plannedHours || 0} ч. Уменьшите плановые часы.`,
-          "err"
+          'error'
         );
         return;
       }
@@ -410,16 +458,20 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
 
     if (f.repeatType !== 'none') {
       if (f.repeatType === 'weekly_days' && (!f.repeatDays || f.repeatDays.length === 0)) {
-        return toast("Выберите хотя бы один день недели", "err");
+        showToast('Выберите хотя бы один день недели', 'error');
+        return;
       }
       if (f.repeatEndType === 'date' && !f.repeatEndValue) {
-        return toast("Укажите дату окончания повторения", "err");
+        showToast('Укажите дату окончания повторения', 'error');
+        return;
       }
       if (f.repeatEndType === 'count' && (!f.repeatEndValue || parseInt(f.repeatEndValue, 10) <= 0)) {
-        return toast("Укажите количество повторений", "err");
+        showToast('Укажите количество повторений', 'error');
+        return;
       }
       if (f.repeatEndType === 'date' && f.repeatEndValue && f.repeatEndValue <= f.start) {
-        return toast("Дата окончания должна быть позже даты начала", "err");
+        showToast('Дата окончания должна быть позже даты начала', 'error');
+        return;
       }
     }
 
@@ -432,14 +484,20 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
 
   const addLog = () => {
     const h = parseFloat(String(logH).replace(",", "."));
-    if (!h || h <= 0) return toast("Введите корректное количество часов", "err");
-    if (f.plannedHours && sp + h > f.plannedHours) return toast(`Нельзя внести больше плановых: доступно ещё ${Math.max(0, f.plannedHours - sp)} ч`, "err");
+    if (!h || h <= 0) {
+      showToast('Введите корректное количество часов', 'error');
+      return;
+    }
+    if (f.plannedHours && sp + h > f.plannedHours) {
+      showToast(`Нельзя внести больше плановых: доступно ещё ${Math.max(0, f.plannedHours - sp)} ч`, 'error');
+      return;
+    }
     const newLogs = [...f.logs, { id: uid(), userId: ur.id, date: logDate, hours: h, note: logNote.trim() }];
     setF((s) => ({ ...s, logs: newLogs }));
     setLogH("");
     setLogNote("");
     setLogDate(TODAY);
-    toast("Часы учтены");
+    showToast('Часы учтены', 'success');
   };
 
   const [showAssigneeSelector, setShowAssigneeSelector] = useState(false);
@@ -448,7 +506,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
   const addAssignee = () => {
     if (!newAssigneeId) return;
     if (f.assigneeIds.includes(newAssigneeId)) {
-      toast("Этот исполнитель уже добавлен", "err");
+      showToast('Этот исполнитель уже добавлен', 'warning');
       return;
     }
     setF(prev => ({ ...prev, assigneeIds: [...prev.assigneeIds, newAssigneeId] }));
@@ -473,211 +531,318 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
     doSave('inwork');
   };
 
+  const subtasks = useMemo(() => {
+    return db.tasks.filter(t => t.parentTaskId === f.id);
+  }, [db, f.id]);
+
+  const parentTask = useMemo(() => {
+    if (!f.parentTaskId) return null;
+    return db.tasks.find(t => t.id === f.parentTaskId);
+  }, [db, f.parentTaskId]);
+
   return (
-    <Modal title={(readOnly ? "Архивная задача — только чтение" : existing ? "Карточка задачи" : "Новая задача")} onClose={onClose} width={720}>
+    <Modal title={(readOnly ? "Архивная задача — только чтение" : existing ? "Карточка задачи" : "Новая задача")} onClose={onClose} width={760}>
       {readOnly && <div className="info-box">Задача в архиве с {fmtDMY(existing.archivedAt)}. Редактирование, изменение статусов и комментирование запрещены.</div>}
       <div className="tabs sm">
-        {[["form", "Данные"], ["time", `Учёт времени (${sp}/${f.plannedHours ?? "—"})`], ...(existing ? [["chat", `Обсуждение (${f.comments.length})`], ["files", `Файлы (${f.files?.length || 0})`], ["hist", "История"]] : [])].map(([id, l]) => 
+        {[
+          ["form", "Данные"],
+          ["time", `Учёт времени (${sp}/${f.plannedHours ?? "—"})`],
+          ...((f.isSummary || hasSubtasks) ? [["subtasks", `Подзадачи (${subtasks.length})`]] : []),
+          ...(existing ? [["chat", `Обсуждение (${f.comments.length})`], ["files", `Файлы (${f.files?.length || 0})`], ["hist", "История"]] : [])
+        ].map(([id, l]) => 
           <button key={id} className={"tab" + (tab === id ? " on" : "")} onClick={() => setTab(id)}>{l}</button>
         )}
       </div>
 
-      {tab === "form" && (<>
-        {vacWarn && <div className="warn-box"><Ic d={ICONS.beach} size={15} /> Один из исполнителей находится в отпуске с {fmtDMY(vacWarn.start)} по {fmtDMY(vacWarn.end)}. Даты пересекаются с периодом задачи.</div>}
-        {remainProj !== null && remainProj - (+f.plannedHours || 0) < 0 && <div className="warn-box">Внимание: задача превысит остаток бюджета проекта ({remainProj} ч). Потребуется утверждение ГД.</div>}
-        {isAdminProj && !readOnly && <div className="info-box">Административный проект: срок исполнения и плановые часы задачи — по желанию.</div>}
-        <div className="form-grid">
-          <label className="lbl">Название *</label><input className="inp" disabled={!canEditFields} value={f.title} onChange={(e) => set("title", e.target.value)} />
-          <label className="lbl">Описание</label><textarea className="inp" rows="2" disabled={!canEditFields} value={f.desc} onChange={(e) => set("desc", e.target.value)} />
-          <label className="lbl">Проект * <span className="mut">(активные)</span></label>
-          {readOnly ? <input className="inp" disabled value={proj ? `${proj.code} — ${proj.name}` : ""} /> : (
-              <select className="inp sel" disabled={!canEditFields} value={f.projectId} onChange={(e) => set("projectId", e.target.value)}>
-                <option value="">— выберите проект —</option>
-                {projs.map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}{p.ptype === "admin" ? " (административный)" : ""}</option>)}
-              </select>
-            )}
-          <label className="lbl">Приоритет *</label>
-          <select className="inp sel" disabled={!canEditFields} value={f.priority} onChange={(e) => set("priority", e.target.value)}>
-            {Object.entries(PRIORITIES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-          </select>
-          
-          <label className="lbl">Исполнители *</label>
-          {readOnly ? (
-            <input className="inp" disabled value={(f.assigneeIds || []).map(id => empName(id)).join(', ')} />
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                {f.assigneeIds.map(id => {
-                  const e = db.employees.find(x => x.id === id);
-                  return e ? (
-                    <span key={id} className="assigned-executor">
-                      <Avatar employee={e} size="xs" />
-                      <span>{e.last} {e.first}</span>
-                      <button type="button" onClick={() => removeAssignee(id)}>×</button>
-                    </span>
-                  ) : null;
-                })}
-                {f.assigneeIds.length === 0 && <span className="mut sm">Нет исполнителей</span>}
+      {tab === "form" && (
+        <>
+          {vacWarn && <div className="warn-box"><Ic d={ICONS.beach} size={15} /> Один из исполнителей находится в отпуске с {fmtDMY(vacWarn.start)} по {fmtDMY(vacWarn.end)}. Даты пересекаются с периодом задачи.</div>}
+          {remainProj !== null && remainProj - (+f.plannedHours || 0) < 0 && <div className="warn-box">Внимание: задача превысит остаток бюджета проекта ({remainProj} ч). Потребуется утверждение ГД.</div>}
+          {isAdminProj && !readOnly && <div className="info-box">Административный проект: срок исполнения и плановые часы задачи — по желанию.</div>}
+
+          <div className="project-info-fields">
+            {/* Название */}
+            <div className="field-row">
+              <label className="field-label">Название *</label>
+              <input className="inp" disabled={!canEditFields} value={f.title} onChange={(e) => set("title", e.target.value)} />
+            </div>
+
+            {/* Суммарная задача */}
+            <div className="field-row">
+              <label className="field-label">Суммарная задача</label>
+              <div className="duo" style={{ flex: 1 }}>
+                <input
+                  type="checkbox"
+                  disabled={!canEditFields || hasSubtasks}
+                  checked={hasSubtasks || f.isSummary}
+                  onChange={(e) => set("isSummary", e.target.checked)}
+                />
+                <span className="mut sm">Отметьте, если эта задача содержит подзадачи</span>
               </div>
-              {canEditFields && (
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <button className="btn ghost sm" onClick={() => setShowAssigneeSelector(!showAssigneeSelector)}>
-                    <Ic d={ICONS.plus} size={13} /> Добавить
+            </div>
+
+            {/* Родительская задача */}
+            {parentTask && (
+              <div className="field-row">
+                <label className="field-label">Родительская задача</label>
+                <div className="duo" style={{ flex: 1 }}>
+                  <input className="inp" disabled value={parentTask.title} />
+                  <button
+                    className="btn ghost sm"
+                    onClick={() => {
+                      onClose();
+                      setTimeout(() => openTask(parentTask.id), 50);
+                    }}
+                  >
+                    <Ic d={ICONS.external} size={14} /> Перейти
                   </button>
-                  {showAssigneeSelector && (
-                    <select className="inp sel sm" style={{ width: '200px' }} value={newAssigneeId} onChange={e => setNewAssigneeId(e.target.value)}>
-                      <option value="">— выберите —</option>
-                      {availableCandidates.map(e => (
-                        <option key={e.id} value={e.id}>{e.last} {e.first} — {primaryDept(e)?.name || ''}</option>
-                      ))}
-                    </select>
-                  )}
-                  {showAssigneeSelector && (
-                    <button className="btn primary sm" onClick={addAssignee} disabled={!newAssigneeId}>Добавить</button>
+                </div>
+              </div>
+            )}
+
+            {/* Описание */}
+            <div className="field-row">
+              <label className="field-label">Описание</label>
+              <textarea className="inp" rows="2" disabled={!canEditFields} value={f.desc} onChange={(e) => set("desc", e.target.value)} />
+            </div>
+
+            {/* Проект */}
+            <div className="field-row">
+              <label className="field-label">Проект * <span className="mut">(активные)</span></label>
+              {readOnly ? (
+                <input className="inp" disabled value={proj ? `${proj.code} — ${proj.name}` : ""} />
+              ) : (
+                <select className="inp sel" disabled={!canEditFields || isSubtask} value={f.projectId} onChange={(e) => set("projectId", e.target.value)} style={{ flex: 1 }}>
+                  <option value="">— выберите проект —</option>
+                  {projs.map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}{p.ptype === "admin" ? " (административный)" : ""}</option>)}
+                </select>
+              )}
+            </div>
+
+            {/* Приоритет */}
+            <div className="field-row">
+              <label className="field-label">Приоритет *</label>
+              <select className="inp sel" disabled={!canEditFields} value={f.priority} onChange={(e) => set("priority", e.target.value)} style={{ flex: 1 }}>
+                {Object.entries(PRIORITIES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+              </select>
+            </div>
+
+            {/* Исполнители */}
+            <div className="field-row" style={{ alignItems: 'flex-start' }}>
+              <label className="field-label">Исполнители *</label>
+              {readOnly ? (
+                <input className="inp" disabled value={(f.assigneeIds || []).map(id => empName(id)).join(', ')} />
+              ) : (
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {f.assigneeIds.map(id => {
+                      const e = db.employees.find(x => x.id === id);
+                      return e ? (
+                        <span key={id} className="assigned-executor">
+                          <Avatar employee={e} size="xs" />
+                          <span>{e.last} {e.first}</span>
+                          <button type="button" onClick={() => removeAssignee(id)}>×</button>
+                        </span>
+                      ) : null;
+                    })}
+                    {f.assigneeIds.length === 0 && <span className="mut sm">Нет исполнителей</span>}
+                  </div>
+                  {canEditFields && (
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <button className="btn ghost sm" onClick={() => setShowAssigneeSelector(!showAssigneeSelector)}>
+                        <Ic d={ICONS.plus} size={13} /> Добавить
+                      </button>
+                      {showAssigneeSelector && (
+                        <select className="inp sel sm" style={{ width: '200px' }} value={newAssigneeId} onChange={e => setNewAssigneeId(e.target.value)}>
+                          <option value="">— выберите —</option>
+                          {availableCandidates.map(e => (
+                            <option key={e.id} value={e.id}>{e.last} {e.first} — {primaryDept(e)?.name || ''}</option>
+                          ))}
+                        </select>
+                      )}
+                      {showAssigneeSelector && (
+                        <button className="btn primary sm" onClick={addAssignee} disabled={!newAssigneeId}>Добавить</button>
+                      )}
+                    </div>
                   )}
                 </div>
               )}
             </div>
-          )}
 
-          <label className="lbl">Начало работы</label><input className="inp" type="date" disabled={!canEditFields} value={f.start} onChange={(e) => set("start", e.target.value)} />
-          <label className="lbl">Срок исполнения {!isAdminProj && "*"}</label><input className="inp" type="date" disabled={!canEditFields} value={f.deadline || ""} onChange={(e) => set("deadline", e.target.value)} />
-          <label className="lbl">Плановые часы {!isAdminProj && "*"}</label>
-          <div className="duo">
-            <input 
-              className="inp" 
-              type="number" 
-              min="0.5" 
-              step="0.5" 
-              disabled={!canEditPlannedHours} 
-              value={f.plannedHours ?? ""} 
-              onChange={(e) => set("plannedHours", e.target.value)} 
-            />
-            {!readOnly && existing && !canEditPlannedHours && (
-              <button 
-                className="btn ghost sm" 
-                type="button" 
-                onClick={() => onHoursReq("task", existing.id)}
-              >
-                <Ic d={ICONS.clock} size={13} /> Запросить изменение часов
-              </button>
-            )}
-            {!existing && isAdminProj && (
-              <span className="duo-note">опционально</span>
-            )}
-          </div>
-          <label className="lbl">Статус *</label>
-          <select className="inp sel" disabled={!canChangeStatus && !isAuthor && !isExec} value={f.status} onChange={(e) => set("status", e.target.value)}>
-            {statusOptions.map((s) => <option key={s} value={s}>{TASK_STATUSES[s].label}</option>)}
-          </select>
-          {isExec && !canEditFields && !readOnly && <div className="mut sm" style={{ gridColumn: "1 / -1" }}>Исполнитель может переводить задачу в «В работе» и «На проверке»; закрытие и отмена — у ответственного/руководителя.</div>}
-          
-          <label className="lbl">Зависит от задачи</label>
-          <select 
-            className="inp sel" 
-            disabled={!canEditFields} 
-            value={f.dependencyId || ''} 
-            onChange={(e) => set("dependencyId", e.target.value || null)}
-          >
-            <option value="">— нет зависимости —</option>
-            {db.tasks
-              .filter(t => t.id !== f.id && t.projectId === f.projectId && t.status !== 'closed' && t.status !== 'cancelled')
-              .map(t => (
-                <option key={t.id} value={t.id}>{t.title}</option>
-              ))
-            }
-          </select>
-          
-          <label className="lbl">Тип зависимости</label>
-          <select 
-            className="inp sel" 
-            disabled={!canEditFields || !f.dependencyId} 
-            value={f.dependencyType || 'FS'} 
-            onChange={(e) => set("dependencyType", e.target.value)}
-          >
-            {Object.entries(DEPENDENCY_TYPES).map(([key, val]) => (
-              <option key={key} value={key}>{val.label} — {val.desc}</option>
-            ))}
-          </select>
-        </div>
-
-        {!existing && !readOnly && (
-          <div className="tm-block" style={{ marginTop: '12px' }}>
-            <div className="rep-panel-title">Повторение</div>
-            <div className="form-grid" style={{ gridTemplateColumns: '150px 1fr' }}>
-              <label className="lbl">Тип повторения</label>
-              <select className="inp sel" value={f.repeatType} onChange={(e) => set("repeatType", e.target.value)}>
-                <option value="none">Нет</option>
-                <option value="daily">Ежедневно</option>
-                <option value="weekly_days">Еженедельно по дням</option>
-                <option value="workdays">Каждый рабочий день</option>
-                <option value="monthly">Ежемесячно</option>
-                <option value="yearly">Ежегодно</option>
-                <option value="custom">Произвольно (через N дней)</option>
-              </select>
-
-              {f.repeatType === 'custom' && (
-                <>
-                  <label className="lbl">Интервал (дней)</label>
-                  <input className="inp" type="number" min="1" value={f.repeatInterval} onChange={(e) => set("repeatInterval", e.target.value)} />
-                </>
-              )}
-              {f.repeatType === 'weekly_days' && (
-                <>
-                  <label className="lbl">Дни недели</label>
-                  <div className="duo" style={{ flexWrap: 'wrap', gap: '6px' }}>
-                    {['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map((day, idx) => {
-                      const dayNum = idx + 1;
-                      const checked = f.repeatDays.includes(String(dayNum));
-                      return (
-                        <label key={dayNum} className="dept-pick" style={{ margin: 0 }}>
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => {
-                              const newDays = checked
-                                ? f.repeatDays.filter(d => d !== String(dayNum))
-                                : [...f.repeatDays, String(dayNum)];
-                              set("repeatDays", newDays);
-                            }}
-                          />
-                          {day}
-                        </label>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
-              {f.repeatType !== 'none' && (
-                <>
-                  <label className="lbl">Окончание</label>
-                  <div className="duo" style={{ display: 'flex', gap: '8px' }}>
-                    <select className="inp sel" value={f.repeatEndType} onChange={(e) => set("repeatEndType", e.target.value)} style={{ width: '120px' }}>
-                      <option value="date">По дате</option>
-                      <option value="count">По количеству</option>
-                    </select>
-                    {f.repeatEndType === 'date' ? (
-                      <input className="inp" type="date" value={f.repeatEndValue} onChange={(e) => set("repeatEndValue", e.target.value)} style={{ flex: 1 }} />
-                    ) : (
-                      <input className="inp" type="number" min="1" value={f.repeatEndValue} onChange={(e) => set("repeatEndValue", e.target.value)} placeholder="кол-во" style={{ width: '100px' }} />
-                    )}
-                    <span className="mut sm" style={{ alignSelf: 'center' }}>всего {f.repeatEndType === 'count' ? 'задач' : ''}</span>
-                  </div>
-                </>
-              )}
+            {/* Парная строка: Начало работы и Срок исполнения */}
+            <div className="pj-pair-row">
+              <div className="pj-pair-item">
+                <label className="pj-pair-label">Начало работы</label>
+                <input className="inp pj-pair-input" type="date" disabled={!canEditFields} value={f.start} onChange={(e) => set("start", e.target.value)} />
+              </div>
+              <div className="pj-pair-item">
+                <label className="pj-pair-label">Срок исполнения {!isAdminProj && "*"}</label>
+                <input className="inp pj-pair-input" type="date" disabled={!canEditFields} value={f.deadline || ""} onChange={(e) => set("deadline", e.target.value)} />
+              </div>
             </div>
-          </div>
-        )}
 
-        {remainProj !== null && <div className="budget-hint">Остаток бюджета проекта «{proj.code}»: <b>{remainProj} ч</b> из {proj.budget} ч</div>}
-        
-        {isAuthor && isReview && !readOnly && (
-          <div style={{ marginTop: 16, display: 'flex', gap: 10 }}>
-            <button className="btn primary" onClick={handleAccept}><Ic d={ICONS.check} size={15} /> Принять (закрыть)</button>
-            <button className="btn ghost" onClick={handleRework}><Ic d={ICONS.refresh} size={15} /> Отправить на доработку</button>
+            {/* Парная строка: Плановые часы и Статус */}
+            <div className="pj-pair-row">
+              <div className="pj-pair-item">
+                <label className="pj-pair-label">Плановые часы {!isAdminProj && "*"}</label>
+                <div style={{ display: 'flex', gap: '8px', flex: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+                  {f.isSummary ? (
+                    <input className="inp" disabled value={f.plannedHours ?? 0} style={{ flex: 1, minWidth: '80px' }} />
+                  ) : (
+                    <input 
+                      className="inp" 
+                      type="number" 
+                      min="0.5" 
+                      step="0.5" 
+                      disabled={!canEditPlannedHours} 
+                      value={f.plannedHours ?? ""} 
+                      onChange={(e) => set("plannedHours", e.target.value)} 
+                      style={{ flex: 1, minWidth: '80px' }}
+                    />
+                  )}
+                  {!readOnly && existing && !canEditPlannedHours && !f.isSummary && (
+                    <button 
+                      className="btn ghost sm" 
+                      type="button" 
+                      onClick={() => onHoursReq("task", existing.id)}
+                      style={{ whiteSpace: 'nowrap' }}
+                    >
+                      <Ic d={ICONS.clock} size={13} /> Запросить изменение
+                    </button>
+                  )}
+                  {!existing && isAdminProj && (
+                    <span className="duo-note">опционально</span>
+                  )}
+                  {f.isSummary && (
+                    <span className="duo-note">(сумма подзадач)</span>
+                  )}
+                </div>
+              </div>
+              <div className="pj-pair-item">
+                <label className="pj-pair-label">Статус *</label>
+                <select className="inp sel pj-pair-input" disabled={!canChangeStatus && !isAuthor && !isExec} value={f.status} onChange={(e) => set("status", e.target.value)}>
+                  {statusOptions.map((s) => <option key={s} value={s}>{TASK_STATUSES[s].label}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {isExec && !canEditFields && !readOnly && (
+              <div className="info-box">Исполнитель может переводить задачу в «В работе» и «На проверке»; закрытие и отмена — у ответственного/руководителя.</div>
+            )}
+
+            <div className="field-row">
+                <label className="field-label">Зависит от задачи</label>
+                <select 
+                  className="inp sel" 
+                  disabled={!canEditFields} 
+                  value={f.dependencyId || ''} 
+                  onChange={(e) => set("dependencyId", e.target.value || null)}
+                >
+                  <option value="">— нет зависимости —</option>
+                  {db.tasks
+                    .filter(t => t.id !== f.id && t.projectId === f.projectId && t.status !== 'closed' && t.status !== 'cancelled')
+                    .map(t => (
+                      <option key={t.id} value={t.id}>{t.title}</option>
+                    ))
+                  }
+                </select>
+            </div>
+            <div className="field-row">
+              <label className="field-label">Тип зависимости</label>
+              <select 
+                className="inp sel" 
+                disabled={!canEditFields || !f.dependencyId} 
+                value={f.dependencyType || 'FS'} 
+                onChange={(e) => set("dependencyType", e.target.value)}
+              >
+                {Object.entries(DEPENDENCY_TYPES).map(([key, val]) => (
+                  <option key={key} value={key}>{val.label} — {val.desc}</option>
+                ))}
+              </select>
+            </div>
+
+            {remainProj !== null && <div className="budget-hint">Остаток бюджета проекта «{proj.code}»: <b>{remainProj} ч</b> из {proj.budget} ч</div>}
+            
+            {isAuthor && isReview && !readOnly && (
+              <div style={{ marginTop: 16, display: 'flex', gap: 10 }}>
+                <button className="btn primary" onClick={handleAccept}><Ic d={ICONS.check} size={15} /> Принять (закрыть)</button>
+                <button className="btn ghost" onClick={handleRework}><Ic d={ICONS.refresh} size={15} /> Отправить на доработку</button>
+              </div>
+            )}
           </div>
-        )}
-      </>)}
+
+          {/* Блок Повторение (только для новых задач) */}
+          {!existing && !readOnly && (
+            <div className="tm-block" style={{ marginTop: '12px' }}>
+              <div className="rep-panel-title">Повторение</div>
+              <div className="project-info-fields" style={{ gap: '8px' }}>
+                <div className="field-row">
+                  <label className="field-label">Тип повторения</label>
+                  <select className="inp sel" value={f.repeatType} onChange={(e) => set("repeatType", e.target.value)} style={{ flex: 1 }}>
+                    <option value="none">Нет</option>
+                    <option value="daily">Ежедневно</option>
+                    <option value="weekly_days">Еженедельно по дням</option>
+                    <option value="workdays">Каждый рабочий день</option>
+                    <option value="monthly">Ежемесячно</option>
+                    <option value="yearly">Ежегодно</option>
+                    <option value="custom">Произвольно (через N дней)</option>
+                  </select>
+                </div>
+
+                {f.repeatType === 'custom' && (
+                  <div className="field-row">
+                    <label className="field-label">Интервал (дней)</label>
+                    <input className="inp" type="number" min="1" value={f.repeatInterval} onChange={(e) => set("repeatInterval", e.target.value)} style={{ flex: 1 }} />
+                  </div>
+                )}
+                {f.repeatType === 'weekly_days' && (
+                  <div className="field-row">
+                    <label className="field-label">Дни недели</label>
+                    <div className="duo" style={{ flex: 1, flexWrap: 'wrap', gap: '6px' }}>
+                      {['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map((day, idx) => {
+                        const dayNum = idx + 1;
+                        const checked = f.repeatDays.includes(String(dayNum));
+                        return (
+                          <label key={dayNum} className="dept-pick" style={{ margin: 0 }}>
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => {
+                                const newDays = checked
+                                  ? f.repeatDays.filter(d => d !== String(dayNum))
+                                  : [...f.repeatDays, String(dayNum)];
+                                set("repeatDays", newDays);
+                              }}
+                            />
+                            {day}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                {f.repeatType !== 'none' && (
+                  <div className="field-row">
+                    <label className="field-label">Окончание</label>
+                    <div className="duo" style={{ flex: 1, display: 'flex', gap: '8px' }}>
+                      <select className="inp sel" value={f.repeatEndType} onChange={(e) => set("repeatEndType", e.target.value)} style={{ width: '120px' }}>
+                        <option value="date">По дате</option>
+                        <option value="count">По количеству</option>
+                      </select>
+                      {f.repeatEndType === 'date' ? (
+                        <input className="inp" type="date" value={f.repeatEndValue} onChange={(e) => set("repeatEndValue", e.target.value)} style={{ flex: 1 }} />
+                      ) : (
+                        <input className="inp" type="number" min="1" value={f.repeatEndValue} onChange={(e) => set("repeatEndValue", e.target.value)} placeholder="кол-во" style={{ width: '100px' }} />
+                      )}
+                      <span className="mut sm" style={{ alignSelf: 'center' }}>всего {f.repeatEndType === 'count' ? 'задач' : ''}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </>
+      )}
 
       {tab === "time" && (
         <div className="tm-block" style={{ marginTop: 0 }}>
@@ -735,6 +900,66 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
         </div>
       )}
 
+      {tab === "subtasks" && (f.isSummary || hasSubtasks) && (
+        <div className="tm-block" style={{ marginTop: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <div className="rep-panel-title">Подзадачи</div>
+            <button
+              className="btn primary sm"
+              onClick={() => {
+                onClose();
+                setTimeout(() => openTask(null, 'form', f.id), 50);
+              }}
+              disabled={f.archived}
+            >
+              <Ic d={ICONS.plus} size={14} /> Создать подзадачу
+            </button>
+          </div>
+          {subtasks.length === 0 ? (
+            <div className="mut sm">Нет подзадач</div>
+          ) : (
+            <div style={{ width: '100%', overflowX: 'auto' }}>
+              <table className="tbl" style={{ minWidth: 500, fontSize: 13 }}>
+                <thead>
+                  <tr>
+                    <th>Название</th>
+                    <th>Статус</th>
+                    <th>Исполнители</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {subtasks.map(sub => (
+                    <tr key={sub.id}>
+                      <td><b>{sub.title}</b></td>
+                      <td><span className="st-chip" style={{ background: TASK_STATUSES[sub.status]?.color + '22', color: TASK_STATUSES[sub.status]?.color }}>{TASK_STATUSES[sub.status]?.label}</span></td>
+                      <td>{(sub.assigneeIds || []).map(id => empName(id)).join(', ') || '—'}</td>
+                      <td>
+                        <button 
+                          className="btn ghost sm" 
+                          onClick={() => {
+                            onClose();
+                            setTimeout(() => {
+                              if (typeof openTask === 'function') {
+                                openTask(sub.id);
+                              } else {
+                                console.error('openTask не функция');
+                              }
+                            }, 50);
+                          }}
+                        >
+                          Открыть
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
       {tab === "chat" && existing && (
         <Discussion
           comments={f.comments || []}
@@ -744,7 +969,7 @@ export const TaskModal = ({ db, ur, taskId, initialTab = 'form', spent, planSum,
           onCommentAdded={handleCommentAdded}
           readOnly={readOnly}
           canComment={!readOnly}
-          toast={toast}
+          toast={showToast}
           employees={db.employees}
         />
       )}

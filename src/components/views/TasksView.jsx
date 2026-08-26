@@ -4,12 +4,14 @@ import TasksList from './TasksList';
 import { TASK_STATUSES, TASK_STATUS_ORDER, PRIORITIES } from '../../utils/constants';
 import { fmtDMY, daysDiff, TODAY, isTaskActive } from '../../utils/date';
 import { taskVisible, computeScope, hasRole, canChangeTaskStatus } from '../../utils/permissions';
+import { useToast } from '../../context/ToastContext';
 import { ICONS, Ic } from '../Icons';
 import { useDataHelpers } from '../../hooks';
 import Avatar from '../Avatar';
 import { getProjectColor } from '../../utils/projectHelpers';
 
 export default function TasksView({ db, ur, openTask, store }) {
+  const { showToast } = useToast();
   const { getTaskSpent } = useDataHelpers(db);
   const scope = useMemo(() => computeScope(ur, db), [ur, db]);
   const canSeeAll = hasRole(ur, 'admin', 'director', 'economist', 'kb_chief', 'head', 'project_lead', 'project_manager');
@@ -98,7 +100,7 @@ export default function TasksView({ db, ur, openTask, store }) {
     const task = db.tasks.find(t => t.id === taskId);
     if (!task) return;
     if (!canChangeTaskStatus(ur, task, newStatus, db)) {
-      alert('У вас нет прав на изменение статуса этой задачи.');
+      showToast('У вас нет прав на изменение статуса этой задачи.', 'error');
       return;
     }
     const isClosing = (newStatus === 'closed' || newStatus === 'cancelled') && task.status !== newStatus;
@@ -110,8 +112,6 @@ export default function TasksView({ db, ur, openTask, store }) {
       archivedAt: isClosing ? TODAY : task.archivedAt,
       history: [...task.history, { ts: Date.now(), who: ur.id, text: `Статус → ${TASK_STATUSES[newStatus].label}` }]
     };
-    
-    // ИСПРАВЛЕНИЕ: убрано дублирование addAudit, так как store.upsertTask сам добавляет запись в журнал при изменении статуса
     store.upsertTask(updatedTask);
   };
 

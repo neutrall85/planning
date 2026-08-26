@@ -27,7 +27,6 @@ export default function ModalRenderer({
   openDepts,
   openVacation,
   openDelegation,
-  toast,
 }) {
   const { empName } = useDataHelpers(db);
 
@@ -41,6 +40,7 @@ export default function ModalRenderer({
           ur={ur}
           taskId={modal.taskId}
           initialTab={modal.initialTab || 'form'}
+          parentTaskId={modal.parentTaskId}
           onClose={onClose}
           onSave={(task, isNew) => {
             const old = db.tasks.find(x => x.id === task.id);
@@ -72,12 +72,12 @@ export default function ModalRenderer({
             onClose();
           }}
           onHoursReq={openHoursReq}
-          toast={toast}
           patchTask={store.upsertTask.bind(store)}
           notify={(userId, text, target) => store.addNotification(userId, text, target)}
           store={store}
           spent={(task) => task.logs.reduce((s, l) => s + l.hours, 0)}
           planSum={(projectId) => db.tasks.filter(t => t.projectId === projectId).reduce((s, t) => s + (t.plannedHours || 0), 0)}
+          openTask={openTask}
         />
       );
 
@@ -109,7 +109,6 @@ export default function ModalRenderer({
             store.addAudit('Удаление проекта', { name: p.name }, 'project', p.id);
             onClose();
           }}
-          toast={toast}
           store={store}
           openTask={openTask}
         />
@@ -128,7 +127,6 @@ export default function ModalRenderer({
             const target = modal.kind === 'task' ? db.tasks.find(t => t.id === modal.targetId) : db.projects.find(p => p.id === modal.targetId);
             const targetTitle = target ? (modal.kind === 'task' ? target.title : target.name) : '';
             
-            // Уведомляем всех директоров
             const directors = db.employees.filter(e => e.roles.includes('director') && !e.fired);
             directors.forEach(d => {
               store.addNotification(
@@ -138,7 +136,6 @@ export default function ModalRenderer({
               );
             });
             
-            // Уведомляем автора запроса
             store.addNotification(
               ur.id,
               `Ваш запрос на изменение часов по ${modal.kind === 'task' ? 'задаче' : 'проекту'} "${targetTitle}" отправлен на рассмотрение ГД.`,
@@ -158,7 +155,6 @@ export default function ModalRenderer({
           setDb={(fn) => { store._data = fn(store._data); store._notify(); }}
           empId={modal.empId}
           onClose={onClose}
-          toast={toast}
           audit={store.addAudit.bind(store)}
         />
       );
@@ -170,7 +166,6 @@ export default function ModalRenderer({
           setDb={(fn) => { store._data = fn(store._data); store._notify(); }}
           empId={modal.empId}
           onClose={onClose}
-          toast={toast}
           audit={store.addAudit.bind(store)}
         />
       );
@@ -211,7 +206,6 @@ export default function ModalRenderer({
         <VacNowModal
           db={db}
           onClose={onClose}
-          toast={toast}
         />
       );
 

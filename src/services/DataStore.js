@@ -72,6 +72,47 @@ export default class DataStore {
     }
   }
 
+  // === Рекурсивный подсчёт плановых часов для суммарной задачи ===
+  _calcSummaryHours(taskId, visited = new Set()) {
+    if (visited.has(taskId)) return 0; // защита от циклов
+    visited.add(taskId);
+
+    const task = this._data.tasks.find(t => t.id === taskId);
+    if (!task) return 0;
+    if (!task.isSummary) return task.plannedHours || 0;
+
+    const children = this._data.tasks.filter(t => t.parentTaskId === taskId && !t.archived);
+    let sum = 0;
+    for (const child of children) {
+      sum += this._calcSummaryHours(child.id, visited);
+    }
+    return sum;
+  }
+
+  // === Пересчёт часов для задачи и всех её родителей ===
+  _recalcSummaryHoursChain(taskId) {
+    let current = this._data.tasks.find(t => t.id === taskId);
+    while (current) {
+      if (current.isSummary) {
+        const newHours = this._calcSummaryHours(current.id);
+        // Обновляем plannedHours только если изменилось
+        if (current.plannedHours !== newHours) {
+          current.plannedHours = newHours;
+          const idx = this._data.tasks.findIndex(t => t.id === current.id);
+          if (idx !== -1) {
+            this._data.tasks[idx] = { ...current };
+          }
+        }
+      }
+      // Поднимаемся к родителю
+      if (current.parentTaskId) {
+        current = this._data.tasks.find(t => t.id === current.parentTaskId);
+      } else {
+        break;
+      }
+    }
+  }
+
   // === ЗАДАЧИ (с проверкой бюджета) ===
   upsertTask(task) {
     const idx = this._data.tasks.findIndex(t => t.id === task.id);
@@ -92,11 +133,25 @@ export default class DataStore {
       }
     }
 
+    // Если это новая задача и указан родитель
+    if (idx === -1 && task.parentTaskId) {
+        const parent = this._data.tasks.find(t => t.id === task.parentTaskId);
+        if (parent) {
+            if (!task.projectId) task.projectId = parent.projectId;
+        } else {
+            task.parentTaskId = null;
+        }
+    }
+
     if (idx >= 0) {
       const old = this._data.tasks[idx];
       const changes = [];
       if (old.title !== task.title) changes.push(`Название: "${old.title}" → "${task.title}"`);
-      if (old.plannedHours !== task.plannedHours) changes.push(`Плановые часы: ${old.plannedHours ?? '—'} → ${task.plannedHours ?? '—'}`);
+      
+      // Для суммарных задач plannedHours вычисляется автоматически, не сравниваем
+      if (!task.isSummary && old.plannedHours !== task.plannedHours) {
+        changes.push(`Плановые часы: ${old.plannedHours ?? '—'} → ${task.plannedHours ?? '—'}`);
+      }
       if (JSON.stringify(old.assigneeIds) !== JSON.stringify(task.assigneeIds)) {
         changes.push(`Исполнители: ${old.assigneeIds.map(id => this.empName(id)).join(', ')} → ${task.assigneeIds.map(id => this.empName(id)).join(', ')}`);
       }
@@ -139,7 +194,20 @@ export default class DataStore {
         }
       });
     }
+
     this._data = { ...this._data, tasks };
+    
+    // Пересчёт часов для родительских суммарных задач
+    const taskId = task.id;
+    if (task.parentTaskId) {
+      this._recalcSummaryHoursChain(task.parentTaskId);
+    }
+    // Если у задачи изменился флаг isSummary или parentTaskId, пересчитываем её саму и её родителей
+    // Для новой задачи – пересчёт уже сделан выше для родителей, но если isSummary=true, нужно посчитать её собственные часы
+    if (task.isSummary) {
+      this._recalcSummaryHoursChain(taskId);
+    }
+
     this._notify();
     this._archiveOldTasks(3);
   }
@@ -149,7 +217,24 @@ export default class DataStore {
     if (task) {
       this.addAudit('Удаление задачи', task.title);
     }
+
+    const parentId = task?.parentTaskId;
+
+    // Если удаляемая задача была родительской – сбросим parentTaskId у всех её подзадач
+    this._data.tasks = this._data.tasks.map(t => {
+      if (t.parentTaskId === id) {
+        return { ...t, parentTaskId: null };
+      }
+      return t;
+    });
+
     this._data = { ...this._data, tasks: this._data.tasks.filter(t => t.id !== id) };
+    
+    // Пересчёт часов для родительской суммарной задачи
+    if (parentId) {
+      this._recalcSummaryHoursChain(parentId);
+    }
+
     this._notify();
   }
 

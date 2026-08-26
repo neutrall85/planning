@@ -1,8 +1,8 @@
-// Cabinet.jsx
 import React, { useState, useMemo, useRef } from 'react';
 import { DOMAIN, TASK_STATUSES, TASK_STATUS_ORDER, VACATION_TYPES } from '../utils/constants';
 import { TODAY, fmtDMY, fmtD, iso, addDays, initials, isTaskActive } from '../utils/date';
 import { useDataHelpers } from '../hooks';
+import { useToast } from '../context/ToastContext';
 import { Ic, ICONS } from './Icons';
 import { getPrimaryDeptName } from '../utils/helpers';
 import { Modal } from './Modal';
@@ -17,8 +17,8 @@ function downloadCSV(name, rows) {
   setTimeout(() => URL.revokeObjectURL(a.href), 500);
 }
 
-// ---- Модалка смены пароля ----
-const PasswordChangeModal = ({ user, store, onClose, toast }) => {
+const PasswordChangeModal = ({ user, store, onClose }) => {
+  const { showToast } = useToast();
   const [oldPass, setOldPass] = useState('');
   const [newPass, setNewPass] = useState('');
   const [confirmPass, setConfirmPass] = useState('');
@@ -26,35 +26,30 @@ const PasswordChangeModal = ({ user, store, onClose, toast }) => {
 
   const handleSubmit = () => {
     setError('');
-    // 1. Проверка старого пароля
     if (user.pass !== oldPass) {
       setError('Неверный старый пароль');
       return;
     }
-    // 2. Сложность нового пароля
     if (newPass.length < 8 || !/[A-ZА-ЯЁ]/.test(newPass) || !/[a-zа-яё]/.test(newPass) || !/\d/.test(newPass) || !/[^A-Za-zА-Яа-яЁё0-9]/.test(newPass)) {
       setError('Пароль должен содержать минимум 8 символов, заглавные и строчные буквы, цифру и спецсимвол');
       return;
     }
-    // 3. Совпадение подтверждения
     if (newPass !== confirmPass) {
       setError('Пароли не совпадают');
       return;
     }
-    // 4. Проверка истории (последние 4 пароля)
     const history = user.passwordHistory || [];
     if (history.some(p => p === newPass)) {
       setError('Этот пароль уже использовался ранее. Выберите другой.');
       return;
     }
-    // 5. Обновление
     const updated = {
       ...user,
       pass: newPass,
       passwordHistory: [...history.slice(-4), newPass],
     };
     store.upsertEmployee(updated);
-    toast('Пароль успешно изменён');
+    showToast('Пароль успешно изменён', 'success');
     onClose();
   };
 
@@ -78,15 +73,14 @@ const PasswordChangeModal = ({ user, store, onClose, toast }) => {
   );
 };
 
-// ---- Основной компонент Cabinet ----
 export default function Cabinet({ store, data, user, openTask, openVacation, openDelegation }) {
+  const { showToast } = useToast();
   const { empName, getEmployeeLoad } = useDataHelpers(data);
   const [tab, setTab] = useState('overview');
 
   const [expFrom, setExpFrom] = useState('');
   const [expTo, setExpTo] = useState('');
 
-  // ---- Состояния для редактирования профиля ----
   const [editMode, setEditMode] = useState(false);
   const [phone, setPhone] = useState(user.phone || '');
   const [extension, setExtension] = useState(user.extension || '');
@@ -112,8 +106,14 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
   }, [myTasks]);
 
   const exportMyReport = () => {
-    if (!expFrom || !expTo) return alert('Выберите даты начала и окончания периода');
-    if (expFrom > expTo) return alert('Дата начала не может быть позже даты окончания');
+    if (!expFrom || !expTo) {
+      showToast('Выберите даты начала и окончания периода', 'warning');
+      return;
+    }
+    if (expFrom > expTo) {
+      showToast('Дата начала не может быть позже даты окончания', 'error');
+      return;
+    }
 
     const allLogs = [];
     myTasks.forEach(t => {
@@ -130,13 +130,16 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
       });
     });
 
-    if (!allLogs.length) return alert('За выбранный период нет учтенных часов');
+    if (!allLogs.length) {
+      showToast('За выбранный период нет учтенных часов', 'warning');
+      return;
+    }
 
     const rows = [['Проект', 'Задача', 'Дата', 'Часы']];
     allLogs.forEach(l => rows.push([l.project, l.task, fmtDMY(l.date), l.hours]));
     
     downloadCSV(`отчет_${user.last}_${expFrom}_${expTo}`, rows);
-    alert('Отчёт выгружен!');
+    showToast('Отчёт выгружен!', 'success');
   };
 
   const tabs = [
@@ -146,10 +149,9 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
     ['profile', 'Профиль и уведомления']
   ];
 
-  // ---- Функция сохранения изменений профиля ----
   const handleSaveProfile = () => {
     if (!extension.trim()) {
-      alert('Внутренний номер телефона не может быть пустым');
+      showToast('Внутренний номер телефона не может быть пустым', 'error');
       return;
     }
     const updated = {
@@ -159,10 +161,9 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
     };
     store.upsertEmployee(updated);
     setEditMode(false);
-    alert('Данные обновлены');
+    showToast('Данные обновлены', 'success');
   };
 
-  // ---- Загрузка фото ----
   const fileInputRef = useRef(null);
   const handlePhotoUpload = (e) => {
     const file = e.target.files?.[0];
@@ -172,7 +173,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
       const photoData = ev.target.result;
       const updated = { ...user, photo: photoData };
       store.upsertEmployee(updated);
-      alert('Фото загружено');
+      showToast('Фото загружено', 'success');
     };
     reader.readAsDataURL(file);
   };
@@ -180,6 +181,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
     if (user.photo && window.confirm('Удалить фото?')) {
       const updated = { ...user, photo: null };
       store.upsertEmployee(updated);
+      showToast('Фото удалено', 'info');
     }
   };
 
@@ -193,7 +195,6 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
 
       {tab === 'overview' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          {/* 1. Затраченные часы */}
           <div className="rep-panel">
             <div className="rep-panel-title">Затраченные часы по задачам (последние 20 дней)</div>
             <div className="toolbar" style={{ marginBottom: 12, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
@@ -242,7 +243,6 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
             </div>
           </div>
 
-          {/* 2. Мои задачи по статусам */}
           <div className="rep-panel">
             <div className="rep-panel-title">Мои задачи по статусам</div>
             {TASK_STATUS_ORDER.map(st => {
@@ -268,7 +268,6 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
             {myTasks.length === 0 && <div className="mut">Задач пока нет</div>}
           </div>
 
-          {/* 3. Мои проекты */}
           <div className="rep-panel">
             <div className="rep-panel-title">Мои проекты</div>
             {myProjects.map(p => (
@@ -398,7 +397,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
                       onChange={e => setExtension(e.target.value)}
                       onBlur={() => {
                         if (!extension.trim()) {
-                          alert('Внутренний номер телефона обязателен');
+                          showToast('Внутренний номер телефона обязателен', 'error');
                         }
                       }}
                     />
@@ -412,8 +411,6 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
                         const dd = data.departments.find(x => x.id === d.deptId);
                         if (!dd) return null;
                         const isPrimary = d.primary;
-                        // Для основного отдела – не показываем должность, т.к. она уже есть в поле "Должность"
-                        // Для дополнительного – показываем должность, если она задана в d.position
                         let positionDisplay = '';
                         if (!isPrimary && d.position) {
                           positionDisplay = ` (${d.position})`;
@@ -479,7 +476,6 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
               user={user}
               store={store}
               onClose={() => setShowPasswordModal(false)}
-              toast={(msg) => alert(msg)}
             />
           )}
         </>
