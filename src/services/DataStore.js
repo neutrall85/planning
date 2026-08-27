@@ -8,6 +8,27 @@ export default class DataStore {
     this._currentUser = null;
     this._listeners = [];
     this._archiveOldTasks(3);
+    // Миграция старых задач: если есть assigneeIds, берём первого как assigneeId
+    this._migrateTasks();
+  }
+
+  _migrateTasks() {
+    let changed = false;
+    this._data.tasks = this._data.tasks.map(t => {
+      if (t.assigneeIds && t.assigneeIds.length > 0 && !t.assigneeId) {
+        changed = true;
+        return { ...t, assigneeId: t.assigneeIds[0], assigneeIds: undefined };
+      }
+      if (t.assigneeIds && t.assigneeIds.length === 0 && !t.assigneeId) {
+        changed = true;
+        return { ...t, assigneeId: null, assigneeIds: undefined };
+      }
+      return t;
+    });
+    if (changed) {
+      this._notify();
+      this.addAudit('Миграция данных', 'Задачи приведены к формату с одним исполнителем (assigneeId)');
+    }
   }
 
   subscribe(callback) {
@@ -72,9 +93,8 @@ export default class DataStore {
     }
   }
 
-  // === Рекурсивный подсчёт плановых часов для суммарной задачи ===
   _calcSummaryHours(taskId, visited = new Set()) {
-    if (visited.has(taskId)) return 0; // защита от циклов
+    if (visited.has(taskId)) return 0;
     visited.add(taskId);
 
     const task = this._data.tasks.find(t => t.id === taskId);
@@ -89,13 +109,11 @@ export default class DataStore {
     return sum;
   }
 
-  // === Пересчёт часов для задачи и всех её родителей ===
   _recalcSummaryHoursChain(taskId) {
     let current = this._data.tasks.find(t => t.id === taskId);
     while (current) {
       if (current.isSummary) {
         const newHours = this._calcSummaryHours(current.id);
-        // Обновляем plannedHours только если изменилось
         if (current.plannedHours !== newHours) {
           current.plannedHours = newHours;
           const idx = this._data.tasks.findIndex(t => t.id === current.id);
@@ -104,7 +122,6 @@ export default class DataStore {
           }
         }
       }
-      // Поднимаемся к родителю
       if (current.parentTaskId) {
         current = this._data.tasks.find(t => t.id === current.parentTaskId);
       } else {
@@ -113,13 +130,39 @@ export default class DataStore {
     }
   }
 
-  // === ЗАДАЧИ (с проверкой бюджета) ===
+  /**
+   * Проверяет, не превышает ли сумма плановых часов подзадач заданный бюджет родительской задачи.
+   * @param {string} parentId - ID родительской задачи
+   * @param {string|null} excludeTaskId - ID задачи, которую нужно исключить из суммы (при обновлении)
+   * @throws {Error} если сумма подзадач превышает plannedHours родителя
+   */
+  _checkSubtaskBudget(parentId, excludeTaskId = null) {
+    const parent = this._data.tasks.find(t => t.id === parentId);
+    if (!parent) return;
+
+    // Если родитель суммарный или у него не заданы часы – ограничение не применяем
+    if (parent.isSummary || parent.plannedHours == null) return;
+
+    // Суммируем часы всех непосредственных подзадач, исключая указанную
+    const children = this._data.tasks.filter(t =>
+      t.parentTaskId === parentId && t.id !== excludeTaskId && !t.archived
+    );
+    const sumChildren = children.reduce((acc, t) => acc + (t.plannedHours || 0), 0);
+
+    // Если сумма подзадач превышает бюджет родителя
+    if (sumChildren > parent.plannedHours) {
+      throw new Error(
+        `Сумма плановых часов подзадач (${sumChildren} ч) превышает бюджет родительской задачи "${parent.title}" (${parent.plannedHours} ч). Уменьшите часы подзадач или увеличьте бюджет родителя.`
+      );
+    }
+  }
+
   upsertTask(task) {
     const idx = this._data.tasks.findIndex(t => t.id === task.id);
     let tasks;
     let auditMessage = '';
 
-    // ПРОВЕРКА БЮДЖЕТА (только для производственных проектов)
+    // Проверка бюджета проекта
     const projectForBudget = this._data.projects.find(p => p.id === task.projectId);
     if (projectForBudget && projectForBudget.budget != null && projectForBudget.ptype !== 'admin' && !projectForBudget.archived) {
       const otherTasksSum = this._data.tasks
@@ -133,27 +176,54 @@ export default class DataStore {
       }
     }
 
-    // Если это новая задача и указан родитель
-    if (idx === -1 && task.parentTaskId) {
-        const parent = this._data.tasks.find(t => t.id === task.parentTaskId);
-        if (parent) {
-            if (!task.projectId) task.projectId = parent.projectId;
-        } else {
-            task.parentTaskId = null;
+    // ----- НОВАЯ ПРОВЕРКА: бюджет подзадач -----
+    // 1. Если задача имеет родителя, проверяем, что сумма подзадач родителя (включая эту) не превышает его часы
+    if (task.parentTaskId) {
+      // При обновлении исключаем саму задачу, при создании – нет
+      this._checkSubtaskBudget(task.parentTaskId, idx === -1 ? null : task.id);
+    }
+
+    // 2. Если обновляется существующая задача и она НЕ суммарная, и её plannedHours изменяется (или может быть изменён),
+    //    проверяем, что сумма её существующих подзадач (если есть) не превышает новый plannedHours.
+    //    Это нужно для случая, когда пользователь уменьшает часы родительской задачи, у которой уже есть подзадачи.
+    if (idx !== -1) {
+      const existingTask = this._data.tasks[idx];
+      // Проверяем только если plannedHours задано, задача не суммарная, и plannedHours изменился (или мы просто хотим проверить)
+      if (!task.isSummary && task.plannedHours != null) {
+        // Суммируем часы всех подзадач этой задачи (исключая саму себя)
+        const childrenSum = this._data.tasks
+          .filter(t => t.parentTaskId === task.id && t.id !== task.id && !t.archived)
+          .reduce((acc, t) => acc + (t.plannedHours || 0), 0);
+        if (childrenSum > task.plannedHours) {
+          throw new Error(
+            `Сумма плановых часов подзадач (${childrenSum} ч) превышает новый бюджет задачи "${task.title}" (${task.plannedHours} ч). Уменьшите часы подзадач или увеличьте бюджет задачи.`
+          );
         }
+      }
+    }
+
+    // Далее идёт существующая логика
+    if (idx === -1 && task.parentTaskId) {
+      const parent = this._data.tasks.find(t => t.id === task.parentTaskId);
+      if (parent) {
+        if (!task.projectId) task.projectId = parent.projectId;
+      } else {
+        task.parentTaskId = null;
+      }
     }
 
     if (idx >= 0) {
       const old = this._data.tasks[idx];
       const changes = [];
       if (old.title !== task.title) changes.push(`Название: "${old.title}" → "${task.title}"`);
-      
-      // Для суммарных задач plannedHours вычисляется автоматически, не сравниваем
       if (!task.isSummary && old.plannedHours !== task.plannedHours) {
         changes.push(`Плановые часы: ${old.plannedHours ?? '—'} → ${task.plannedHours ?? '—'}`);
       }
-      if (JSON.stringify(old.assigneeIds) !== JSON.stringify(task.assigneeIds)) {
-        changes.push(`Исполнители: ${old.assigneeIds.map(id => this.empName(id)).join(', ')} → ${task.assigneeIds.map(id => this.empName(id)).join(', ')}`);
+      // Сравниваем assigneeId
+      if (old.assigneeId !== task.assigneeId) {
+        const oldName = old.assigneeId ? this.empName(old.assigneeId) : '—';
+        const newName = task.assigneeId ? this.empName(task.assigneeId) : '—';
+        changes.push(`Исполнитель: ${oldName} → ${newName}`);
       }
       if (old.status !== task.status) {
         changes.push(`Статус: ${TASK_STATUSES[old.status].label} → ${TASK_STATUSES[task.status].label}`);
@@ -168,7 +238,6 @@ export default class DataStore {
           }
         }
       }
-      // Логирование изменений зависимостей
       if (old.dependencyId !== task.dependencyId || old.dependencyType !== task.dependencyType) {
         const oldDep = old.dependencyId ? this._data.tasks.find(t => t.id === old.dependencyId) : null;
         const newDep = task.dependencyId ? this._data.tasks.find(t => t.id === task.dependencyId) : null;
@@ -188,24 +257,18 @@ export default class DataStore {
       }
       tasks = [...this._data.tasks, task];
       this.addAudit('Создание задачи', task.title, 'task', task.id);
-      (task.assigneeIds || []).forEach(id => {
-        if (id !== this._currentUser?.id) {
-          this.addNotification(id, `Вам назначена задача "${task.title}"`, { targetType: 'task', targetId: task.id });
-        }
-      });
+      if (task.assigneeId && task.assigneeId !== this._currentUser?.id) {
+        this.addNotification(task.assigneeId, `Вам назначена задача "${task.title}"`, { targetType: 'task', targetId: task.id });
+      }
     }
 
     this._data = { ...this._data, tasks };
-    
-    // Пересчёт часов для родительских суммарных задач
-    const taskId = task.id;
+
     if (task.parentTaskId) {
       this._recalcSummaryHoursChain(task.parentTaskId);
     }
-    // Если у задачи изменился флаг isSummary или parentTaskId, пересчитываем её саму и её родителей
-    // Для новой задачи – пересчёт уже сделан выше для родителей, но если isSummary=true, нужно посчитать её собственные часы
     if (task.isSummary) {
-      this._recalcSummaryHoursChain(taskId);
+      this._recalcSummaryHoursChain(task.id);
     }
 
     this._notify();
@@ -220,7 +283,6 @@ export default class DataStore {
 
     const parentId = task?.parentTaskId;
 
-    // Если удаляемая задача была родительской – сбросим parentTaskId у всех её подзадач
     this._data.tasks = this._data.tasks.map(t => {
       if (t.parentTaskId === id) {
         return { ...t, parentTaskId: null };
@@ -229,8 +291,7 @@ export default class DataStore {
     });
 
     this._data = { ...this._data, tasks: this._data.tasks.filter(t => t.id !== id) };
-    
-    // Пересчёт часов для родительской суммарной задачи
+
     if (parentId) {
       this._recalcSummaryHoursChain(parentId);
     }
@@ -238,7 +299,6 @@ export default class DataStore {
     this._notify();
   }
 
-  // === ПРОЕКТЫ ===
   upsertProject(project) {
     const idx = this._data.projects.findIndex(p => p.id === project.id);
     let projects;
@@ -294,7 +354,6 @@ export default class DataStore {
     this._notify();
   }
 
-  // === ОТПУСКА ===
   upsertVacation(vac) {
     const idx = this._data.vacations.findIndex(v => v.id === vac.id);
     let vacations;
@@ -335,12 +394,10 @@ export default class DataStore {
     const statuses = vac.delegation.statuses.length ? vac.delegation.statuses : ['new', 'inwork', 'review'];
     this._data.tasks = this._data.tasks.map(t => {
       if (t.archived) return t;
-      if (!t.assigneeIds.includes(fromId)) return t;
+      if (t.assigneeId !== fromId) return t;
       if (!statuses.includes(t.status)) return t;
       if (t.deadline && t.deadline < start) return t;
-      const newAssignees = t.assigneeIds.filter(id => id !== fromId);
-      if (!newAssignees.includes(toId)) newAssignees.push(toId);
-      const updated = { ...t, assigneeIds: newAssignees };
+      const updated = { ...t, assigneeId: toId };
       updated.history = [...updated.history, {
         ts: Date.now(),
         who: 'system',
@@ -360,12 +417,10 @@ export default class DataStore {
     const toId = vac.delegation.subId;
     this._data.tasks = this._data.tasks.map(t => {
       if (t.archived) return t;
-      if (!t.assigneeIds.includes(toId)) return t;
+      if (t.assigneeId !== toId) return t;
       const hasDelegation = t.history.some(h => h.text.includes(`переназначена с ${this.empName(fromId)} на ${this.empName(toId)}`));
       if (!hasDelegation) return t;
-      const newAssignees = t.assigneeIds.filter(id => id !== toId);
-      if (!newAssignees.includes(fromId)) newAssignees.push(fromId);
-      const updated = { ...t, assigneeIds: newAssignees };
+      const updated = { ...t, assigneeId: fromId };
       updated.history = [...updated.history, {
         ts: Date.now(),
         who: 'system',
@@ -377,7 +432,6 @@ export default class DataStore {
     this.addNotification(fromId, `Задачи возвращены вам по окончании отпуска`, { targetType: 'vacation', targetId: vacationId });
   }
 
-  // === СОТРУДНИКИ ===
   upsertEmployee(emp) {
     const idx = this._data.employees.findIndex(e => e.id === emp.id);
     let employees;
@@ -424,7 +478,6 @@ export default class DataStore {
     this._notify();
   }
 
-  // === АУДИТ И УВЕДОМЛЕНИЯ ===
   addAudit(action, details, targetType = null, targetId = null) {
     let detailsStr = details;
     if (typeof details === 'object') {
@@ -475,7 +528,6 @@ export default class DataStore {
     this._notify();
   }
 
-  // === ЗАПРОСЫ ===
   addHoursRequest(req) {
     this._data = { ...this._data, hoursRequests: [req, ...this._data.hoursRequests] };
     this._notify();

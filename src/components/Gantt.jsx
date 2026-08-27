@@ -222,14 +222,13 @@ export default function Gantt({ db, ur, openTask, openProject }) {
                     <div style={{ width }} />
                   </div>
                   {g.items.map(t => {
-                    const assignees = (t.assigneeIds || []).map(id => db.employees.find(e => e.id === id)).filter(Boolean);
-                    const a = assignees[0];
+                    const assignee = t.assigneeId ? db.employees.find(e => e.id === t.assigneeId) : null;
                     const left = t.sIdx * DW + 2;
                     const w = Math.max((t.eIdx - t.sIdx + 1) * DW - 4, DW - 8);
                     const sp = getTaskSpent(t);
                     const pct = Math.min(100, (sp / Math.max(1, t.plannedHours || 0)) * 100);
                     const fillWidth = pct > 0 ? Math.max(pct, 2) : 0;
-                    const vac = a ? vacOverlap(a.id, t.start, t.deadline) : null;
+                    const vac = assignee ? vacOverlap(assignee.id, t.start, t.deadline) : null;
                     const tip = `${t.title}: ${fmtD(t.start)} — ${fmtD(t.deadline)}, план ${t.plannedHours ?? '—'} ч${vac ? `. Исполнитель в отпуске ${fmtDMY(vac.start)}–${fmtDMY(vac.end)}` : ''}`;
                     const depTask = taskDeps[t.id];
                     let depLine = null;
@@ -274,7 +273,7 @@ export default function Gantt({ db, ur, openTask, openProject }) {
                         <div className="gantt-label" onClick={() => openTask(t.id)}>
                           <span className={`gtitle${t.status === 'cancelled' ? ' dim' : ''}`}>{t.title}</span>
                           <span className="gsub">
-                            {a && <Avatar employee={a} size="xs" />} · {t.plannedHours ?? '—'} ч · {TASK_STATUSES[t.status].label}
+                            {assignee && <Avatar employee={assignee} size="xs" />} · {t.plannedHours ?? '—'} ч · {TASK_STATUSES[t.status].label}
                           </span>
                         </div>
                         <div className="gantt-track">

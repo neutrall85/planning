@@ -21,7 +21,6 @@ const AIRCRAFT_TYPES = [
 ];
 const PROJECT_TYPE_OPTIONS = ['Ремонт', 'Модификация', 'КС', 'ИКУ'];
 
-// Маппинг старых приоритетов для админ-проектов на новые
 const ADMIN_PRIORITY_MAP = {
   AOG: 'high',
   CRIT: 'mid',
@@ -119,9 +118,7 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
       if (!f.end) return toast("Для производственного проекта дата окончания обязательна", "err");
       if (!f.kbId) return toast("Для производственного проекта необходимо выбрать подразделение (КБ)", "err");
     }
-    // Бюджет: для админ-проектов он не обязателен, но если введён — сохраняем число
     const budgetValue = f.budget !== '' && f.budget != null ? +f.budget : null;
-    // Для производственных проектов бюджет обязателен и должен быть > 0
     if (!isAdminType && (!f.budget || +f.budget <= 0)) {
       return toast("Для производственного проекта бюджет обязателен и должен быть больше 0", "err");
     }
@@ -146,7 +143,7 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
       list = list.filter(t => !t.archived);
     }
     if (isExec) {
-      list = list.filter(t => (t.assigneeIds || []).includes(ur.id));
+      list = list.filter(t => t.assigneeId === ur.id);
     }
 
     const sortFn = (a, b) => {
@@ -157,8 +154,10 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
           valB = b.title.toLowerCase();
           break;
         case 'assignees':
-          valA = (a.assigneeIds || []).map(id => db.employees.find(e => e.id === id)?.last || '').join(', ').toLowerCase();
-          valB = (b.assigneeIds || []).map(id => db.employees.find(e => e.id === id)?.last || '').join(', ').toLowerCase();
+          const assigneeA = a.assigneeId ? db.employees.find(e => e.id === a.assigneeId) : null;
+          const assigneeB = b.assigneeId ? db.employees.find(e => e.id === b.assigneeId) : null;
+          valA = assigneeA ? assigneeA.last.toLowerCase() : '';
+          valB = assigneeB ? assigneeB.last.toLowerCase() : '';
           break;
         case 'status':
           valA = a.status;
@@ -221,8 +220,8 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
     const ids = new Set(
       db.tasks
         .filter((t) => t.projectId === f.id)
-        .map((t) => t.assigneeIds || [])
-        .flat()
+        .map((t) => t.assigneeId)
+        .filter(Boolean)
     );
     if (f.managerId) ids.add(f.managerId);
     return [...ids]
@@ -297,7 +296,6 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
 
       {tab === 'info' && (
         <div className="project-info-fields">
-          {/* Одиночные поля */}
           <div className="field-row">
             <label className="field-label">Название *</label>
             <input className="inp" disabled={!canEditFields} value={f.name} onChange={(e) => set("name", e.target.value)} />
@@ -313,7 +311,6 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
             <input className="inp" disabled={!canEditFields} value={f.customer} onChange={(e) => set("customer", e.target.value)} placeholder="Наименование заказчика" />
           </div>
 
-          {/* Парные строки */}
           <div className="pj-pair-row">
             <div className="pj-pair-item">
               <label className="pj-pair-label">Тип проекта *</label>
@@ -375,7 +372,6 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
             </div>
           </div>
 
-          {/* Бюджет — теперь доступен для всех типов, но для админ-проектов не обязателен */}
           <div className="pj-pair-row">
             <div className="pj-pair-item">
               <label className="pj-pair-label">Бюджет, ч {!isAdminType && "*"}</label>
@@ -400,7 +396,6 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
             </div>
           </div>
 
-          {/* Ответственный — одиночное поле, только для производственных */}
           {!isAdminType && (
             <div className="field-row">
               <label className="field-label">Ответственный *</label>
@@ -417,7 +412,7 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
         <div className="tm-block">
           <div className="tm-block-header">
             <div className="rep-panel-title">Задачи проекта ({taskList.length})</div>
-            <button className="btn primary sm" onClick={() => openTask(null, 'form')} disabled={existing.archived}>
+            <button className="btn primary sm" onClick={() => openTask(null, 'form', null, existing.id)} disabled={existing.archived}>
               <Ic d={ICONS.plus} size={14} /> Создать задачу
             </button>
           </div>
@@ -429,7 +424,7 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
                     Задача {taskSortField === 'title' && (taskSortDir === 'asc' ? '↑' : '↓')}
                   </th>
                   <th className="sortable" onClick={() => handleSort('assignees')}>
-                    Исполнители {taskSortField === 'assignees' && (taskSortDir === 'asc' ? '↑' : '↓')}
+                    Исполнитель {taskSortField === 'assignees' && (taskSortDir === 'asc' ? '↑' : '↓')}
                   </th>
                   <th className="sortable" onClick={() => handleSort('status')}>
                     Статус {taskSortField === 'status' && (taskSortDir === 'asc' ? '↑' : '↓')}
@@ -453,7 +448,7 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
               </thead>
               <tbody>
                 {taskList.map(t => {
-                  const assignees = (t.assigneeIds || []).map(id => db.employees.find(e => e.id === id)).filter(Boolean);
+                  const assignee = t.assigneeId ? db.employees.find(e => e.id === t.assigneeId) : null;
                   const creatorId = t.history?.length > 0 ? t.history.find(h => h.who !== 'system')?.who || t.history[0]?.who : null;
                   const creator = creatorId ? db.employees.find(e => e.id === creatorId) : null;
                   const spent = getTaskSpent(t);
@@ -461,7 +456,7 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
                   return (
                     <tr key={t.id} className="clickable-row" onClick={() => { onClose(); openTask(t.id); }}>
                       <td><b>{t.title}</b></td>
-                      <td>{assignees.length ? assignees.map(a => `${a.last} ${a.first}`).join(', ') : '—'}</td>
+                      <td>{assignee ? `${assignee.last} ${assignee.first}` : '—'}</td>
                       <td><span className="st-chip" style={{ background: TASK_STATUSES[t.status].color + '22', color: TASK_STATUSES[t.status].color }}>{TASK_STATUSES[t.status].label}</span></td>
                       <td>{t.plannedHours ?? '—'}</td>
                       <td>{spent}</td>

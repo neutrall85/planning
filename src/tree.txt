@@ -1,0 +1,87 @@
+Структура папок
+Серийный номер тома: A208-C61C
+C:.
+|   App.jsx
+|   index.jsx
+|   tree.txt
+|   
++---assets
+|       hero.png
+|       react.svg
+|       vite.svg
+|       
++---components
+|   |   Archive.jsx
+|   |   Avatar.jsx
+|   |   Cabinet.jsx
+|   |   Calendar.jsx
+|   |   CreateEmployeeModal.jsx
+|   |   Discussion.jsx
+|   |   EditEmployeeModal.jsx
+|   |   ErrorBoundary.jsx
+|   |   FormField.jsx
+|   |   Gantt.jsx
+|   |   Icons.jsx
+|   |   Journal.jsx
+|   |   Kanban.jsx
+|   |   LoginScreen.jsx
+|   |   MainLayout.jsx
+|   |   Modal.jsx
+|   |   ModalRenderer.jsx
+|   |   NotifPanel.jsx
+|   |   ProjectProgress.jsx
+|   |   Projects.jsx
+|   |   Reports.jsx
+|   |   Requests.jsx
+|   |   Staff.jsx
+|   |   Table.jsx
+|   |   
+|   +---Modals
+|   |       DelegationModal.jsx
+|   |       DeptsModal.jsx
+|   |       HoursRequestModal.jsx
+|   |       index.jsx
+|   |       ProjectModal.jsx
+|   |       RolesModal.jsx
+|   |       TaskModal.jsx
+|   |       VacationModal.jsx
+|   |       VacNowModal.jsx
+|   |       
+|   \---views
+|           ArchiveView.jsx
+|           CabinetView.jsx
+|           index.js
+|           JournalView.jsx
+|           ProjectsView.jsx
+|           ReportsView.jsx
+|           RequestsView.jsx
+|           StaffView.jsx
+|           TasksList.jsx
+|           TasksView.jsx
+|           
++---context
+|       StoreContext.jsx
+|       ToastContext.jsx
+|       
++---css
+|       styles.css
+|       
++---hooks
+|       index.js
+|       useAuth.js
+|       useDataHelpers.js
+|       useModals.js
+|       useStore.js
+|       useTaskFilters.js
+|       
++---services
+|       DataStore.js
+|       mockData.js
+|       
+\---utils
+        constants.js
+        date.js
+        helpers.js
+        permissions.js
+        projectHelpers.js
+        

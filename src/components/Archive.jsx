@@ -13,7 +13,6 @@ export default function Archive({ db, ur, openTask, openProject, restoreTask, re
   const [fExec, setFExec] = useState('all');
   const [fDept, setFDept] = useState('all');
 
-  // ---- ИЗМЕНЕНИЕ: показываем все закрытые/отменённые + уже архивированные ----
   const archProjects = db.projects.filter(p => p.archived || p.status === 'closed' || p.status === 'cancelled');
   const archTasks = db.tasks.filter(t => t.archived || t.status === 'closed' || t.status === 'cancelled');
 
@@ -22,15 +21,15 @@ export default function Archive({ db, ur, openTask, openProject, restoreTask, re
   const taskList = archTasks.filter(t => {
     if (!fit(t.archivedAt || TODAY)) return false;
     if (fProj !== 'all' && t.projectId !== fProj) return false;
-    if (fExec !== 'all' && (t.assigneeIds || []).includes(fExec)) return false;
+    if (fExec !== 'all' && t.assigneeId !== fExec) return false;
     if (fDept !== 'all') {
-      const assignees = (t.assigneeIds || []).map(id => db.employees.find(x => x.id === id)).filter(Boolean);
-      if (!assignees.some(a => a.departments.some(d => d.deptId === fDept))) return false;
+      const assignee = t.assigneeId ? db.employees.find(x => x.id === t.assigneeId) : null;
+      if (!assignee || !assignee.departments.some(d => d.deptId === fDept)) return false;
     }
     return true;
   });
 
-  const execs = [...new Set(archTasks.flatMap(t => t.assigneeIds || []))].map(id => db.employees.find(e => e.id === id)).filter(Boolean);
+  const execs = [...new Set(archTasks.map(t => t.assigneeId).filter(Boolean))].map(id => db.employees.find(e => e.id === id)).filter(Boolean);
   const projOptions = [...new Set(archTasks.map(t => t.projectId))].map(id => db.projects.find(p => p.id === id)).filter(Boolean);
 
   return (
@@ -66,7 +65,6 @@ export default function Archive({ db, ur, openTask, openProject, restoreTask, re
                 <td>{fmtDMY(p.archivedAt)}</td>
                 <td>
                   <button className="btn ghost sm" onClick={() => openProject(p.id)}>Открыть</button>
-                  {/* ---- ИЗМЕНЕНИЕ: показываем восстановление только для действительно архивированных ---- */}
                   {canRestore(ur) && p.archived && (
                     <button className="btn ghost sm" onClick={() => restoreProject(p.id)}>
                       <Ic d={ICONS.restore} size={12} /> Восстановить
@@ -82,17 +80,16 @@ export default function Archive({ db, ur, openTask, openProject, restoreTask, re
       <div className="rep-panel">
         <div className="rep-panel-title">Архивные задачи ({taskList.length})</div>
         <table className="tbl">
-          <thead><tr><th>Задача</th><th>Проект</th><th>Исполнители</th><th>В архиве с</th><th></th></tr></thead>
+          <thead><tr><th>Задача</th><th>Проект</th><th>Исполнитель</th><th>В архиве с</th><th></th></tr></thead>
           <tbody>
             {taskList.map(t => (
               <tr key={t.id}>
                 <td><b>{t.title}</b></td>
                 <td>{db.projects.find(x => x.id === t.projectId)?.code}</td>
-                <td>{(t.assigneeIds || []).map(id => empName(id)).join(', ')}</td>
+                <td>{t.assigneeId ? empName(t.assigneeId) : '—'}</td>
                 <td>{fmtDMY(t.archivedAt)}</td>
                 <td>
                   <button className="btn ghost sm" onClick={() => openTask(t.id)}>Открыть</button>
-                  {/* ---- ИЗМЕНЕНИЕ: показываем восстановление только для действительно архивированных ---- */}
                   {canRestore(ur) && t.archived && (
                     <button className="btn ghost sm" onClick={() => restoreTask(t.id)}>
                       <Ic d={ICONS.restore} size={12} /> Восстановить

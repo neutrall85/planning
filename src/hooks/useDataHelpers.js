@@ -28,7 +28,7 @@ export const useDataHelpers = (data) => {
 
   const getEmployeeLoad = (empId) => {
     if (!data || !data.tasks) return { plan: 0, cnt: 0 };
-    const active = data.tasks.filter(t => !t.archived && (t.assigneeIds || []).includes(empId) && !['closed','cancelled'].includes(t.status));
+    const active = data.tasks.filter(t => !t.archived && t.assigneeId === empId && !['closed','cancelled'].includes(t.status));
     return { plan: active.reduce((s, t) => s + (t.plannedHours || 0), 0), cnt: active.length };
   };
 

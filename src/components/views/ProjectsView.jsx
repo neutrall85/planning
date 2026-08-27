@@ -28,7 +28,7 @@ export default function ProjectsView({ db, ur, openProject, openHoursReq, store 
       ? db.projects.filter(p => !p.archived || p.status === 'closed' || p.status === 'cancelled')
       : db.projects.filter(p => (!p.archived || p.status === 'closed' || p.status === 'cancelled') && scope.projIds.has(p.id));
     if (showOnlyMyProjects) {
-      const myTasks = db.tasks.filter(t => (t.assigneeIds || []).includes(ur.id) && !t.archived);
+      const myTasks = db.tasks.filter(t => t.assigneeId === ur.id && !t.archived);
       const myProjectIds = new Set(myTasks.map(t => t.projectId));
       list = list.filter(p => myProjectIds.has(p.id));
     }
@@ -39,8 +39,8 @@ export default function ProjectsView({ db, ur, openProject, openHoursReq, store 
     const activeProjectIds = new Set(db.projects.filter(p => !p.archived || p.status === 'closed' || p.status === 'cancelled').map(p => p.id));
     const involvedIds = new Set();
     db.tasks.forEach(t => {
-      if (activeProjectIds.has(t.projectId) && !t.archived) {
-        (t.assigneeIds || []).forEach(id => involvedIds.add(id));
+      if (activeProjectIds.has(t.projectId) && !t.archived && t.assigneeId) {
+        involvedIds.add(t.assigneeId);
       }
     });
     return db.employees.filter(e => involvedIds.has(e.id));
@@ -78,7 +78,7 @@ export default function ProjectsView({ db, ur, openProject, openHoursReq, store 
     if (filterParticipant !== 'all') {
       const projectIdsWithParticipant = new Set();
       db.tasks.forEach(t => {
-        if (!t.archived && (t.assigneeIds || []).includes(filterParticipant)) {
+        if (!t.archived && t.assigneeId === filterParticipant) {
           projectIdsWithParticipant.add(t.projectId);
         }
       });
@@ -88,9 +88,9 @@ export default function ProjectsView({ db, ur, openProject, openHoursReq, store 
     if (filterDept !== 'all') {
       const projectIdsWithDept = new Set();
       db.tasks.forEach(t => {
-        if (!t.archived) {
-          const assignees = (t.assigneeIds || []).map(id => db.employees.find(e => e.id === id)).filter(Boolean);
-          if (assignees.some(a => a.departments.some(d => d.deptId === filterDept))) {
+        if (!t.archived && t.assigneeId) {
+          const assignee = db.employees.find(e => e.id === t.assigneeId);
+          if (assignee && assignee.departments.some(d => d.deptId === filterDept)) {
             projectIdsWithDept.add(t.projectId);
           }
         }
@@ -105,7 +105,7 @@ export default function ProjectsView({ db, ur, openProject, openHoursReq, store 
     const tasks = db.tasks.filter(t => t.projectId === project.id && !t.archived);
     const plan = tasks.reduce((s, t) => s + (t.plannedHours || 0), 0);
     const fact = tasks.reduce((s, t) => s + t.logs.reduce((lsum, l) => lsum + l.hours, 0), 0);
-    const uniqueAssignees = [...new Set(tasks.flatMap(t => t.assigneeIds || []))];
+    const uniqueAssignees = [...new Set(tasks.map(t => t.assigneeId).filter(Boolean))];
     const canClose = () => {
       const creatorId = project.creatorId || project.history?.find(h => h.who !== 'system')?.who;
       return hasRole(ur, 'admin') || hasRole(ur, 'director') || (creatorId && creatorId === ur.id);
@@ -159,6 +159,8 @@ export default function ProjectsView({ db, ur, openProject, openHoursReq, store 
   const closeProject = (p) => store.upsertProject({ ...p, status: 'closed', closedAt: TODAY });
   const cancelProject = (p) => store.upsertProject({ ...p, status: 'cancelled' });
 
+  const canCreateProject = hasRole(ur, 'admin', 'director', 'kb_chief', 'project_manager');
+
   return (
     <>
       <div className="toolbar">
@@ -198,7 +200,6 @@ export default function ProjectsView({ db, ur, openProject, openHoursReq, store 
           {participantOptions.map(emp => <option key={emp.id} value={emp.id}>{emp.last} {emp.first}</option>)}
         </select>
 
-        {/* Нативный селект для отдела с классом filter-select-dept */}
         <select className="inp sel sm filter-select filter-select-dept" value={filterDept} onChange={e => setFilterDept(e.target.value)}>
           <option value="all">Отдел</option>
           {deptOptions.map(dept => <option key={dept.id} value={dept.id}>{dept.name}</option>)}
@@ -211,7 +212,7 @@ export default function ProjectsView({ db, ur, openProject, openHoursReq, store 
           </label>
         )}
 
-        {hasRole(ur, 'admin', 'director', 'kb_chief', 'project_manager') && (
+        {canCreateProject && (
           <button className="btn primary" onClick={() => openProject(null)}>
             <Ic d={ICONS.plus} size={15} /> Проект
           </button>

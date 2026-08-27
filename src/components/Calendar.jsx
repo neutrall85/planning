@@ -14,26 +14,22 @@ const DayCell = ({ d, big, byDay, db, openTask }) => {
       <div className="cal-chips">
         {tasks.slice(0, big ? 12 : 3).map(t => {
           const p = db.projects.find(x => x.id === t.projectId);
-          const assignees = (t.assigneeIds || [])
-            .map(id => db.employees.find(e => e.id === id))
-            .filter(Boolean);
+          const assignee = t.assigneeId ? db.employees.find(e => e.id === t.assigneeId) : null;
 
           return (
             <div
               key={t.id}
               className="cal-chip"
-              style={{ borderColor: p?.color }} // borderColor оставляем, т.к. это динамический цвет
+              style={{ borderColor: p?.color }}
               onClick={() => openTask(t.id)}
               title={`${t.title} (${p?.code || 'без проекта'})`}
             >
               <div className="cal-task-title">
-                <span className="pdot" style={{ background: p?.color }} /> {/* pdot тоже динамический */}
+                <span className="pdot" style={{ background: p?.color }} />
                 <span>{t.title}</span>
               </div>
               <div className="cal-executors">
-                {assignees.map(emp => (
-                  <Avatar key={emp.id} employee={emp} size="xs" />
-                ))}
+                {assignee && <Avatar employee={assignee} size="xs" />}
               </div>
             </div>
           );
@@ -49,15 +45,12 @@ export default function Calendar({ db, ur, openTask }) {
   const [anchor, setAnchor] = useState(new Date());
   const [showOnlyMy, setShowOnlyMy] = useState(false);
 
-  // Определяем, показывать ли чекбокс – только если пользователь видит не только свои задачи
   const canSeeAll = hasRole(ur, "admin", "director", "economist", "kb_chief", "head", "project_lead", "project_manager");
 
-  // Сначала получаем все задачи, которые видны пользователю
   let allTasks = db.tasks.filter(t => isTaskActive(t) && taskVisible(ur, scope, t, db) && t.deadline && !['closed','cancelled'].includes(t.status));
 
-  // Применяем фильтр "Только мои задачи"
   if (showOnlyMy) {
-    allTasks = allTasks.filter(t => (t.assigneeIds || []).includes(ur.id));
+    allTasks = allTasks.filter(t => t.assigneeId === ur.id);
   }
 
   const byDay = useMemo(() => {

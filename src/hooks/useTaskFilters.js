@@ -9,7 +9,7 @@ export const useTaskFilters = (data, filters) => {
     if (priority && priority !== 'all') list = list.filter(t => t.priority === priority);
     if (deptId && deptId !== 'all') {
       list = list.filter(t => {
-        const emp = data.employees.find(e => e.id === t.assigneeId);
+        const emp = t.assigneeId ? data.employees.find(e => e.id === t.assigneeId) : null;
         return emp && emp.departments.some(d => d.deptId === deptId);
       });
     }

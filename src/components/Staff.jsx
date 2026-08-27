@@ -43,7 +43,6 @@ const EmployeeRow = React.memo(({
     }));
   }, [employee, setDb, ur]);
 
-  // ---- ИЗМЕНЕНИЕ: отображаем должность и отдел ----
   const mainDept = getPrimaryDeptName(employee, db);
   const displayPosition = employee.position || 'Сотрудник';
 

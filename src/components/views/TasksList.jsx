@@ -1,3 +1,4 @@
+// src/components/TasksList.jsx
 import React from 'react';
 import { TASK_STATUSES, PRIORITIES } from '../../utils/constants';
 import { fmtDMY, TODAY } from '../../utils/date';
@@ -12,7 +13,7 @@ export default function TasksList({ tasks, db, openTask }) {
     <div className="pj-grid">
       {tasks.map(task => {
         const project = db.projects.find(p => p.id === task.projectId);
-        const assignees = (task.assigneeIds || []).map(id => db.employees.find(e => e.id === id)).filter(Boolean);
+        const assignee = task.assigneeId ? db.employees.find(e => e.id === task.assigneeId) : null;
         const factHours = task.logs.reduce((sum, log) => sum + log.hours, 0);
         const overdue = task.deadline && !['closed','cancelled'].includes(task.status) && task.deadline < TODAY;
         const status = TASK_STATUSES[task.status]?.label || task.status;
@@ -41,9 +42,9 @@ export default function TasksList({ tasks, db, openTask }) {
               ) : 'не задан'}
             </div>
             <div className="pj-row">
-              <span className="mut">Исполнители: </span>
+              <span className="mut">Ответственный: </span>
               <span>
-                {assignees.length ? assignees.map(a => `${a.last} ${a.first}`).join(', ') : 'не назначены'}
+                {assignee ? `${assignee.last} ${assignee.first}` : 'не назначен'}
               </span>
             </div>
             <div className="pj-budget" style={{ marginTop: 8 }}>
@@ -60,7 +61,6 @@ export default function TasksList({ tasks, db, openTask }) {
               )}
             </div>
             <div className="pj-foot">
-              {/* Удалён блок с аватарами */}
               {overdue && <span style={{ color: '#dc2626', fontSize: 12, fontWeight: 600 }}>Просрочено</span>}
             </div>
           </div>

@@ -86,7 +86,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
   const [extension, setExtension] = useState(user.extension || '');
   const [showPasswordModal, setShowPasswordModal] = useState(false);
 
-  const myTasks = data.tasks.filter(t => isTaskActive(t) && (t.assigneeIds || []).includes(user.id) && !user.fired);
+  const myTasks = data.tasks.filter(t => isTaskActive(t) && t.assigneeId === user.id && !user.fired);
   const myProjects = [...new Set(myTasks.map(t => t.projectId))].map(id => data.projects.find(p => p.id === id)).filter(Boolean);
   const myVacs = data.vacations.filter(v => v.empId === user.id);
   const myDeleg = data.roleDelegations.filter(r => r.fromId === user.id || r.toId === user.id);

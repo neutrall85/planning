@@ -86,7 +86,7 @@ export default function Reports({ db, ur }) {
         });
       }
       if (filters.projectId !== 'all') tasks = tasks.filter(t => t.projectId === filters.projectId);
-      if (filters.assigneeId !== 'all') tasks = tasks.filter(t => (t.assigneeIds || []).includes(filters.assigneeId));
+      if (filters.assigneeId !== 'all') tasks = tasks.filter(t => t.assigneeId === filters.assigneeId);
       if (filters.status !== 'all') tasks = tasks.filter(t => t.status === filters.status);
       if (filters.priority !== 'all') tasks = tasks.filter(t => t.priority === filters.priority);
       if (filters.customer) {
@@ -112,13 +112,13 @@ export default function Reports({ db, ur }) {
       if (filters.projectId !== 'all') {
         const taskIds = tasksList.filter(t => t.projectId === filters.projectId).map(t => t.id);
         employees = employees.filter(e =>
-          tasksList.some(t => t.assigneeIds?.includes(e.id) && taskIds.includes(t.id))
+          tasksList.some(t => t.assigneeId === e.id && taskIds.includes(t.id))
         );
       }
       if (filters.assigneeId !== 'all') employees = employees.filter(e => e.id === filters.assigneeId);
       if (filters.customer) {
         employees = employees.filter(e => {
-          const userTasks = tasksList.filter(t => t.assigneeIds?.includes(e.id));
+          const userTasks = tasksList.filter(t => t.assigneeId === e.id);
           if (userTasks.length === 0) return false;
           return userTasks.some(t => {
             const project = projectsList.find(p => p.id === t.projectId);
@@ -135,7 +135,7 @@ export default function Reports({ db, ur }) {
             ...l,
             taskTitle: t.title,
             projectId: t.projectId,
-            assigneeIds: t.assigneeIds || [],
+            assigneeId: t.assigneeId,
           });
         });
       });
@@ -218,7 +218,6 @@ export default function Reports({ db, ur }) {
       showToast('Нет данных для выгрузки', 'warning');
       return;
     }
-    // Заглушка
     showToast('Выгрузка XLSX пока не реализована', 'info');
   };
 
@@ -237,7 +236,7 @@ export default function Reports({ db, ur }) {
                 <th>#</th>
                 <th>Задача</th>
                 <th>Проект</th>
-                <th>Исполнители</th>
+                <th>Исполнитель</th>
                 <th>Статус</th>
                 <th>Приоритет</th>
                 <th>План (ч)</th>
@@ -255,7 +254,7 @@ export default function Reports({ db, ur }) {
                     <td>{idx + 1}</td>
                     <td><b>{t.title}</b></td>
                     <td>{project?.code || '—'}</td>
-                    <td>{(t.assigneeIds || []).map(id => empName(id)).join(', ') || '—'}</td>
+                    <td>{t.assigneeId ? empName(t.assigneeId) : '—'}</td>
                     <td><span className="st-chip" style={{ background: statusDef.color + '22', color: statusDef.color }}>{statusDef.label}</span></td>
                     <td><span style={{ color: priorityDef.color }}>{priorityDef.label}</span></td>
                     <td>{t.plannedHours ?? '—'}</td>
@@ -323,7 +322,7 @@ export default function Reports({ db, ur }) {
             <tbody>
               {results.map((e, idx) => {
                 const deptName = getPrimaryDeptName(e, safeDb);
-                const tasks = (safeDb.tasks || []).filter(t => t.assigneeIds?.includes(e.id));
+                const tasks = (safeDb.tasks || []).filter(t => t.assigneeId === e.id);
                 const plan = tasks.reduce((s, t) => s + (t.plannedHours || 0), 0);
                 const fact = tasks.reduce((s, t) => s + getTaskSpent(t), 0);
                 return (

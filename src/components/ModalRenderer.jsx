@@ -1,3 +1,4 @@
+// src/components/ModalRenderer.jsx
 import React from 'react';
 import {
   TaskModal,
@@ -41,6 +42,7 @@ export default function ModalRenderer({
           taskId={modal.taskId}
           initialTab={modal.initialTab || 'form'}
           parentTaskId={modal.parentTaskId}
+          initialProjectId={modal.initialProjectId} // <--- ДОБАВЛЕНО
           onClose={onClose}
           onSave={(task, isNew) => {
             const old = db.tasks.find(x => x.id === task.id);

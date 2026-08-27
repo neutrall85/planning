@@ -1,9 +1,10 @@
+// src/components/views/TasksView.jsx
 import React, { useState, useMemo } from 'react';
 import Kanban from '../Kanban';
 import TasksList from './TasksList';
 import { TASK_STATUSES, TASK_STATUS_ORDER, PRIORITIES } from '../../utils/constants';
 import { fmtDMY, daysDiff, TODAY, isTaskActive } from '../../utils/date';
-import { taskVisible, computeScope, hasRole, canChangeTaskStatus } from '../../utils/permissions';
+import { taskVisible, computeScope, hasRole, canChangeTaskStatus, canCreateTask } from '../../utils/permissions';
 import { useToast } from '../../context/ToastContext';
 import { ICONS, Ic } from '../Icons';
 import { useDataHelpers } from '../../hooks';
@@ -27,12 +28,12 @@ export default function TasksView({ db, ur, openTask, store }) {
   const filteredTasks = useMemo(() => {
     let list = db.tasks.filter(t => isTaskActive(t) && taskVisible(ur, scope, t, db));
     if (fProj !== 'all') list = list.filter(t => t.projectId === fProj);
-    if (fExec !== 'all') list = list.filter(t => (t.assigneeIds || []).includes(fExec));
+    if (fExec !== 'all') list = list.filter(t => t.assigneeId === fExec); // <-- один исполнитель
     if (fPrio !== 'all') list = list.filter(t => t.priority === fPrio);
     if (fDept !== 'all') {
       list = list.filter(t => {
-        const assignees = (t.assigneeIds || []).map(id => db.employees.find(e => e.id === id)).filter(Boolean);
-        return assignees.some(a => a.departments.some(d => d.deptId === fDept));
+        const assignee = t.assigneeId ? db.employees.find(e => e.id === t.assigneeId) : null;
+        return assignee && assignee.departments.some(d => d.deptId === fDept);
       });
     }
     if (q.trim()) {
@@ -42,7 +43,7 @@ export default function TasksView({ db, ur, openTask, store }) {
         (db.projects.find(p => p.id === t.projectId)?.name || '').toLowerCase().includes(s)
       );
     }
-    if (showOnlyMy) list = list.filter(t => (t.assigneeIds || []).includes(ur.id));
+    if (showOnlyMy) list = list.filter(t => t.assigneeId === ur.id); // <-- один исполнитель
     return list;
   }, [db, ur, scope, fProj, fExec, fPrio, fDept, q, showOnlyMy]);
 
@@ -52,7 +53,7 @@ export default function TasksView({ db, ur, openTask, store }) {
   }, [filteredTasks, db.projects]);
 
   const execOptions = useMemo(() => {
-    const ids = new Set(filteredTasks.flatMap(t => t.assigneeIds || []));
+    const ids = new Set(filteredTasks.map(t => t.assigneeId).filter(Boolean));
     return db.employees.filter(e => ids.has(e.id));
   }, [filteredTasks, db.employees]);
 
@@ -60,7 +61,7 @@ export default function TasksView({ db, ur, openTask, store }) {
 
   const renderTaskCard = (task) => {
     const p = db.projects.find(x => x.id === task.projectId);
-    const assignees = (task.assigneeIds || []).map(id => db.employees.find(e => e.id === id)).filter(Boolean);
+    const assignee = task.assigneeId ? db.employees.find(e => e.id === task.assigneeId) : null;
     const sp = getTaskSpent(task);
     const overdue = task.deadline && !['closed','cancelled'].includes(task.status) && task.deadline < TODAY;
     const soon = task.deadline && !overdue && !['closed','cancelled'].includes(task.status) && daysDiff(TODAY, task.deadline) <= 3;
@@ -74,12 +75,9 @@ export default function TasksView({ db, ur, openTask, store }) {
           {p?.code}
         </div>
         <div className="kcard-meta">
-          {assignees.length > 0 && (
+          {assignee && (
             <span className="kassignee">
-              {assignees.slice(0,2).map(a => (
-                <Avatar key={a.id} employee={a} size="xs" />
-              ))}
-              {assignees.length > 2 && <span className="mut sm">+{assignees.length-2}</span>}
+              <Avatar employee={assignee} size="xs" />
             </span>
           )}
           <span className="khours"><Ic d={ICONS.clock} size={13} /> {sp}/{task.plannedHours ?? '—'} ч</span>
@@ -114,6 +112,8 @@ export default function TasksView({ db, ur, openTask, store }) {
     };
     store.upsertTask(updatedTask);
   };
+
+  const canCreate = canCreateTask(ur);
 
   return (
     <>
@@ -165,9 +165,11 @@ export default function TasksView({ db, ur, openTask, store }) {
           </label>
         )}
 
-        <button className="btn primary" onClick={() => openTask(null)}>
-          <Ic d={ICONS.plus} size={15} /> Создать
-        </button>
+        {canCreate && (
+          <button className="btn primary" onClick={() => openTask(null)}>
+            <Ic d={ICONS.plus} size={15} /> Создать
+          </button>
+        )}
       </div>
 
       {viewMode === 'kanban' ? (

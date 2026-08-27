@@ -47,20 +47,18 @@ export default function Projects({ db, ur, openProject, openHoursReq, closeProje
               <ProjectProgress project={p} plan={plan} fact={fact} />
               <div className="pj-foot">
                 <div className="pj-avatars">
-                  {tasks.slice(0, 6).flatMap(t =>
-                    (t.assigneeIds || []).map(id => {
-                      const a = db.employees.find(e => e.id === id);
-                      return a && (
-                        <span
-                          key={`${t.id}-${a.id}`}
-                          className="avatar xs"
-                          title={`${a.last} ${a.first}`}
-                        >
-                          {initials(a.first, a.last)}
-                        </span>
-                      );
-                    })
-                  )}
+                  {tasks.slice(0, 6).map(t => {
+                    const a = t.assigneeId ? db.employees.find(e => e.id === t.assigneeId) : null;
+                    return a && (
+                      <span
+                        key={t.id}
+                        className="avatar xs"
+                        title={`${a.last} ${a.first}`}
+                      >
+                        {initials(a.first, a.last)}
+                      </span>
+                    );
+                  })}
                 </div>
                 <div className="pj-actions" onClick={(e) => e.stopPropagation()}>
                   {((hasRole(ur, 'project_lead') && p.managerId === ur.id) || hasRole(ur, 'admin', 'director', 'economist', 'kb_chief')) && p.status === 'active' && p.ptype !== 'admin' && (

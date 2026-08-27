@@ -120,7 +120,7 @@ function generateRepeatDates(startDate, deadline, repeatConfig, endDate, maxCoun
 }
 
 export const TaskModal = ({ 
-  db, ur, taskId, initialTab = 'form', parentTaskId,
+  db, ur, taskId, initialTab = 'form', parentTaskId, initialProjectId,
   onClose, onSave, onDelete, onHoursReq, patchTask, notify, store,
   openTask,
   spent, planSum, 
@@ -148,8 +148,8 @@ export const TaskModal = ({
     id: "t_" + uid(),
     title: "",
     desc: "",
-    projectId: "",
-    assigneeIds: [],
+    projectId: initialProjectId || "",
+    assigneeId: null,                       // <-- один исполнитель
     priority: "mid",
     plannedHours: 8,
     start: TODAY,
@@ -196,10 +196,10 @@ export const TaskModal = ({
   const isAdminProj = proj && proj.ptype === "admin";
   const sp = f.logs.reduce((s, l) => s + l.hours, 0);
   const remainProj = proj && proj.budget != null && !proj.archived ? proj.budget - (planSum(proj.id) - (existing ? (existing.plannedHours || 0) : 0)) : null;
-  const vacWarn = !readOnly && f.assigneeIds && f.assigneeIds.length > 0 && f.deadline ? f.assigneeIds.map(id => vacOverlap(id, f.start || f.deadline, f.deadline)).find(v => v !== null) : null;
+  const vacWarn = !readOnly && f.assigneeId && f.deadline ? vacOverlap(f.assigneeId, f.start || f.deadline, f.deadline) : null;
   const isExec = existing && (existing.assigneeIds || []).includes(ur.id);
   
-  const canLog = !readOnly && (existing ? isExec : f.assigneeIds?.includes(ur.id));
+  const canLog = !readOnly && (existing ? isExec : f.assigneeId === ur.id);
 
   const statusOptions = useMemo(() => {
     if (isExec && !canChangeTaskStatus(ur, f, 'closed', db) && !canChangeTaskStatus(ur, f, 'cancelled', db)) {
@@ -246,7 +246,7 @@ export const TaskModal = ({
     const mentioned = extractMentions(comment.text, db.employees);
     const pj = db.projects.find((p) => p.id === f.projectId);
     const subs = new Set(mentioned);
-    (f.assigneeIds || []).forEach(id => subs.add(id));
+    if (f.assigneeId) subs.add(f.assigneeId);
     if (pj && pj.managerId) subs.add(pj.managerId);
     if (comment.parentId) {
       const parent = f.comments.find((x) => x.id === comment.parentId);
@@ -428,8 +428,8 @@ export const TaskModal = ({
       showToast('Задача обязательно назначается в рамках проекта', 'error');
       return;
     }
-    if (!f.assigneeIds || f.assigneeIds.length === 0) {
-      showToast('Выберите хотя бы одного исполнителя', 'error');
+    if (!f.assigneeId) {
+      showToast('Выберите ответственного исполнителя', 'error');
       return;
     }
     if (!isAdminProj) {
@@ -441,6 +441,16 @@ export const TaskModal = ({
         showToast('Для производственного проекта срок исполнения обязателен', 'error');
         return;
       }
+    }
+
+    // Проверка права на создание задачи (для новых и подзадач)
+    if (!existing && !canCreateTask(ur)) {
+      showToast('У вас нет прав на создание задач. Только ГК, ГД, Админ и Менеджер проектов.', 'error');
+      return;
+    }
+    if (parentTaskId && !canCreateTask(ur)) {
+      showToast('У вас нет прав на создание подзадач.', 'error');
+      return;
     }
 
     const projForBudget = db.projects.find(p => p.id === f.projectId);
@@ -475,8 +485,8 @@ export const TaskModal = ({
       }
     }
 
-    if (f.assigneeIds && f.assigneeIds.length > 0) {
-      f.assigneeIds.forEach(id => ensureExecutorRole(id));
+    if (f.assigneeId) {
+      ensureExecutorRole(f.assigneeId);
     }
     if (vacWarn) { setConfirmVac(vacWarn); return; }
     doSave(f.status);
@@ -499,28 +509,6 @@ export const TaskModal = ({
     setLogDate(TODAY);
     showToast('Часы учтены', 'success');
   };
-
-  const [showAssigneeSelector, setShowAssigneeSelector] = useState(false);
-  const [newAssigneeId, setNewAssigneeId] = useState('');
-
-  const addAssignee = () => {
-    if (!newAssigneeId) return;
-    if (f.assigneeIds.includes(newAssigneeId)) {
-      showToast('Этот исполнитель уже добавлен', 'warning');
-      return;
-    }
-    setF(prev => ({ ...prev, assigneeIds: [...prev.assigneeIds, newAssigneeId] }));
-    setNewAssigneeId('');
-    setShowAssigneeSelector(false);
-  };
-
-  const removeAssignee = (id) => {
-    setF(prev => ({ ...prev, assigneeIds: prev.assigneeIds.filter(x => x !== id) }));
-  };
-
-  const availableCandidates = useMemo(() => {
-    return asOpts.filter(e => !f.assigneeIds.includes(e.id));
-  }, [asOpts, f.assigneeIds]);
 
   const handleAccept = () => {
     if (!isAuthor || !isReview) return;
@@ -556,7 +544,7 @@ export const TaskModal = ({
 
       {tab === "form" && (
         <>
-          {vacWarn && <div className="warn-box"><Ic d={ICONS.beach} size={15} /> Один из исполнителей находится в отпуске с {fmtDMY(vacWarn.start)} по {fmtDMY(vacWarn.end)}. Даты пересекаются с периодом задачи.</div>}
+          {vacWarn && <div className="warn-box"><Ic d={ICONS.beach} size={15} /> Ответственный исполнитель находится в отпуске с {fmtDMY(vacWarn.start)} по {fmtDMY(vacWarn.end)}. Даты пересекаются с периодом задачи.</div>}
           {remainProj !== null && remainProj - (+f.plannedHours || 0) < 0 && <div className="warn-box">Внимание: задача превысит остаток бюджета проекта ({remainProj} ч). Потребуется утверждение ГД.</div>}
           {isAdminProj && !readOnly && <div className="info-box">Административный проект: срок исполнения и плановые часы задачи — по желанию.</div>}
 
@@ -606,10 +594,12 @@ export const TaskModal = ({
               <textarea className="inp" rows="2" disabled={!canEditFields} value={f.desc} onChange={(e) => set("desc", e.target.value)} />
             </div>
 
-            {/* Проект */}
+            {/* Проект — заблокирован, если передан initialProjectId */}
             <div className="field-row">
               <label className="field-label">Проект * <span className="mut">(активные)</span></label>
               {readOnly ? (
+                <input className="inp" disabled value={proj ? `${proj.code} — ${proj.name}` : ""} />
+              ) : initialProjectId ? (
                 <input className="inp" disabled value={proj ? `${proj.code} — ${proj.name}` : ""} />
               ) : (
                 <select className="inp sel" disabled={!canEditFields || isSubtask} value={f.projectId} onChange={(e) => set("projectId", e.target.value)} style={{ flex: 1 }}>
@@ -627,45 +617,24 @@ export const TaskModal = ({
               </select>
             </div>
 
-            {/* Исполнители */}
-            <div className="field-row" style={{ alignItems: 'flex-start' }}>
-              <label className="field-label">Исполнители *</label>
+            {/* Исполнитель (ответственный) — один select */}
+            <div className="field-row">
+              <label className="field-label">Ответственный *</label>
               {readOnly ? (
-                <input className="inp" disabled value={(f.assigneeIds || []).map(id => empName(id)).join(', ')} />
+                <input className="inp" disabled value={empName(f.assigneeId)} />
               ) : (
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                    {f.assigneeIds.map(id => {
-                      const e = db.employees.find(x => x.id === id);
-                      return e ? (
-                        <span key={id} className="assigned-executor">
-                          <Avatar employee={e} size="xs" />
-                          <span>{e.last} {e.first}</span>
-                          <button type="button" onClick={() => removeAssignee(id)}>×</button>
-                        </span>
-                      ) : null;
-                    })}
-                    {f.assigneeIds.length === 0 && <span className="mut sm">Нет исполнителей</span>}
-                  </div>
-                  {canEditFields && (
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      <button className="btn ghost sm" onClick={() => setShowAssigneeSelector(!showAssigneeSelector)}>
-                        <Ic d={ICONS.plus} size={13} /> Добавить
-                      </button>
-                      {showAssigneeSelector && (
-                        <select className="inp sel sm" style={{ width: '200px' }} value={newAssigneeId} onChange={e => setNewAssigneeId(e.target.value)}>
-                          <option value="">— выберите —</option>
-                          {availableCandidates.map(e => (
-                            <option key={e.id} value={e.id}>{e.last} {e.first} — {primaryDept(e)?.name || ''}</option>
-                          ))}
-                        </select>
-                      )}
-                      {showAssigneeSelector && (
-                        <button className="btn primary sm" onClick={addAssignee} disabled={!newAssigneeId}>Добавить</button>
-                      )}
-                    </div>
-                  )}
-                </div>
+                <select
+                  className="inp sel"
+                  disabled={!canEditFields}
+                  value={f.assigneeId || ''}
+                  onChange={(e) => set("assigneeId", e.target.value || null)}
+                  style={{ flex: 1 }}
+                >
+                  <option value="">— выберите —</option>
+                  {asOpts.map(e => (
+                    <option key={e.id} value={e.id}>{e.last} {e.first}</option>
+                  ))}
+                </select>
               )}
             </div>
 
@@ -730,29 +699,31 @@ export const TaskModal = ({
               <div className="info-box">Исполнитель может переводить задачу в «В работе» и «На проверке»; закрытие и отмена — у ответственного/руководителя.</div>
             )}
 
+            {/* Зависимости — поля одно под другим */}
             <div className="field-row">
-                <label className="field-label">Зависит от задачи</label>
-                <select 
-                  className="inp sel" 
-                  disabled={!canEditFields} 
-                  value={f.dependencyId || ''} 
-                  onChange={(e) => set("dependencyId", e.target.value || null)}
-                >
-                  <option value="">— нет зависимости —</option>
-                  {db.tasks
-                    .filter(t => t.id !== f.id && t.projectId === f.projectId && t.status !== 'closed' && t.status !== 'cancelled')
-                    .map(t => (
-                      <option key={t.id} value={t.id}>{t.title}</option>
-                    ))
-                  }
-                </select>
+              <label className="field-label">Зависит от задачи</label>
+              <select
+                className="inp sel"
+                disabled={!canEditFields}
+                value={f.dependencyId || ''}
+                onChange={(e) => set("dependencyId", e.target.value || null)}
+              >
+                <option value="">— нет зависимости —</option>
+                {db.tasks
+                  .filter(t => t.id !== f.id && t.projectId === f.projectId && t.status !== 'closed' && t.status !== 'cancelled')
+                  .map(t => (
+                    <option key={t.id} value={t.id}>{t.title}</option>
+                  ))
+                }
+              </select>
             </div>
+
             <div className="field-row">
               <label className="field-label">Тип зависимости</label>
-              <select 
-                className="inp sel" 
-                disabled={!canEditFields || !f.dependencyId} 
-                value={f.dependencyType || 'FS'} 
+              <select
+                className="inp sel"
+                disabled={!canEditFields || !f.dependencyId}
+                value={f.dependencyType || 'FS'}
                 onChange={(e) => set("dependencyType", e.target.value)}
               >
                 {Object.entries(DEPENDENCY_TYPES).map(([key, val]) => (
@@ -933,7 +904,7 @@ export const TaskModal = ({
                     <tr key={sub.id}>
                       <td><b>{sub.title}</b></td>
                       <td><span className="st-chip" style={{ background: TASK_STATUSES[sub.status]?.color + '22', color: TASK_STATUSES[sub.status]?.color }}>{TASK_STATUSES[sub.status]?.label}</span></td>
-                      <td>{(sub.assigneeIds || []).map(id => empName(id)).join(', ') || '—'}</td>
+                      <td>{sub.assigneeId ? empName(sub.assigneeId) : '—'}</td>
                       <td>
                         <button 
                           className="btn ghost sm" 
@@ -977,7 +948,7 @@ export const TaskModal = ({
       {tab === "files" && (
         <div className="tm-block" style={{ marginTop: 0 }}>
           <div className="rep-panel-title">Файлы задачи</div>
-          {!readOnly && (canEditFields || f.assigneeIds?.includes(ur.id) || f.creatorId === ur.id) && (
+          {!readOnly && (canEditFields || f.assigneeId === ur.id || f.creatorId === ur.id) && (
             <div className="toolbar">
               <input
                 type="file"
@@ -1033,7 +1004,7 @@ export const TaskModal = ({
                     >
                       Скачать
                     </a>
-                    {!readOnly && (canEditFields || f.assigneeIds?.includes(ur.id) || f.creatorId === ur.id) && (
+                    {!readOnly && (canEditFields || f.assigneeId === ur.id || f.creatorId === ur.id) && (
                       <button
                         className="icon-btn danger"
                         onClick={() => handleFileDelete(file.id)}
@@ -1077,7 +1048,7 @@ export const TaskModal = ({
 
       {confirmVac && (
         <Modal title="Конфликт с отпуском исполнителя" onClose={() => setConfirmVac(null)} width={460}>
-          <p>Один из исполнителей находится в отпуске с {fmtDMY(confirmVac.start)} по {fmtDMY(confirmVac.end)}. Вы уверены, что хотите назначить задачу?</p>
+          <p>Ответственный исполнитель находится в отпуске с {fmtDMY(confirmVac.start)} по {fmtDMY(confirmVac.end)}. Вы уверены, что хотите назначить задачу?</p>
           <div className="modal-foot">
             <div className="spacer" />
             <button className="btn ghost" onClick={() => setConfirmVac(null)}>Отмена</button>

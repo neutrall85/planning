@@ -455,7 +455,8 @@ export function buildMockData() {
     },
   ];
 
-  const T = (id, title, projectId, assigneeIds, planned, s, dl, status, priority, desc, extra = {}) => {
+  // Вспомогательная функция для создания задач с одним исполнителем (assigneeId)
+  const T = (id, title, projectId, assigneeId, planned, s, dl, status, priority, desc, extra = {}) => {
     const history = extra.history || [{ ts: now - 86400000 * 6, who: extra.creatorId || "aleksey.gendirov", text: "Задача создана" }];
     const creatorId = extra.creatorId || (history.length > 0 ? history[0].who : "aleksey.gendirov");
     const startDate = makeDate(s);
@@ -464,56 +465,125 @@ export function buildMockData() {
     createdAtDate.setDate(createdAtDate.getDate() + Math.floor(Math.random() * 11) - 5);
     const createdAtStr = createdAtDate.toISOString();
     return {
-      id, title, desc: desc || "", projectId, assigneeIds: Array.isArray(assigneeIds) ? assigneeIds : [assigneeIds],
-      plannedHours: planned, start: startDate, deadline: deadlineDate,
-      status, priority, logs: [], comments: [], history,
+      id, title, desc: desc || "", projectId,
+      assigneeId: assigneeId || null,  // один исполнитель
+      plannedHours: planned,
+      start: startDate,
+      deadline: deadlineDate,
+      status,
+      priority,
+      logs: extra.logs || [],
+      comments: extra.comments || [],
+      history,
       creatorId,
       createdAt: extra.createdAt || createdAtStr,
-      delegatedFrom: null, archived: false, archivedAt: null, closedAt: null,
-      isSummary: false,
-      parentTaskId: null,
-      ...extra,
+      delegatedFrom: extra.delegatedFrom || null,
+      archived: extra.archived || false,
+      archivedAt: extra.archivedAt || null,
+      closedAt: extra.closedAt || null,
+      isSummary: extra.isSummary || false,
+      parentTaskId: extra.parentTaskId || null,
+      files: extra.files || [],
+      dependencyId: extra.dependencyId || null,
+      dependencyType: extra.dependencyType || 'FS',
     };
   };
 
   const tasks = [
-    T("t01", "Расчёт подъёмной силы крыла", "p_lm24", ["isaev"], 24, -12, 6, "inwork", "high", "Расчёт и оформление отчёта.", { logs: [ { id: uid(), userId: "isaev", date: makeDate(-6), hours: 6, note: "Проверка методики" }, { id: uid(), userId: "isaev", date: makeDate(-2), hours: 5, note: "Расчётная сетка" } ], comments: [ { id: "c1", parentId: null, authorId: "e_morozov", ts: now - 3600000 * 20, text: "@Исаев Роман — подключите, пожалуйста, отдел прочности к пятнице." }, { id: "c2", parentId: "c1", authorId: "isaev", ts: now - 3600000 * 18, text: "Принято, сегодня подготовлю исходные данные." } ], creatorId: "e_morozov" }),
-    T("t02", "3D-модель фюзеляжа", "p_lm24", ["e_tolka"], 40, -15, 12, "inwork", "mid", "Силовой набор и обводы.", { logs: [ { id: uid(), userId: "e_tolka", date: makeDate(-5), hours: 8, note: "Шпангоуты" } ], creatorId: "e_morozov" }),
-    T("t03", "Нагрузки на элероны", "p_lm24", ["e_zaitsev"], 16, -10, -2, "new", "crit", "Эпюры нагрузок для навесок.", { creatorId: "e_morozov" }),
-    T("t04", "Отчёт по прочности фюзеляжа", "p_lm24", ["e_frolova"], 32, -8, 18, "review", "high", "Статика и усталость.", { logs: [ { id: uid(), userId: "e_frolova", date: makeDate(-3), hours: 12, note: "МКЭ-модель" } ], creatorId: "e_morozov" }),
-    T("t05", "Весовая сводка компоновки", "p_lm24", ["e_gusev"], 20, -5, 9, "inwork", "mid", "", { logs: [ { id: uid(), userId: "e_gusev", date: makeDate(-1), hours: 4, note: "Сведение таблиц" } ], creatorId: "e_morozov" }),
-    T("t06", "Программа лётных испытаний", "p_cert", ["e_fedorov"], 16, -2, 25, "new", "mid", "Совместно с лётной службой.", { creatorId: "e_fedorov" }),
-    T("t07", "Согласование плана статиспытаний", "p_cert", ["e_anokhin"], 12, -4, 4, "inwork", "high", "", { logs: [ { id: uid(), userId: "e_anokhin", date: makeDate(-2), hours: 3, note: "Замечания" } ], creatorId: "e_fedorov" }),
-    T("t08", "Чертежи лопастей несущего винта", "p_heli", ["e_somova"], 36, -18, 20, "inwork", "high", "Переназначено на период отпуска Сомовой.", { delegatedFrom: "e_somova", logs: [ { id: uid(), userId: "e_somova", date: makeDate(-7), hours: 10, note: "Комлевая часть" } ], creatorId: "e_gromov" }),
-    T("t09", "Вибрационный расчёт главного редуктора", "p_heli", ["isaev"], 18, -6, 14, "new", "mid", "", { creatorId: "e_gromov" }),
-    T("t10", "Термогазодинамический расчёт компрессора", "p_rd900", ["e_tihonov"], 48, -14, 28, "inwork", "crit", "Режимы взлёт/крейсер.", { logs: [ { id: uid(), userId: "e_tihonov", date: makeDate(-4), hours: 12, note: "Характеристики ступеней" } ], creatorId: "e_krylov" }),
-    T("t11", "Прочность камеры сгорания", "p_rd900", ["e_medvedev"], 30, -9, 22, "inwork", "mid", "", { logs: [ { id: uid(), userId: "e_medvedev", date: makeDate(-3), hours: 6, note: "Теплонапряжённость" } ], creatorId: "e_krylov" }),
-    T("t12", "ТЗ на САУ-900", "p_rd900", ["e_orlova"], 20, -7, 10, "review", "mid", "", { logs: [ { id: uid(), userId: "e_orlova", date: makeDate(-2), hours: 8, note: "Разделы 3–5" } ], creatorId: "e_krylov" }),
-    T("t13", "Компрессор ВСУ-14", "p_apu", ["e_tihonov"], 22, -4, 16, "new", "mid", "", { creatorId: "e_medvedev" }),
-    T("t14", "Испытания стартер-генератора ВСУ", "p_apu", ["e_gusev"], 14, -12, -4, "inwork", "high", "Стенд №3, протокол.", { logs: [ { id: uid(), userId: "e_gusev", date: makeDate(-6), hours: 6, note: "Прогон на стенде" } ], creatorId: "e_medvedev" }),
-    T("t15", "Разработка ТЗ на новое радиооборудование", "p_obr", ["e_anokhin"], 30, -3, 15, "inwork", "high", "Требования к дальности и помехозащищённости.", { creatorId: "nikolay.managerov" }),
-    T("t16", "Тестирование прототипа приемника", "p_obr", ["e_anokhin"], 20, 2, 18, "new", "mid", "", { creatorId: "nikolay.managerov" }),
-    T("t17", "Интеграция с бортовой шиной", "p_obr", ["e_anokhin"], 24, 5, 25, "new", "mid", "", { creatorId: "nikolay.managerov" }),
-    T("t18", "Подготовка зала ко Дню промышленности", "p_event", ["olga.personalova"], null, 0, 6, "new", "mid", "", { creatorId: "olga.personalova" }),
-    T("t19", "Заказать сувенирную продукцию", "p_event", ["olga.personalova"], 6, 1, 10, "new", "low", "", { creatorId: "olga.personalova" }),
-    T("t_a1", "Монтаж оборудования точек доступа", "p_old", ["e_anokhin"], 30, -290, -240, "closed", "mid", "Завершено в прошлом отчётном периоде.", { logs: [ { id: uid(), userId: "e_anokhin", date: makeDate(-250), hours: 28, note: "Монтаж и пусконаладка" } ], closedAt: D(-215), comments: [ { id: "ca1", parentId: null, authorId: "e_morozov", ts: now - 86400000 * 220, text: "Прошу зафиксировать итоговую схему размещения точек." }, { id: "ca2", parentId: "ca1", authorId: "e_anokhin", ts: now - 86400000 * 218, text: "Схема приложена к отчёту, всё смонтировано." } ], creatorId: "e_morozov" }),
-    T("t_a2", "Аудит сетевых кабелей", "p_old", ["e_morozov"], 18, -280, -235, "closed", "low", "", { logs: [ { id: uid(), userId: "e_morozov", date: makeDate(-240), hours: 16, note: "Аудит завершён" } ], closedAt: D(-220), creatorId: "e_morozov" }),
-    T("t_a3", "Подготовка регламента мероприятий", "p_long", ["olga.personalova"], 10, -320, -305, "closed", "low", "Задача долгосрочного административного проекта — не архивируется.", { logs: [ { id: uid(), userId: "olga.personalova", date: makeDate(-310), hours: 9, note: "Регламент готов" } ], closedAt: D(-300), creatorId: "olga.personalova" }),
-    T("t20", "Аудит качества сборки", "p_lm24", ["sergey.adminov"], 12, -8, 5, "new", "high", "Проверка соответствия технологии."),
-    T("t21", "Утверждение стратегии развития", "p_bp", ["aleksey.gendirov"], 8, -5, 10, "new", "high", "Подготовка и утверждение стратегии."),
-    T("t22", "Анализ бюджетов проектов", "p_bp", ["erik.ekonomistov"], 16, -3, 12, "inwork", "mid", "Сравнение плановых и фактических затрат.", { logs: [ { id: uid(), userId: "erik.ekonomistov", date: makeDate(-2), hours: 8, note: "Сбор данных" } ] }),
-    T("t23", "Руководство проектированием крыла", "p_lm24", ["ivan.konstruktorov"], 20, -10, 15, "inwork", "crit", "Общее руководство конструкторской группой."),
-    T("t24", "Расчёт газодинамики двигателя", "p_rd900", ["e_belova"], 30, -12, 20, "new", "high", "Расчёт параметров рабочего процесса."),
-    T("t25", "Координация аэродинамических расчётов", "p_aero", ["mikhail.otdelov"], 18, -5, 10, "inwork", "mid", "Сведение результатов.", { logs: [ { id: uid(), userId: "mikhail.otdelov", date: makeDate(-2), hours: 6, note: "Совещание" } ] }),
-    T("t26", "Планирование испытаний", "p_cert", ["kirill.proektov"], 14, -4, 8, "new", "mid", "Разработка программы испытаний."),
-    T("t27", "Управление проектом ОБРЭО", "p_obr", ["nikolay.managerov"], 24, -3, 15, "inwork", "high", "Координация работ по проекту.", { logs: [ { id: uid(), userId: "nikolay.managerov", date: makeDate(-1), hours: 6, note: "План-график" } ] }),
-    T("t28", "Контроль качества сборки", "p_lm24", ["e_otk_head"], 16, -6, 4, "new", "high", "Входной контроль комплектующих."),
-    T("t29", "Проверка документации", "p_lm24", ["e_otk_spec"], 12, -4, 2, "new", "mid", "Проверка конструкторской документации."),
-    T("t31", "Термогазодинамика РД-900", "p_rd900", ["e_krylov"], 26, -10, 18, "inwork", "crit", "Термодинамические расчёты.", { logs: [ { id: uid(), userId: "e_krylov", date: makeDate(-3), hours: 12, note: "Моделирование" } ] }),
-    T("t32", "Планирование прочностных испытаний", "p_proch", ["e_gromov"], 14, -2, 6, "new", "mid", "План испытаний планера."),
-    T("t33", "Компоновка отсеков", "p_lm24", ["e_ilina"], 20, -8, 10, "inwork", "mid", "Размещение оборудования.", { logs: [ { id: uid(), userId: "e_ilina", date: makeDate(-1), hours: 4, note: "Эскизы" } ] }),
-    T("t34", "Программирование САУ", "p_sau", ["e_koval"], 40, -6, 20, "new", "high", "Разработка ПО для управления двигателем."),
-    T("t35", "Расчёт ресурса лопаток", "p_rd900", ["e_melnik"], 24, -9, 14, "inwork", "mid", "Усталостный расчёт.", { logs: [ { id: uid(), userId: "e_melnik", date: makeDate(-4), hours: 10, note: "Нагрузки" } ] }),
+    T("t01", "Расчёт подъёмной силы крыла", "p_lm24", "isaev", 24, -12, 6, "inwork", "high", "Расчёт и оформление отчёта.", {
+      logs: [ { id: uid(), userId: "isaev", date: makeDate(-6), hours: 6, note: "Проверка методики" }, { id: uid(), userId: "isaev", date: makeDate(-2), hours: 5, note: "Расчётная сетка" } ],
+      comments: [ { id: "c1", parentId: null, authorId: "e_morozov", ts: now - 3600000 * 20, text: "@Исаев Роман — подключите, пожалуйста, отдел прочности к пятнице." }, { id: "c2", parentId: "c1", authorId: "isaev", ts: now - 3600000 * 18, text: "Принято, сегодня подготовлю исходные данные." } ],
+      creatorId: "e_morozov"
+    }),
+    T("t02", "3D-модель фюзеляжа", "p_lm24", "e_tolka", 40, -15, 12, "inwork", "mid", "Силовой набор и обводы.", {
+      logs: [ { id: uid(), userId: "e_tolka", date: makeDate(-5), hours: 8, note: "Шпангоуты" } ],
+      creatorId: "e_morozov"
+    }),
+    T("t03", "Нагрузки на элероны", "p_lm24", "e_zaitsev", 16, -10, -2, "new", "crit", "Эпюры нагрузок для навесок.", { creatorId: "e_morozov" }),
+    T("t04", "Отчёт по прочности фюзеляжа", "p_lm24", "e_frolova", 32, -8, 18, "review", "high", "Статика и усталость.", {
+      logs: [ { id: uid(), userId: "e_frolova", date: makeDate(-3), hours: 12, note: "МКЭ-модель" } ],
+      creatorId: "e_morozov"
+    }),
+    T("t05", "Весовая сводка компоновки", "p_lm24", "e_gusev", 20, -5, 9, "inwork", "mid", "", {
+      logs: [ { id: uid(), userId: "e_gusev", date: makeDate(-1), hours: 4, note: "Сведение таблиц" } ],
+      creatorId: "e_morozov"
+    }),
+    T("t06", "Программа лётных испытаний", "p_cert", "e_fedorov", 16, -2, 25, "new", "mid", "Совместно с лётной службой.", { creatorId: "e_fedorov" }),
+    T("t07", "Согласование плана статиспытаний", "p_cert", "e_anokhin", 12, -4, 4, "inwork", "high", "", {
+      logs: [ { id: uid(), userId: "e_anokhin", date: makeDate(-2), hours: 3, note: "Замечания" } ],
+      creatorId: "e_fedorov"
+    }),
+    T("t08", "Чертежи лопастей несущего винта", "p_heli", "e_somova", 36, -18, 20, "inwork", "high", "Переназначено на период отпуска Сомовой.", {
+      delegatedFrom: "e_somova",
+      logs: [ { id: uid(), userId: "e_somova", date: makeDate(-7), hours: 10, note: "Комлевая часть" } ],
+      creatorId: "e_gromov"
+    }),
+    T("t09", "Вибрационный расчёт главного редуктора", "p_heli", "isaev", 18, -6, 14, "new", "mid", "", { creatorId: "e_gromov" }),
+    T("t10", "Термогазодинамический расчёт компрессора", "p_rd900", "e_tihonov", 48, -14, 28, "inwork", "crit", "Режимы взлёт/крейсер.", {
+      logs: [ { id: uid(), userId: "e_tihonov", date: makeDate(-4), hours: 12, note: "Характеристики ступеней" } ],
+      creatorId: "e_krylov"
+    }),
+    T("t11", "Прочность камеры сгорания", "p_rd900", "e_medvedev", 30, -9, 22, "inwork", "mid", "", {
+      logs: [ { id: uid(), userId: "e_medvedev", date: makeDate(-3), hours: 6, note: "Теплонапряжённость" } ],
+      creatorId: "e_krylov"
+    }),
+    T("t12", "ТЗ на САУ-900", "p_rd900", "e_orlova", 20, -7, 10, "review", "mid", "", {
+      logs: [ { id: uid(), userId: "e_orlova", date: makeDate(-2), hours: 8, note: "Разделы 3–5" } ],
+      creatorId: "e_krylov"
+    }),
+    T("t13", "Компрессор ВСУ-14", "p_apu", "e_tihonov", 22, -4, 16, "new", "mid", "", { creatorId: "e_medvedev" }),
+    T("t14", "Испытания стартер-генератора ВСУ", "p_apu", "e_gusev", 14, -12, -4, "inwork", "high", "Стенд №3, протокол.", {
+      logs: [ { id: uid(), userId: "e_gusev", date: makeDate(-6), hours: 6, note: "Прогон на стенде" } ],
+      creatorId: "e_medvedev"
+    }),
+    T("t15", "Разработка ТЗ на новое радиооборудование", "p_obr", "e_anokhin", 30, -3, 15, "inwork", "high", "Требования к дальности и помехозащищённости.", { creatorId: "nikolay.managerov" }),
+    T("t16", "Тестирование прототипа приемника", "p_obr", "e_anokhin", 20, 2, 18, "new", "mid", "", { creatorId: "nikolay.managerov" }),
+    T("t17", "Интеграция с бортовой шиной", "p_obr", "e_anokhin", 24, 5, 25, "new", "mid", "", { creatorId: "nikolay.managerov" }),
+    T("t18", "Подготовка зала ко Дню промышленности", "p_event", "olga.personalova", null, 0, 6, "new", "mid", "", { creatorId: "olga.personalova" }),
+    T("t19", "Заказать сувенирную продукцию", "p_event", "olga.personalova", 6, 1, 10, "new", "low", "", { creatorId: "olga.personalova" }),
+    T("t_a1", "Монтаж оборудования точек доступа", "p_old", "e_anokhin", 30, -290, -240, "closed", "mid", "Завершено в прошлом отчётном периоде.", {
+      logs: [ { id: uid(), userId: "e_anokhin", date: makeDate(-250), hours: 28, note: "Монтаж и пусконаладка" } ],
+      closedAt: D(-215),
+      comments: [ { id: "ca1", parentId: null, authorId: "e_morozov", ts: now - 86400000 * 220, text: "Прошу зафиксировать итоговую схему размещения точек." }, { id: "ca2", parentId: "ca1", authorId: "e_anokhin", ts: now - 86400000 * 218, text: "Схема приложена к отчёту, всё смонтировано." } ],
+      creatorId: "e_morozov"
+    }),
+    T("t_a2", "Аудит сетевых кабелей", "p_old", "e_morozov", 18, -280, -235, "closed", "low", "", {
+      logs: [ { id: uid(), userId: "e_morozov", date: makeDate(-240), hours: 16, note: "Аудит завершён" } ],
+      closedAt: D(-220),
+      creatorId: "e_morozov"
+    }),
+    T("t_a3", "Подготовка регламента мероприятий", "p_long", "olga.personalova", 10, -320, -305, "closed", "low", "Задача долгосрочного административного проекта — не архивируется.", {
+      logs: [ { id: uid(), userId: "olga.personalova", date: makeDate(-310), hours: 9, note: "Регламент готов" } ],
+      closedAt: D(-300),
+      creatorId: "olga.personalova"
+    }),
+    T("t20", "Аудит качества сборки", "p_lm24", "sergey.adminov", 12, -8, 5, "new", "high", "Проверка соответствия технологии."),
+    T("t21", "Утверждение стратегии развития", "p_bp", "aleksey.gendirov", 8, -5, 10, "new", "high", "Подготовка и утверждение стратегии."),
+    T("t22", "Анализ бюджетов проектов", "p_bp", "erik.ekonomistov", 16, -3, 12, "inwork", "mid", "Сравнение плановых и фактических затрат.", {
+      logs: [ { id: uid(), userId: "erik.ekonomistov", date: makeDate(-2), hours: 8, note: "Сбор данных" } ]
+    }),
+    T("t23", "Руководство проектированием крыла", "p_lm24", "ivan.konstruktorov", 20, -10, 15, "inwork", "crit", "Общее руководство конструкторской группой."),
+    T("t24", "Расчёт газодинамики двигателя", "p_rd900", "e_belova", 30, -12, 20, "new", "high", "Расчёт параметров рабочего процесса."),
+    T("t25", "Координация аэродинамических расчётов", "p_aero", "mikhail.otdelov", 18, -5, 10, "inwork", "mid", "Сведение результатов.", {
+      logs: [ { id: uid(), userId: "mikhail.otdelov", date: makeDate(-2), hours: 6, note: "Совещание" } ]
+    }),
+    T("t26", "Планирование испытаний", "p_cert", "kirill.proektov", 14, -4, 8, "new", "mid", "Разработка программы испытаний."),
+    T("t27", "Управление проектом ОБРЭО", "p_obr", "nikolay.managerov", 24, -3, 15, "inwork", "high", "Координация работ по проекту.", {
+      logs: [ { id: uid(), userId: "nikolay.managerov", date: makeDate(-1), hours: 6, note: "План-график" } ]
+    }),
+    T("t28", "Контроль качества сборки", "p_lm24", "e_otk_head", 16, -6, 4, "new", "high", "Входной контроль комплектующих."),
+    T("t29", "Проверка документации", "p_lm24", "e_otk_spec", 12, -4, 2, "new", "mid", "Проверка конструкторской документации."),
+    T("t31", "Термогазодинамика РД-900", "p_rd900", "e_krylov", 26, -10, 18, "inwork", "crit", "Термодинамические расчёты.", {
+      logs: [ { id: uid(), userId: "e_krylov", date: makeDate(-3), hours: 12, note: "Моделирование" } ]
+    }),
+    T("t32", "Планирование прочностных испытаний", "p_proch", "e_gromov", 14, -2, 6, "new", "mid", "План испытаний планера."),
+    T("t33", "Компоновка отсеков", "p_lm24", "e_ilina", 20, -8, 10, "inwork", "mid", "Размещение оборудования.", {
+      logs: [ { id: uid(), userId: "e_ilina", date: makeDate(-1), hours: 4, note: "Эскизы" } ]
+    }),
+    T("t34", "Программирование САУ", "p_sau", "e_koval", 40, -6, 20, "new", "high", "Разработка ПО для управления двигателем."),
+    T("t35", "Расчёт ресурса лопаток", "p_rd900", "e_melnik", 24, -9, 14, "inwork", "mid", "Усталостный расчёт.", {
+      logs: [ { id: uid(), userId: "e_melnik", date: makeDate(-4), hours: 10, note: "Нагрузки" } ]
+    }),
   ];
 
   const vacations = [
