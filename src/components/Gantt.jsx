@@ -128,7 +128,11 @@ const TaskRow = ({
 
   return (
     <div className={`gantt-row${level > 0 ? ' gantt-row-child' : ''}${isCritical ? ' gantt-critical' : ''} relative`}>
-      <div className="gantt-label" onClick={() => openTask(task.id)}>
+      <div 
+        className="gantt-label" 
+        onClick={() => openTask(task.id)}
+        style={{ '--indent-level': level * 20 + 'px' }}
+      >
         <div className="flex items-center gap-1">
           {hasChildren && (
             <button
@@ -192,6 +196,7 @@ const ProjectGroup = ({
   expandedTasks,
   setExpandedTasks,
   criticalIds,
+  cornerWidth,
 }) => {
   const projectColor = getProjectColor(project);
   const tree = buildTaskTree(tasks);
@@ -200,16 +205,17 @@ const ProjectGroup = ({
   const renderRows = () => {
     const rows = [];
     const visited = new Set();
-    const traverse = (node) => {
+    const traverse = (node, level = 0) => {
       if (visited.has(node.id)) return;
       visited.add(node.id);
       const isExpanded = expandedTasks.has(node.id);
+      const hasChildren = node.children && node.children.length > 0;
       rows.push(
         <TaskRow
           key={node.id}
           task={node}
-          level={node.level}
-          hasChildren={node.hasChildren}
+          level={level}
+          hasChildren={hasChildren}
           expanded={isExpanded}
           onToggle={(id) => {
             setExpandedTasks((prev) => {
@@ -231,7 +237,7 @@ const ProjectGroup = ({
         />
       );
       if (isExpanded) {
-        node.children.forEach((child) => traverse(child));
+        node.children.forEach((child) => traverse(child, level + 1));
       }
     };
     tree.forEach((root) => traverse(root));
@@ -276,6 +282,31 @@ export default function Gantt({ db, ur, openTask, openProject }) {
   const [expandedTasks, setExpandedTasks] = useState(new Set());
   const [mode, setMode] = useState('month');
   const [anchor, setAnchor] = useState(() => iso(new Date(new Date().getFullYear(), new Date().getMonth(), 1)));
+  const [cornerWidth, setCornerWidth] = useState(240);
+  const [isResizing, setIsResizing] = useState(false);
+
+  // Обработчик перетаскивания разделителя
+  const handleResizerMouseDown = useCallback((e) => {
+    e.preventDefault();
+    setIsResizing(true);
+    const startX = e.clientX;
+    const startWidth = cornerWidth;
+
+    const handleMouseMove = (moveEvent) => {
+      const diff = moveEvent.clientX - startX;
+      const newWidth = Math.max(150, Math.min(500, startWidth + diff));
+      setCornerWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, [cornerWidth]);
 
   const getDaysInRange = useCallback((anchorDate, mode) => {
     const start = parseISO(anchorDate);
@@ -398,7 +429,7 @@ export default function Gantt({ db, ur, openTask, openProject }) {
   const viewStart = days[0];
   const viewEnd = days[days.length - 1];
   const width = days.length * DW;
-  const totalWidth = width + 240;
+  const totalWidth = width + cornerWidth;
 
   if (projectGroups.length === 0) {
     return (
@@ -470,9 +501,15 @@ export default function Gantt({ db, ur, openTask, openProject }) {
       </div>
 
       <div className="gantt-scroll">
-        <div className="gantt" style={{ '--gantt-width': totalWidth + 'px' }}>
+        <div className="gantt" style={{ '--gantt-width': totalWidth + 'px', '--corner-width': cornerWidth + 'px' }}>
           <div className="gantt-top">
-            <div className="gantt-corner">Проект / задача</div>
+            <div className="gantt-corner">
+              Проект / задача
+              <div 
+                className={`gantt-resizer${isResizing ? ' dragging' : ''}`}
+                onMouseDown={handleResizerMouseDown}
+              />
+            </div>
             <div className="gantt-axis" style={{ width }}>
               <div className="gantt-months" style={{ display: 'flex', flexWrap: 'nowrap', width }}>
                 {months.map((m, i) => (
@@ -493,7 +530,7 @@ export default function Gantt({ db, ur, openTask, openProject }) {
             </div>
           </div>
           <div className="gantt-body">
-            <div className="gantt-grid" style={{ width, left: 240 }}>
+            <div className="gantt-grid" style={{ width, left: cornerWidth }}>
               {days.map(d => <div key={d} className={`gcell${[0,6].includes(parseISO(d).getDay()) ? ' wk' : ''}`} style={{ width: DW, flex: 'none' }} />)}
               <div className="gtoday" style={{ left: days.indexOf(TODAY) * DW + DW/2 }} />
             </div>
@@ -514,6 +551,7 @@ export default function Gantt({ db, ur, openTask, openProject }) {
                 expandedTasks={expandedTasks}
                 setExpandedTasks={setExpandedTasks}
                 criticalIds={criticalIds}
+                cornerWidth={cornerWidth}
               />
             ))}
           </div>
