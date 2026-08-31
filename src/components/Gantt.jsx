@@ -200,16 +200,17 @@ const ProjectGroup = ({
   const renderRows = () => {
     const rows = [];
     const visited = new Set();
-    const traverse = (node) => {
+    const traverse = (node, level = 0) => {
       if (visited.has(node.id)) return;
       visited.add(node.id);
       const isExpanded = expandedTasks.has(node.id);
+      const hasChildren = node.children && node.children.length > 0;
       rows.push(
         <TaskRow
           key={node.id}
           task={node}
-          level={node.level}
-          hasChildren={node.hasChildren}
+          level={level}
+          hasChildren={hasChildren}
           expanded={isExpanded}
           onToggle={(id) => {
             setExpandedTasks((prev) => {
