@@ -3,13 +3,11 @@ import { fmtDT, fmtDMY } from '../utils/date';
 import { useDataHelpers } from '../hooks';
 import { Ic, ICONS } from './Icons';
 
-// Безопасная проверка даты
 const safeDate = (ts) => {
   const d = new Date(ts);
   return isNaN(d.getTime()) ? null : d;
 };
 
-// Правильный парсинг строки "дд.мм.гггг" в объект Date
 const parseDayKey = (dayKey) => {
   const parts = dayKey.split('.');
   if (parts.length !== 3) return null;
@@ -73,7 +71,7 @@ export default function Journal({ db }) {
   const filteredEntries = useMemo(() => {
     return allEntries.filter(entry => {
       const dateObj = safeDate(entry.ts);
-      if (!dateObj) return false; // пропускаем записи с некорректной датой
+      if (!dateObj) return false;
       
       const entryDate = fmtDMY(entry.ts);
       if (filters.dateFrom && entryDate < filters.dateFrom) return false;
@@ -90,12 +88,11 @@ export default function Journal({ db }) {
     });
   }, [allEntries, filters]);
 
-  // Группировка по датам (день/месяц) - используем parseDayKey
   const groupedEntries = useMemo(() => {
     const groups = {};
     filteredEntries.forEach(entry => {
       const d = safeDate(entry.ts);
-      if (!d) return; // пропускаем
+      if (!d) return;
       
       const dayKey = fmtDMY(entry.ts);
       const monthKey = `${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
@@ -105,7 +102,6 @@ export default function Journal({ db }) {
       groups[monthKey][dayKey].push(entry);
     });
     
-    // Сортировка месяцев (от новых к старым)
     const sortedMonths = Object.keys(groups).sort((a, b) => {
       const [m1, y1] = a.split('.').map(Number);
       const [m2, y2] = b.split('.').map(Number);
@@ -126,7 +122,6 @@ export default function Journal({ db }) {
     return result;
   }, [filteredEntries]);
 
-  // Плоский список для пагинации (без дубликатов)
   const flatEntries = useMemo(() => {
     const result = [];
     let lastMonth = null;
@@ -180,7 +175,7 @@ export default function Journal({ db }) {
       const obj = typeof entry.details === 'string' ? JSON.parse(entry.details) : entry.details;
       if (typeof obj === 'object') {
         return (
-          <div style={{ fontSize: '12px', color: 'var(--mut)', marginTop: '2px' }}>
+          <div className="text-xs text-mut mt-1">
             {Object.entries(obj).map(([key, val]) => (
               <div key={key}><b>{key}:</b> {String(val)}</div>
             ))}
@@ -215,48 +210,44 @@ export default function Journal({ db }) {
 
   return (
     <div className="rep">
-      <div className="rep-panel" style={{ padding: '16px' }}>
+      <div className="rep-panel p-4">
         <div className="rep-panel-title">Фильтры журнала</div>
-        <div className="toolbar" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
-          <label className="lbl" style={{ margin: 0 }}>С даты:</label>
+        <div className="toolbar flex flex-wrap gap-2 items-center">
+          <label className="lbl m-0">С даты:</label>
           <input
-            className="inp"
+            className="inp w-150"
             type="date"
             value={filters.dateFrom}
             onChange={e => handleFilterChange('dateFrom', e.target.value)}
-            style={{ width: '150px' }}
           />
           <span>—</span>
           <input
-            className="inp"
+            className="inp w-150"
             type="date"
             value={filters.dateTo}
             onChange={e => handleFilterChange('dateTo', e.target.value)}
-            style={{ width: '150px' }}
           />
 
-          <label className="lbl" style={{ margin: 0 }}>Пользователь:</label>
+          <label className="lbl m-0">Пользователь:</label>
           <select
-            className="inp sel"
+            className="inp sel w-180"
             value={filters.userId}
             onChange={e => handleFilterChange('userId', e.target.value)}
-            style={{ width: '180px' }}
           >
             <option value="all">Все</option>
             {userOptions.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
           </select>
 
-          <label className="lbl" style={{ margin: 0 }}>Действие:</label>
+          <label className="lbl m-0">Действие:</label>
           <select
-            className="inp sel"
+            className="inp sel w-200"
             value={filters.action}
             onChange={e => handleFilterChange('action', e.target.value)}
-            style={{ width: '200px' }}
           >
             {ACTIONS.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
           </select>
 
-          <div className="search-box" style={{ flex: 1, minWidth: '200px' }}>
+          <div className="search-box flex-1 min-w-200">
             <Ic d={ICONS.search} size={15} />
             <input
               placeholder="Поиск по действию или деталям..."
@@ -267,11 +258,11 @@ export default function Journal({ db }) {
         </div>
       </div>
 
-      <div className="rep-panel" style={{ padding: '16px' }}>
-        <div className="rep-panel-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="rep-panel p-4">
+        <div className="rep-panel-title flex justify-between items-center">
           <span>
             Всего записей: {filteredEntries.length}
-            <span className="mut sm" style={{ marginLeft: '12px', fontWeight: 'normal' }}>
+            <span className="mut sm font-normal ml-3">
               (показано {paginatedFlat.length})
             </span>
           </span>
@@ -280,29 +271,21 @@ export default function Journal({ db }) {
           </button>
         </div>
         
-        <div style={{ marginTop: '12px' }}>
+        <div className="mt-3">
           {paginatedFlat.length === 0 ? (
-            <div className="mut" style={{ textAlign: 'center', padding: '40px 20px' }}>
-              <div style={{ fontSize: '48px', marginBottom: '12px', opacity: 0.3 }}>📋</div>
-              <div style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px' }}>Записей не найдено</div>
+            <div className="mut text-center p-5">
+              <div className="text-center" style={{ fontSize: '48px', marginBottom: '12px', opacity: 0.3 }}>📋</div>
+              <div className="text-sm font-semibold mb-1">Записей не найдено</div>
               <div className="mut sm">Измените параметры фильтра или выберите другой период</div>
             </div>
           ) : (
             <table className="tbl" style={{ fontSize: '13px' }}>
               <thead>
                 <tr>
-                  <th style={{ width: '160px', color: 'var(--mut)', textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.5px' }}>
-                    Дата и время
-                  </th>
-                  <th style={{ width: '180px', color: 'var(--mut)', textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.5px' }}>
-                    Пользователь
-                  </th>
-                  <th style={{ color: 'var(--mut)', textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.5px' }}>
-                    Действие
-                  </th>
-                  <th style={{ color: 'var(--mut)', textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.5px' }}>
-                    Детали
-                  </th>
+                  <th className="w-160 text-mut text-xs uppercase tracking-wider">Дата и время</th>
+                  <th className="w-180 text-mut text-xs uppercase tracking-wider">Пользователь</th>
+                  <th className="text-mut text-xs uppercase tracking-wider">Действие</th>
+                  <th className="text-mut text-xs uppercase tracking-wider">Детали</th>
                 </tr>
               </thead>
               <tbody>
@@ -314,18 +297,8 @@ export default function Journal({ db }) {
                     <React.Fragment key={entry.id}>
                       {showMonth && (
                         <tr>
-                          <td colSpan="4" style={{ 
-                            background: 'linear-gradient(90deg, #f8fafc, transparent)', 
-                            padding: '12px 10px 8px',
-                            borderTop: index === 0 ? 'none' : '2px solid var(--line)',
-                          }}>
-                            <div style={{ 
-                              fontSize: '12px', 
-                              fontWeight: 800, 
-                              color: '#1e293b',
-                              textTransform: 'capitalize',
-                              letterSpacing: '0.3px',
-                            }}>
+                          <td colSpan="4" className="p-2 border-t" style={{ background: 'linear-gradient(90deg, #f8fafc, transparent)' }}>
+                            <div className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
                               {entry._monthLabel}
                             </div>
                           </td>
@@ -333,64 +306,27 @@ export default function Journal({ db }) {
                       )}
                       {showDay && (
                         <tr>
-                          <td colSpan="4" style={{ 
-                            padding: '8px 10px 6px',
-                            borderTop: '1px dashed #e2e8f0',
-                          }}>
-                            <div style={{ 
-                              fontSize: '11px', 
-                              fontWeight: 700, 
-                              color: 'var(--acc)',
-                              textTransform: 'capitalize',
-                              letterSpacing: '0.3px',
-                            }}>
+                          <td colSpan="4" className="p-1 border-t border-dashed">
+                            <div className="text-xs font-bold text-acc uppercase tracking-wider">
                               {entry._dayLabel}
                             </div>
                           </td>
                         </tr>
                       )}
-                      <tr style={{ 
-                        background: showDay ? '#fafbff' : 'transparent',
-                        transition: 'background 0.15s',
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = showDay ? '#f0f7ff' : '#f8fafc'}
-                      onMouseLeave={(e) => e.currentTarget.style.background = showDay ? '#fafbff' : 'transparent'}
-                      >
-                        <td style={{ 
-                          whiteSpace: 'nowrap', 
-                          fontSize: '12px',
-                          color: 'var(--mut)',
-                          fontFamily: 'monospace',
-                        }}>
+                      <tr className={showDay ? 'bg-blue-50' : ''} onMouseEnter={(e) => e.currentTarget.style.background = showDay ? '#f0f7ff' : '#f8fafc'} onMouseLeave={(e) => e.currentTarget.style.background = showDay ? '#fafbff' : 'transparent'}>
+                        <td className="whitespace-nowrap text-xs text-mut font-mono">
                           {safeDate(entry.ts) ? fmtDT(entry.ts) : '—'}
                         </td>
                         <td>
-                          <div style={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            gap: '8px',
-                            fontWeight: 600,
-                            fontSize: '13px',
-                          }}>
-                            <div className="avatar xs" style={{ 
-                              background: entry.userId === 'system' 
-                                ? 'linear-gradient(135deg, #64748b, #475569)' 
-                                : 'linear-gradient(135deg, #1e3a8a, #0ea5e9)',
-                              width: '24px',
-                              height: '24px',
-                              fontSize: '9px',
-                            }}>
+                          <div className="flex items-center gap-2 font-semibold text-sm">
+                            <div className="avatar xs" style={{ background: entry.userId === 'system' ? 'linear-gradient(135deg, #64748b, #475569)' : 'linear-gradient(135deg, #1e3a8a, #0ea5e9)', width: 24, height: 24, fontSize: 9 }}>
                               {entry.userId === 'system' ? 'S' : (empName(entry.userId) || entry.userId).charAt(0).toUpperCase()}
                             </div>
                             {entry.userId === 'system' ? 'Система' : empName(entry.userId) || entry.userId}
                           </div>
                         </td>
                         <td>
-                          <div style={{ 
-                            fontWeight: 600, 
-                            fontSize: '13px',
-                            color: '#1e293b',
-                          }}>
+                          <div className="font-semibold text-sm text-slate-800">
                             {entry.action}
                           </div>
                         </td>
@@ -407,49 +343,23 @@ export default function Journal({ db }) {
         </div>
 
         {totalPages > 1 && (
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'center', 
-            alignItems: 'center',
-            gap: '12px', 
-            marginTop: '20px',
-            paddingTop: '16px',
-            borderTop: '1px solid var(--line)',
-          }}>
+          <div className="flex justify-center items-center gap-3 mt-5 pt-4 border-t">
             <button
               className="btn ghost sm"
               disabled={page === 1}
               onClick={() => setPage(p => Math.max(1, p - 1))}
-              style={{ 
-                minWidth: '36px',
-                height: '36px',
-                padding: '0',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
+              style={{ minWidth: '36px', height: '36px', padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
             >
               ←
             </button>
-            <span style={{ 
-              fontSize: '13px', 
-              color: 'var(--mut)',
-              fontWeight: 500,
-            }}>
-              Страница <b style={{ color: 'var(--txt)' }}>{page}</b> из <b style={{ color: 'var(--txt)' }}>{totalPages}</b>
+            <span className="text-sm text-mut font-medium">
+              Страница <b className="text-txt">{page}</b> из <b className="text-txt">{totalPages}</b>
             </span>
             <button
               className="btn ghost sm"
               disabled={page === totalPages}
               onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-              style={{ 
-                minWidth: '36px',
-                height: '36px',
-                padding: '0',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
+              style={{ minWidth: '36px', height: '36px', padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
             >
               →
             </button>

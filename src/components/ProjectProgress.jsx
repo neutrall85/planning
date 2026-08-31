@@ -4,7 +4,7 @@ import { getProjectColor } from '../utils/projectHelpers';
 
 export default function ProjectProgress({ project, plan, fact }) {
   const budget = project?.budget;
-  if (budget == null) return null; // для админ-проектов без бюджета ничего не показываем
+  if (budget == null) return null;
 
   const usePct = Math.round((fact / Math.max(1, budget)) * 100);
   const overPlan = plan > budget;

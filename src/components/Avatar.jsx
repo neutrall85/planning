@@ -50,7 +50,6 @@ export default function Avatar({ employee, size = 'sm', className = '' }) {
         className="avatar-wrapper"
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        style={{ display: 'inline-block', position: 'relative' }}
       >
         {avatarContent}
       </span>

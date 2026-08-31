@@ -224,12 +224,12 @@ export default function Reports({ db, ur }) {
   const renderResults = () => {
     const type = filters.type;
     if (results.length === 0) {
-      return <div className="empty-note" style={{ padding: '20px 0' }}>Нет данных, соответствующих фильтрам</div>;
+      return <div className="empty-note p-4">Нет данных, соответствующих фильтрам</div>;
     }
 
     if (type === 'tasks') {
       return (
-        <div style={{ width: '100%', overflowX: 'auto' }}>
+        <div className="w-full overflow-x-auto">
           <table className="tbl" style={{ minWidth: '800px', fontSize: '13px' }}>
             <thead>
               <tr>
@@ -269,7 +269,7 @@ export default function Reports({ db, ur }) {
       );
     } else if (type === 'projects') {
       return (
-        <div style={{ width: '100%', overflowX: 'auto' }}>
+        <div className="w-full overflow-x-auto">
           <table className="tbl" style={{ minWidth: '600px', fontSize: '13px' }}>
             <thead>
               <tr>
@@ -307,7 +307,7 @@ export default function Reports({ db, ur }) {
       );
     } else if (type === 'employees') {
       return (
-        <div style={{ width: '100%', overflowX: 'auto' }}>
+        <div className="w-full overflow-x-auto">
           <table className="tbl" style={{ minWidth: '600px', fontSize: '13px' }}>
             <thead>
               <tr>
@@ -342,7 +342,7 @@ export default function Reports({ db, ur }) {
       );
     } else if (type === 'worklog') {
       return (
-        <div style={{ width: '100%', overflowX: 'auto' }}>
+        <div className="w-full overflow-x-auto">
           <table className="tbl" style={{ minWidth: '700px', fontSize: '13px' }}>
             <thead>
               <tr>
@@ -385,11 +385,11 @@ export default function Reports({ db, ur }) {
 
   return (
     <div className="rep">
-      <div className="rep-panel" style={{ padding: '16px' }}>
+      <div className="rep-panel p-4">
         <div className="rep-panel-title">Фильтры отчёта</div>
 
-        <div className="toolbar" style={{ marginBottom: '8px' }}>
-          <label className="lbl" style={{ margin: 0 }}>Тип отчёта:</label>
+        <div className="toolbar mb-2">
+          <label className="lbl m-0">Тип отчёта:</label>
           <div className="seg">
             {REPORT_TYPES.map(typeOption => (
               <button
@@ -403,104 +403,95 @@ export default function Reports({ db, ur }) {
           </div>
         </div>
 
-        <div className="toolbar" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+        <div className="toolbar flex flex-wrap gap-2 items-center">
           {showDateRange && (
             <>
-              <label className="lbl" style={{ margin: 0 }}>
+              <label className="lbl m-0">
                 {type === 'worklog' ? 'Дата записи:' : type === 'projects' ? 'Начало:' : 'Создан с:'}
               </label>
               <input
-                className="inp"
+                className="inp w-150"
                 type="date"
                 value={filters.dateFrom}
                 onChange={e => handleFilterChange('dateFrom', e.target.value)}
-                style={{ width: '150px' }}
               />
               <span>—</span>
               <input
-                className="inp"
+                className="inp w-150"
                 type="date"
                 value={filters.dateTo}
                 onChange={e => handleFilterChange('dateTo', e.target.value)}
-                style={{ width: '150px' }}
               />
             </>
           )}
 
           {showDeadlineRange && (
             <>
-              <label className="lbl" style={{ margin: 0 }}>
+              <label className="lbl m-0">
                 {type === 'projects' ? 'Окончание:' : 'Срок исполнения:'}
               </label>
               <input
-                className="inp"
+                className="inp w-150"
                 type="date"
                 value={filters.deadlineFrom}
                 onChange={e => handleFilterChange('deadlineFrom', e.target.value)}
-                style={{ width: '150px' }}
               />
               <span>—</span>
               <input
-                className="inp"
+                className="inp w-150"
                 type="date"
                 value={filters.deadlineTo}
                 onChange={e => handleFilterChange('deadlineTo', e.target.value)}
-                style={{ width: '150px' }}
               />
             </>
           )}
 
-          <label className="lbl" style={{ margin: 0 }}>Проект:</label>
+          <label className="lbl m-0">Проект:</label>
           <select
-            className="inp sel"
+            className="inp sel w-180"
             value={filters.projectId}
             onChange={e => handleFilterChange('projectId', e.target.value)}
-            style={{ width: '180px' }}
           >
             <option value="all">Все проекты</option>
             {visibleProjects.map(p => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
           </select>
 
-          <label className="lbl" style={{ margin: 0 }}>Исполнитель:</label>
+          <label className="lbl m-0">Исполнитель:</label>
           <select
-            className="inp sel"
+            className="inp sel w-180"
             value={filters.assigneeId}
             onChange={e => handleFilterChange('assigneeId', e.target.value)}
-            style={{ width: '180px' }}
           >
             <option value="all">Все</option>
             {visibleEmployees.map(e => <option key={e.id} value={e.id}>{e.last} {e.first}</option>)}
           </select>
 
-          <label className="lbl" style={{ margin: 0 }}>Заказчик:</label>
+          <label className="lbl m-0">Заказчик:</label>
           <input
-            className="inp"
+            className="inp w-200"
             type="text"
             value={filters.customer}
             onChange={e => handleFilterChange('customer', e.target.value)}
             placeholder="поиск по названию"
-            style={{ width: '200px' }}
           />
 
           {showStatusPriority && (
             <>
-              <label className="lbl" style={{ margin: 0 }}>Статус задачи:</label>
+              <label className="lbl m-0">Статус задачи:</label>
               <select
-                className="inp sel"
+                className="inp sel w-140"
                 value={filters.status}
                 onChange={e => handleFilterChange('status', e.target.value)}
-                style={{ width: '140px' }}
               >
                 <option value="all">Все</option>
                 {Object.keys(TASK_STATUSES).map(st => <option key={st} value={st}>{TASK_STATUSES[st].label}</option>)}
               </select>
 
-              <label className="lbl" style={{ margin: 0 }}>Приоритет:</label>
+              <label className="lbl m-0">Приоритет:</label>
               <select
-                className="inp sel"
+                className="inp sel w-140"
                 value={filters.priority}
                 onChange={e => handleFilterChange('priority', e.target.value)}
-                style={{ width: '140px' }}
               >
                 <option value="all">Все</option>
                 {Object.keys(PRIORITIES).map(pr => <option key={pr} value={pr}>{PRIORITIES[pr].label}</option>)}
@@ -509,17 +500,16 @@ export default function Reports({ db, ur }) {
           )}
         </div>
 
-        <div style={{ marginTop: '12px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+        <div className="mt-3 flex gap-3 flex-wrap">
           <button className="btn primary" onClick={applyFilters}>Применить</button>
           <button className="btn ghost" onClick={resetFilters}>Сбросить фильтры</button>
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+          <div className="flex gap-2 items-center">
             <input
-              className="inp"
+              className="inp w-180"
               type="text"
               value={filterName}
               onChange={e => setFilterName(e.target.value)}
               placeholder="Название шаблона"
-              style={{ width: '180px' }}
             />
             <button className="btn ghost" onClick={saveFilter}>
               <Ic d={ICONS.plus} size={13} /> Сохранить фильтр
@@ -529,9 +519,9 @@ export default function Reports({ db, ur }) {
       </div>
 
       {savedFilters.length > 0 && (
-        <div className="rep-panel" style={{ padding: '16px' }}>
+        <div className="rep-panel p-4">
           <div className="rep-panel-title">Сохранённые шаблоны</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+          <div className="flex flex-wrap gap-3">
             {savedFilters.map(f => {
               const criteria = [];
               const typeLabel = REPORT_TYPES.find(t => t.value === f.filters.type)?.label || 'Задачи';
@@ -560,18 +550,17 @@ export default function Reports({ db, ur }) {
               const displayText = criteria.length ? criteria.join(' · ') : 'Все';
 
               return (
-                <div key={f.id} className="pj-card" style={{ minWidth: '200px', maxWidth: '280px', cursor: 'pointer', padding: '12px', position: 'relative' }}>
-                  <div style={{ fontWeight: '700', fontSize: '14px', marginBottom: '6px' }}>{f.name}</div>
-                  <div style={{ fontSize: '12px', color: 'var(--mut)', lineHeight: '1.4' }}>{displayText}</div>
+                <div key={f.id} className="pj-card cursor-pointer p-3 relative" style={{ minWidth: '200px', maxWidth: '280px' }}>
+                  <div className="font-bold text-sm mb-1">{f.name}</div>
+                  <div className="text-xs text-mut leading-tight">{displayText}</div>
                   <button
-                    className="icon-btn"
-                    style={{ position: 'absolute', top: '6px', right: '6px' }}
+                    className="icon-btn absolute top-1 right-1"
                     onClick={(e) => { e.stopPropagation(); deleteFilter(f.id); }}
                     title="Удалить шаблон"
                   >
                     <Ic d={ICONS.x} size={14} />
                   </button>
-                  <div style={{ marginTop: '8px' }}>
+                  <div className="mt-2">
                     <button className="btn ghost sm" onClick={() => loadFilter(f)}>Загрузить</button>
                   </div>
                 </div>
@@ -581,9 +570,9 @@ export default function Reports({ db, ur }) {
         </div>
       )}
 
-      <div className="rep-panel" style={{ padding: '16px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-          <div className="rep-panel-title" style={{ marginBottom: 0 }}>Результаты ({results.length})</div>
+      <div className="rep-panel p-4">
+        <div className="flex justify-between items-center mb-3">
+          <div className="rep-panel-title m-0">Результаты ({results.length})</div>
           <button className="btn primary sm" onClick={downloadXLSX} disabled={results.length === 0}>
             <Ic d={ICONS.download} size={13} /> Выгрузить XLSX
           </button>

@@ -584,6 +584,13 @@ export function buildMockData() {
     T("t35", "Расчёт ресурса лопаток", "p_rd900", "e_melnik", 24, -9, 14, "inwork", "mid", "Усталостный расчёт.", {
       logs: [ { id: uid(), userId: "e_melnik", date: makeDate(-4), hours: 10, note: "Нагрузки" } ]
     }),
+
+    // ===== НОВЫЕ ПОДЗАДАЧИ (добавлены в конец) =====
+    T("t01_sub1", "Подзадача 1: Расчёт подъёмной силы (детализация)", "p_lm24", "isaev", 12, -10, 0, "inwork", "mid", "Детальный расчёт по сечениям.", { parentTaskId: "t01", creatorId: "e_morozov" }),
+    T("t01_sub2", "Подзадача 2: Оформление отчёта по крылу", "p_lm24", "isaev", 8, -5, 5, "new", "low", "Графики и пояснительная записка.", { parentTaskId: "t01", creatorId: "e_morozov" }),
+
+    T("t08_sub1", "Подзадача 1: Чертежи комлевой части лопасти", "p_heli", "e_somova", 16, -15, 10, "inwork", "high", "Деталировка комлевой части.", { parentTaskId: "t08", creatorId: "e_gromov" }),
+    T("t08_sub2", "Подзадача 2: Прочностной расчёт лопастей", "p_heli", "e_somova", 14, -8, 2, "review", "high", "Расчёт на прочность.", { parentTaskId: "t08", creatorId: "e_gromov" }),
   ];
 
   const vacations = [

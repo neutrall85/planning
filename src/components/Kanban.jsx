@@ -14,30 +14,23 @@ export default function Kanban({
   onToggleMy,
   extraFilters,
   emptyMessage = 'Нет элементов',
-  columns, // новый пропс
+  columns,
 }) {
   const [dragOverCol, setDragOverCol] = useState(null);
 
-  // Определяем классы и стили
   const kanbanClasses = ['kanban'];
   const style = {};
 
   if (columns) {
-    // Если задано явное количество колонок – устанавливаем CSS-переменную
     style['--columns'] = columns;
-    // Не добавляем класс k5, так как переменная перекроет его
   } else {
-    // Иначе – старое поведение: если статусов 5, добавляем класс k5
     if (statusOrder.length === 5) {
       kanbanClasses.push('k5');
     }
-    // Если статусов не 5, то используем стандартный стиль (4 колонки)
-    // Без переменной --columns будет использовано значение по умолчанию из CSS
   }
 
   return (
     <div>
-      {/* Панель инструментов (без изменений) */}
       <div className="toolbar">
         {onSearchChange && (
           <div className="search-box">
@@ -51,13 +44,13 @@ export default function Kanban({
         )}
         {extraFilters}
         {onToggleMy && (
-          <label className="dept-pick" style={{ marginLeft: 8 }}>
+          <label className="dept-pick ml-2">
             <input
               type="checkbox"
               checked={showOnlyMy}
               onChange={(e) => onToggleMy(e.target.checked)}
             />
-            <span style={{ fontSize: 13 }}>Только мои</span>
+            <span className="text-sm">Только мои</span>
           </label>
         )}
         {onNew && (

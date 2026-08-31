@@ -1,26 +1,283 @@
-import React, { useState, useMemo } from 'react';
-import { TODAY, iso, addDays, parseISO, fmtD, fmtDMY, isTaskActive } from '../utils/date';
-import { TASK_STATUSES, DEPENDENCY_TYPES, PRIORITIES } from '../utils/constants';
+import React, { useState, useMemo, useCallback } from 'react';
+import { TODAY, iso, addDays, parseISO, fmtD, fmtDMY } from '../utils/date';
+import { TASK_STATUSES, PRIORITIES } from '../utils/constants';
 import { useDataHelpers } from '../hooks';
 import { computeScope, taskVisible } from '../utils/permissions';
 import { Ic, ICONS } from './Icons';
 import Avatar from './Avatar';
 import { getProjectColor } from '../utils/projectHelpers';
 
-export default function Gantt({ db, ur, openTask, openProject }) {
-  const { empName, getTaskSpent, vacOverlap } = useDataHelpers(db);
-  const scope = useMemo(() => computeScope(ur, db), [ur, db]);
-  const tasks = db.tasks.filter(t => isTaskActive(t) && taskVisible(ur, scope, t, db) && t.start && t.deadline);
-
-  const [mode, setMode] = useState('month');
-  const [anchor, setAnchor] = useState(() => {
-    const d = new Date();
-    return iso(new Date(d.getFullYear(), d.getMonth(), 1));
+// ===== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====
+const buildTaskTree = (tasks) => {
+  const map = {};
+  const roots = [];
+  tasks.forEach(t => { map[t.id] = { ...t, children: [] }; });
+  tasks.forEach(t => {
+    // ПРИВЕДЕНИЕ К СТРОКЕ – ГЛАВНОЕ ИСПРАВЛЕНИЕ
+    const parentId = t.parentTaskId ? String(t.parentTaskId) : null;
+    if (parentId && map[parentId]) {
+      map[parentId].children.push(map[t.id]);
+    } else {
+      roots.push(map[t.id]);
+    }
   });
+  const sortChildren = (node) => {
+    node.children.sort((a, b) => (a.start || '').localeCompare(b.start || ''));
+    node.children.forEach(sortChildren);
+  };
+  roots.forEach(sortChildren);
+  return roots;
+};
 
-  const DW = 34;
+const flattenTree = (nodes, level = 0, acc = []) => {
+  nodes.forEach(node => {
+    acc.push({ ...node, level, hasChildren: node.children.length > 0 });
+    flattenTree(node.children, level + 1, acc);
+  });
+  return acc;
+};
 
-  const getDaysInRange = (anchorDate, mode) => {
+const computeCriticalPath = (tasks) => {
+  const critical = new Set();
+  tasks.forEach(t => {
+    if (t.dependencyId) {
+      const dep = tasks.find(d => d.id === t.dependencyId);
+      if (dep && t.deadline === dep.deadline) {
+        critical.add(t.id);
+        critical.add(dep.id);
+      }
+    }
+  });
+  return critical;
+};
+
+// ===== СТРОКА ЗАДАЧИ =====
+const TaskRow = ({
+  task,
+  level,
+  hasChildren,
+  expanded,
+  onToggle,
+  days,
+  DW,
+  viewStart,
+  viewEnd,
+  db,
+  openTask,
+  getTaskSpent,
+  vacOverlap,
+  isCritical,
+}) => {
+  const assignee = task.assigneeId ? db.employees.find(e => e.id === task.assigneeId) : null;
+  const project = db.projects.find(p => p.id === task.projectId);
+
+  // Нормализация дат (обрезаем время до YYYY-MM-DD)
+  const normalizeDate = (dateStr) => (dateStr ? dateStr.slice(0, 10) : '');
+
+  let sIdx = days.indexOf(normalizeDate(task.start));
+  let eIdx = days.indexOf(normalizeDate(task.deadline));
+
+  // Если дата не найдена, но задача покрывает весь видимый диапазон
+  if (sIdx === -1 && eIdx === -1) {
+    if (task.start < viewStart && task.deadline > viewEnd) {
+      sIdx = 0;
+      eIdx = days.length - 1;
+    } else return null;
+  }
+  // Если одна из дат не найдена, но другая есть – пытаемся найти по другой
+  if (sIdx === -1 && eIdx !== -1) {
+    const startDate = parseISO(task.start);
+    const deadlineDate = parseISO(task.deadline);
+    const diffDays = Math.round((deadlineDate - startDate) / 86400000);
+    const possibleStartIdx = eIdx - diffDays;
+    if (possibleStartIdx >= 0) sIdx = possibleStartIdx;
+    else sIdx = 0;
+  }
+  if (eIdx === -1 && sIdx !== -1) {
+    const startDate = parseISO(task.start);
+    const deadlineDate = parseISO(task.deadline);
+    const diffDays = Math.round((deadlineDate - startDate) / 86400000);
+    const possibleEndIdx = sIdx + diffDays;
+    if (possibleEndIdx < days.length) eIdx = possibleEndIdx;
+    else eIdx = days.length - 1;
+  }
+
+  if (sIdx === -1 || eIdx === -1 || sIdx > eIdx) return null;
+
+  const left = sIdx * DW + 2;
+  const w = Math.max((eIdx - sIdx + 1) * DW - 4, DW - 8);
+  const sp = getTaskSpent(task);
+  const pct = Math.min(100, (sp / Math.max(1, task.plannedHours || 0)) * 100);
+  const fillWidth = pct > 0 ? Math.max(pct, 2) : 0;
+  const vac = assignee ? vacOverlap(assignee.id, task.start, task.deadline) : null;
+  const isMilestone = task.start === task.deadline;
+  const priorityColor = PRIORITIES[task.priority]?.color || '#64748b';
+  const bgColor = priorityColor + '33';
+
+  const tooltipLines = [
+    `${task.title}`,
+    `Проект: ${project?.code || '—'}`,
+    `Статус: ${TASK_STATUSES[task.status]?.label || task.status}`,
+    `Приоритет: ${PRIORITIES[task.priority]?.label || task.priority}`,
+    `План: ${task.plannedHours ?? '—'} ч, Факт: ${sp} ч`,
+    `Срок: ${fmtD(task.start)} — ${fmtD(task.deadline)}`,
+    ...(assignee ? [`Исполнитель: ${assignee.last} ${assignee.first}`] : []),
+    ...(vac ? [`⚠️ В отпуске ${fmtDMY(vac.start)}–${fmtDMY(vac.end)}`] : []),
+    ...(isCritical ? ['🔴 Критическая задача'] : []),
+  ].join('\n');
+
+  return (
+    <div className={`gantt-row${level > 0 ? ' gantt-row-child' : ''}${isCritical ? ' gantt-critical' : ''} relative`}>
+      <div className="gantt-label" onClick={() => openTask(task.id)}>
+        <div className="flex items-center gap-1">
+          {hasChildren && (
+            <button
+              className={`gantt-expand-btn${expanded ? ' expanded' : ''}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggle(task.id);
+              }}
+              title={expanded ? 'Свернуть' : 'Развернуть'}
+            >
+              ▶
+            </button>
+          )}
+          <span className={`gtitle${task.status === 'cancelled' ? ' dim' : ''}`}>
+            {task.title}
+          </span>
+        </div>
+        <span className="gsub">
+          {assignee && <Avatar employee={assignee} size="xs" />} · {task.plannedHours ?? '—'} ч · {TASK_STATUSES[task.status]?.label || task.status}
+        </span>
+      </div>
+      <div className="gantt-track">
+        {isMilestone ? (
+          <div className="gantt-milestone" style={{ left: left + w/2 - 8, top: 8, borderColor: priorityColor }} title={tooltipLines} />
+        ) : (
+          <div
+            className="gbar"
+            style={{
+              '--bar-left': left + 'px',
+              '--bar-width': w + 'px',
+              '--bar-bg': bgColor,
+              '--bar-opacity': task.status === 'cancelled' ? 0.45 : 1,
+              '--fill-width': fillWidth + '%',
+              '--fill-color': task.status === 'closed' ? '#10b981' : priorityColor,
+            }}
+            onClick={() => openTask(task.id)}
+            title={tooltipLines}
+          >
+            <div className="gbar-fill" />
+            {vac && <span className="gbar-vac">🏖</span>}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ===== ГРУППА ПРОЕКТА =====
+const ProjectGroup = ({
+  project,
+  tasks,
+  days,
+  DW,
+  viewStart,
+  viewEnd,
+  db,
+  openTask,
+  openProject,
+  getTaskSpent,
+  vacOverlap,
+  expandedTasks,
+  setExpandedTasks,
+  criticalIds,
+}) => {
+  const projectColor = getProjectColor(project);
+  const tree = buildTaskTree(tasks);
+  const flat = flattenTree(tree);
+
+  const renderRows = () => {
+    const rows = [];
+    const visited = new Set();
+    const traverse = (node) => {
+      if (visited.has(node.id)) return;
+      visited.add(node.id);
+      const isExpanded = expandedTasks.has(node.id);
+      rows.push(
+        <TaskRow
+          key={node.id}
+          task={node}
+          level={node.level}
+          hasChildren={node.hasChildren}
+          expanded={isExpanded}
+          onToggle={(id) => {
+            setExpandedTasks((prev) => {
+              const newSet = new Set(prev);
+              if (newSet.has(id)) newSet.delete(id);
+              else newSet.add(id);
+              return newSet;
+            });
+          }}
+          days={days}
+          DW={DW}
+          viewStart={viewStart}
+          viewEnd={viewEnd}
+          db={db}
+          openTask={openTask}
+          getTaskSpent={getTaskSpent}
+          vacOverlap={vacOverlap}
+          isCritical={criticalIds.has(node.id)}
+        />
+      );
+      if (isExpanded) {
+        node.children.forEach((child) => traverse(child));
+      }
+    };
+    tree.forEach((root) => traverse(root));
+    return rows;
+  };
+
+  const rows = renderRows();
+  if (rows.length === 0) return null;
+
+  return (
+    <div key={project.id}>
+      <div className="gantt-group">
+        <div
+          className="gantt-group-name cursor-pointer underline"
+          onClick={() => openProject && openProject(project.id)}
+          title="Открыть проект"
+        >
+          <span className="pdot" style={{ background: projectColor }} />
+          {project.code} · {project.name}
+          <span className="mut sm ml-2">({rows.length} задач)</span>
+        </div>
+        <div style={{ width: days.length * DW }} />
+      </div>
+      {rows}
+    </div>
+  );
+};
+
+// ===== ОСНОВНОЙ КОМПОНЕНТ =====
+export default function Gantt({ db, ur, openTask, openProject }) {
+  const { getTaskSpent, vacOverlap } = useDataHelpers(db);
+  const scope = useMemo(() => computeScope(ur, db), [ur, db]);
+
+  const [filters, setFilters] = useState({
+    projectId: 'all',
+    assigneeId: 'all',
+    status: 'all',
+  });
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const DW_BASE = 34;
+  const DW = Math.round(DW_BASE * zoomLevel);
+  const [expandedTasks, setExpandedTasks] = useState(new Set());
+  const [mode, setMode] = useState('month');
+  const [anchor, setAnchor] = useState(() => iso(new Date(new Date().getFullYear(), new Date().getMonth(), 1)));
+
+  const getDaysInRange = useCallback((anchorDate, mode) => {
     const start = parseISO(anchorDate);
     const days = [];
     if (mode === 'month') {
@@ -40,7 +297,7 @@ export default function Gantt({ db, ur, openTask, openProject }) {
       }
     }
     return days;
-  };
+  }, []);
 
   const shift = (dir) => {
     let newAnchor;
@@ -60,59 +317,93 @@ export default function Gantt({ db, ur, openTask, openProject }) {
     setAnchor(newAnchor);
   };
 
-  const ganttData = useMemo(() => {
-    if (!tasks.length) return null;
-    const days = getDaysInRange(anchor, mode);
-    const months = [];
+  // Получаем все задачи (исключаем только закрытые и отменённые)
+  const allTasks = useMemo(() => {
+    let tasks = db.tasks.filter(
+      (t) =>
+        !t.archived &&
+        taskVisible(ur, scope, t, db) &&
+        t.start &&
+        t.deadline &&
+        !['closed', 'cancelled'].includes(t.status)
+    );
+    // Нормализуем даты (обрезаем время до YYYY-MM-DD)
+    tasks = tasks.map(t => ({
+      ...t,
+      start: t.start ? t.start.slice(0, 10) : null,
+      deadline: t.deadline ? t.deadline.slice(0, 10) : null,
+    }));
+    if (filters.projectId !== 'all') tasks = tasks.filter((t) => t.projectId === filters.projectId);
+    if (filters.assigneeId !== 'all') tasks = tasks.filter((t) => t.assigneeId === filters.assigneeId);
+    if (filters.status !== 'all') tasks = tasks.filter((t) => t.status === filters.status);
+    return tasks;
+  }, [db.tasks, ur, scope, filters]);
+
+  // Группировка по проектам
+  const projectGroups = useMemo(() => {
+    const groups = new Map();
+    allTasks.forEach((t) => {
+      if (!groups.has(t.projectId)) {
+        const project = db.projects.find((p) => p.id === t.projectId);
+        if (project) groups.set(t.projectId, { project, tasks: [] });
+      }
+      const group = groups.get(t.projectId);
+      if (group) group.tasks.push(t);
+    });
+    return Array.from(groups.values());
+  }, [allTasks, db.projects]);
+
+  const criticalIds = useMemo(() => computeCriticalPath(allTasks), [allTasks]);
+
+  const projectOptions = useMemo(() => {
+    const ids = new Set(allTasks.map((t) => t.projectId));
+    return db.projects.filter((p) => ids.has(p.id));
+  }, [allTasks, db.projects]);
+
+  const assigneeOptions = useMemo(() => {
+    const ids = new Set(allTasks.map((t) => t.assigneeId).filter(Boolean));
+    return db.employees.filter((e) => ids.has(e.id));
+  }, [allTasks, db.employees]);
+
+  const days = useMemo(() => getDaysInRange(anchor, mode), [anchor, mode, getDaysInRange]);
+  const months = useMemo(() => {
+    const result = [];
     days.forEach((day, i) => {
       const d = parseISO(day);
-      const lbl = `${['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'][d.getMonth()]} ${d.getFullYear()}`;
-      if (!months.length || months[months.length-1].label !== lbl) months.push({ label: lbl, from: i, to: i });
-      else months[months.length-1].to = i;
-    });
-    const viewStart = days[0];
-    const viewEnd = days[days.length - 1];
-    const groups = [];
-    const seen = new Set();
-    tasks.forEach(t => {
-      if (!seen.has(t.projectId)) {
-        seen.add(t.projectId);
-        const project = db.projects.find(p => p.id === t.projectId);
-        if (project && (scope.all || scope.projIds.has(project.id))) {
-          groups.push({ project, items: [] });
-        }
+      const lbl = `${
+        [
+          'Январь',
+          'Февраль',
+          'Март',
+          'Апрель',
+          'Май',
+          'Июнь',
+          'Июль',
+          'Август',
+          'Сентябрь',
+          'Октябрь',
+          'Ноябрь',
+          'Декабрь',
+        ][d.getMonth()]
+      } ${d.getFullYear()}`;
+      if (!result.length || result[result.length - 1].label !== lbl) {
+        result.push({ label: lbl, from: i, to: i });
+      } else {
+        result[result.length - 1].to = i;
       }
     });
-    groups.forEach(g => {
-      const items = tasks
-        .filter(t => t.projectId === g.project.id)
-        .map(t => {
-          let sIdx = days.indexOf(t.start);
-          let eIdx = days.indexOf(t.deadline);
-          if (sIdx === -1 && eIdx === -1) {
-            if (t.start < viewStart && t.deadline > viewEnd) {
-              sIdx = 0; eIdx = days.length - 1;
-            } else {
-              return null;
-            }
-          }
-          if (sIdx === -1 && t.start < viewStart) sIdx = 0;
-          if (eIdx === -1 && t.deadline > viewEnd) eIdx = days.length - 1;
-          if (sIdx === -1 || eIdx === -1) return null;
-          if (sIdx > eIdx) return null;
-          return { ...t, sIdx, eIdx };
-        })
-        .filter(Boolean)
-        .sort((a,b) => (a.start < b.start ? -1 : 1));
-      g.items = items;
-    });
-    return { days, months, groups: groups.filter(g => g.items.length > 0) };
-  }, [tasks, db.projects, anchor, mode, scope]);
+    return result;
+  }, [days]);
 
-  if (!ganttData || ganttData.groups.length === 0) {
+  const viewStart = days[0];
+  const viewEnd = days[days.length - 1];
+  const width = days.length * DW;
+  const totalWidth = width + 240;
+
+  if (projectGroups.length === 0) {
     return (
       <div className="gantt-panel">
-        <div className="cal-head" style={{ padding: '12px 16px', borderBottom: '1px solid var(--line)' }}>
+        <div className="cal-head p-3 border-b">
           <div className="cal-nav">
             <button className="icon-btn" onClick={() => shift(-1)}><Ic d={ICONS.left} size={16} /></button>
             <div className="cal-title" style={{ minWidth: '120px', fontSize: '15px', fontWeight: 700 }}>{fmtDMY(anchor)}</div>
@@ -126,33 +417,44 @@ export default function Gantt({ db, ur, openTask, openProject }) {
             </div>
           </div>
         </div>
-        <div className="empty-note" style={{ padding: '60px 0' }}>Нет доступных задач в выбранном периоде</div>
+        <div className="empty-note p-4">Нет доступных задач в выбранном периоде</div>
       </div>
     );
   }
 
-  const { days, months, groups } = ganttData;
-  const todayIdx = days.indexOf(TODAY);
-  const width = days.length * DW;
-  const totalWidth = width + 240;
-
-  const getDepCoords = (t, depTask, depItem) => {
-    if (!depTask || !depItem) return null;
-    const tLeft = t.sIdx * DW + DW/2;
-    const tRight = t.eIdx * DW + DW/2;
-    const depLeft = depItem.sIdx * DW + DW/2;
-    const depRight = depItem.eIdx * DW + DW/2;
-    switch (t.dependencyType) {
-      case 'SS': return { fromX: depLeft, toX: tLeft, fromY: -25, toY: -10 };
-      case 'FF': return { fromX: depRight, toX: tRight, fromY: -25, toY: -10 };
-      case 'SF': return { fromX: depLeft, toX: tRight, fromY: -25, toY: -10 };
-      default: return { fromX: depRight, toX: tLeft, fromY: -25, toY: -10 };
-    }
-  };
-
   return (
     <div className="gantt-panel">
-      <div className="cal-head" style={{ padding: '12px 16px', borderBottom: '1px solid var(--line)' }}>
+      <div className="gantt-filter-bar">
+        <select className="inp sel gantt-filter-select" value={filters.projectId} onChange={(e) => setFilters(prev => ({ ...prev, projectId: e.target.value }))}>
+          <option value="all">Все проекты</option>
+          {projectOptions.map(p => <option key={p.id} value={p.id}>{p.code}</option>)}
+        </select>
+        <select className="inp sel gantt-filter-select" value={filters.assigneeId} onChange={(e) => setFilters(prev => ({ ...prev, assigneeId: e.target.value }))}>
+          <option value="all">Все исполнители</option>
+          {assigneeOptions.map(e => <option key={e.id} value={e.id}>{e.last} {e.first}</option>)}
+        </select>
+        <select className="inp sel gantt-filter-select" value={filters.status} onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}>
+          <option value="all">Все статусы</option>
+          {Object.entries(TASK_STATUSES).map(([key, val]) => <option key={key} value={key}>{val.label}</option>)}
+        </select>
+        <div className="gantt-zoom">
+          <button className="icon-btn" onClick={() => setZoomLevel(Math.max(0.5, zoomLevel - 0.25))}>−</button>
+          <span className="zoom-value">{Math.round(zoomLevel * 100)}%</span>
+          <button className="icon-btn" onClick={() => setZoomLevel(Math.min(2, zoomLevel + 0.25))}>+</button>
+        </div>
+        <button className="btn ghost sm" onClick={() => setExpandedTasks(new Set())}>Свернуть всё</button>
+        <button className="btn ghost sm" onClick={() => {
+          const allIds = [];
+          projectGroups.forEach(({ tasks }) => {
+            const tree = buildTaskTree(tasks);
+            const flat = flattenTree(tree);
+            flat.forEach(n => { if (n.hasChildren) allIds.push(n.id); });
+          });
+          setExpandedTasks(new Set(allIds));
+        }}>Развернуть всё</button>
+      </div>
+
+      <div className="cal-head p-3 border-b">
         <div className="cal-nav">
           <button className="icon-btn" onClick={() => shift(-1)}><Ic d={ICONS.left} size={16} /></button>
           <div className="cal-title" style={{ minWidth: '120px', fontSize: '15px', fontWeight: 700 }}>{fmtDMY(anchor)}</div>
@@ -174,9 +476,7 @@ export default function Gantt({ db, ur, openTask, openProject }) {
             <div className="gantt-axis" style={{ width }}>
               <div className="gantt-months" style={{ display: 'flex', flexWrap: 'nowrap', width }}>
                 {months.map((m, i) => (
-                  <div key={i} className="gantt-month" style={{ width: (m.to - m.from + 1) * DW, flex: 'none' }}>
-                    {m.label}
-                  </div>
+                  <div key={i} className="gantt-month" style={{ width: (m.to - m.from + 1) * DW, flex: 'none' }}>{m.label}</div>
                 ))}
               </div>
               <div className="gantt-days" style={{ display: 'flex', flexWrap: 'nowrap', width }}>
@@ -184,11 +484,7 @@ export default function Gantt({ db, ur, openTask, openProject }) {
                   const dt = parseISO(d);
                   const wk = dt.getDay();
                   return (
-                    <div
-                      key={d}
-                      className={`gday${(wk === 0 || wk === 6) ? ' wk' : ''}${d === TODAY ? ' td' : ''}`}
-                      style={{ width: DW, flex: 'none', whiteSpace: 'nowrap', boxSizing: 'border-box' }}
-                    >
+                    <div key={d} className={`gday${wk === 0 || wk === 6 ? ' wk' : ''}${d === TODAY ? ' td' : ''}`} style={{ width: DW, flex: 'none', whiteSpace: 'nowrap', boxSizing: 'border-box' }}>
                       {dt.getDate()}
                     </div>
                   );
@@ -198,116 +494,39 @@ export default function Gantt({ db, ur, openTask, openProject }) {
           </div>
           <div className="gantt-body">
             <div className="gantt-grid" style={{ width, left: 240 }}>
-              {days.map(d => <div key={d} className={`gcell${([0,6].includes(parseISO(d).getDay()) ? ' wk' : '')}`} style={{ width: DW, flex: 'none' }} />)}
-              {todayIdx >= 0 && <div className="gtoday" style={{ left: todayIdx * DW + DW/2 }} />}
+              {days.map(d => <div key={d} className={`gcell${[0,6].includes(parseISO(d).getDay()) ? ' wk' : ''}`} style={{ width: DW, flex: 'none' }} />)}
+              <div className="gtoday" style={{ left: days.indexOf(TODAY) * DW + DW/2 }} />
             </div>
-            {groups.map(g => {
-              const taskDeps = g.items.reduce((acc, t) => {
-                if (t.dependencyId) acc[t.id] = db.tasks.find(dt => dt.id === t.dependencyId);
-                return acc;
-              }, {});
-              const projectColor = getProjectColor(g.project);
-
-              return (
-                <div key={g.project.id}>
-                  <div className="gantt-group">
-                    <div 
-                      className="gantt-group-name" 
-                      style={{ cursor: 'pointer', textDecoration: 'underline' }}
-                      onClick={() => openProject && openProject(g.project.id)}
-                      title="Открыть проект"
-                    >
-                      <span className="pdot" style={{ background: projectColor }} />{g.project.code} · {g.project.name}
-                    </div>
-                    <div style={{ width }} />
-                  </div>
-                  {g.items.map(t => {
-                    const assignee = t.assigneeId ? db.employees.find(e => e.id === t.assigneeId) : null;
-                    const left = t.sIdx * DW + 2;
-                    const w = Math.max((t.eIdx - t.sIdx + 1) * DW - 4, DW - 8);
-                    const sp = getTaskSpent(t);
-                    const pct = Math.min(100, (sp / Math.max(1, t.plannedHours || 0)) * 100);
-                    const fillWidth = pct > 0 ? Math.max(pct, 2) : 0;
-                    const vac = assignee ? vacOverlap(assignee.id, t.start, t.deadline) : null;
-                    const tip = `${t.title}: ${fmtD(t.start)} — ${fmtD(t.deadline)}, план ${t.plannedHours ?? '—'} ч${vac ? `. Исполнитель в отпуске ${fmtDMY(vac.start)}–${fmtDMY(vac.end)}` : ''}`;
-                    const depTask = taskDeps[t.id];
-                    let depLine = null;
-                    if (depTask) {
-                      const depItem = g.items.find(it => it.id === depTask.id);
-                      if (depItem) {
-                        const coords = getDepCoords(t, depTask, depItem);
-                        if (coords) {
-                          depLine = (
-                            <svg
-                              style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}
-                            >
-                              <path
-                                d={`M ${coords.fromX} ${coords.fromY} L ${coords.toX} ${coords.fromY} L ${coords.toX} ${coords.toY}`}
-                                fill="none"
-                                stroke="#94a3b8"
-                                strokeWidth="2"
-                                strokeDasharray="4 2"
-                                markerEnd="url(#arrowhead)"
-                              />
-                              <text
-                                x={(coords.fromX + coords.toX) / 2}
-                                y={coords.fromY - 5}
-                                fontSize="10"
-                                fill="#64748b"
-                                textAnchor="middle"
-                              >
-                                {t.dependencyType || 'FS'}
-                              </text>
-                            </svg>
-                          );
-                        }
-                      }
-                    }
-
-                    const priorityColor = PRIORITIES[t.priority]?.color || '#64748b';
-                    const bgColor = priorityColor + '33';
-
-                    return (
-                      <div key={t.id} className="gantt-row" style={{ position: 'relative' }}>
-                        {depLine}
-                        <div className="gantt-label" onClick={() => openTask(t.id)}>
-                          <span className={`gtitle${t.status === 'cancelled' ? ' dim' : ''}`}>{t.title}</span>
-                          <span className="gsub">
-                            {assignee && <Avatar employee={assignee} size="xs" />} · {t.plannedHours ?? '—'} ч · {TASK_STATUSES[t.status].label}
-                          </span>
-                        </div>
-                        <div className="gantt-track">
-                          <div
-                            className="gbar"
-                            style={{
-                              '--bar-left': left + 'px',
-                              '--bar-width': w + 'px',
-                              '--bar-bg': bgColor,
-                              '--bar-opacity': t.status === 'cancelled' ? 0.45 : 1,
-                              '--fill-width': fillWidth + '%',
-                              '--fill-color': t.status === 'closed' ? '#10b981' : priorityColor
-                            }}
-                            onClick={() => openTask(t.id)}
-                            title={tip}
-                          >
-                            <div className="gbar-fill" />
-                            {vac && <span className="gbar-vac">🏖</span>}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
+            {projectGroups.map(({ project, tasks }) => (
+              <ProjectGroup
+                key={project.id}
+                project={project}
+                tasks={tasks}
+                days={days}
+                DW={DW}
+                viewStart={viewStart}
+                viewEnd={viewEnd}
+                db={db}
+                openTask={openTask}
+                openProject={openProject}
+                getTaskSpent={getTaskSpent}
+                vacOverlap={vacOverlap}
+                expandedTasks={expandedTasks}
+                setExpandedTasks={setExpandedTasks}
+                criticalIds={criticalIds}
+              />
+            ))}
           </div>
         </div>
       </div>
-      <div className="gantt-legend" style={{ padding: '8px 16px', borderTop: '1px solid var(--line)' }}>
-        <span><span className="lg-dot" style={{ background: '#ef4444' }} /> сегодня</span>
-        <span><span className="lg-dot" style={{ background: '#e2e8f0' }} /> выходные</span>
-        <span>🏖 — исполнитель в отпуске</span>
-        <span>Заполнение полосы — факт / план</span>
+
+      <div className="gantt-legend p-2 border-t flex flex-wrap gap-4 items-center">
+        <span className="legend-item"><span className="legend-dot" style={{ background: '#ef4444' }} /> сегодня</span>
+        <span className="legend-item"><span className="legend-dot" style={{ background: '#e2e8f0' }} /> выходные</span>
+        <span className="legend-item"><span className="legend-dot milestone" /> веха</span>
+        <span className="legend-item"><span className="legend-dot critical" /> критический путь</span>
+        <span className="legend-item">🏖 — исполнитель в отпуске</span>
+        <span className="legend-item">Заполнение полосы — факт / план</span>
       </div>
     </div>
   );

@@ -7,9 +7,6 @@ import { Ic, ICONS } from './Icons';
 import { COMMENT_EDIT_WINDOW } from '../utils/constants';
 import Avatar from './Avatar';
 
-/**
- * Рендерит текст с подсветкой @упоминаний
- */
 function renderMentionText(text) {
   return text.split("@").map((part, i) => {
     if (i === 0) return <span key={i}>{part}</span>;
@@ -29,9 +26,6 @@ function renderMentionText(text) {
   });
 }
 
-/**
- * Извлекает ID сотрудников, упомянутых через @фамилия
- */
 export function extractMentions(text, employees) {
   const found = [];
   text.split("@").slice(1).forEach((part) => {
@@ -43,9 +37,6 @@ export function extractMentions(text, employees) {
   return found;
 }
 
-/**
- * Универсальный компонент обсуждения (дерево комментариев с ответами, упоминаниями, редактированием)
- */
 export default function Discussion({
   comments,
   currentUser,
@@ -68,7 +59,6 @@ export default function Discussion({
 
   const allEmployees = employees;
 
-  // Фильтрация кандидатов для упоминаний
   const filteredCandidates = useMemo(() => {
     if (mentionQ === null) return [];
     return candidates.filter((e) =>
@@ -76,7 +66,6 @@ export default function Discussion({
     );
   }, [candidates, mentionQ]);
 
-  // При изменении mentionQ вычисляем позицию для портала
   useEffect(() => {
     if (mentionQ !== null && textareaRef.current) {
       const rect = textareaRef.current.getBoundingClientRect();
@@ -90,7 +79,6 @@ export default function Discussion({
     }
   }, [mentionQ]);
 
-  // Восстановление курсора после обновления text
   useEffect(() => {
     if (cursorPosRef.current !== null && textareaRef.current) {
       textareaRef.current.setSelectionRange(cursorPosRef.current, cursorPosRef.current);
@@ -98,10 +86,8 @@ export default function Discussion({
     }
   }, [text]);
 
-  // Поиск автора по ID
   const getAuthor = (id) => allEmployees.find((e) => e.id === id);
 
-  // Обработка ввода текста (включая поиск @)
   const onType = (val) => {
     setText(val);
     const lastAt = val.lastIndexOf("@");
@@ -117,7 +103,6 @@ export default function Discussion({
     }
   };
 
-  // Выбор упоминания из всплывающего списка
   const pickMention = (emp) => {
     const lastAt = text.lastIndexOf("@");
     if (lastAt === -1) return;
@@ -127,20 +112,17 @@ export default function Discussion({
     const insert = `${emp.last} ${emp.first}, `;
     const newText = prefix + insert + suffix;
 
-    // Позиция курсора – сразу после вставленного имени (включая запятую и пробел)
     const cursorPos = prefix.length + insert.length;
     cursorPosRef.current = cursorPos;
 
     setText(newText);
     setMentionQ(null);
 
-    // Возвращаем фокус в текстовое поле
     if (textareaRef.current) {
       textareaRef.current.focus();
     }
   };
 
-  // Отправка комментария
   const send = () => {
     if (readOnly || !canComment) return;
     if (!text.trim()) return;
@@ -162,19 +144,16 @@ export default function Discussion({
     setMentionQ(null);
   };
 
-  // Проверка права на удаление
   const canDelete = (c) => {
     const hasReplies = comments.some((x) => x.parentId === c.id);
     if (has(currentUser, "admin", "director")) return true;
     return c.authorId === currentUser.id && !hasReplies;
   };
 
-  // Проверка права на редактирование (в течение окна)
   const canEdit = (c) =>
     c.authorId === currentUser.id &&
     Date.now() - c.ts < COMMENT_EDIT_WINDOW;
 
-  // Удаление комментария и всех ответов
   const del = (c) => {
     if (!window.confirm("Удалить комментарий и все ответы?")) return;
 
@@ -195,7 +174,6 @@ export default function Discussion({
     if (toast) toast("Комментарий удалён");
   };
 
-  // Сохранение отредактированного комментария
   const saveEdit = (c) => {
     if (!editText.trim()) return;
     const updatedComments = comments.map((x) =>
@@ -206,7 +184,6 @@ export default function Discussion({
     setEditText("");
   };
 
-  // Рекурсивное построение дерева комментариев
   const renderTree = (parentId, depth) => {
     const children = comments
       .filter((c) => (c.parentId || null) === parentId)
@@ -310,7 +287,6 @@ export default function Discussion({
           )}
 
           <div className="cm-input-wrap">
-            {/* Список упоминаний рендерится через портал с динамическим позиционированием */}
             {mentionPopup.visible && filteredCandidates.length > 0 &&
               createPortal(
                 <div

@@ -23,9 +23,8 @@ export default function TasksList({ tasks, db, openTask }) {
         return (
           <div 
             key={task.id} 
-            className="pj-card" 
+            className="pj-card cursor-pointer" 
             onClick={() => openTask(task.id)}
-            style={{ cursor: 'pointer' }}
           >
             <div className="pj-top">
               <span className="pj-code" style={{ background: project?.color + '22', color: project?.color || '#64748b' }}>
@@ -47,7 +46,7 @@ export default function TasksList({ tasks, db, openTask }) {
                 {assignee ? `${assignee.last} ${assignee.first}` : 'не назначен'}
               </span>
             </div>
-            <div className="pj-budget" style={{ marginTop: 8 }}>
+            <div className="pj-budget mt-8">
               <div className="pj-budget-row">
                 <span>Часы: <b>{factHours}</b> / <b>{task.plannedHours ?? '—'}</b></span>
               </div>
@@ -61,7 +60,7 @@ export default function TasksList({ tasks, db, openTask }) {
               )}
             </div>
             <div className="pj-foot">
-              {overdue && <span style={{ color: '#dc2626', fontSize: 12, fontWeight: 600 }}>Просрочено</span>}
+              {overdue && <span className="red text-12 font-semibold">Просрочено</span>}
             </div>
           </div>
         );

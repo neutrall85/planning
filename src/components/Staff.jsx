@@ -16,7 +16,6 @@ import CreateEmployeeModal from "./CreateEmployeeModal";
 import Avatar from "./Avatar";
 import { getPrimaryDeptName } from "../utils/helpers";
 
-// ---- Строка сотрудника ----
 const EmployeeRow = React.memo(({
   employee,
   isFired,
@@ -87,7 +86,6 @@ const EmployeeRow = React.memo(({
   );
 });
 
-// ---- Основной компонент Staff ----
 export default function Staff({ db, setDb, ur, openRoles, openDepts, openVacation }) {
   const { getEmployeeLoad, empName } = useDataHelpers(db);
   const [showFired, setShowFired] = useState(false);
@@ -283,7 +281,7 @@ export default function Staff({ db, setDb, ur, openRoles, openDepts, openVacatio
             <div className="st-sec-title">Все отпуска</div>
             <button className="btn primary sm" onClick={() => openVacation(null, null)}><Ic d={ICONS.plus} size={13} /> Отпуск сотруднику</button>
           </div>
-          <div style={{ padding: 14 }}>
+          <div className="p-3">
             <table className="tbl">
               <thead><tr><th>Сотрудник</th><th>Отдел</th><th>Период</th><th>Тип</th><th>Делегирование</th><th>Статус</th><th></th></tr></thead>
               <tbody>

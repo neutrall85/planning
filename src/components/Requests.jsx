@@ -39,7 +39,7 @@ export default function Requests({ db, setDb, ur, initialTab = 'hours', addAudit
           task: targetTitle, 
           previousHours: r.oldH, 
           newHours: r.newH,
-          reason: r.reason          // <-- добавлено поле reason
+          reason: r.reason
         }, 'hoursRequest', r.id);
       } else {
         addAudit('Отклонение запроса часов', { 

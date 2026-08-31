@@ -63,7 +63,7 @@ const PasswordChangeModal = ({ user, store, onClose }) => {
         <label className="lbl">Подтверждение *</label>
         <input className="inp" type="password" value={confirmPass} onChange={e => setConfirmPass(e.target.value)} />
       </div>
-      {error && <div className="login-err" style={{ marginTop: 8 }}>{error}</div>}
+      {error && <div className="login-err mt-2">{error}</div>}
       <div className="modal-foot">
         <div className="spacer" />
         <button className="btn ghost" onClick={onClose}>Отмена</button>
@@ -194,26 +194,26 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
       </div>
 
       {tab === 'overview' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div className="flex flex-col gap-4">
           <div className="rep-panel">
             <div className="rep-panel-title">Затраченные часы по задачам (последние 20 дней)</div>
-            <div className="toolbar" style={{ marginBottom: 12, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+            <div className="toolbar flex items-center flex-wrap gap-2 mb-3">
               <span className="mut sm">Экспорт:</span>
-              <input className="inp" type="date" style={{ width: 150 }} value={expFrom} onChange={e => setExpFrom(e.target.value)} />
+              <input className="inp w-150" type="date" value={expFrom} onChange={e => setExpFrom(e.target.value)} />
               <span className="mut sm">—</span>
-              <input className="inp" type="date" style={{ width: 150 }} value={expTo} onChange={e => setExpTo(e.target.value)} />
+              <input className="inp w-150" type="date" value={expTo} onChange={e => setExpTo(e.target.value)} />
               <button className="btn primary sm" onClick={exportMyReport}>
                 <Ic d={ICONS.download} size={13} /> Выгрузить в Excel (CSV)
               </button>
             </div>
 
-            <div style={{ width: '100%', overflowX: 'auto' }}>
-              <table className="tbl" style={{ width: '100%', minWidth: '700px', borderCollapse: 'collapse' }}>
+            <div className="w-full overflow-x-auto">
+              <table className="tbl w-full" style={{ minWidth: '700px' }}>
                 <thead>
                   <tr>
-                    <th style={{ minWidth: '200px', textAlign: 'left', borderBottom: '1px solid var(--line)' }}>Задача</th>
+                    <th className="text-left border-b" style={{ minWidth: '200px' }}>Задача</th>
                     {days.map(d => (
-                      <th key={d} style={{ textAlign: 'center', minWidth: '60px', borderBottom: '1px solid var(--line)', fontSize: '11px', color: 'var(--mut)' }}>
+                      <th key={d} className="text-center border-b text-xs text-mut" style={{ minWidth: '60px' }}>
                         {fmtD(d)}
                       </th>
                     ))}
@@ -221,22 +221,22 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
                 </thead>
                 <tbody>
                   {taskTableData.map(({ task, logMap }) => (
-                    <tr key={task.id} style={{ cursor: 'pointer' }} onClick={() => openTask(task.id)}>
-                      <td style={{ textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #f1f5f9' }}>
+                    <tr key={task.id} className="cursor-pointer" onClick={() => openTask(task.id)}>
+                      <td className="text-left font-semibold border-b">
                         {task.title}
-                        <span className="mut sm" style={{ marginLeft: 8, fontWeight: 400 }}>
+                        <span className="mut sm font-normal ml-2">
                           ({data.projects.find(p => p.id === task.projectId)?.code || '—'})
                         </span>
                       </td>
                       {days.map(d => (
-                        <td key={d} style={{ textAlign: 'center', borderBottom: '1px solid #f1f5f9' }}>
+                        <td key={d} className="text-center border-b">
                           {logMap[d] ? <b>{logMap[d]} ч</b> : ''}
                         </td>
                       ))}
                     </tr>
                   ))}
                   {taskTableData.length === 0 && (
-                    <tr><td colSpan={days.length + 1} className="mut" style={{ textAlign: 'center', padding: 20 }}>Нет учтённых часов</td></tr>
+                    <tr><td colSpan={days.length + 1} className="mut text-center p-5">Нет учтённых часов</td></tr>
                   )}
                 </tbody>
               </table>
@@ -274,7 +274,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
               <div key={p.id} className="cab-proj">
                 <span className="pdot" style={{ background: p.color }} />
                 {p.code} — {p.name}
-                {p.ptype === 'admin' && <span className="adm-badge" style={{ marginLeft: 8 }}>адм</span>}
+                {p.ptype === 'admin' && <span className="adm-badge ml-2">адм</span>}
               </div>
             ))}
             {myProjects.length === 0 && <div className="mut">Нет участия в проектах</div>}
@@ -284,9 +284,9 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
 
       {tab === 'vacations' && (
         <div className="rep-panel">
-          <div className="rep-panel-title">
+          <div className="rep-panel-title flex items-center">
             Мои отпуска
-            <button className="btn primary sm" style={{ marginLeft: 'auto' }} onClick={() => openVacation(null)}>
+            <button className="btn primary sm ml-auto" onClick={() => openVacation(null)}>
               <Ic d={ICONS.plus} size={13} /> Добавить отпуск
             </button>
           </div>
@@ -323,9 +323,9 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
 
       {tab === 'delegation' && (
         <div className="rep-panel">
-          <div className="rep-panel-title">
+          <div className="rep-panel-title flex items-center">
             Временная передача ролей
-            <button className="btn primary sm" style={{ marginLeft: 'auto' }} onClick={openDelegation}>
+            <button className="btn primary sm ml-auto" onClick={openDelegation}>
               <Ic d={ICONS.plus} size={13} /> Делегировать роль
             </button>
           </div>
@@ -355,19 +355,19 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
           <div className="cab-grid">
             <div className="rep-panel">
               <div className="rep-panel-title">Личные данные</div>
-              <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-                <div style={{ flex: '0 0 140px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+              <div className="flex gap-4 flex-wrap">
+                <div className="flex flex-col items-center gap-2" style={{ flex: '0 0 140px' }}>
                   {user.photo ? (
-                    <img src={user.photo} alt="Аватар" style={{ width: 120, height: 120, borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--line)' }} />
+                    <img src={user.photo} alt="Аватар" className="rounded-full object-cover border" style={{ width: 120, height: 120 }} />
                   ) : (
-                    <div style={{ width: 120, height: 120, borderRadius: '50%', background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 12 }}>Нет фото</div>
+                    <div className="rounded-full flex items-center justify-center text-xs" style={{ width: 120, height: 120, background: '#e2e8f0', color: '#94a3b8' }}>Нет фото</div>
                   )}
-                  <input type="file" accept="image/*" ref={fileInputRef} style={{ display: 'none' }} onChange={handlePhotoUpload} />
+                  <input type="file" accept="image/*" ref={fileInputRef} className="file-input-hidden" onChange={handlePhotoUpload} />
                   <button className="btn primary sm" onClick={() => fileInputRef.current?.click()}>Загрузить фото</button>
                   {user.photo && <button className="btn ghost sm" onClick={handlePhotoDelete}>Удалить фото</button>}
                 </div>
 
-                <div style={{ flex: 1, minWidth: 300 }}>
+                <div className="flex-1" style={{ minWidth: 300 }}>
                   <div className="form-grid">
                     <label className="lbl">Фамилия</label>
                     <input className="inp" disabled value={user.last} />
@@ -427,7 +427,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
                     </div>
                   </div>
 
-                  <div style={{ marginTop: 16, display: 'flex', gap: 10, justifyContent: 'flex-end', alignItems: 'center' }}>
+                  <div className="mt-4 flex gap-3 justify-end items-center">
                     <button className="btn danger" onClick={() => setShowPasswordModal(true)}>Изменить пароль</button>
                     {editMode ? (
                       <>
@@ -463,7 +463,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
               ))}
               <p className="mut sm">Критичные уведомления (восстановление пароля, утверждения) отключить нельзя.</p>
 
-              <div className="rep-panel-title" style={{ marginTop: 16 }}>История делегирований</div>
+              <div className="rep-panel-title mt-4">История делегирований</div>
               {data.roleDelegations.filter(r => r.fromId === user.id).map(r => (
                 <div key={r.id} className="mut sm">→ {empName(r.toId)}: {r.roles.join(', ')} ({fmtDMY(r.start)} — {r.end ? fmtDMY(r.end) : 'до отмены'})</div>
               ))}

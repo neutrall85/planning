@@ -5,7 +5,7 @@ import { useDataHelpers } from '../../hooks';
 import { VACATION_TYPES, TASK_STATUSES } from '../../utils/constants';
 import { TODAY, iso, addDays, uid, fmtDMY } from '../../utils/date';
 import { canManageAllVacations } from '../../utils/permissions';
-import { getPrimaryDeptName } from '../../utils/helpers'; // <-- добавлен импорт
+import { getPrimaryDeptName } from '../../utils/helpers';
 
 export const VacationModal = ({ db, ur, vacationId, forEmpId, onClose, onSave }) => {
   const existing = vacationId ? db.vacations.find((v) => v.id === vacationId) : null;
@@ -32,7 +32,6 @@ export const VacationModal = ({ db, ur, vacationId, forEmpId, onClose, onSave })
     onSave({ ...f }, !existing);
   };
 
-  // Для выбора сотрудника (если есть право)
   const renderEmployeeSelect = () => {
     if (!canPick) return null;
     return (
@@ -95,7 +94,7 @@ export const VacationModal = ({ db, ur, vacationId, forEmpId, onClose, onSave })
               ))}
             </select>
             {f.delegation.enabled && !f.delegation.subId && (
-              <div className="error-message show" style={{ gridColumn: '2' }}>Выберите замещающего сотрудника</div>
+              <div className="error-message show grid-col-2">Выберите замещающего сотрудника</div>
             )}
             <label className="lbl">Какие задачи делегировать</label>
             <div className="sub-picks">

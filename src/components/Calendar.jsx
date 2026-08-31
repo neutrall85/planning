@@ -95,9 +95,9 @@ export default function Calendar({ db, ur, openTask }) {
           <button className="btn ghost sm" onClick={() => setAnchor(new Date())}>Сегодня</button>
           <div className="seg">{['day','week','month'].map(m => <button key={m} className={`seg-btn${mode===m?' on':''}`} onClick={() => setMode(m)}>{['День','Неделя','Месяц'][['day','week','month'].indexOf(m)]}</button>)}</div>
           {canSeeAll && (
-            <label className="dept-pick" style={{ marginLeft: 8 }}>
+            <label className="dept-pick ml-2">
               <input type="checkbox" checked={showOnlyMy} onChange={(e) => setShowOnlyMy(e.target.checked)} />
-              <span style={{ fontSize: 13 }}>Мои задачи</span>
+              <span className="text-sm">Мои задачи</span>
             </label>
           )}
         </div>

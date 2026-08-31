@@ -13,7 +13,6 @@ export const RolesModal = ({ db, setDb, empId, onClose, toast, audit }) => {
   const toggle = (r) => setRoles((s) => (s.includes(r) ? s.filter((x) => x !== r) : [...s, r]));
 
   const save = () => {
-    // Если роль kb_chief активна, очищаем отделы (главные конструкторы не имеют отделов)
     let updatedDepartments = emp.departments;
     if (roles.includes("kb_chief")) {
       updatedDepartments = [];

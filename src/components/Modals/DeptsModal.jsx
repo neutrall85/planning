@@ -9,13 +9,11 @@ export const DeptsModal = ({ db, setDb, empId, onClose, toast, audit }) => {
     setSel((s) => {
       if (s.some((x) => x.deptId === deptId)) {
         const next = s.filter((x) => x.deptId !== deptId);
-        // если после удаления не осталось primary, делаем первый primary
         if (next.length && !next.some((x) => x.primary)) {
           next[0].primary = true;
         }
         return next;
       }
-      // добавляем новый отдел как неосновной (primary: false)
       return [...s, { deptId, primary: s.length === 0, position: '' }];
     });
   };
@@ -31,7 +29,6 @@ export const DeptsModal = ({ db, setDb, empId, onClose, toast, audit }) => {
   const save = () => {
     if (!sel.length) return toast("Выберите хотя бы одно подразделение", "err");
     if (!sel.some((x) => x.primary)) return toast("Укажите основное подразделение", "err");
-    // Обновляем сотрудника
     const before = emp.departments.map((x) => `${x.deptId}:${x.position || ''}`).join(',');
     const after = sel.map((x) => `${x.deptId}:${x.position || ''}`).join(',');
     setDb((s) => ({
@@ -60,8 +57,8 @@ export const DeptsModal = ({ db, setDb, empId, onClose, toast, audit }) => {
           const isPrimary = cur && cur.primary;
           const isExtra = cur && !cur.primary;
           return (
-            <div key={d.id} style={{ marginBottom: 8 }}>
-              <label className="roles-item" style={{ border: 'none', padding: 0 }}>
+            <div key={d.id} className="mb-8">
+              <label className="roles-item roles-item-clean">
                 <input type="checkbox" checked={!!cur} onChange={() => toggle(d.id)} />
                 <span style={{ flex: 1 }}>
                   {d.name} <span className="mut sm">{kb ? `· ${kb.name}` : "· вне КБ"}</span>
@@ -72,20 +69,17 @@ export const DeptsModal = ({ db, setDb, empId, onClose, toast, audit }) => {
                   </button>
                 )}
               </label>
-              {/* Поле для дополнительной должности показываем только для НЕосновных отделов */}
               {isExtra && (
-                <div style={{ marginLeft: 28, marginTop: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div className="extra-position-field">
                   <label className="lbl" style={{ margin: 0, fontSize: 12 }}>Должность в этом отделе (дополнительная):</label>
                   <input
-                    className="inp"
-                    style={{ flex: 1, padding: '6px 10px', fontSize: 14 }}
+                    className="inp extra-position-input"
                     value={cur.position || ''}
                     onChange={(e) => setPosition(d.id, e.target.value)}
                     placeholder="Например: Ведущий инженер (совмещение)"
                   />
                 </div>
               )}
-              {/* Для основного отдела не показываем поле — должность редактируется в карточке сотрудника */}
             </div>
           );
         })}

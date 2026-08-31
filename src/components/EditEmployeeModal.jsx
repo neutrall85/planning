@@ -10,7 +10,7 @@ export default function EditEmployeeModal({ db, setDb, employeeId, onClose, toas
     last: emp.last || '',
     first: emp.first || '',
     email: emp.email || '',
-    position: emp.position || 'Сотрудник',   // <-- основная должность
+    position: emp.position || 'Сотрудник',
     phone: emp.phone || '',
     extension: emp.extension || '',
     tab: emp.tab || '',
@@ -34,7 +34,7 @@ export default function EditEmployeeModal({ db, setDb, employeeId, onClose, toas
       last: form.last.trim(),
       first: form.first.trim(),
       email: form.email.trim(),
-      position: form.position.trim() || 'Сотрудник',   // <-- сохраняем основную должность
+      position: form.position.trim() || 'Сотрудник',
       phone: form.phone || '',
       extension: form.extension || '',
       tab: form.tab || '',
@@ -70,7 +70,7 @@ export default function EditEmployeeModal({ db, setDb, employeeId, onClose, toas
         <input className="inp" name="first" value={form.first} onChange={handleChange} />
         <label className="lbl">E-mail *</label>
         <input className="inp" name="email" value={form.email} onChange={handleChange} />
-        <label className="lbl">Должность (основная)</label>   {/* <-- подпись */}
+        <label className="lbl">Должность (основная)</label>
         <input className="inp" name="position" value={form.position} onChange={handleChange} />
         <label className="lbl">Телефон</label>
         <input className="inp" name="phone" value={form.phone} onChange={handleChange} />

@@ -410,13 +410,13 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
 
       {tab === 'tasks' && existing && (
         <div className="tm-block">
-          <div className="tm-block-header">
+          <div className="tm-block-header flex justify-between items-center">
             <div className="rep-panel-title">Задачи проекта ({taskList.length})</div>
             <button className="btn primary sm" onClick={() => openTask(null, 'form', null, existing.id)} disabled={existing.archived}>
               <Ic d={ICONS.plus} size={14} /> Создать задачу
             </button>
           </div>
-          <div className="table-wrap">
+          <div className="tasks-table-wrap">
             <table className="tbl tasks-table">
               <thead>
                 <tr>
@@ -470,7 +470,7 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
               </tbody>
             </table>
           </div>
-          <div className="project-meta">
+          <div className="project-meta mt-8">
             Проект создан: {existing && existing.history?.length > 0 ? (() => {
               const creatorId = existing.history.find(h => h.who !== 'system')?.who || existing.history[0]?.who;
               const creator = creatorId ? db.employees.find(e => e.id === creatorId) : null;
@@ -509,7 +509,7 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
             <div className="mut sm">Файлы не загружены</div>
           )}
           {f.files && f.files.length > 0 && (
-            <div className="files-list">
+            <div className="flex flex-col gap-8">
               {f.files.map(file => {
                 const uploader = db.employees.find(e => e.id === file.uploadedBy);
                 const fileSize = file.size < 1024 ? file.size + ' Б' : file.size < 1048576 ? (file.size / 1024).toFixed(1) + ' КБ' : (file.size / 1048576).toFixed(1) + ' МБ';

@@ -485,6 +485,7 @@ input, select, textarea {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0; /* важно для Firefox */
 }
 
 /* --- common components --- */
@@ -1066,7 +1067,26 @@ input, select, textarea {
   border-radius: 99px;
 }
 
-/* --- gantt --- */
+/* --- Gantt (адаптивная высота, без !important) --- */
+.gantt-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;               /* занимает всю высоту родителя */
+  min-height: 0;              /* разрешает сжатие */
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--sh);
+}
+
+.gantt-scroll {
+  flex: 1 1 auto;            /* растягивается на всё свободное место */
+  overflow: auto;
+  min-height: 0;
+  max-height: none;          /* убираем старый фиксированный лимит */
+}
+
 .gantt {
   min-width: 100%;
   width: var(--gantt-width, auto);
@@ -1109,18 +1129,7 @@ input, select, textarea {
   margin-right: 6px;
   font-size: 14px;
 }
-.gantt-panel {
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  box-shadow: var(--sh);
-  overflow: hidden;
-  animation: fadeUp .3s ease;
-}
-.gantt-scroll {
-  overflow: auto;
-  max-height: calc(100vh - 220px);
-}
+
 .gantt-top {
   display: flex;
   position: sticky;
@@ -1128,7 +1137,9 @@ input, select, textarea {
   z-index: 5;
   background: #fff;
   border-bottom: 1px solid var(--line);
+  flex-shrink: 0;            /* шапка не сжимается */
 }
+
 .gantt-corner {
   width: 240px;
   flex: none;
@@ -1140,10 +1151,12 @@ input, select, textarea {
   display: flex;
   align-items: flex-end;
 }
+
 .gantt-months {
   display: flex;
   height: 24px;
 }
+
 .gantt-month {
   font-size: 13px;
   font-weight: 800;
@@ -1153,14 +1166,12 @@ input, select, textarea {
   white-space: nowrap;
   overflow: hidden;
 }
+
 .gantt-days {
   display: flex;
   height: 26px;
 }
-.gantt-track {
-  position: relative;
-  height: 46px;
-}
+
 .gday {
   display: flex;
   align-items: center;
@@ -1170,19 +1181,23 @@ input, select, textarea {
   border-left: 1px solid #eef2f7;
   font-variant-numeric: tabular-nums;
 }
+
 .gday.wk {
   background: #f8fafc;
   color: #b6c2d4;
 }
+
 .gday.td {
   background: #2563eb;
   color: #fff;
   font-weight: 800;
   border-radius: 6px;
 }
+
 .gantt-body {
   position: relative;
 }
+
 .gantt-grid {
   position: absolute;
   top: 0;
@@ -1190,13 +1205,16 @@ input, select, textarea {
   display: flex;
   pointer-events: none;
 }
+
 .gcell {
   border-left: 1px solid #f1f5f9;
   height: 100%;
 }
+
 .gcell.wk {
   background: #f8fafc88;
 }
+
 .gtoday {
   position: absolute;
   top: 0;
@@ -1205,12 +1223,15 @@ input, select, textarea {
   background: #ef4444;
   opacity: .8;
 }
+
 .gantt-group {
   display: flex;
   align-items: center;
   background: #f1f5f9;
   border-top: 1px solid var(--line);
+  flex-shrink: 0;            /* заголовок группы не сжимается */
 }
+
 .gantt-group-name {
   width: 240px;
   flex: none;
@@ -1225,13 +1246,16 @@ input, select, textarea {
   text-overflow: ellipsis;
   border-right: 1px solid var(--line);
 }
+
 .gantt-row {
   display: flex;
   border-top: 1px solid #f1f5f9;
 }
+
 .gantt-row:hover {
   background: #f8fafc;
 }
+
 .gantt-label {
   width: 240px;
   flex: none;
@@ -1243,6 +1267,7 @@ input, select, textarea {
   cursor: pointer;
   min-height: 46px;
 }
+
 .gtitle {
   font-size: 14px;
   font-weight: 700;
@@ -1250,44 +1275,17 @@ input, select, textarea {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
 .gtitle.dim {
   text-decoration: line-through;
   opacity: .6;
 }
+
 .gsub {
   font-size: 13px;
   color: var(--mut);
 }
-.gantt-track {
-  position: relative;
-  height: 46px;
-}
-.gbar {
-  position: absolute;
-  top: 11px;
-  height: 24px;
-  border-radius: 7px;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-}
-.gbar:hover {
-  filter: brightness(1.05);
-}
-.gbar-fill {
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 100%;
-  border-radius: 6px;
-  opacity: 0.9;
-}
-.gbar-vac {
-  position: relative;
-  margin-left: auto;
-  margin-right: 6px;
-  font-size: 14px;
-}
+
 .gantt-legend {
   display: flex;
   gap: 20px;
@@ -1297,7 +1295,9 @@ input, select, textarea {
   color: var(--mut);
   align-items: center;
   flex-wrap: wrap;
+  flex-shrink: 0;            /* легенда не сжимается */
 }
+
 .lg-dot {
   width: 9px;
   height: 9px;
@@ -1449,15 +1449,6 @@ input, select, textarea {
   text-overflow: ellipsis;
   width: 100%;
 }
-/* .cal-executor {
-  font-size: 11px;
-  color: var(--mut);
-  font-weight: 400;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  width: 100%;
-} */
 .cal-executors {
   display: flex;
   gap: 4px;
@@ -2283,41 +2274,6 @@ input, select, textarea {
   color: #10b981;
   font-weight: 700;
 }
-/* --- Gantt: фильтры --- */
-.gantt-filters {
-  display: flex;
-  gap: 10px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--line);
-  background: #f8fafc;
-  align-items: center;
-  flex-wrap: wrap;
-}
-.gantt-filters .inp.sm {
-  min-width: 150px;
-  font-size: 15px;
-}
-
-/* --- Gantt: базовый план --- */
-.gbar-baseline {
-  position: absolute;
-  top: 11px;
-  height: 24px;
-  border-radius: 7px;
-  z-index: 1;
-}
-
-/* --- Gantt: зависимости (SVG стрелки) --- */
-.gantt-dependencies {
-  overflow: visible;
-}
-.dependency-arrow path {
-  transition: stroke 0.15s ease, fill 0.15s ease;
-}
-.dependency-arrow:hover path {
-  stroke: #2563eb;
-  fill: #2563eb;
-}
 
 /* --- Popover для редактирования задачи --- */
 .task-edit-popover {
@@ -2560,4 +2516,342 @@ input, select, textarea {
 .pj-pair-input {
   flex: 1;
   min-width: 0;
+}
+
+/* Утилиты для отступов и выравнивания */
+.mb-8 { margin-bottom: 8px; }
+.mb-12 { margin-bottom: 12px; }
+.mt-8 { margin-top: 8px; }
+.mt-12 { margin-top: 12px; }
+.mt-16 { margin-top: 16px; }
+.gap-8 { gap: 8px; }
+.gap-10 { gap: 10px; }
+.flex { display: flex; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.flex-wrap { flex-wrap: wrap; }
+.flex-1 { flex: 1; }
+.min-w-80 { min-width: 80px; }
+.nowrap { white-space: nowrap; }
+.overflow-auto { overflow: auto; }
+.w-full { width: 100%; }
+.text-mut { color: var(--mut); }
+.text-sm { font-size: 14px; }
+.text-xs { font-size: 13px; }
+
+/* Для модальных форм */
+.roles-item-clean {
+  border: none;
+  padding: 0;
+}
+.extra-position-field {
+  margin-left: 28px;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.extra-position-input {
+  flex: 1;
+  padding: 6px 10px;
+  font-size: 14px;
+}
+
+/* Для таблиц задач */
+.tasks-table-wrap {
+  overflow-x: auto;
+}
+.tasks-table {
+  min-width: 500px;
+  font-size: 13px;
+}
+.task-chip {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.task-chip-default {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+/* Для полей ввода в модалке */
+.inp-sm {
+  padding: 6px 10px;
+  font-size: 14px;
+}
+.inp-with-button {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* Для файлов */
+.file-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #f8fafc;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+}
+.file-info {
+  flex: 1;
+}
+.file-name {
+  font-weight: 600;
+}
+.file-meta {
+  font-size: 12px;
+  color: var(--mut);
+}
+
+/* Для панели управления временем */
+.tm-add {
+  display: flex;
+  gap: 8px;
+}
+.tm-add .inp {
+  font-size: 15px;
+}
+.tm-add-date {
+  width: 150px;
+}
+.tm-add-hours {
+  width: 90px;
+}
+.tm-add-note {
+  flex: 1;
+}
+
+/* Для подзадач */
+.subtask-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.subtask-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+.subtask-table {
+  min-width: 500px;
+  font-size: 13px;
+}
+
+/* Для отделов в DeptsModal */
+.dept-item {
+  margin-bottom: 8px;
+}
+.dept-item-label {
+  border: none;
+  padding: 0;
+}
+.primary-btn-active {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+}
+
+/* Дополнительные утилитарные классы для замены инлайн-стилей */
+.ml-auto { margin-left: auto; }
+.ml-8 { margin-left: 8px; }
+.mt-8 { margin-top: 8px; }
+.cursor-pointer { cursor: pointer; }
+.text-12 { font-size: 12px; }
+.font-semibold { font-weight: 600; }
+
+/* ===== Утилитные классы ===== */
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.flex-wrap { flex-wrap: wrap; }
+.flex-1 { flex: 1; }
+.flex-none { flex: none; }
+.items-center { align-items: center; }
+.items-start { align-items: flex-start; }
+.items-end { align-items: flex-end; }
+.justify-between { justify-content: space-between; }
+.justify-end { justify-content: flex-end; }
+.justify-center { justify-content: center; }
+.gap-1 { gap: 4px; }
+.gap-2 { gap: 8px; }
+.gap-3 { gap: 12px; }
+.gap-4 { gap: 16px; }
+.gap-5 { gap: 20px; }
+.gap-6 { gap: 24px; }
+.w-full { width: 100%; }
+.w-auto { width: auto; }
+.h-full { height: 100%; }
+.overflow-auto { overflow: auto; }
+.overflow-x-auto { overflow-x: auto; }
+.relative { position: relative; }
+.absolute { position: absolute; }
+.text-center { text-align: center; }
+.text-left { text-align: left; }
+.text-right { text-align: right; }
+.font-bold { font-weight: 700; }
+.font-semibold { font-weight: 600; }
+.font-normal { font-weight: 400; }
+.text-sm { font-size: 14px; }
+.text-xs { font-size: 12px; }
+.text-mut { color: var(--mut); }
+.p-1 { padding: 4px; }
+.p-2 { padding: 8px; }
+.p-3 { padding: 12px; }
+.p-4 { padding: 16px; }
+.p-5 { padding: 20px; }
+.m-1 { margin: 4px; }
+.m-2 { margin: 8px; }
+.m-3 { margin: 12px; }
+.m-4 { margin: 16px; }
+.m-5 { margin: 20px; }
+.mt-1 { margin-top: 4px; }
+.mt-2 { margin-top: 8px; }
+.mt-3 { margin-top: 12px; }
+.mt-4 { margin-top: 16px; }
+.mt-5 { margin-top: 20px; }
+.mb-1 { margin-bottom: 4px; }
+.mb-2 { margin-bottom: 8px; }
+.mb-3 { margin-bottom: 12px; }
+.mb-4 { margin-bottom: 16px; }
+.mb-5 { margin-bottom: 20px; }
+.ml-1 { margin-left: 4px; }
+.ml-2 { margin-left: 8px; }
+.ml-auto { margin-left: auto; }
+.mr-2 { margin-right: 8px; }
+.border { border: 1px solid var(--line); }
+.border-b { border-bottom: 1px solid var(--line); }
+.border-t { border-top: 1px solid var(--line); }
+.rounded { border-radius: 8px; }
+.rounded-lg { border-radius: 12px; }
+.rounded-full { border-radius: 9999px; }
+.object-cover { object-fit: cover; }
+
+/* специфические размеры */
+.w-140 { width: 140px; }
+.w-150 { width: 150px; }
+.min-w-60 { min-width: 60px; }
+.min-w-200 { min-width: 200px; }
+.min-w-300 { min-width: 300px; }
+
+/* для avatar-wrapper */
+.avatar-wrapper { display: inline-block; position: relative; }
+
+/* ===== Gantt: новые элементы ===== */
+.gantt-filter-bar {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 10px;
+  padding: 12px 16px;
+  background: #f8fafc;
+  border-bottom: 1px solid var(--line);
+  align-items: center;
+  overflow-x: auto;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.gantt-filter-select {
+  min-width: 140px;
+  width: auto;
+  flex: 0 0 auto;
+  font-size: 14px;
+}
+
+.gantt-filter-bar .btn {
+  flex: 0 0 auto;
+  font-size: 14px;
+}
+
+.gantt-zoom {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.gantt-zoom .zoom-value {
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 40px;
+  text-align: center;
+}
+
+.gantt-expand-btn {
+  background: none;
+  border: none;
+  color: var(--mut);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0 4px;
+  margin-right: 4px;
+  transition: transform 0.2s;
+  display: inline-flex;
+  align-items: center;
+}
+.gantt-expand-btn:hover {
+  color: var(--txt);
+}
+.gantt-expand-btn.expanded {
+  transform: rotate(90deg);
+}
+
+.gantt-row-child .gantt-label {
+  padding-left: 28px;
+}
+.gantt-row-child .gantt-label .gtitle {
+  font-weight: 500;
+  color: #475569;
+}
+
+.gantt-milestone {
+  position: absolute;
+  top: 8px;
+  width: 16px;
+  height: 16px;
+  transform: rotate(45deg);
+  border: 2px solid;
+  background: #fff;
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+.gantt-critical .gbar {
+  box-shadow: 0 0 0 2px #ef4444, 0 0 0 4px rgba(239, 68, 68, 0.2);
+}
+.gantt-critical .gtitle {
+  color: #b91c1c;
+}
+
+.gantt-legend .legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 16px;
+}
+.gantt-legend .legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+}
+.gantt-legend .legend-dot.milestone {
+  transform: rotate(45deg);
+  width: 10px;
+  height: 10px;
+  border: 2px solid #2563eb;
+  background: #fff;
+}
+.gantt-legend .legend-dot.critical {
+  border: 2px solid #ef4444;
+  background: transparent;
+  width: 12px;
+  height: 12px;
 }

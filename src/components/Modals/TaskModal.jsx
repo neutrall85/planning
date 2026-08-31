@@ -149,7 +149,7 @@ export const TaskModal = ({
     title: "",
     desc: "",
     projectId: initialProjectId || "",
-    assigneeId: null,                       // <-- один исполнитель
+    assigneeId: null,
     priority: "mid",
     plannedHours: 8,
     start: TODAY,
@@ -443,7 +443,6 @@ export const TaskModal = ({
       }
     }
 
-    // Проверка права на создание задачи (для новых и подзадач)
     if (!existing && !canCreateTask(ur)) {
       showToast('У вас нет прав на создание задач. Только ГК, ГД, Админ и Менеджер проектов.', 'error');
       return;
@@ -549,16 +548,14 @@ export const TaskModal = ({
           {isAdminProj && !readOnly && <div className="info-box">Административный проект: срок исполнения и плановые часы задачи — по желанию.</div>}
 
           <div className="project-info-fields">
-            {/* Название */}
             <div className="field-row">
               <label className="field-label">Название *</label>
               <input className="inp" disabled={!canEditFields} value={f.title} onChange={(e) => set("title", e.target.value)} />
             </div>
 
-            {/* Суммарная задача */}
             <div className="field-row">
               <label className="field-label">Суммарная задача</label>
-              <div className="duo" style={{ flex: 1 }}>
+              <div className="duo flex-1">
                 <input
                   type="checkbox"
                   disabled={!canEditFields || hasSubtasks}
@@ -569,11 +566,10 @@ export const TaskModal = ({
               </div>
             </div>
 
-            {/* Родительская задача */}
             {parentTask && (
               <div className="field-row">
                 <label className="field-label">Родительская задача</label>
-                <div className="duo" style={{ flex: 1 }}>
+                <div className="duo flex-1">
                   <input className="inp" disabled value={parentTask.title} />
                   <button
                     className="btn ghost sm"
@@ -588,13 +584,11 @@ export const TaskModal = ({
               </div>
             )}
 
-            {/* Описание */}
             <div className="field-row">
               <label className="field-label">Описание</label>
               <textarea className="inp" rows="2" disabled={!canEditFields} value={f.desc} onChange={(e) => set("desc", e.target.value)} />
             </div>
 
-            {/* Проект — заблокирован, если передан initialProjectId */}
             <div className="field-row">
               <label className="field-label">Проект * <span className="mut">(активные)</span></label>
               {readOnly ? (
@@ -609,7 +603,6 @@ export const TaskModal = ({
               )}
             </div>
 
-            {/* Приоритет */}
             <div className="field-row">
               <label className="field-label">Приоритет *</label>
               <select className="inp sel" disabled={!canEditFields} value={f.priority} onChange={(e) => set("priority", e.target.value)} style={{ flex: 1 }}>
@@ -617,7 +610,6 @@ export const TaskModal = ({
               </select>
             </div>
 
-            {/* Исполнитель (ответственный) — один select */}
             <div className="field-row">
               <label className="field-label">Ответственный *</label>
               {readOnly ? (
@@ -638,7 +630,6 @@ export const TaskModal = ({
               )}
             </div>
 
-            {/* Парная строка: Начало работы и Срок исполнения */}
             <div className="pj-pair-row">
               <div className="pj-pair-item">
                 <label className="pj-pair-label">Начало работы</label>
@@ -650,31 +641,28 @@ export const TaskModal = ({
               </div>
             </div>
 
-            {/* Парная строка: Плановые часы и Статус */}
             <div className="pj-pair-row">
               <div className="pj-pair-item">
                 <label className="pj-pair-label">Плановые часы {!isAdminProj && "*"}</label>
-                <div style={{ display: 'flex', gap: '8px', flex: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+                <div className="flex flex-wrap items-center gap-8 flex-1">
                   {f.isSummary ? (
-                    <input className="inp" disabled value={f.plannedHours ?? 0} style={{ flex: 1, minWidth: '80px' }} />
+                    <input className="inp flex-1 min-w-80" disabled value={f.plannedHours ?? 0} />
                   ) : (
                     <input 
-                      className="inp" 
+                      className="inp flex-1 min-w-80" 
                       type="number" 
                       min="0.5" 
                       step="0.5" 
                       disabled={!canEditPlannedHours} 
                       value={f.plannedHours ?? ""} 
                       onChange={(e) => set("plannedHours", e.target.value)} 
-                      style={{ flex: 1, minWidth: '80px' }}
                     />
                   )}
                   {!readOnly && existing && !canEditPlannedHours && !f.isSummary && (
                     <button 
-                      className="btn ghost sm" 
+                      className="btn ghost sm nowrap" 
                       type="button" 
                       onClick={() => onHoursReq("task", existing.id)}
-                      style={{ whiteSpace: 'nowrap' }}
                     >
                       <Ic d={ICONS.clock} size={13} /> Запросить изменение
                     </button>
@@ -699,7 +687,6 @@ export const TaskModal = ({
               <div className="info-box">Исполнитель может переводить задачу в «В работе» и «На проверке»; закрытие и отмена — у ответственного/руководителя.</div>
             )}
 
-            {/* Зависимости — поля одно под другим */}
             <div className="field-row">
               <label className="field-label">Зависит от задачи</label>
               <select
@@ -735,21 +722,20 @@ export const TaskModal = ({
             {remainProj !== null && <div className="budget-hint">Остаток бюджета проекта «{proj.code}»: <b>{remainProj} ч</b> из {proj.budget} ч</div>}
             
             {isAuthor && isReview && !readOnly && (
-              <div style={{ marginTop: 16, display: 'flex', gap: 10 }}>
+              <div className="mt-16 flex gap-10">
                 <button className="btn primary" onClick={handleAccept}><Ic d={ICONS.check} size={15} /> Принять (закрыть)</button>
                 <button className="btn ghost" onClick={handleRework}><Ic d={ICONS.refresh} size={15} /> Отправить на доработку</button>
               </div>
             )}
           </div>
 
-          {/* Блок Повторение (только для новых задач) */}
           {!existing && !readOnly && (
-            <div className="tm-block" style={{ marginTop: '12px' }}>
+            <div className="tm-block mt-12">
               <div className="rep-panel-title">Повторение</div>
               <div className="project-info-fields" style={{ gap: '8px' }}>
                 <div className="field-row">
                   <label className="field-label">Тип повторения</label>
-                  <select className="inp sel" value={f.repeatType} onChange={(e) => set("repeatType", e.target.value)} style={{ flex: 1 }}>
+                  <select className="inp sel flex-1" value={f.repeatType} onChange={(e) => set("repeatType", e.target.value)}>
                     <option value="none">Нет</option>
                     <option value="daily">Ежедневно</option>
                     <option value="weekly_days">Еженедельно по дням</option>
@@ -763,13 +749,13 @@ export const TaskModal = ({
                 {f.repeatType === 'custom' && (
                   <div className="field-row">
                     <label className="field-label">Интервал (дней)</label>
-                    <input className="inp" type="number" min="1" value={f.repeatInterval} onChange={(e) => set("repeatInterval", e.target.value)} style={{ flex: 1 }} />
+                    <input className="inp flex-1" type="number" min="1" value={f.repeatInterval} onChange={(e) => set("repeatInterval", e.target.value)} />
                   </div>
                 )}
                 {f.repeatType === 'weekly_days' && (
                   <div className="field-row">
                     <label className="field-label">Дни недели</label>
-                    <div className="duo" style={{ flex: 1, flexWrap: 'wrap', gap: '6px' }}>
+                    <div className="duo flex-1 flex-wrap gap-6">
                       {['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map((day, idx) => {
                         const dayNum = idx + 1;
                         const checked = f.repeatDays.includes(String(dayNum));
@@ -795,17 +781,17 @@ export const TaskModal = ({
                 {f.repeatType !== 'none' && (
                   <div className="field-row">
                     <label className="field-label">Окончание</label>
-                    <div className="duo" style={{ flex: 1, display: 'flex', gap: '8px' }}>
-                      <select className="inp sel" value={f.repeatEndType} onChange={(e) => set("repeatEndType", e.target.value)} style={{ width: '120px' }}>
+                    <div className="duo flex-1 gap-8">
+                      <select className="inp sel" style={{ width: '120px' }} value={f.repeatEndType} onChange={(e) => set("repeatEndType", e.target.value)}>
                         <option value="date">По дате</option>
                         <option value="count">По количеству</option>
                       </select>
                       {f.repeatEndType === 'date' ? (
-                        <input className="inp" type="date" value={f.repeatEndValue} onChange={(e) => set("repeatEndValue", e.target.value)} style={{ flex: 1 }} />
+                        <input className="inp flex-1" type="date" value={f.repeatEndValue} onChange={(e) => set("repeatEndValue", e.target.value)} />
                       ) : (
-                        <input className="inp" type="number" min="1" value={f.repeatEndValue} onChange={(e) => set("repeatEndValue", e.target.value)} placeholder="кол-во" style={{ width: '100px' }} />
+                        <input className="inp w-90" type="number" min="1" value={f.repeatEndValue} onChange={(e) => set("repeatEndValue", e.target.value)} placeholder="кол-во" />
                       )}
-                      <span className="mut sm" style={{ alignSelf: 'center' }}>всего {f.repeatEndType === 'count' ? 'задач' : ''}</span>
+                      <span className="mut sm self-center">всего {f.repeatEndType === 'count' ? 'задач' : ''}</span>
                     </div>
                   </div>
                 )}
@@ -816,7 +802,7 @@ export const TaskModal = ({
       )}
 
       {tab === "time" && (
-        <div className="tm-block" style={{ marginTop: 0 }}>
+        <div className="tm-block mt-0">
           <div className="tm-progress"><div className="tm-progress-fill" style={{ width: Math.min(100, (sp / Math.max(1, f.plannedHours || 0)) * 100) + "%" }} /></div>
           {f.logs.length > 0 && (
             <div className="tm-logs">
@@ -834,16 +820,14 @@ export const TaskModal = ({
             <>
               <div className="tm-add">
                 <input
-                  className="inp"
+                  className="inp tm-add-date"
                   type="date"
                   value={logDate}
                   onChange={(e) => setLogDate(e.target.value)}
                   max={TODAY}
-                  style={{ width: '150px' }}
                 />
                 <input
-                  className="inp"
-                  style={{ width: 90 }}
+                  className="inp tm-add-hours"
                   type="number"
                   min="0.5"
                   step="0.5"
@@ -852,7 +836,7 @@ export const TaskModal = ({
                   onChange={(e) => setLogH(e.target.value)}
                 />
                 <input
-                  className="inp"
+                  className="inp tm-add-note"
                   placeholder="комментарий"
                   value={logNote}
                   onChange={(e) => setLogNote(e.target.value)}
@@ -861,10 +845,10 @@ export const TaskModal = ({
                   <Ic d={ICONS.clock} size={14} /> Внести часы
                 </button>
               </div>
-              <div className="mut sm" style={{ marginTop: 8 }}>
+              <div className="mut sm mt-8">
                 {f.plannedHours ? `Часы не могут превышать плановые: доступно ещё ${Math.max(0, f.plannedHours - sp)} ч.` : "Плановые часы не заданы — ограничение не применяется."}
                 <br />
-                <span style={{ fontSize: '13px', color: 'var(--mut)' }}>Выберите дату за прошлые дни или сегодня (будущие даты недоступны).</span>
+                <span className="text-xs text-mut">Выберите дату за прошлые дни или сегодня (будущие даты недоступны).</span>
               </div>
             </>
           ) : <div className="mut sm">{readOnly ? "Учёт часов для архивных задач недоступен." : "Часы вносит только исполнитель задачи."}</div>}
@@ -872,8 +856,8 @@ export const TaskModal = ({
       )}
 
       {tab === "subtasks" && (f.isSummary || hasSubtasks) && (
-        <div className="tm-block" style={{ marginTop: 0 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+        <div className="tm-block mt-0">
+          <div className="subtask-header">
             <div className="rep-panel-title">Подзадачи</div>
             <button
               className="btn primary sm"
@@ -889,8 +873,8 @@ export const TaskModal = ({
           {subtasks.length === 0 ? (
             <div className="mut sm">Нет подзадач</div>
           ) : (
-            <div style={{ width: '100%', overflowX: 'auto' }}>
-              <table className="tbl" style={{ minWidth: 500, fontSize: 13 }}>
+            <div className="subtask-table-wrap">
+              <table className="tbl subtask-table">
                 <thead>
                   <tr>
                     <th>Название</th>
@@ -946,7 +930,7 @@ export const TaskModal = ({
       )}
 
       {tab === "files" && (
-        <div className="tm-block" style={{ marginTop: 0 }}>
+        <div className="tm-block mt-0">
           <div className="rep-panel-title">Файлы задачи</div>
           {!readOnly && (canEditFields || f.assigneeId === ur.id || f.creatorId === ur.id) && (
             <div className="toolbar">
@@ -966,7 +950,7 @@ export const TaskModal = ({
             <div className="mut sm">Файлы не загружены</div>
           )}
           {f.files && f.files.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div className="flex flex-col gap-8">
               {f.files.map(file => {
                 const uploader = db.employees.find(e => e.id === file.uploadedBy);
                 const fileSize = file.size < 1024
@@ -975,22 +959,11 @@ export const TaskModal = ({
                     ? (file.size / 1024).toFixed(1) + ' КБ'
                     : (file.size / 1048576).toFixed(1) + ' МБ';
                 return (
-                  <div
-                    key={file.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px',
-                      background: '#f8fafc',
-                      padding: '8px 12px',
-                      borderRadius: '8px',
-                      border: '1px solid var(--line)'
-                    }}
-                  >
+                  <div key={file.id} className="file-item">
                     <Ic d={ICONS.file} size={24} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 600 }}>{file.name}</div>
-                      <div className="mut sm">
+                    <div className="file-info">
+                      <div className="file-name">{file.name}</div>
+                      <div className="file-meta">
                         {fileSize} · загрузил {uploader ? `${uploader.last} ${uploader.first}` : '—'}{' '}
                         {file.uploadedAt ? fmtDMY(file.uploadedAt) : ''}
                       </div>

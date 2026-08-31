@@ -168,16 +168,16 @@ export default function MainLayout({ store, data, user }) {
           </div>
         </div>
         <div
-          className="user-card"
+          className="user-card cursor-pointer mb-4"
           onClick={() => setView('cabinet')}
-          style={{ cursor: 'pointer', marginBottom: '16px' }}
         >
           <div className="avatar">
             {user.photo ? (
               <img
                 src={user.photo}
                 alt="Аватар"
-                style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
+                className="rounded-full object-cover"
+                style={{ width: '100%', height: '100%' }}
               />
             ) : (
               initials(user.first, user.last)

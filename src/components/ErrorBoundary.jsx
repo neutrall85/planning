@@ -14,10 +14,10 @@ export default class ErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{ padding: '40px', fontFamily: 'sans-serif', textAlign: 'center' }}>
+        <div className="p-5 text-center" style={{ fontFamily: 'sans-serif' }}>
           <h2>Что-то пошло не так</h2>
-          <p style={{ color: '#666' }}>Попробуйте перезагрузить страницу или сообщите разработчику.</p>
-          <button onClick={() => window.location.reload()} style={{ padding: '8px 16px', marginTop: '12px', cursor: 'pointer' }}>
+          <p className="text-mut">Попробуйте перезагрузить страницу или сообщите разработчику.</p>
+          <button onClick={() => window.location.reload()} className="p-2 mt-3 cursor-pointer">
             Перезагрузить
           </button>
         </div>

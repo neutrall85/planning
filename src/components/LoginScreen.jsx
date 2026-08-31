@@ -151,8 +151,8 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
     <div className="login-wrap">
       <div className="login-hero">
         <div className="logo lg"><div className="logo-mark">АП</div><div><div className="logo-name">АвиаГоризонт</div><div className="logo-sub">планирование и учёт времени</div></div></div>
-        <h2>Единая среда планирования КБ</h2>
-        <p>Канбан, диаграмма Ганта и календарь. Производственные проекты двух типов, административные проекты, задачи с подзадачами бесконечной вложенности, отпуска с делегированием, HR-администрирование и журнал аудита.</p>
+        <h2>Единая среда планирования ИЦ</h2>
+        <p>Канбан, список, диаграмма Ганта и календарь. Производственные проекты двух типов, административные проекты, задачи с подзадачами бесконечной вложенности, отпуска с делегированием, HR-администрирование и журнал аудита.</p>
         <ul className="hero-list">
           <li>9 ролей, включая HR-менеджера; временное делегирование полномочий</li>
           <li>Архив закрытых задач и проектов при попадании в завершенные или отмененные</li>
@@ -176,7 +176,7 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
                   <label className="lbl">Логин (e-mail)</label>
                   <div className="email-inp"><input className="inp" value={lg} onChange={(e) => { setLg(e.target.value); setErr(null); }} placeholder="ivanov" autoFocus /><span className="email-dom">{"@" + DOMAIN}</span></div>
                   <label className="lbl">Пароль</label>
-                  <div style={{ position: 'relative' }}>
+                  <div className="relative">
                     <input
                       className="inp"
                       type={showPassword ? "text" : "password"}
@@ -208,7 +208,7 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
               <label className="lbl">E-mail *</label>
               <div className="email-inp"><input className="inp" value={reg.email} onChange={(e) => setReg({ ...reg, email: e.target.value })} placeholder="ivanov" /><span className="email-dom">{"@" + DOMAIN}</span></div>
               <label className="lbl">Пароль *</label>
-              <div style={{ position: 'relative' }}>
+              <div className="relative">
                 <input
                   className="inp"
                   type={showRegPass ? "text" : "password"}

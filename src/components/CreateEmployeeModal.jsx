@@ -31,7 +31,6 @@ export default function CreateEmployeeModal({ db, setDb, onClose, toast, audit }
       toast('Сотрудник с таким email уже существует', 'err');
       return;
     }
-    // Проверка пароля
     if (form.pass.length < 8) {
       toast('Пароль должен быть не менее 8 символов', 'err');
       return;

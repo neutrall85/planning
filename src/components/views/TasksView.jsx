@@ -28,7 +28,7 @@ export default function TasksView({ db, ur, openTask, store }) {
   const filteredTasks = useMemo(() => {
     let list = db.tasks.filter(t => isTaskActive(t) && taskVisible(ur, scope, t, db));
     if (fProj !== 'all') list = list.filter(t => t.projectId === fProj);
-    if (fExec !== 'all') list = list.filter(t => t.assigneeId === fExec); // <-- один исполнитель
+    if (fExec !== 'all') list = list.filter(t => t.assigneeId === fExec);
     if (fPrio !== 'all') list = list.filter(t => t.priority === fPrio);
     if (fDept !== 'all') {
       list = list.filter(t => {
@@ -43,7 +43,7 @@ export default function TasksView({ db, ur, openTask, store }) {
         (db.projects.find(p => p.id === t.projectId)?.name || '').toLowerCase().includes(s)
       );
     }
-    if (showOnlyMy) list = list.filter(t => t.assigneeId === ur.id); // <-- один исполнитель
+    if (showOnlyMy) list = list.filter(t => t.assigneeId === ur.id);
     return list;
   }, [db, ur, scope, fProj, fExec, fPrio, fDept, q, showOnlyMy]);
 
@@ -81,7 +81,7 @@ export default function TasksView({ db, ur, openTask, store }) {
             </span>
           )}
           <span className="khours"><Ic d={ICONS.clock} size={13} /> {sp}/{task.plannedHours ?? '—'} ч</span>
-          <span className="prio-chip" style={{ color: priority.color, fontWeight: 700, fontSize: '12px' }}>
+          <span className="prio-chip" style={{ color: priority.color }}>
             {priority.label}
           </span>
         </div>
@@ -159,7 +159,7 @@ export default function TasksView({ db, ur, openTask, store }) {
         )}
 
         {canSeeAll && (
-          <label className="dept-pick" style={{ marginLeft: 'auto' }}>
+          <label className="dept-pick ml-auto">
             <input type="checkbox" checked={showOnlyMy} onChange={e => setShowOnlyMy(e.target.checked)} />
             <span>Мои задачи</span>
           </label>

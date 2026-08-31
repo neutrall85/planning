@@ -119,14 +119,13 @@ export default function ProjectsView({ db, ur, openProject, openHoursReq, store 
           {project.code}
         </div>
         <div className="kcard-meta">
-          <span className="mut sm">{PROJECT_STATUSES[project.ptype || 'prod']}</span>
-          <span className="mut sm" style={{ marginLeft: 8, color: PROJECT_PRIORITIES[project.priority]?.color || '#64748b' }}>
+          <span className="mut sm ml-8" style={{ color: PROJECT_PRIORITIES[project.priority]?.color || '#64748b' }}>
             {project.priority || 'NORM'}
           </span>
           <ProjectProgress project={project} plan={plan} fact={fact} />
         </div>
         <div className="kcard-foot">
-          <div className="pj-avatars" style={{ flex: 1 }}>
+          <div className="pj-avatars flex-1">
             {uniqueAssignees.slice(0,4).map(id => {
               const a = db.employees.find(e => e.id === id);
               return a ? <Avatar key={id} employee={a} size="xs" /> : null;
@@ -206,7 +205,7 @@ export default function ProjectsView({ db, ur, openProject, openHoursReq, store 
         </select>
 
         {canSeeAll && (
-          <label className="dept-pick" style={{ marginLeft: 'auto' }}>
+          <label className="dept-pick ml-auto">
             <input type="checkbox" checked={showOnlyMyProjects} onChange={e => setShowOnlyMyProjects(e.target.checked)} />
             <span>Проекты с моими задачами</span>
           </label>

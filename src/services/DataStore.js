@@ -1,3 +1,4 @@
+// src/services/DataStore.js
 import { TODAY, iso, addDays, addMonths, uid, fmtDMY } from '../utils/date';
 import { TASK_STATUSES, TASK_STATUS_ORDER, PRIORITIES, VACATION_TYPES, PROJECT_STATUSES, PROJECT_TYPES, DEPENDENCY_TYPES } from '../utils/constants';
 import { buildMockData } from './mockData';
@@ -10,6 +11,8 @@ export default class DataStore {
     this._archiveOldTasks(3);
     // Миграция старых задач: если есть assigneeIds, берём первого как assigneeId
     this._migrateTasks();
+    // +++ Новая миграция: добавляем budgetHours и actualHours
+    this._migrateBudgetAndActual();
   }
 
   _migrateTasks() {
@@ -28,6 +31,27 @@ export default class DataStore {
     if (changed) {
       this._notify();
       this.addAudit('Миграция данных', 'Задачи приведены к формату с одним исполнителем (assigneeId)');
+    }
+  }
+
+  // +++ Миграция: добавляем budgetHours для суммарных задач и actualHours для всех
+  _migrateBudgetAndActual() {
+    let changed = false;
+    this._data.tasks = this._data.tasks.map(t => {
+      let updated = { ...t };
+      if (updated.actualHours === undefined) {
+        updated.actualHours = 0;
+        changed = true;
+      }
+      if (updated.isSummary && updated.budgetHours === undefined) {
+        updated.budgetHours = updated.plannedHours || 0;
+        changed = true;
+      }
+      return updated;
+    });
+    if (changed) {
+      this._notify();
+      this.addAudit('Миграция данных', 'Добавлены поля budgetHours и actualHours для задач');
     }
   }
 
@@ -93,6 +117,7 @@ export default class DataStore {
     }
   }
 
+  // ----- Рекурсивный подсчёт суммы плановых часов подзадач (без изменений) -----
   _calcSummaryHours(taskId, visited = new Set()) {
     if (visited.has(taskId)) return 0;
     visited.add(taskId);
@@ -109,18 +134,13 @@ export default class DataStore {
     return sum;
   }
 
+  // +++ ИСПРАВЛЕНО: НЕ перезаписываем plannedHours для суммарных задач
   _recalcSummaryHoursChain(taskId) {
     let current = this._data.tasks.find(t => t.id === taskId);
     while (current) {
       if (current.isSummary) {
-        const newHours = this._calcSummaryHours(current.id);
-        if (current.plannedHours !== newHours) {
-          current.plannedHours = newHours;
-          const idx = this._data.tasks.findIndex(t => t.id === current.id);
-          if (idx !== -1) {
-            this._data.tasks[idx] = { ...current };
-          }
-        }
+        // plannedHours НЕ МЕНЯЕМ – это бюджет
+        // Сумма подзадач вычисляется в getRemainingHours через _calcSummaryHours
       }
       if (current.parentTaskId) {
         current = this._data.tasks.find(t => t.id === current.parentTaskId);
@@ -130,26 +150,61 @@ export default class DataStore {
     }
   }
 
+  // +++ Вычисление остатка для задачи
+  getRemainingHours(taskId) {
+    const task = this._data.tasks.find(t => t.id === taskId);
+    if (!task) return null;
+    if (!task.isSummary) {
+      return (task.plannedHours || 0) - (task.actualHours || 0);
+    }
+    const budget = task.budgetHours ?? task.plannedHours ?? 0;
+    const actual = task.actualHours || 0;
+    const childrenSum = this._calcSummaryHours(task.id);
+    return budget - actual - childrenSum;
+  }
+
+  // +++ Проверка возможности добавления/изменения подзадачи
+  _canAddChildToParent(parentId, childEstimate, excludeTaskId = null) {
+    const parent = this._data.tasks.find(t => t.id === parentId);
+    if (!parent) return true;
+    if (!parent.isSummary) {
+      if (parent.plannedHours == null) return true;
+      let childrenSum = 0;
+      const children = this._data.tasks.filter(t =>
+        t.parentTaskId === parentId && t.id !== excludeTaskId && !t.archived
+      );
+      for (const child of children) {
+        childrenSum += child.plannedHours || 0;
+      }
+      const totalWithNew = childrenSum + (childEstimate || 0);
+      return totalWithNew <= parent.plannedHours;
+    }
+    const budget = parent.budgetHours ?? parent.plannedHours ?? 0;
+    const actual = parent.actualHours || 0;
+    let childrenSum = 0;
+    const children = this._data.tasks.filter(t =>
+      t.parentTaskId === parentId && t.id !== excludeTaskId && !t.archived
+    );
+    for (const child of children) {
+      childrenSum += child.plannedHours || 0;
+    }
+    const totalWithNew = childrenSum + (childEstimate || 0);
+    return (actual + totalWithNew) <= budget;
+  }
+
   /**
    * Проверяет, не превышает ли сумма плановых часов подзадач заданный бюджет родительской задачи.
-   * @param {string} parentId - ID родительской задачи
-   * @param {string|null} excludeTaskId - ID задачи, которую нужно исключить из суммы (при обновлении)
-   * @throws {Error} если сумма подзадач превышает plannedHours родителя
+   * (используется для не-суммарных родительских задач, сохраняем для обратной совместимости)
    */
   _checkSubtaskBudget(parentId, excludeTaskId = null) {
     const parent = this._data.tasks.find(t => t.id === parentId);
     if (!parent) return;
-
-    // Если родитель суммарный или у него не заданы часы – ограничение не применяем
     if (parent.isSummary || parent.plannedHours == null) return;
 
-    // Суммируем часы всех непосредственных подзадач, исключая указанную
     const children = this._data.tasks.filter(t =>
       t.parentTaskId === parentId && t.id !== excludeTaskId && !t.archived
     );
     const sumChildren = children.reduce((acc, t) => acc + (t.plannedHours || 0), 0);
-
-    // Если сумма подзадач превышает бюджет родителя
     if (sumChildren > parent.plannedHours) {
       throw new Error(
         `Сумма плановых часов подзадач (${sumChildren} ч) превышает бюджет родительской задачи "${parent.title}" (${parent.plannedHours} ч). Уменьшите часы подзадач или увеличьте бюджет родителя.`
@@ -157,12 +212,20 @@ export default class DataStore {
     }
   }
 
+  // ----- upsertTask с изменениями -----
   upsertTask(task) {
     const idx = this._data.tasks.findIndex(t => t.id === task.id);
     let tasks;
     let auditMessage = '';
 
-    // Проверка бюджета проекта
+    // +++ Если задача новая и она суммарная, сохраняем budgetHours
+    if (idx === -1 && task.isSummary) {
+      if (task.budgetHours === undefined) {
+        task.budgetHours = task.plannedHours || 0;
+      }
+    }
+
+    // Проверка бюджета проекта (без изменений)
     const projectForBudget = this._data.projects.find(p => p.id === task.projectId);
     if (projectForBudget && projectForBudget.budget != null && projectForBudget.ptype !== 'admin' && !projectForBudget.archived) {
       const otherTasksSum = this._data.tasks
@@ -176,21 +239,23 @@ export default class DataStore {
       }
     }
 
-    // ----- НОВАЯ ПРОВЕРКА: бюджет подзадач -----
-    // 1. Если задача имеет родителя, проверяем, что сумма подзадач родителя (включая эту) не превышает его часы
+    // +++ Проверка бюджета родительской задачи
     if (task.parentTaskId) {
-      // При обновлении исключаем саму задачу, при создании – нет
-      this._checkSubtaskBudget(task.parentTaskId, idx === -1 ? null : task.id);
+      const excludeId = idx === -1 ? null : task.id;
+      if (!this._canAddChildToParent(task.parentTaskId, task.plannedHours || 0, excludeId)) {
+        const parent = this._data.tasks.find(t => t.id === task.parentTaskId);
+        const parentName = parent ? `"${parent.title}"` : 'родительской задачи';
+        throw new Error(
+          `Невозможно добавить/обновить подзадачу: превышение бюджета ${parentName}.`
+        );
+      }
     }
 
-    // 2. Если обновляется существующая задача и она НЕ суммарная, и её plannedHours изменяется (или может быть изменён),
-    //    проверяем, что сумма её существующих подзадач (если есть) не превышает новый plannedHours.
-    //    Это нужно для случая, когда пользователь уменьшает часы родительской задачи, у которой уже есть подзадачи.
+    // 2. Если обновляется существующая задача и она НЕ суммарная, и её plannedHours изменяется,
+    //    проверяем, что сумма её существующих подзадач не превышает новый plannedHours.
     if (idx !== -1) {
       const existingTask = this._data.tasks[idx];
-      // Проверяем только если plannedHours задано, задача не суммарная, и plannedHours изменился (или мы просто хотим проверить)
       if (!task.isSummary && task.plannedHours != null) {
-        // Суммируем часы всех подзадач этой задачи (исключая саму себя)
         const childrenSum = this._data.tasks
           .filter(t => t.parentTaskId === task.id && t.id !== task.id && !t.archived)
           .reduce((acc, t) => acc + (t.plannedHours || 0), 0);
@@ -200,9 +265,18 @@ export default class DataStore {
           );
         }
       }
+      // +++ Если задача суммарная, запрещаем менять plannedHours вручную
+      if (task.isSummary && task.plannedHours !== undefined && task.plannedHours !== existingTask.plannedHours) {
+        task.plannedHours = existingTask.plannedHours; // восстанавливаем бюджет
+        if (task.budgetHours !== undefined) {
+          // разрешено менять бюджет
+        } else {
+          task.budgetHours = existingTask.budgetHours ?? existingTask.plannedHours ?? 0;
+        }
+      }
     }
 
-    // Далее идёт существующая логика
+    // Далее идёт существующая логика (без изменений)
     if (idx === -1 && task.parentTaskId) {
       const parent = this._data.tasks.find(t => t.id === task.parentTaskId);
       if (parent) {
@@ -219,7 +293,14 @@ export default class DataStore {
       if (!task.isSummary && old.plannedHours !== task.plannedHours) {
         changes.push(`Плановые часы: ${old.plannedHours ?? '—'} → ${task.plannedHours ?? '—'}`);
       }
-      // Сравниваем assigneeId
+      // +++ Учитываем изменение фактических часов
+      if (old.actualHours !== task.actualHours) {
+        changes.push(`Фактические часы: ${old.actualHours ?? 0} → ${task.actualHours ?? 0}`);
+      }
+      // +++ Учитываем изменение бюджета для суммарной задачи
+      if (task.isSummary && old.budgetHours !== task.budgetHours) {
+        changes.push(`Бюджет: ${old.budgetHours ?? '—'} → ${task.budgetHours ?? '—'}`);
+      }
       if (old.assigneeId !== task.assigneeId) {
         const oldName = old.assigneeId ? this.empName(old.assigneeId) : '—';
         const newName = task.assigneeId ? this.empName(task.assigneeId) : '—';
@@ -264,6 +345,7 @@ export default class DataStore {
 
     this._data = { ...this._data, tasks };
 
+    // +++ Пересчёт цепочек (теперь не затирает plannedHours)
     if (task.parentTaskId) {
       this._recalcSummaryHoursChain(task.parentTaskId);
     }
@@ -275,6 +357,7 @@ export default class DataStore {
     this._archiveOldTasks(3);
   }
 
+  // ----- deleteTask (исправлено: пересчёт родителя) -----
   deleteTask(id) {
     const task = this._data.tasks.find(t => t.id === id);
     if (task) {
@@ -299,6 +382,33 @@ export default class DataStore {
     this._notify();
   }
 
+  // +++ Установка бюджета для суммарной задачи
+  setBudget(taskId, newBudget) {
+    const task = this._data.tasks.find(t => t.id === taskId);
+    if (!task) throw new Error('Задача не найдена');
+    if (!task.isSummary) throw new Error('Только для суммарных задач');
+    if (typeof newBudget !== 'number' || newBudget < 0) throw new Error('Бюджет должен быть неотрицательным числом');
+
+    const childrenSum = this._calcSummaryHours(taskId);
+    const actual = task.actualHours || 0;
+    if (childrenSum + actual > newBudget) {
+      throw new Error(
+        `Новый бюджет (${newBudget} ч) меньше суммы подзадач (${childrenSum} ч) и фактических часов (${actual} ч).`
+      );
+    }
+
+    task.budgetHours = newBudget;
+    // plannedHours остаётся бюджетом, не меняем
+    const idx = this._data.tasks.findIndex(t => t.id === taskId);
+    if (idx !== -1) {
+      this._data.tasks[idx] = { ...task };
+    }
+    this._notify();
+    this.addAudit('Изменение бюджета', `Задача "${task.title}" → ${newBudget} ч`, 'task', taskId);
+    return task;
+  }
+
+  // ----- Остальные методы (без изменений) -----
   upsertProject(project) {
     const idx = this._data.projects.findIndex(p => p.id === project.id);
     let projects;

@@ -26,17 +26,16 @@ export default function Projects({ db, ur, openProject, openHoursReq, closeProje
           return (
             <div 
               key={p.id} 
-              className="pj-card" 
+              className="pj-card cursor-pointer" 
               onClick={() => openProject(p.id)}
-              style={{ cursor: 'pointer' }}
             >
               <div className="pj-top">
                 <span className="pj-code" style={{ background: projectColor + '22', color: projectColor }}>
                   {p.code}
                 </span>
                 <span className={`pj-st ${p.status}`}>{PROJECT_STATUSES[p.status]}</span>
-                <span style={{ fontSize: '11px', color: '#64748b' }}>{PROJECT_TYPES[p.ptype || 'prod']}</span>
-                <span className="pj-priority" style={{ color: PROJECT_PRIORITIES[p.priority]?.color || '#64748b', fontWeight: 600 }}>
+                <span className="text-xs text-mut">{PROJECT_TYPES[p.ptype || 'prod']}</span>
+                <span className="pj-priority font-semibold" style={{ color: PROJECT_PRIORITIES[p.priority]?.color || '#64748b' }}>
                   {p.priority || 'NORM'}
                 </span>
               </div>
