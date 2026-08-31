@@ -1141,7 +1141,7 @@ input, select, textarea {
 }
 
 .gantt-corner {
-  width: 240px;
+  width: var(--corner-width, 240px);
   flex: none;
   padding: 14px;
   font-size: 14px;
@@ -1150,6 +1150,39 @@ input, select, textarea {
   border-right: 1px solid var(--line);
   display: flex;
   align-items: flex-end;
+  position: relative;
+}
+
+.gantt-resizer {
+  position: absolute;
+  right: -4px;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: col-resize;
+  z-index: 10;
+  background: transparent;
+  transition: background 0.2s;
+}
+
+.gantt-resizer:hover,
+.gantt-resizer.dragging {
+  background: #3b82f6;
+  opacity: 0.5;
+}
+
+.gantt-label {
+  width: var(--corner-width, 240px);
+  flex: none;
+  padding: 5px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border-right: 1px solid var(--line);
+  cursor: pointer;
+  min-height: 46px;
+  position: relative;
+  padding-left: calc(14px + var(--indent-level, 0px));
 }
 
 .gantt-months {
@@ -1233,7 +1266,7 @@ input, select, textarea {
 }
 
 .gantt-group-name {
-  width: 240px;
+  width: var(--corner-width, 240px);
   flex: none;
   font-size: 14px;
   font-weight: 800;
@@ -2804,12 +2837,33 @@ input, select, textarea {
   transform: rotate(90deg);
 }
 
+/* Улучшенная визуализация */
+.gantt-row {
+  transition: background 0.15s ease;
+}
+.gantt-row:hover .gantt-label {
+  background: linear-gradient(90deg, #f1f5f9 0%, transparent 100%);
+}
 .gantt-row-child .gantt-label {
-  padding-left: 28px;
+  background: linear-gradient(90deg, #fafafa 0%, transparent 100%);
 }
 .gantt-row-child .gantt-label .gtitle {
   font-weight: 500;
   color: #475569;
+}
+.gantt-row-child:hover .gantt-label {
+  background: linear-gradient(90deg, #f1f5f9 0%, transparent 100%);
+}
+.gbar {
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.gbar:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+.gantt-group {
+  background: linear-gradient(180deg, #e2e8f0 0%, #f1f5f9 100%);
 }
 
 .gantt-milestone {

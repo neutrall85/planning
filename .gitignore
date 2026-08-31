@@ -1,5 +1,18 @@
 ```
 # Build artifacts
 dist/
+build/
+
+# Dependencies
+node_modules/
+
+# Logs and temp files
+*.log
+*.tmp
+
+# Editors
+.vscode/
+
+# Original rules preserved
+*.log
 ```
-node_modules
