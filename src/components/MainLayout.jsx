@@ -1,3 +1,4 @@
+// src/components/MainLayout.jsx
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useAuth, useStore } from '../hooks';
 import { hasRole, canExport, computeScope } from '../utils/permissions';
@@ -9,9 +10,11 @@ import ModalRenderer from './ModalRenderer';
 import * as Views from './views';
 import Calendar from './Calendar';
 import Gantt from './Gantt';
+import { useToast } from '../context/ToastContext';
 
 export default function MainLayout({ store, data, user }) {
   const { logout } = useStore();
+  const { showToast } = useToast();
   const [view, setView] = useState('kanban');
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef(null);
@@ -53,26 +56,13 @@ export default function MainLayout({ store, data, user }) {
     if (!targetType || !targetId) return;
     store.markNotificationRead(notification.id);
     switch (targetType) {
-      case 'task':
-        openTask(targetId, 'chat');
-        break;
-      case 'project':
-        openProject(targetId);
-        break;
-      case 'hours':
-        setView('requests');
-        break;
-      case 'vacation':
-        openVacation(targetId);
-        break;
-      case 'delegation':
-        setView('requests');
-        break;
-      case 'registration':
-        setView('requests');
-        break;
-      default:
-        break;
+      case 'task': openTask(targetId, 'chat'); break;
+      case 'project': openProject(targetId); break;
+      case 'hours': setView('requests'); break;
+      case 'vacation': openVacation(targetId); break;
+      case 'delegation': setView('requests'); break;
+      case 'registration': setView('requests'); break;
+      default: break;
     }
     setNotifOpen(false);
   };
@@ -97,14 +87,10 @@ export default function MainLayout({ store, data, user }) {
   const renderView = () => {
     const commonProps = { db: data, ur: user, openTask, openProject, store };
     switch (view) {
-      case 'kanban':
-        return <Views.KanbanView {...commonProps} />;
-      case 'gantt':
-        return <Gantt {...commonProps} />;
-      case 'calendar':
-        return <Calendar {...commonProps} />;
-      case 'projects':
-        return <Views.ProjectsView {...commonProps} openHoursReq={openHoursReq} />;
+      case 'kanban': return <Views.KanbanView {...commonProps} />;
+      case 'gantt': return <Gantt {...commonProps} />;
+      case 'calendar': return <Calendar {...commonProps} />;
+      case 'projects': return <Views.ProjectsView {...commonProps} openHoursReq={openHoursReq} />;
       case 'cabinet':
         return (
           <Views.CabinetView
@@ -127,8 +113,7 @@ export default function MainLayout({ store, data, user }) {
             openVacation={openVacation}
           />
         );
-      case 'reports':
-        return <Views.ReportsView db={data} ur={user} />;
+      case 'reports': return <Views.ReportsView db={data} ur={user} />;
       case 'archive':
         return (
           <Views.ArchiveView
@@ -147,13 +132,13 @@ export default function MainLayout({ store, data, user }) {
             setDb={(fn) => { store._data = fn(store._data); store._notify(); }}
             ur={user}
             addAudit={store.addAudit.bind(store)}
-            notify={store.addNotification.bind(store)}
+            notifyVacationDecision={store.notifyVacationDecision.bind(store)}
+            notifyRoleDelegationDecision={store.notifyRoleDelegationDecision.bind(store)}
+            notifyHoursRequestDecision={store.notifyHoursRequestDecision.bind(store)}
           />
         );
-      case 'journal':
-        return <Views.JournalView db={data} ur={user} />;
-      default:
-        return null;
+      case 'journal': return <Views.JournalView db={data} ur={user} />;
+      default: return null;
     }
   };
 
@@ -167,21 +152,11 @@ export default function MainLayout({ store, data, user }) {
             <div className="logo-sub">планирование и учёт времени</div>
           </div>
         </div>
-        <div
-          className="user-card cursor-pointer mb-4"
-          onClick={() => setView('cabinet')}
-        >
+        <div className="user-card cursor-pointer mb-4" onClick={() => setView('cabinet')}>
           <div className="avatar">
             {user.photo ? (
-              <img
-                src={user.photo}
-                alt="Аватар"
-                className="rounded-full object-cover"
-                style={{ width: '100%', height: '100%' }}
-              />
-            ) : (
-              initials(user.first, user.last)
-            )}
+              <img src={user.photo} alt="Аватар" className="rounded-full object-cover" style={{ width: '100%', height: '100%' }} />
+            ) : initials(user.first, user.last)}
           </div>
           <div className="user-meta">
             <div className="user-name">{user.last} {user.first}</div>
@@ -189,10 +164,7 @@ export default function MainLayout({ store, data, user }) {
           </div>
           <button
             className="icon-btn dark"
-            onClick={(e) => {
-              e.stopPropagation();
-              logout();
-            }}
+            onClick={(e) => { e.stopPropagation(); logout(); }}
             title="Выйти"
           >
             <Ic d={ICONS.out} size={16} />
@@ -223,7 +195,8 @@ export default function MainLayout({ store, data, user }) {
               {navItems.find((n) => n.id === view)?.label || 'Личный кабинет'}
             </h1>
             <div className="page-sub">
-              Вторник, 4 августа 2026 · вы вошли как {user.last} {user.first}
+              {new Date().toLocaleDateString('ru-RU', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+              {' '}· вы вошли как {user.last} {user.first}
             </div>
           </div>
           <div className="top-tools">
@@ -241,7 +214,8 @@ export default function MainLayout({ store, data, user }) {
               {notifOpen && (
                 <NotifPanel
                   list={myNotifs}
-                  setDb={(fn) => { store._data = fn(store._data); store._notify(); }}
+                  currentUserId={user.id}
+                  markAllRead={(userId) => store.markAllNotificationsRead(userId)}
                   onNavigate={handleNotificationNavigate}
                   onClose={() => setNotifOpen(false)}
                 />
@@ -267,6 +241,7 @@ export default function MainLayout({ store, data, user }) {
           openDepts={openDepts}
           openVacation={openVacation}
           openDelegation={openDelegation}
+          toast={showToast}
         />
       )}
     </div>

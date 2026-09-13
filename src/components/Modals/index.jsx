@@ -6,3 +6,5 @@ export { DeptsModal } from './DeptsModal';
 export { VacationModal } from './VacationModal';
 export { DelegationModal } from './DelegationModal';
 export { VacNowModal } from './VacNowModal';
+export { CreateEmployeeModal } from './CreateEmployeeModal';
+export { EditEmployeeModal } from './EditEmployeeModal';

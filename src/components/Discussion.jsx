@@ -1,11 +1,21 @@
 // src/components/Discussion.jsx
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { uid, fmtDT, initials } from '../utils/date';
 import { has } from '../utils/permissions';
 import { Ic, ICONS } from './Icons';
 import { COMMENT_EDIT_WINDOW } from '../utils/constants';
 import Avatar from './Avatar';
+import { Lightbox } from './Lightbox';
+
+// Функция для подсветки совпадений в тексте
+function highlightText(text, query) {
+  if (!query || !query.trim()) return text;
+  const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+  return text.split(regex).map((part, i) =>
+    regex.test(part) ? <mark key={i} className="search-highlight">{part}</mark> : part
+  );
+}
 
 function renderMentionText(text) {
   return text.split("@").map((part, i) => {
@@ -38,16 +48,19 @@ export function extractMentions(text, employees) {
 }
 
 export default function Discussion({
-  comments,
+  store,
+  filter,
   currentUser,
   candidates = [],
-  onUpdateComments,
-  onCommentAdded,
   readOnly = false,
   canComment = true,
   toast,
   employees = [],
+  onTaskClick = null,
+  showTaskLink = false,
+  tasks = [],
 }) {
+  const [comments, setComments] = useState(() => store.getComments(filter));
   const [text, setText] = useState("");
   const [replyTo, setReplyTo] = useState(null);
   const [editingId, setEditingId] = useState(null);
@@ -56,8 +69,71 @@ export default function Discussion({
   const [mentionPopup, setMentionPopup] = useState({ visible: false, x: 0, y: 0 });
   const textareaRef = useRef(null);
   const cursorPosRef = useRef(null);
+  const [attachments, setAttachments] = useState([]);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(null);
+  const [lightboxAttachments, setLightboxAttachments] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const allEmployees = employees;
+
+  // Подписка на изменения
+  useEffect(() => {
+    const unsub = store.subscribe(() => {
+      setComments(store.getComments(filter));
+    });
+    return unsub;
+  }, [store, filter]);
+
+  // Закреплённые комментарии
+  const pinnedComments = useMemo(() => {
+    return comments.filter(c => c.pinned);
+  }, [comments]);
+
+  // Фильтрация по поиску (с сохранением иерархии)
+  const filteredComments = useMemo(() => {
+    if (!searchQuery.trim()) return comments;
+
+    const query = searchQuery.trim().toLowerCase();
+    const filterRecursive = (items) => {
+      return items.filter(item => {
+        const textMatch = item.text.toLowerCase().includes(query);
+        const children = filterRecursive(
+          comments.filter(c => c.parentId === item.id)
+        );
+        if (textMatch || children.length > 0) {
+          item._children = children;
+          return true;
+        }
+        return false;
+      });
+    };
+    return filterRecursive(comments.filter(c => !c.parentId));
+  }, [comments, searchQuery]);
+
+  // Получение дочерних комментариев с учётом фильтра
+  const getFilteredChildren = (parentId) => {
+    if (!searchQuery.trim()) {
+      return comments.filter(c => (c.parentId || null) === parentId)
+        .sort((a, b) => a.createdAt - b.createdAt);
+    }
+    const filterRecursive = (items) => {
+      return items.filter(item => {
+        const textMatch = item.text.toLowerCase().includes(searchQuery.trim().toLowerCase());
+        const children = filterRecursive(
+          comments.filter(c => c.parentId === item.id)
+        );
+        if (textMatch || children.length > 0) {
+          item._children = children;
+          return true;
+        }
+        return false;
+      });
+    };
+    const root = filterRecursive(comments.filter(c => c.parentId === parentId));
+    return root.sort((a, b) => a.createdAt - b.createdAt);
+  };
 
   const filteredCandidates = useMemo(() => {
     if (mentionQ === null) return [];
@@ -123,25 +199,91 @@ export default function Discussion({
     }
   };
 
-  const send = () => {
-    if (readOnly || !canComment) return;
-    if (!text.trim()) return;
+  const handleDragOver = useCallback((e) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  }, []);
 
-    const newComment = {
-      id: uid(),
-      parentId: replyTo,
+  const handleDragLeave = useCallback((e) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  }, []);
+
+  const handleDrop = useCallback((e) => {
+    e.preventDefault();
+    setIsDragOver(false);
+
+    if (readOnly || !canComment) {
+      toast?.('У вас нет прав для загрузки файлов', 'warning');
+      return;
+    }
+
+    const files = Array.from(e.dataTransfer.files);
+    const validFiles = files.filter(f => f.type.startsWith('image/') && f.size <= 5 * 1024 * 1024);
+    if (validFiles.length !== files.length) {
+      toast?.('Некоторые файлы пропущены (только изображения до 5 МБ)', 'warning');
+    }
+    if (validFiles.length > 0) {
+      setAttachments(prev => [...prev, ...validFiles]);
+      toast?.(`Добавлено ${validFiles.length} файлов`, 'success');
+    }
+  }, [readOnly, canComment, toast]);
+
+  const removeAttachment = (index) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const send = async () => {
+    if (readOnly || !canComment) return;
+    if (!text.trim() && attachments.length === 0) {
+      toast?.('Введите текст или прикрепите изображение', 'warning');
+      return;
+    }
+
+    const commentData = {
+      projectId: filter.projectId || null,
+      taskId: filter.taskId || null,
+      parentId: replyTo || null,
       authorId: currentUser.id,
-      ts: Date.now(),
       text: text.trim(),
+      attachments: [],
     };
 
-    const updatedComments = [...comments, newComment];
-    onUpdateComments(updatedComments);
-    if (onCommentAdded) onCommentAdded(newComment);
+    const created = store.addComment(commentData);
+
+    for (const file of attachments) {
+      try {
+        await store.addAttachment(created.id, file);
+      } catch (err) {
+        toast?.(`Ошибка загрузки ${file.name}: ${err.message}`, 'error');
+      }
+    }
 
     setText("");
     setReplyTo(null);
+    setAttachments([]);
     setMentionQ(null);
+    toast?.('Комментарий добавлен', 'success');
+  };
+
+  // Обработчик клавиш: Enter – отправка, Ctrl+Enter / Cmd+Enter – перенос строки
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const target = e.target;
+        const start = target.selectionStart;
+        const end = target.selectionEnd;
+        const newText = text.substring(0, start) + '\n' + text.substring(end);
+        setText(newText);
+        requestAnimationFrame(() => {
+          target.selectionStart = target.selectionEnd = start + 1;
+        });
+        return;
+      }
+      e.preventDefault();
+      send();
+    }
   };
 
   const canDelete = (c) => {
@@ -152,60 +294,103 @@ export default function Discussion({
 
   const canEdit = (c) =>
     c.authorId === currentUser.id &&
-    Date.now() - c.ts < COMMENT_EDIT_WINDOW;
+    Date.now() - c.createdAt < COMMENT_EDIT_WINDOW;
+
+  const canPin = (c) => has(currentUser, "admin", "director", "project_lead", "project_manager");
 
   const del = (c) => {
     if (!window.confirm("Удалить комментарий и все ответы?")) return;
-
-    const subtree = new Set([c.id]);
-    let changed = true;
-    while (changed) {
-      changed = false;
-      comments.forEach((x) => {
-        if (x.parentId && subtree.has(x.parentId) && !subtree.has(x.id)) {
-          subtree.add(x.id);
-          changed = true;
-        }
-      });
-    }
-
-    const updatedComments = comments.filter((x) => !subtree.has(x.id));
-    onUpdateComments(updatedComments);
-    if (toast) toast("Комментарий удалён");
+    store.deleteComment(c.id);
+    toast?.("Комментарий удалён");
   };
 
   const saveEdit = (c) => {
     if (!editText.trim()) return;
-    const updatedComments = comments.map((x) =>
-      x.id === c.id ? { ...x, text: editText.trim() } : x
-    );
-    onUpdateComments(updatedComments);
+    store.updateComment(c.id, editText.trim());
     setEditingId(null);
     setEditText("");
+    toast?.("Комментарий обновлён");
+  };
+
+  const togglePin = (c) => {
+    try {
+      if (!c.pinned && pinnedComments.length >= 5) {
+        toast?.('Нельзя закрепить более 5 сообщений', 'warning');
+        return;
+      }
+      const updated = store.togglePinComment(c.id);
+      toast?.(updated.pinned ? 'Комментарий закреплён' : 'Закрепление снято', 'success');
+    } catch (err) {
+      toast?.(err.message, 'error');
+    }
+  };
+
+  const scrollToComment = (commentId) => {
+    const el = document.getElementById(`comment-${commentId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.style.transition = 'background 0.3s';
+      el.style.background = '#fef3c7';
+      setTimeout(() => {
+        el.style.background = '';
+      }, 2000);
+    }
+  };
+
+  const openLightbox = (attachmentsList, index) => {
+    setLightboxAttachments(attachmentsList);
+    setLightboxIndex(index);
+  };
+
+  const closeLightbox = () => {
+    setLightboxIndex(null);
+    setLightboxAttachments([]);
+  };
+
+  const handlePrev = () => {
+    if (lightboxIndex === null || lightboxIndex === undefined) return;
+    setLightboxIndex((prev) => (prev === 0 ? lightboxAttachments.length - 1 : prev - 1));
+  };
+
+  const handleNext = () => {
+    if (lightboxIndex === null || lightboxIndex === undefined) return;
+    setLightboxIndex((prev) => (prev === lightboxAttachments.length - 1 ? 0 : prev + 1));
   };
 
   const renderTree = (parentId, depth) => {
-    const children = comments
-      .filter((c) => (c.parentId || null) === parentId)
-      .sort((a, b) => a.ts - b.ts);
+    const children = getFilteredChildren(parentId);
 
     return children.map((c) => {
       const author = getAuthor(c.authorId);
+      const task = c.taskId ? tasks.find(t => t.id === c.taskId) : null;
+      const attachmentsList = c.attachments || [];
+      const textContent = searchQuery.trim()
+        ? highlightText(c.text, searchQuery.trim())
+        : renderMentionText(c.text);
+
       return (
-        <div key={c.id}>
-          <div className={"cm" + (depth > 0 ? " reply" : "")}>
+        <div key={c.id} id={`comment-${c.id}`}>
+          <div className={"cm" + (depth > 0 ? " reply" : "") + (c.pinned ? " pinned" : "")}>
             <div className="cm-head">
               <Avatar employee={author} size="xs" />
               <span className="cm-author">
                 {author ? `${author.last} ${author.first}` : "—"}
               </span>
-              <span className="mut sm">{fmtDT(c.ts)}</span>
-              {!readOnly &&
-                editingId !== c.id &&
-                Date.now() - c.ts < COMMENT_EDIT_WINDOW &&
-                c.authorId === currentUser.id && (
-                  <span className="mut sm">· можно редактировать</span>
-                )}
+              <span className="mut sm">{fmtDT(c.createdAt)}</span>
+              {c.updatedAt > c.createdAt && <span className="mut sm">(ред.)</span>}
+              {c.pinned && <span className="pinned-badge" title="Закреплено">📌</span>}
+              {showTaskLink && c.taskId && task && onTaskClick && (
+                <button
+                  className="link"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onTaskClick(c.taskId);
+                  }}
+                  title="Открыть задачу"
+                >
+                  {task.title}
+                </button>
+              )}
             </div>
 
             {editingId === c.id ? (
@@ -229,7 +414,35 @@ export default function Discussion({
                 </div>
               </div>
             ) : (
-              <div className="cm-text">{renderMentionText(c.text)}</div>
+              <div className="cm-text">{textContent}</div>
+            )}
+
+            {attachmentsList.length > 0 && (
+              <div className="attachment-grid">
+                {attachmentsList.map((att, idx) => (
+                  <div
+                    key={att.id}
+                    className="attachment-item"
+                    onClick={() => openLightbox(attachmentsList, idx)}
+                  >
+                    <img
+                      src={att.url}
+                      alt={att.name}
+                      className="attachment-thumb"
+                    />
+                    <div className="attachment-overlay">
+                      <a
+                        href={att.url}
+                        download={att.name}
+                        className="attachment-download"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Ic d={ICONS.download} size={16} />
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
 
             {!readOnly && canComment && (
@@ -248,6 +461,11 @@ export default function Discussion({
                     Редактировать
                   </button>
                 )}
+                {canPin(c) && (
+                  <button className="link" onClick={() => togglePin(c)}>
+                    {c.pinned ? 'Открепить' : 'Закрепить'}
+                  </button>
+                )}
                 {canDelete(c) && (
                   <button className="link red-link" onClick={() => del(c)}>
                     Удалить
@@ -264,9 +482,91 @@ export default function Discussion({
 
   return (
     <div className="chat">
+      <div className="discussion-header">
+        <div className="pinned-messages">
+          {pinnedComments.length > 0 && (
+            <>
+              <div className="pinned-label">📌 Закреплено</div>
+              {pinnedComments.map((c) => {
+                const author = getAuthor(c.authorId);
+                const canUnpin = canPin(c);
+                return (
+                  <div
+                    key={c.id}
+                    className="pinned-item"
+                    onClick={() => scrollToComment(c.id)}
+                    title="Перейти к сообщению"
+                  >
+                    <Avatar employee={author} size="xs" />
+                    <span className="pinned-author">
+                      {author ? `${author.last} ${author.first}` : "—"}
+                    </span>
+                    <span className="mut sm">{fmtDT(c.createdAt)}</span>
+                    <span className="pinned-preview">
+                      {c.text.length > 50 ? c.text.substring(0, 50) + '...' : c.text}
+                    </span>
+                    {canUnpin && (
+                      <button
+                        className="icon-btn xs pinned-remove"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          togglePin(c);
+                        }}
+                        title="Открепить"
+                      >
+                        <Ic d={ICONS.x} size={14} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </>
+          )}
+        </div>
+        <div className="search-toggle">
+          <button
+            className={`icon-btn ${isSearchOpen ? 'active' : ''}`}
+            onClick={() => setIsSearchOpen(!isSearchOpen)}
+            title="Поиск"
+          >
+            <Ic d={ICONS.search} size={18} />
+          </button>
+        </div>
+      </div>
+
+      {isSearchOpen && (
+        <div className="chat-search">
+          <div className="search-box">
+            <Ic d={ICONS.search} size={15} />
+            <input
+              type="text"
+              placeholder="Поиск по обсуждению..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="chat-search-input"
+              autoFocus
+            />
+            {searchQuery && (
+              <button className="icon-btn xs" onClick={() => setSearchQuery("")}>
+                <Ic d={ICONS.x} size={14} />
+              </button>
+            )}
+          </div>
+          {searchQuery && (
+            <span className="search-result-count">
+              Найдено: {filteredComments.length}
+            </span>
+          )}
+        </div>
+      )}
+
       {renderTree(null, 0)}
 
-      {comments.length === 0 && (
+      {filteredComments.length === 0 && searchQuery && (
+        <div className="mut sm">Ничего не найдено</div>
+      )}
+
+      {comments.length === 0 && !searchQuery && (
         <div className="mut sm">Обсуждений пока нет — начните диалог.</div>
       )}
 
@@ -286,7 +586,12 @@ export default function Discussion({
             </div>
           )}
 
-          <div className="cm-input-wrap">
+          <div
+            className={`cm-input-wrap${isDragOver ? ' drag-over' : ''}`}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
             {mentionPopup.visible && filteredCandidates.length > 0 &&
               createPortal(
                 <div
@@ -298,7 +603,7 @@ export default function Discussion({
                     zIndex: 10001,
                   }}
                 >
-                  {filteredCandidates.slice(0, 6).map((e) => (
+                  {filteredCandidates.map((e) => (
                     <div
                       key={e.id}
                       className="mention-item"
@@ -319,20 +624,36 @@ export default function Discussion({
               ref={textareaRef}
               className="inp"
               rows="2"
-              placeholder="Комментарий… Введите @ для упоминания участника"
+              placeholder="Комментарий… Введите @ для упоминания участника. Перетащите изображения сюда."
               value={text}
               onChange={(e) => onType(e.target.value)}
+              onKeyDown={handleKeyDown}
               disabled={readOnly || !canComment}
             />
           </div>
+
+          {attachments.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-2">
+              {attachments.map((file, idx) => (
+                <div key={idx} className="flex items-center gap-1 bg-gray-100 rounded px-2 py-1">
+                  <span className="text-sm">{file.name}</span>
+                  <button className="icon-btn xs" onClick={() => removeAttachment(idx)}>
+                    <Ic d={ICONS.x} size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="cm-foot">
             <span className="mut sm">
               Участники получат уведомление; упомянутые — отдельно.
             </span>
-            <button className="btn primary sm" onClick={send}>
-              <Ic d={ICONS.chat} size={13} /> Отправить
-            </button>
+            <div className="flex gap-2">
+              <button className="btn primary sm" onClick={send}>
+                <Ic d={ICONS.chat} size={13} /> Отправить
+              </button>
+            </div>
           </div>
         </>
       ) : readOnly ? (
@@ -345,6 +666,16 @@ export default function Discussion({
             У вас нет прав для комментирования этого объекта.
           </div>
         )
+      )}
+
+      {lightboxIndex !== null && lightboxAttachments.length > 0 && (
+        <Lightbox
+          photos={lightboxAttachments}
+          currentIndex={lightboxIndex}
+          onClose={closeLightbox}
+          onPrev={handlePrev}
+          onNext={handleNext}
+        />
       )}
     </div>
   );

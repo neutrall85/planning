@@ -5,7 +5,16 @@ import { hasRole, canApproveVacation } from "../utils/permissions";
 import { Ic, ICONS } from "./Icons";
 import { useDataHelpers } from "../hooks";
 
-export default function Requests({ db, setDb, ur, initialTab = 'hours', addAudit, notify }) {
+export default function Requests({
+  db,
+  setDb,
+  ur,
+  initialTab = 'hours',
+  addAudit,
+  notifyVacationDecision,
+  notifyRoleDelegationDecision,
+  notifyHoursRequestDecision,
+}) {
   const { empName } = useDataHelpers(db);
   const [tab, setTab] = useState(initialTab);
 
@@ -16,14 +25,14 @@ export default function Requests({ db, setDb, ur, initialTab = 'hours', addAudit
   if (hasRole(ur, 'admin')) tabs.push(['reg', 'Заявки на регистрацию']);
 
   const decideHours = (r, ok) => {
-    const targetTitle = ok 
-      ? (r.kind === "task" 
-          ? db.tasks.find(t => t.id === r.targetId)?.title 
+    const targetTitle = ok
+      ? (r.kind === "task"
+          ? db.tasks.find(t => t.id === r.targetId)?.title
           : db.projects.find(p => p.id === r.targetId)?.name)
-      : (r.kind === "task" 
-          ? db.tasks.find(t => t.id === r.targetId)?.title 
+      : (r.kind === "task"
+          ? db.tasks.find(t => t.id === r.targetId)?.title
           : db.projects.find(p => p.id === r.targetId)?.name);
-    
+
     setDb((s) => {
       const st = { ...s, hoursRequests: s.hoursRequests.map((x) => (x.id === r.id ? { ...x, status: ok ? "approved" : "rejected" } : x)) };
       if (ok) {
@@ -32,56 +41,34 @@ export default function Requests({ db, setDb, ur, initialTab = 'hours', addAudit
       }
       return st;
     });
-    
+
+    if (notifyHoursRequestDecision) notifyHoursRequestDecision(r, ok, targetTitle);
+
     setTimeout(() => {
       if (ok) {
-        addAudit('Утверждение запроса часов', { 
-          task: targetTitle, 
-          previousHours: r.oldH, 
-          newHours: r.newH,
-          reason: r.reason
-        }, 'hoursRequest', r.id);
+        addAudit('Утверждение запроса часов', { task: targetTitle, previousHours: r.oldH, newHours: r.newH, reason: r.reason }, 'hoursRequest', r.id);
       } else {
-        addAudit('Отклонение запроса часов', { 
-          task: targetTitle,
-          requestedHours: r.newH,
-          reason: r.reason
-        }, 'hoursRequest', r.id);
+        addAudit('Отклонение запроса часов', { task: targetTitle, requestedHours: r.newH, reason: r.reason }, 'hoursRequest', r.id);
       }
     }, 0);
-
-    if (notify) {
-      const statusText = ok ? 'утверждён' : 'отклонён';
-      notify(
-        r.reqId,
-        `Ваш запрос на изменение часов по ${r.kind === 'task' ? 'задаче' : 'проекту'} "${targetTitle}" ${statusText}.`,
-        { targetType: 'hours', targetId: r.id }
-      );
-    }
   };
 
   const decideVac = (v, ok) => {
     const employeeName = empName(v.empId);
     const period = `${fmtDMY(v.start)}—${fmtDMY(v.end)}`;
-    
+
     setDb((s) => {
       const updated = { ...s, vacations: s.vacations.map((x) => (x.id === v.id ? { ...x, status: ok ? "approved" : "rejected" } : x)) };
       return updated;
     });
-    
+
+    if (notifyVacationDecision) notifyVacationDecision(v, ok);
+
     setTimeout(() => {
       if (ok) {
-        addAudit('Утверждение отпуска', { 
-          employee: employeeName, 
-          period,
-          type: VACATION_TYPES[v.type]?.label || v.type
-        }, 'vacation', v.id);
+        addAudit('Утверждение отпуска', { employee: employeeName, period, type: VACATION_TYPES[v.type]?.label || v.type }, 'vacation', v.id);
       } else {
-        addAudit('Отклонение отпуска', { 
-          employee: employeeName, 
-          period,
-          type: VACATION_TYPES[v.type]?.label || v.type
-        }, 'vacation', v.id);
+        addAudit('Отклонение отпуска', { employee: employeeName, period, type: VACATION_TYPES[v.type]?.label || v.type }, 'vacation', v.id);
       }
     }, 0);
   };
@@ -90,46 +77,38 @@ export default function Requests({ db, setDb, ur, initialTab = 'hours', addAudit
     const fromName = empName(r.fromId);
     const toName = empName(r.toId);
     const rolesStr = r.roles.join(', ');
-    
+
     setDb((s) => {
       const updated = { ...s, roleDelegations: s.roleDelegations.map((x) => (x.id === r.id ? { ...x, status: ok ? "active" : "rejected" } : x)) };
       return updated;
     });
-    
+
+    if (notifyRoleDelegationDecision) notifyRoleDelegationDecision(r, ok);
+
     setTimeout(() => {
       if (ok) {
-        addAudit('Принятие делегирования', { 
-          from: fromName, 
-          to: toName, 
-          roles: rolesStr,
-          start: fmtDMY(r.start),
-          end: fmtDMY(r.end)
-        }, 'delegation', r.id);
+        addAudit('Принятие делегирования', { from: fromName, to: toName, roles: rolesStr, start: fmtDMY(r.start), end: fmtDMY(r.end) }, 'delegation', r.id);
       } else {
-        addAudit('Отклонение делегирования', { 
-          from: fromName, 
-          to: toName, 
-          roles: rolesStr 
-        }, 'delegation', r.id);
+        addAudit('Отклонение делегирования', { from: fromName, to: toName, roles: rolesStr }, 'delegation', r.id);
       }
     }, 0);
   };
 
   const decideReg = (r, ok) => {
     const empNameStr = `${r.last} ${r.first}`;
-    
+
     if (ok) {
       setDb((s) => {
         const existing = s.employees.find(e => e.email === r.email);
         if (existing) {
           const updated = { ...existing, roles: ['executor'] };
-          return { 
-            ...s, 
+          return {
+            ...s,
             employees: s.employees.map(e => e.id === updated.id ? updated : e),
             regRequests: s.regRequests.map(x => x.id === r.id ? { ...x, status: "approved" } : x)
           };
         } else {
-          const newEmp = { 
+          const newEmp = {
             id: "e_" + Math.random().toString(36).slice(2,6),
             last: r.last,
             first: r.first,
@@ -146,39 +125,37 @@ export default function Requests({ db, setDb, ur, initialTab = 'hours', addAudit
             failed: 0,
             lockUntil: 0
           };
-          return { 
-            ...s, 
+          return {
+            ...s,
             employees: [...s.employees, newEmp],
             regRequests: s.regRequests.map(x => x.id === r.id ? { ...x, status: "approved" } : x)
           };
         }
       });
-      
+
       setTimeout(() => {
-        addAudit('Одобрение регистрации', { 
-          email: r.email, 
-          employee: empNameStr,
-          position: r.position || 'Сотрудник'
-        }, 'registration', r.id);
+        addAudit('Одобрение регистрации', { email: r.email, employee: empNameStr, position: r.position || 'Сотрудник' }, 'registration', r.id);
       }, 0);
     } else {
       setDb((s) => {
         return { ...s, regRequests: s.regRequests.map((x) => (x.id === r.id ? { ...x, status: "rejected" } : x)) };
       });
-      
+
       setTimeout(() => {
-        addAudit('Отклонение регистрации', { 
-          email: r.email, 
-          employee: empNameStr,
-          reason: r.rejectionReason || 'Не указана'
-        }, 'registration', r.id);
+        addAudit('Отклонение регистрации', { email: r.email, employee: empNameStr, reason: r.rejectionReason || 'Не указана' }, 'registration', r.id);
       }, 0);
     }
   };
 
   return (
     <div>
-      <div className="tabs">{tabs.map(([id, l]) => <button key={id} className={"tab" + (tab === id ? " on" : "")} onClick={() => setTab(id)}>{l}</button>)}</div>
+      <div className="tabs">
+        {tabs.map(([id, l]) => (
+          <button key={id} className={"tab" + (tab === id ? " on" : "")} onClick={() => setTab(id)}>
+            {l}
+          </button>
+        ))}
+      </div>
 
       {tab === "hours" && hasRole(ur, "director", "admin") && (
         <div className="rep-panel">
@@ -230,7 +207,10 @@ export default function Requests({ db, setDb, ur, initialTab = 'hours', addAudit
                   <td><b>{empName(v.empId)}</b></td>
                   <td>{fmtDMY(v.start)} — {fmtDMY(v.end)}</td>
                   <td>{v.delegation.enabled ? empName(v.delegation.subId) : '—'}</td>
-                  <td><button className="btn primary sm" onClick={() => decideVac(v, true)}>Утвердить</button> <button className="btn danger sm" onClick={() => decideVac(v, false)}>Отклонить</button></td>
+                  <td>
+                    <button className="btn primary sm" onClick={() => decideVac(v, true)}>Утвердить</button>{' '}
+                    <button className="btn danger sm" onClick={() => decideVac(v, false)}>Отклонить</button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -248,7 +228,16 @@ export default function Requests({ db, setDb, ur, initialTab = 'hours', addAudit
                 <tr key={r.id}>
                   <td>{empName(r.fromId)}</td><td>{empName(r.toId)}</td>
                   <td>{r.roles.map(x => ROLES[x].label).join(", ")}</td>
-                  <td>{r.status === "pending" && r.toId === ur.id ? (<><button className="btn primary sm" onClick={() => decideRD(r, true)}>Принять</button> <button className="btn danger sm" onClick={() => decideRD(r, false)}>Отклонить</button></>) : <span className={"st-chip " + r.status}>{r.status}</span>}</td>
+                  <td>
+                    {r.status === "pending" && r.toId === ur.id ? (
+                      <>
+                        <button className="btn primary sm" onClick={() => decideRD(r, true)}>Принять</button>{' '}
+                        <button className="btn danger sm" onClick={() => decideRD(r, false)}>Отклонить</button>
+                      </>
+                    ) : (
+                      <span className={"st-chip " + r.status}>{r.status}</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -264,8 +253,18 @@ export default function Requests({ db, setDb, ur, initialTab = 'hours', addAudit
             <tbody>
               {db.regRequests.map(r => (
                 <tr key={r.id}>
-                  <td><b>{r.last} {r.first}</b></td><td>{r.email}@aviahorizont.ru</td>
-                  <td>{r.status === "pending" ? (<><button className="btn primary sm" onClick={() => decideReg(r, true)}>Одобрить</button> <button className="btn danger sm" onClick={() => decideReg(r, false)}>Отклонить</button></>) : <span className={"st-chip " + (r.status === "approved" ? "approved" : "rejected")}>{r.status}</span>}</td>
+                  <td><b>{r.last} {r.first}</b></td>
+                  <td>{r.email}@aviahorizont.ru</td>
+                  <td>
+                    {r.status === "pending" ? (
+                      <>
+                        <button className="btn primary sm" onClick={() => decideReg(r, true)}>Одобрить</button>{' '}
+                        <button className="btn danger sm" onClick={() => decideReg(r, false)}>Отклонить</button>
+                      </>
+                    ) : (
+                      <span className={"st-chip " + (r.status === "approved" ? "approved" : "rejected")}>{r.status}</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

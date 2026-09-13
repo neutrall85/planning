@@ -11,8 +11,8 @@ import {
 } from "../utils/permissions";
 import { Ic, ICONS } from "./Icons";
 import { useDataHelpers } from "../hooks";
-import EditEmployeeModal from "./EditEmployeeModal";
-import CreateEmployeeModal from "./CreateEmployeeModal";
+import { EditEmployeeModal } from "./Modals/EditEmployeeModal";
+import { CreateEmployeeModal } from "./Modals/CreateEmployeeModal";
 import Avatar from "./Avatar";
 import { getPrimaryDeptName } from "../utils/helpers";
 
@@ -212,7 +212,7 @@ export default function Staff({ db, setDb, ur, openRoles, openDepts, openVacatio
         <div className="st-section">
           <div className="st-sec-head">
             <div className="st-sec-title">Руководство</div>
-            <div className="st-sec-sub">{noDeptEmployees.length} чел.</div>
+            {/* <div className="st-sec-sub">{noDeptEmployees.length} чел.</div> */}
           </div>
           {noDeptEmployees.map(e => (
             <EmployeeRow
@@ -236,14 +236,10 @@ export default function Staff({ db, setDb, ur, openRoles, openDepts, openVacatio
         <div className="st-section" key={kb.id}>
           <div className="st-sec-head">
             <div className="st-sec-title">{kb.name}</div>
-            <div className="st-sec-sub">{kb.full} · главный конструктор: {chiefs.map(e => `${e.last} ${e.first}`).join(', ') || '—'}</div>
+            {/* <div className="st-sec-sub">{kb.full} · главный конструктор: {chiefs.map(e => `${e.last} ${e.first}`).join(', ') || '—'}</div> */}
           </div>
           {chiefs.length > 0 && (
             <div className="st-dept" style={{ borderTop: '1px solid var(--line)' }}>
-              <div className="st-dept-head">
-                <span className="st-dept-name">Главные конструкторы</span>
-                <span className="kcount">{chiefs.length}</span>
-              </div>
               {chiefs.map(e => (
                 <EmployeeRow
                   key={e.id}

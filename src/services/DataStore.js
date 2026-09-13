@@ -1,43 +1,52 @@
 // src/services/DataStore.js
-import { TODAY, iso, addDays, addMonths, uid, fmtDMY } from '../utils/date';
-import { TASK_STATUSES, TASK_STATUS_ORDER, PRIORITIES, VACATION_TYPES, PROJECT_STATUSES, PROJECT_TYPES, DEPENDENCY_TYPES } from '../utils/constants';
 import { buildMockData } from './mockData';
+import { TODAY, iso, addMonths, addDays, uid, fmtDMY } from '../utils/date';
+import { TASK_STATUSES, TASK_STATUS_ORDER, PRIORITIES, VACATION_TYPES, PROJECT_STATUSES, PROJECT_TYPES, DEPENDENCY_TYPES } from '../utils/constants';
 
-export default class DataStore {
-  constructor() {
-    this._data = buildMockData();
-    this._currentUser = null;
-    this._listeners = [];
-    this._archiveOldTasks(3);
-    // Миграция старых задач: если есть assigneeIds, берём первого как assigneeId
-    this._migrateTasks();
-    // +++ Новая миграция: добавляем budgetHours и actualHours
-    this._migrateBudgetAndActual();
-  }
+// Импорты репозиториев
+import { TaskRepository } from '../repositories/TaskRepository';
+import { ProjectRepository } from '../repositories/ProjectRepository';
+import { EmployeeRepository } from '../repositories/EmployeeRepository';
+import { VacationRepository } from '../repositories/VacationRepository';
+import { NotificationRepository } from '../repositories/NotificationRepository';
+import { AuditRepository } from '../repositories/AuditRepository';
+import { DepartmentRepository } from '../repositories/DepartmentRepository';
+import { KbRepository } from '../repositories/KbRepository';
+import { HoursRequestRepository } from '../repositories/HoursRequestRepository';
+import { RoleDelegationRepository } from '../repositories/RoleDelegationRepository';
 
-  _migrateTasks() {
+// Импорты сервисов
+import { BudgetService } from './BudgetService';
+import { TaskService } from './TaskService';
+import { ProjectService } from './ProjectService';
+import { VacationService } from './VacationService';
+import { EmployeeService } from './EmployeeService';
+import { AuthService } from './AuthService';
+import { NotificationService } from './NotificationService';
+import { AuditService } from './AuditService';
+import { DepartmentService } from './DepartmentService';
+import { KbService } from './KbService';
+import { HoursRequestService } from './HoursRequestService';
+import { RoleDelegationService } from './RoleDelegationService';
+
+// Миграции
+class DataMigrator {
+  static migrate(data) {
     let changed = false;
-    this._data.tasks = this._data.tasks.map(t => {
+    data.tasks = data.tasks.map(t => {
       if (t.assigneeIds && t.assigneeIds.length > 0 && !t.assigneeId) {
         changed = true;
-        return { ...t, assigneeId: t.assigneeIds[0], assigneeIds: undefined };
+        const { assigneeIds, ...rest } = t;
+        return { ...rest, assigneeId: assigneeIds[0] };
       }
       if (t.assigneeIds && t.assigneeIds.length === 0 && !t.assigneeId) {
         changed = true;
-        return { ...t, assigneeId: null, assigneeIds: undefined };
+        const { assigneeIds, ...rest } = t;
+        return { ...rest, assigneeId: null };
       }
       return t;
     });
-    if (changed) {
-      this._notify();
-      this.addAudit('Миграция данных', 'Задачи приведены к формату с одним исполнителем (assigneeId)');
-    }
-  }
-
-  // +++ Миграция: добавляем budgetHours для суммарных задач и actualHours для всех
-  _migrateBudgetAndActual() {
-    let changed = false;
-    this._data.tasks = this._data.tasks.map(t => {
+    data.tasks = data.tasks.map(t => {
       let updated = { ...t };
       if (updated.actualHours === undefined) {
         updated.actualHours = 0;
@@ -49,615 +58,373 @@ export default class DataStore {
       }
       return updated;
     });
-    if (changed) {
-      this._notify();
-      this.addAudit('Миграция данных', 'Добавлены поля budgetHours и actualHours для задач');
-    }
+    return { data, changed };
   }
+}
+
+class DataStore {
+  constructor() {
+    this._data = buildMockData();
+    const { data, changed } = DataMigrator.migrate(this._data);
+    this._data = data;
+    if (changed) {
+      this._data.audit.unshift({
+        id: uid(),
+        ts: Date.now(),
+        userId: 'system',
+        action: 'Миграция данных',
+        details: 'Задачи приведены к формату с одним исполнителем и добавлены поля actualHours/budgetHours',
+        targetType: null,
+        targetId: null,
+      });
+    }
+
+    this._listeners = [];
+
+    // Репозитории
+    this._taskRepo = new TaskRepository(this._data.tasks);
+    this._projectRepo = new ProjectRepository(this._data.projects);
+    this._employeeRepo = new EmployeeRepository(this._data.employees);
+    this._vacationRepo = new VacationRepository(this._data.vacations);
+    this._notificationRepo = new NotificationRepository(this._data.notifications);
+    this._auditRepo = new AuditRepository(this._data.audit);
+    this._deptRepo = new DepartmentRepository(this._data.departments);
+    this._kbRepo = new KbRepository(this._data.kbs);
+    this._hoursRequestRepo = new HoursRequestRepository(this._data.hoursRequests);
+    this._roleDelegationRepo = new RoleDelegationRepository(this._data.roleDelegations);
+
+    // Сервисы
+    this._auditService = new AuditService(this._auditRepo, () => this._notify());
+    this._notificationService = new NotificationService(
+      this._notificationRepo,
+      () => this._notify(),
+      () => this._data
+    );
+    this._employeeService = new EmployeeService(this._employeeRepo, this._auditService, () => this._notify());
+    this._budgetService = new BudgetService(this._taskRepo, this._projectRepo, this._employeeRepo);
+    this._taskService = new TaskService(
+      this._taskRepo,
+      this._projectRepo,
+      this._employeeRepo,
+      this._budgetService,
+      this._notificationService,
+      this._auditService,
+      () => this._notify()
+    );
+    this._projectService = new ProjectService(
+      this._projectRepo,
+      this._taskRepo,
+      this._notificationService,
+      this._auditService,
+      () => this._notify()
+    );
+    this._vacationService = new VacationService(
+      this._vacationRepo,
+      this._taskService,
+      this._notificationService,
+      this._auditService,
+      () => this._notify()
+    );
+    this._authService = new AuthService(this._employeeService, this._auditService, () => this._notify());
+    this._departmentService = new DepartmentService(this._deptRepo, this._auditService, () => this._notify());
+    this._kbService = new KbService(this._kbRepo, this._auditService, () => this._notify());
+    this._hoursRequestService = new HoursRequestService(this._hoursRequestRepo, () => this._notify());
+    this._roleDelegationService = new RoleDelegationService(this._roleDelegationRepo, this._auditService, () => this._notify());
+
+    this._data.comments = this._data.comments || [];
+    this._migrateComments();
+
+    this._taskService.archiveOldTasks(3);
+  }
+
+  // ---------- Публичный API ----------
+
+  get data() { return this._data; }
 
   subscribe(callback) {
     this._listeners.push(callback);
     return () => { this._listeners = this._listeners.filter(cb => cb !== callback); };
   }
+
   _notify() {
     this._listeners.forEach(cb => cb(this._data));
   }
 
-  get data() { return this._data; }
-  getCurrentUser() { return this._currentUser; }
+  // Управление сессией
+  getCurrentUser() { return this._authService.getCurrentUser(); }
+  login(email, password) { return this._authService.login(email, password); }
+  logout() { this._authService.logout(); }
 
-  login(email, password) {
-    const found = this._data.employees.find(e => e.email.toLowerCase() === email.trim().toLowerCase());
-    if (found && found.lockUntil && Date.now() < found.lockUntil) {
-      const remainingMinutes = Math.ceil((found.lockUntil - Date.now()) / 60000);
-      return `Учётная запись заблокирована на ${remainingMinutes} мин. после 5 неудачных попыток входа`;
-    }
-    if (found && found.pass === password && !found.fired) {
-      if (found.failed > 0) {
-        found.failed = 0;
-        found.lockUntil = 0;
-        this.upsertEmployee(found);
-      }
-      this._currentUser = found;
-      this._notify();
-      return true;
-    }
-    if (found) {
-      found.failed = (found.failed || 0) + 1;
-      if (found.failed >= 5) {
-        found.lockUntil = Date.now() + 15 * 60 * 1000;
-        this.upsertEmployee(found);
-        return 'Учётная запись заблокирована на 15 мин. после 5 неудачных попыток входа';
-      }
-      this.upsertEmployee(found);
-    }
-    return 'Неправильно введен логин/пароль';
-  }
-
-  logout() {
-    this._currentUser = null;
-    this._notify();
-  }
-
-  _archiveOldTasks(months = 3) {
-    const cutoff = addMonths(new Date(), -months);
-    const cutoffIso = iso(cutoff);
-    let changed = false;
-    this._data.tasks = this._data.tasks.map(t => {
-      if (t.archived) return t;
-      if ((t.status === 'closed' || t.status === 'cancelled') && t.closedAt && t.closedAt < cutoffIso) {
-        changed = true;
-        return { ...t, archived: true, archivedAt: TODAY };
-      }
-      return t;
-    });
-    if (changed) {
-      this._notify();
-      this.addAudit('Автоматическая архивация задач', `Задачи, закрытые более ${months} мес., перемещены в архив`);
-    }
-  }
-
-  // ----- Рекурсивный подсчёт суммы плановых часов подзадач (без изменений) -----
-  _calcSummaryHours(taskId, visited = new Set()) {
-    if (visited.has(taskId)) return 0;
-    visited.add(taskId);
-
-    const task = this._data.tasks.find(t => t.id === taskId);
-    if (!task) return 0;
-    if (!task.isSummary) return task.plannedHours || 0;
-
-    const children = this._data.tasks.filter(t => t.parentTaskId === taskId && !t.archived);
-    let sum = 0;
-    for (const child of children) {
-      sum += this._calcSummaryHours(child.id, visited);
-    }
-    return sum;
-  }
-
-  // +++ ИСПРАВЛЕНО: НЕ перезаписываем plannedHours для суммарных задач
-  _recalcSummaryHoursChain(taskId) {
-    let current = this._data.tasks.find(t => t.id === taskId);
-    while (current) {
-      if (current.isSummary) {
-        // plannedHours НЕ МЕНЯЕМ – это бюджет
-        // Сумма подзадач вычисляется в getRemainingHours через _calcSummaryHours
-      }
-      if (current.parentTaskId) {
-        current = this._data.tasks.find(t => t.id === current.parentTaskId);
-      } else {
-        break;
-      }
-    }
-  }
-
-  // +++ Вычисление остатка для задачи
-  getRemainingHours(taskId) {
-    const task = this._data.tasks.find(t => t.id === taskId);
-    if (!task) return null;
-    if (!task.isSummary) {
-      return (task.plannedHours || 0) - (task.actualHours || 0);
-    }
-    const budget = task.budgetHours ?? task.plannedHours ?? 0;
-    const actual = task.actualHours || 0;
-    const childrenSum = this._calcSummaryHours(task.id);
-    return budget - actual - childrenSum;
-  }
-
-  // +++ Проверка возможности добавления/изменения подзадачи
-  _canAddChildToParent(parentId, childEstimate, excludeTaskId = null) {
-    const parent = this._data.tasks.find(t => t.id === parentId);
-    if (!parent) return true;
-    if (!parent.isSummary) {
-      if (parent.plannedHours == null) return true;
-      let childrenSum = 0;
-      const children = this._data.tasks.filter(t =>
-        t.parentTaskId === parentId && t.id !== excludeTaskId && !t.archived
-      );
-      for (const child of children) {
-        childrenSum += child.plannedHours || 0;
-      }
-      const totalWithNew = childrenSum + (childEstimate || 0);
-      return totalWithNew <= parent.plannedHours;
-    }
-    const budget = parent.budgetHours ?? parent.plannedHours ?? 0;
-    const actual = parent.actualHours || 0;
-    let childrenSum = 0;
-    const children = this._data.tasks.filter(t =>
-      t.parentTaskId === parentId && t.id !== excludeTaskId && !t.archived
-    );
-    for (const child of children) {
-      childrenSum += child.plannedHours || 0;
-    }
-    const totalWithNew = childrenSum + (childEstimate || 0);
-    return (actual + totalWithNew) <= budget;
-  }
-
-  /**
-   * Проверяет, не превышает ли сумма плановых часов подзадач заданный бюджет родительской задачи.
-   * (используется для не-суммарных родительских задач, сохраняем для обратной совместимости)
-   */
-  _checkSubtaskBudget(parentId, excludeTaskId = null) {
-    const parent = this._data.tasks.find(t => t.id === parentId);
-    if (!parent) return;
-    if (parent.isSummary || parent.plannedHours == null) return;
-
-    const children = this._data.tasks.filter(t =>
-      t.parentTaskId === parentId && t.id !== excludeTaskId && !t.archived
-    );
-    const sumChildren = children.reduce((acc, t) => acc + (t.plannedHours || 0), 0);
-    if (sumChildren > parent.plannedHours) {
-      throw new Error(
-        `Сумма плановых часов подзадач (${sumChildren} ч) превышает бюджет родительской задачи "${parent.title}" (${parent.plannedHours} ч). Уменьшите часы подзадач или увеличьте бюджет родителя.`
-      );
-    }
-  }
-
-  // ----- upsertTask с изменениями -----
+  // Задачи
   upsertTask(task) {
-    const idx = this._data.tasks.findIndex(t => t.id === task.id);
-    let tasks;
-    let auditMessage = '';
-
-    // +++ Если задача новая и она суммарная, сохраняем budgetHours
-    if (idx === -1 && task.isSummary) {
-      if (task.budgetHours === undefined) {
-        task.budgetHours = task.plannedHours || 0;
-      }
-    }
-
-    // Проверка бюджета проекта (без изменений)
-    const projectForBudget = this._data.projects.find(p => p.id === task.projectId);
-    if (projectForBudget && projectForBudget.budget != null && projectForBudget.ptype !== 'admin' && !projectForBudget.archived) {
-      const otherTasksSum = this._data.tasks
-        .filter(t => t.projectId === task.projectId && t.id !== task.id)
-        .reduce((sum, t) => sum + (t.plannedHours || 0), 0);
-      const newTotal = otherTasksSum + (task.plannedHours || 0);
-      if (newTotal > projectForBudget.budget) {
-        throw new Error(
-          `Превышение бюджета проекта! Бюджет: ${projectForBudget.budget} ч, сумма остальных задач: ${otherTasksSum} ч, запрошено: ${task.plannedHours || 0} ч.`
-        );
-      }
-    }
-
-    // +++ Проверка бюджета родительской задачи
-    if (task.parentTaskId) {
-      const excludeId = idx === -1 ? null : task.id;
-      if (!this._canAddChildToParent(task.parentTaskId, task.plannedHours || 0, excludeId)) {
-        const parent = this._data.tasks.find(t => t.id === task.parentTaskId);
-        const parentName = parent ? `"${parent.title}"` : 'родительской задачи';
-        throw new Error(
-          `Невозможно добавить/обновить подзадачу: превышение бюджета ${parentName}.`
-        );
-      }
-    }
-
-    // 2. Если обновляется существующая задача и она НЕ суммарная, и её plannedHours изменяется,
-    //    проверяем, что сумма её существующих подзадач не превышает новый plannedHours.
-    if (idx !== -1) {
-      const existingTask = this._data.tasks[idx];
-      if (!task.isSummary && task.plannedHours != null) {
-        const childrenSum = this._data.tasks
-          .filter(t => t.parentTaskId === task.id && t.id !== task.id && !t.archived)
-          .reduce((acc, t) => acc + (t.plannedHours || 0), 0);
-        if (childrenSum > task.plannedHours) {
-          throw new Error(
-            `Сумма плановых часов подзадач (${childrenSum} ч) превышает новый бюджет задачи "${task.title}" (${task.plannedHours} ч). Уменьшите часы подзадач или увеличьте бюджет задачи.`
-          );
-        }
-      }
-      // +++ Если задача суммарная, запрещаем менять plannedHours вручную
-      if (task.isSummary && task.plannedHours !== undefined && task.plannedHours !== existingTask.plannedHours) {
-        task.plannedHours = existingTask.plannedHours; // восстанавливаем бюджет
-        if (task.budgetHours !== undefined) {
-          // разрешено менять бюджет
-        } else {
-          task.budgetHours = existingTask.budgetHours ?? existingTask.plannedHours ?? 0;
-        }
-      }
-    }
-
-    // Далее идёт существующая логика (без изменений)
-    if (idx === -1 && task.parentTaskId) {
-      const parent = this._data.tasks.find(t => t.id === task.parentTaskId);
-      if (parent) {
-        if (!task.projectId) task.projectId = parent.projectId;
-      } else {
-        task.parentTaskId = null;
-      }
-    }
-
-    if (idx >= 0) {
-      const old = this._data.tasks[idx];
-      const changes = [];
-      if (old.title !== task.title) changes.push(`Название: "${old.title}" → "${task.title}"`);
-      if (!task.isSummary && old.plannedHours !== task.plannedHours) {
-        changes.push(`Плановые часы: ${old.plannedHours ?? '—'} → ${task.plannedHours ?? '—'}`);
-      }
-      // +++ Учитываем изменение фактических часов
-      if (old.actualHours !== task.actualHours) {
-        changes.push(`Фактические часы: ${old.actualHours ?? 0} → ${task.actualHours ?? 0}`);
-      }
-      // +++ Учитываем изменение бюджета для суммарной задачи
-      if (task.isSummary && old.budgetHours !== task.budgetHours) {
-        changes.push(`Бюджет: ${old.budgetHours ?? '—'} → ${task.budgetHours ?? '—'}`);
-      }
-      if (old.assigneeId !== task.assigneeId) {
-        const oldName = old.assigneeId ? this.empName(old.assigneeId) : '—';
-        const newName = task.assigneeId ? this.empName(task.assigneeId) : '—';
-        changes.push(`Исполнитель: ${oldName} → ${newName}`);
-      }
-      if (old.status !== task.status) {
-        changes.push(`Статус: ${TASK_STATUSES[old.status].label} → ${TASK_STATUSES[task.status].label}`);
-        if ((task.status === 'closed' || task.status === 'cancelled') && old.status !== task.status) {
-          task.closedAt = TODAY;
-          if (task.creatorId) {
-            this.addNotification(task.creatorId, `Задача "${task.title}" ${task.status === 'closed' ? 'закрыта' : 'отменена'}`, { targetType: 'task', targetId: task.id });
-          }
-          const project = this._data.projects.find(p => p.id === task.projectId);
-          if (project && project.managerId && project.managerId !== task.creatorId) {
-            this.addNotification(project.managerId, `Задача "${task.title}" проекта ${project.code} ${task.status === 'closed' ? 'закрыта' : 'отменена'}`, { targetType: 'task', targetId: task.id });
-          }
-        }
-      }
-      if (old.dependencyId !== task.dependencyId || old.dependencyType !== task.dependencyType) {
-        const oldDep = old.dependencyId ? this._data.tasks.find(t => t.id === old.dependencyId) : null;
-        const newDep = task.dependencyId ? this._data.tasks.find(t => t.id === task.dependencyId) : null;
-        const depTypeLabel = task.dependencyType ? DEPENDENCY_TYPES[task.dependencyType]?.label : '';
-        const oldDepStr = oldDep ? `"${oldDep.title}" (${DEPENDENCY_TYPES[old.dependencyType]?.label || 'FS'})` : 'нет';
-        const newDepStr = newDep ? `"${newDep.title}" (${depTypeLabel})` : 'нет';
-        changes.push(`Зависимость: ${oldDepStr} → ${newDepStr}`);
-      }
-      if (changes.length > 0) {
-        auditMessage = `Изменение задачи "${task.title}": ${changes.join('; ')}`;
-        this.addAudit('Изменение задачи', auditMessage, 'task', task.id);
-      }
-      tasks = this._data.tasks.map(t => t.id === task.id ? task : t);
-    } else {
-      if (!task.createdAt) {
-        task.createdAt = new Date().toISOString();
-      }
-      tasks = [...this._data.tasks, task];
-      this.addAudit('Создание задачи', task.title, 'task', task.id);
-      if (task.assigneeId && task.assigneeId !== this._currentUser?.id) {
-        this.addNotification(task.assigneeId, `Вам назначена задача "${task.title}"`, { targetType: 'task', targetId: task.id });
-      }
-    }
-
-    this._data = { ...this._data, tasks };
-
-    // +++ Пересчёт цепочек (теперь не затирает plannedHours)
-    if (task.parentTaskId) {
-      this._recalcSummaryHoursChain(task.parentTaskId);
-    }
-    if (task.isSummary) {
-      this._recalcSummaryHoursChain(task.id);
-    }
-
-    this._notify();
-    this._archiveOldTasks(3);
+    const user = this._authService.getCurrentUser();
+    this._taskService.upsertTask(task, user?.id || 'system');
   }
-
-  // ----- deleteTask (исправлено: пересчёт родителя) -----
   deleteTask(id) {
-    const task = this._data.tasks.find(t => t.id === id);
-    if (task) {
-      this.addAudit('Удаление задачи', task.title);
-    }
-
-    const parentId = task?.parentTaskId;
-
-    this._data.tasks = this._data.tasks.map(t => {
-      if (t.parentTaskId === id) {
-        return { ...t, parentTaskId: null };
-      }
-      return t;
-    });
-
-    this._data = { ...this._data, tasks: this._data.tasks.filter(t => t.id !== id) };
-
-    if (parentId) {
-      this._recalcSummaryHoursChain(parentId);
-    }
-
-    this._notify();
+    const user = this._authService.getCurrentUser();
+    this._taskService.deleteTask(id, user?.id || 'system');
   }
-
-  // +++ Установка бюджета для суммарной задачи
+  getRemainingHours(taskId) {
+    return this._taskService.getRemainingHours(taskId);
+  }
   setBudget(taskId, newBudget) {
-    const task = this._data.tasks.find(t => t.id === taskId);
-    if (!task) throw new Error('Задача не найдена');
-    if (!task.isSummary) throw new Error('Только для суммарных задач');
-    if (typeof newBudget !== 'number' || newBudget < 0) throw new Error('Бюджет должен быть неотрицательным числом');
-
-    const childrenSum = this._calcSummaryHours(taskId);
-    const actual = task.actualHours || 0;
-    if (childrenSum + actual > newBudget) {
-      throw new Error(
-        `Новый бюджет (${newBudget} ч) меньше суммы подзадач (${childrenSum} ч) и фактических часов (${actual} ч).`
-      );
-    }
-
-    task.budgetHours = newBudget;
-    // plannedHours остаётся бюджетом, не меняем
-    const idx = this._data.tasks.findIndex(t => t.id === taskId);
-    if (idx !== -1) {
-      this._data.tasks[idx] = { ...task };
-    }
-    this._notify();
-    this.addAudit('Изменение бюджета', `Задача "${task.title}" → ${newBudget} ч`, 'task', taskId);
-    return task;
+    const user = this._authService.getCurrentUser();
+    return this._taskService.setBudget(taskId, newBudget, user?.id || 'system');
+  }
+  addTaskLog(taskId, message) {
+    const user = this._authService.getCurrentUser();
+    this._taskService.addTaskLog(taskId, message, user?.id || 'system');
   }
 
-  // ----- Остальные методы (без изменений) -----
+  // Проекты
   upsertProject(project) {
-    const idx = this._data.projects.findIndex(p => p.id === project.id);
-    let projects;
-    let auditMessage = '';
-    if (idx >= 0) {
-      const oldProject = this._data.projects[idx];
-      const changes = [];
-      if (oldProject.name !== project.name) changes.push(`Название: "${oldProject.name}" → "${project.name}"`);
-      if (oldProject.code !== project.code) changes.push(`Код: "${oldProject.code}" → "${project.code}"`);
-      if (oldProject.budget !== project.budget) changes.push(`Бюджет: ${oldProject.budget ?? '—'} → ${project.budget ?? '—'}`);
-      if (oldProject.status !== project.status) {
-        changes.push(`Статус: ${PROJECT_STATUSES[oldProject.status]} → ${PROJECT_STATUSES[project.status]}`);
-        if ((project.status === 'closed' || project.status === 'cancelled') && oldProject.status !== project.status) {
-          project.archived = true;
-          project.archivedAt = TODAY;
-          this._data.tasks = this._data.tasks.map(t => {
-            if (t.projectId === project.id) {
-              const updated = { ...t, archived: true, archivedAt: TODAY };
-              if (t.creatorId) {
-                this.addNotification(t.creatorId, `Задача "${t.title}" проекта ${project.code} архивирована (проект закрыт)`, { targetType: 'task', targetId: t.id });
-              }
-              return updated;
-            }
-            return t;
-          });
-          this.addNotification(project.managerId || 'system', `Проект "${project.name}" архивирован`, { targetType: 'project', targetId: project.id });
-        }
-      }
-      if (changes.length > 0) {
-        auditMessage = `Изменение проекта "${project.name}": ${changes.join('; ')}`;
-        this.addAudit('Изменение проекта', auditMessage, 'project', project.id);
-      }
-      projects = this._data.projects.map(p => p.id === project.id ? project : p);
-    } else {
-      projects = [...this._data.projects, project];
-      this.addAudit('Создание проекта', project.name, 'project', project.id);
-    }
-    this._data = { ...this._data, projects };
-    this._notify();
-    this._archiveOldTasks(3);
+    const user = this._authService.getCurrentUser();
+    this._projectService.upsertProject(project, user?.id || 'system');
   }
-
   deleteProject(id) {
-    const project = this._data.projects.find(p => p.id === id);
-    if (project) {
-      this.addAudit('Удаление проекта', project.name);
-    }
-    this._data = {
-      ...this._data,
-      projects: this._data.projects.filter(p => p.id !== id),
-      tasks: this._data.tasks.filter(t => t.projectId !== id)
-    };
-    this._notify();
+    const user = this._authService.getCurrentUser();
+    this._projectService.deleteProject(id, user?.id || 'system');
   }
 
+  // Отпуска
   upsertVacation(vac) {
-    const idx = this._data.vacations.findIndex(v => v.id === vac.id);
-    let vacations;
-    if (idx >= 0) {
-      const old = this._data.vacations[idx];
-      this.addAudit('Изменение отпуска', `${vac.empId} ${fmtDMY(vac.start)}—${fmtDMY(vac.end)}`);
-      vacations = this._data.vacations.map(v => v.id === vac.id ? vac : v);
-    } else {
-      vacations = [...this._data.vacations, vac];
-      this.addAudit('Создание отпуска', `${vac.empId} ${fmtDMY(vac.start)}—${fmtDMY(vac.end)}`);
-    }
-    this._data = { ...this._data, vacations };
-    this._notify();
-    if (vac.delegation.enabled && vac.status === 'approved' && vac.start <= TODAY) {
-      this.applyDelegation(vac.id);
-    }
+    const user = this._authService.getCurrentUser();
+    this._vacationService.upsertVacation(vac, user?.id || 'system');
   }
-
   deleteVacation(id) {
-    const vac = this._data.vacations.find(v => v.id === id);
-    if (vac) {
-      this.addAudit('Удаление отпуска', `${vac.empId} ${fmtDMY(vac.start)}—${fmtDMY(vac.end)}`);
-      if (vac.delegation.enabled) {
-        this.revertDelegation(id);
-      }
-    }
-    this._data = { ...this._data, vacations: this._data.vacations.filter(v => v.id !== id) };
-    this._notify();
+    const user = this._authService.getCurrentUser();
+    this._vacationService.deleteVacation(id, user?.id || 'system');
   }
+  applyDelegation(vacationId) { this._vacationService.applyDelegation(vacationId); }
+  revertDelegation(vacationId) { this._vacationService.revertDelegation(vacationId); }
 
-  applyDelegation(vacationId) {
-    const vac = this._data.vacations.find(v => v.id === vacationId);
-    if (!vac || !vac.delegation.enabled || vac.status !== 'approved') return;
-    const start = vac.start;
-    const end = vac.end;
-    const fromId = vac.empId;
-    const toId = vac.delegation.subId;
-    const statuses = vac.delegation.statuses.length ? vac.delegation.statuses : ['new', 'inwork', 'review'];
-    this._data.tasks = this._data.tasks.map(t => {
-      if (t.archived) return t;
-      if (t.assigneeId !== fromId) return t;
-      if (!statuses.includes(t.status)) return t;
-      if (t.deadline && t.deadline < start) return t;
-      const updated = { ...t, assigneeId: toId };
-      updated.history = [...updated.history, {
-        ts: Date.now(),
-        who: 'system',
-        text: `Задача переназначена с ${this.empName(fromId)} на ${this.empName(toId)} на период отпуска с ${fmtDMY(start)} по ${fmtDMY(end)}`
-      }];
-      return updated;
-    });
-    this._notify();
-    this.addNotification(toId, `Вам переданы задачи ${this.empName(fromId)} на время отпуска`, { targetType: 'vacation', targetId: vacationId });
-    this.addNotification(fromId, `Ваши задачи переданы ${this.empName(toId)} на период отпуска`, { targetType: 'vacation', targetId: vacationId });
-  }
-
-  revertDelegation(vacationId) {
-    const vac = this._data.vacations.find(v => v.id === vacationId);
-    if (!vac || !vac.delegation.enabled) return;
-    const fromId = vac.empId;
-    const toId = vac.delegation.subId;
-    this._data.tasks = this._data.tasks.map(t => {
-      if (t.archived) return t;
-      if (t.assigneeId !== toId) return t;
-      const hasDelegation = t.history.some(h => h.text.includes(`переназначена с ${this.empName(fromId)} на ${this.empName(toId)}`));
-      if (!hasDelegation) return t;
-      const updated = { ...t, assigneeId: fromId };
-      updated.history = [...updated.history, {
-        ts: Date.now(),
-        who: 'system',
-        text: `Задача возвращена ${this.empName(fromId)} по окончании отпуска`
-      }];
-      return updated;
-    });
-    this._notify();
-    this.addNotification(fromId, `Задачи возвращены вам по окончании отпуска`, { targetType: 'vacation', targetId: vacationId });
-  }
-
+  // Сотрудники
   upsertEmployee(emp) {
-    const idx = this._data.employees.findIndex(e => e.id === emp.id);
-    let employees;
-    if (idx >= 0) {
-      const old = this._data.employees[idx];
-      if (JSON.stringify(old.departments) !== JSON.stringify(emp.departments)) {
-        this.addAudit('Изменение подразделений', `${emp.last} ${emp.first}: ${old.departments.map(d => d.deptId).join(',')} → ${emp.departments.map(d => d.deptId).join(',')}`);
-      }
-      if (JSON.stringify(old.roles) !== JSON.stringify(emp.roles)) {
-        this.addAudit('Изменение ролей', `${emp.last} ${emp.first}: ${old.roles.join(', ')} → ${emp.roles.join(', ')}`);
-      }
-      employees = this._data.employees.map(e => e.id === emp.id ? emp : e);
-    } else {
-      employees = [...this._data.employees, emp];
-      this.addAudit('Создание сотрудника', `${emp.last} ${emp.first}`);
-    }
-    this._data = { ...this._data, employees };
-    this._notify();
+    const user = this._authService.getCurrentUser();
+    this._employeeService.upsertEmployee(emp, user?.id || 'system');
   }
+  empName(id) { return this._employeeService.getEmployeeName(id); }
 
+  // Отделы
   upsertDepartment(dept) {
-    const idx = this._data.departments.findIndex(d => d.id === dept.id);
-    let departments;
-    if (idx >= 0) {
-      departments = this._data.departments.map(d => d.id === dept.id ? dept : d);
-    } else {
-      departments = [...this._data.departments, dept];
-      this.addAudit('Создание отдела', dept.name);
-    }
-    this._data = { ...this._data, departments };
-    this._notify();
+    const user = this._authService.getCurrentUser();
+    this._departmentService.upsertDepartment(dept, user?.id || 'system');
   }
 
+  // База знаний
   upsertKb(kb) {
-    const idx = this._data.kbs.findIndex(k => k.id === kb.id);
-    let kbs;
-    if (idx >= 0) {
-      kbs = this._data.kbs.map(k => k.id === kb.id ? kb : k);
-    } else {
-      kbs = [...this._data.kbs, kb];
-      this.addAudit('Создание КБ', kb.name);
-    }
-    this._data = { ...this._data, kbs };
-    this._notify();
+    const user = this._authService.getCurrentUser();
+    this._kbService.upsertKb(kb, user?.id || 'system');
   }
 
+  // Аудит
   addAudit(action, details, targetType = null, targetId = null) {
-    let detailsStr = details;
-    if (typeof details === 'object') {
-      detailsStr = JSON.stringify(details);
-    }
-    this._data = {
-      ...this._data,
-      audit: [
-        {
-          id: uid(),
-          ts: Date.now(),
-          userId: this._currentUser?.id || "system",
-          action,
-          details: detailsStr,
-          targetType,
-          targetId,
-        },
-        ...this._data.audit
-      ]
-    };
-    this._notify();
+    const user = this._authService.getCurrentUser();
+    this._auditService.addAudit(action, details, targetType, targetId, user?.id || 'system');
   }
 
+  // Уведомления
   addNotification(userId, text, target = null) {
-    this._data = {
-      ...this._data,
-      notifications: [
-        { id: uid(), userId, text, ts: Date.now(), read: false, targetType: target?.targetType || null, targetId: target?.targetId || null },
-        ...this._data.notifications
-      ]
-    };
-    this._notify();
+    this._notificationService.addNotification(userId, text, target);
+  }
+  markNotificationRead(id) { this._notificationService.markRead(id); }
+  markAllNotificationsRead(userId) { this._notificationService.markAllRead(userId); }
+
+  // Семантические уведомления (для UI-слоя)
+  notifyHoursRequestCreated(request, directorIds, targetTitle) {
+    const user = this._authService.getCurrentUser();
+    this._notificationService.notifyHoursRequestCreated(request, directorIds, targetTitle, user?.id || 'system');
+  }
+  notifyHoursRequestDecision(request, approved, targetTitle) {
+    const user = this._authService.getCurrentUser();
+    this._notificationService.notifyHoursRequestDecision(request, approved, targetTitle, user?.id || 'system');
+  }
+  notifyRoleDelegationCreated(delegation) {
+    const user = this._authService.getCurrentUser();
+    this._notificationService.notifyRoleDelegationCreated(delegation, user?.id || 'system');
+  }
+  notifyRoleDelegationDecision(delegation, approved) {
+    const user = this._authService.getCurrentUser();
+    this._notificationService.notifyRoleDelegationDecision(delegation, approved, user?.id || 'system');
+  }
+  notifyVacationDecision(vacation, approved) {
+    this._notificationService.notifyVacationDecision(vacation, approved);
   }
 
-  markNotificationRead(id) {
-    this._data = {
-      ...this._data,
-      notifications: this._data.notifications.map(n => n.id === id ? { ...n, read: true } : n)
-    };
-    this._notify();
-  }
+  // Запросы часов
+  addHoursRequest(req) { this._hoursRequestService.addRequest(req); }
 
-  markAllNotificationsRead(userId) {
-    this._data = {
-      ...this._data,
-      notifications: this._data.notifications.map(n => n.userId === userId ? { ...n, read: true } : n)
-    };
-    this._notify();
-  }
-
-  addHoursRequest(req) {
-    this._data = { ...this._data, hoursRequests: [req, ...this._data.hoursRequests] };
-    this._notify();
-  }
-
+  // Делегирование ролей
   upsertRoleDelegation(rd) {
-    const idx = this._data.roleDelegations.findIndex(r => r.id === rd.id);
-    let roleDelegations;
-    if (idx >= 0) {
-      roleDelegations = this._data.roleDelegations.map(r => r.id === rd.id ? rd : r);
-    } else {
-      roleDelegations = [...this._data.roleDelegations, rd];
-      this.addAudit('Создание делегирования ролей', `${rd.fromId} → ${rd.toId}: ${rd.roles.join(', ')}`);
-    }
-    this._data = { ...this._data, roleDelegations };
+    const user = this._authService.getCurrentUser();
+    this._roleDelegationService.upsertRoleDelegation(rd, user?.id || 'system');
+  }
+
+  // ---------- КОММЕНТАРИИ ----------
+
+  getComments(filter = {}) {
+    let list = this._data.comments || [];
+    if (filter.projectId) list = list.filter(c => c.projectId === filter.projectId);
+    if (filter.taskId !== undefined) list = list.filter(c => c.taskId === filter.taskId);
+    if (filter.parentId !== undefined) list = list.filter(c => c.parentId === filter.parentId);
+    return list.sort((a, b) => {
+      if (a.pinned && !b.pinned) return -1;
+      if (!a.pinned && b.pinned) return 1;
+      return b.createdAt - a.createdAt;
+    });
+  }
+
+  addComment(data) {
+    const comment = {
+      id: uid(),
+      projectId: data.projectId,
+      taskId: data.taskId || null,
+      parentId: data.parentId || null,
+      authorId: data.authorId,
+      text: data.text || '',
+      attachments: data.attachments || [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      pinned: false,
+    };
+    this._data.comments.push(comment);
+    this._notificationService.notifyComment(comment); // ← автоуведомления
+    this._notify();
+    return comment;
+  }
+
+  updateComment(id, newText) {
+    const comment = this._data.comments.find(c => c.id === id);
+    if (!comment) throw new Error('Комментарий не найден');
+    comment.text = newText;
+    comment.updatedAt = Date.now();
+    this._notify();
+    return comment;
+  }
+
+  deleteComment(id) {
+    const toDelete = new Set();
+    const collect = (parentId) => {
+      this._data.comments.forEach(c => {
+        if (c.parentId === parentId && !toDelete.has(c.id)) {
+          toDelete.add(c.id);
+          collect(c.id);
+        }
+      });
+    };
+    toDelete.add(id);
+    collect(id);
+    this._data.comments = this._data.comments.filter(c => !toDelete.has(c.id));
     this._notify();
   }
 
-  empName(id) {
-    const e = this._data.employees.find(x => x.id === id);
-    return e ? `${e.last} ${e.first}` : '—';
+  togglePinComment(commentId) {
+    const comment = this._data.comments.find(c => c.id === commentId);
+    if (!comment) throw new Error('Комментарий не найден');
+    comment.pinned = !comment.pinned;
+    this._notify();
+    const action = comment.pinned ? 'Закрепление комментария' : 'Открепление комментария';
+    const details = {
+      commentId: comment.id,
+      text: comment.text.substring(0, 50) + (comment.text.length > 50 ? '...' : ''),
+      projectId: comment.projectId,
+      taskId: comment.taskId,
+    };
+    const user = this._authService.getCurrentUser();
+    this._auditService.addAudit(action, details, 'comment', comment.id, user?.id || 'system');
+    return comment;
+  }
+
+  addAttachment(commentId, file) {
+    return new Promise((resolve, reject) => {
+      if (!file.type.startsWith('image/')) {
+        reject(new Error('Можно загружать только изображения'));
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        reject(new Error('Размер не более 5 МБ'));
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const attachment = {
+          id: uid(),
+          name: file.name,
+          url: e.target.result,
+          size: file.size,
+          mimeType: file.type,
+          uploadedAt: Date.now(),
+        };
+        const comment = this._data.comments.find(c => c.id === commentId);
+        if (!comment) { reject(new Error('Комментарий не найден')); return; }
+        comment.attachments = comment.attachments || [];
+        comment.attachments.push(attachment);
+        comment.updatedAt = Date.now();
+        this._notify();
+        resolve(attachment);
+      };
+      reader.onerror = () => reject(new Error('Ошибка чтения файла'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // ---------- МИГРАЦИЯ КОММЕНТАРИЕВ ----------
+  _migrateComments() {
+    if (this._data.comments && this._data.comments.length > 0) return;
+    const migrated = [];
+    (this._data.projects || []).forEach(p => {
+      (p.comments || []).forEach(c => {
+        migrated.push({
+          id: c.id || uid(),
+          projectId: p.id,
+          taskId: null,
+          parentId: c.parentId || null,
+          authorId: c.authorId,
+          text: c.text,
+          attachments: c.attachments || [],
+          createdAt: c.ts || Date.now(),
+          updatedAt: c.ts || Date.now(),
+          pinned: c.pinned || false,
+        });
+      });
+      delete p.comments;
+    });
+    (this._data.tasks || []).forEach(t => {
+      (t.comments || []).forEach(c => {
+        migrated.push({
+          id: c.id || uid(),
+          projectId: t.projectId,
+          taskId: t.id,
+          parentId: c.parentId || null,
+          authorId: c.authorId,
+          text: c.text,
+          attachments: c.attachments || [],
+          createdAt: c.ts || Date.now(),
+          updatedAt: c.ts || Date.now(),
+          pinned: c.pinned || false,
+        });
+      });
+      delete t.comments;
+    });
+    this._data.comments = migrated;
+    if (migrated.length) {
+      this._auditService.addAudit('Миграция комментариев', `Перенесено ${migrated.length} комментариев в глобальное хранилище`, null, null, 'system');
+    }
+  }
+
+  _archiveOldTasks(months) { this._taskService.archiveOldTasks(months); }
+  _calcSummaryHours(taskId) { return this._budgetService.calcSummaryHours(taskId); }
+  _recalcSummaryHoursChain(taskId) {
+    const task = this._taskRepo.findById(taskId);
+    if (task) this._taskService._recalcSummaryChain(task);
+  }
+  _canAddChildToParent(parentId, childEstimate, excludeTaskId) {
+    return this._budgetService.canAddChildToParent(parentId, childEstimate, excludeTaskId);
+  }
+  _checkSubtaskBudget(parentId, excludeTaskId) {
+    this._budgetService.checkSubtaskBudget(parentId, excludeTaskId);
   }
 }
+
+const dataStore = new DataStore();
+export default dataStore;

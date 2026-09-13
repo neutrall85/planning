@@ -1,94 +1,94 @@
-import React, { useState } from 'react';
-import { Modal } from '../Modal';
+// src/components/Modals/DeptsModal.jsx
+import { useState, useCallback } from 'react';
+import { ModalShell } from '../ModalShell';
+import { useAsyncSubmit } from '../../hooks/useAsyncSubmit';
 
-export const DeptsModal = ({ db, setDb, empId, onClose, toast, audit }) => {
-  const emp = db.employees.find((e) => e.id === empId);
-  const [sel, setSel] = useState(emp.departments.map(d => ({ ...d })));
+export const DeptsModal = ({ store, empId, onClose, toast }) => {
+  const db = store.getState();
+  const emp = db.employees.find(e => e.id === empId);
+  if (!emp) return null;
 
-  const toggle = (deptId) => {
-    setSel((s) => {
-      if (s.some((x) => x.deptId === deptId)) {
-        const next = s.filter((x) => x.deptId !== deptId);
-        if (next.length && !next.some((x) => x.primary)) {
-          next[0].primary = true;
+  const [selections, setSelections] = useState(emp.departments.map(d => ({ ...d })));
+
+  const toggleDept = (deptId) => {
+    setSelections(prev => {
+      const exists = prev.some(x => x.deptId === deptId);
+      if (exists) {
+        const filtered = prev.filter(x => x.deptId !== deptId);
+        if (filtered.length && !filtered.some(x => x.primary)) {
+          filtered[0].primary = true;
         }
-        return next;
+        return filtered;
       }
-      return [...s, { deptId, primary: s.length === 0, position: '' }];
+      return [...prev, { deptId, primary: prev.length === 0, position: '' }];
     });
   };
 
   const setPrimary = (deptId) => {
-    setSel((s) => s.map((x) => ({ ...x, primary: x.deptId === deptId })));
+    setSelections(prev => prev.map(x => ({ ...x, primary: x.deptId === deptId })));
   };
 
   const setPosition = (deptId, pos) => {
-    setSel((s) => s.map((x) => (x.deptId === deptId ? { ...x, position: pos } : x)));
+    setSelections(prev => prev.map(x => x.deptId === deptId ? { ...x, position: pos } : x));
   };
 
-  const save = () => {
-    if (!sel.length) return toast("Выберите хотя бы одно подразделение", "err");
-    if (!sel.some((x) => x.primary)) return toast("Укажите основное подразделение", "err");
-    const before = emp.departments.map((x) => `${x.deptId}:${x.position || ''}`).join(',');
-    const after = sel.map((x) => `${x.deptId}:${x.position || ''}`).join(',');
-    setDb((s) => ({
-      ...s,
-      employees: s.employees.map((e) =>
-        e.id === empId
-          ? { ...e, departments: sel.map(({ deptId, primary, position }) => ({ deptId, primary, position: position?.trim() || '' })) }
-          : e
-      ),
-    }));
-    audit("Изменение подразделений сотрудника", `${emp.last} ${emp.first}: [${before}] → [${after}]`);
-    toast("Подразделения обновлены");
+  const saveAsync = useCallback(async () => {
+    if (!selections.length) throw new Error('Выберите хотя бы одно подразделение');
+    if (!selections.some(x => x.primary)) throw new Error('Укажите основное подразделение');
+
+    const updatedEmp = {
+      ...emp,
+      departments: selections.map(({ deptId, primary, position }) => ({
+        deptId,
+        primary,
+        position: position?.trim() || ''
+      }))
+    };
+    await store.upsertEmployee(updatedEmp);
+    store.addAudit('Изменение подразделений сотрудника', `${emp.last} ${emp.first}`);
     onClose();
-  };
+  }, [selections, emp, store, onClose]);
+
+  const { submit: save, isSubmitting } = useAsyncSubmit(saveAsync, (error) => {
+    toast(error.message || 'Ошибка сохранения подразделений', 'error');
+  });
 
   return (
-    <Modal title={`Подразделения — ${emp.last} ${emp.first}`} onClose={onClose} width={560}>
-      <p className="mut sm">
-        Сотрудник может числиться в нескольких отделах. Отметьте основное подразделение. 
-        <strong> Для дополнительных (совмещаемых) отделов вы можете указать отдельную должность.</strong>
-      </p>
+    <ModalShell
+      title={`Подразделения — ${emp.last} ${emp.first}`}
+      onClose={onClose}
+      onSave={save}
+      width={560}
+      saveDisabled={isSubmitting}
+    >
+      <p className="mut sm">Сотрудник может числиться в нескольких отделах. Отметьте основное подразделение. Для дополнительных (совмещаемых) отделов вы можете указать отдельную должность.</p>
       <div className="roles-list">
-        {db.departments.map((d) => {
-          const cur = sel.find((x) => x.deptId === d.id);
-          const kb = db.kbs.find((k) => k.id === d.kbId);
+        {db.departments.map(d => {
+          const cur = selections.find(x => x.deptId === d.id);
+          const kb = db.kbs.find(k => k.id === d.kbId);
           const isPrimary = cur && cur.primary;
           const isExtra = cur && !cur.primary;
           return (
             <div key={d.id} className="mb-8">
               <label className="roles-item roles-item-clean">
-                <input type="checkbox" checked={!!cur} onChange={() => toggle(d.id)} />
-                <span style={{ flex: 1 }}>
-                  {d.name} <span className="mut sm">{kb ? `· ${kb.name}` : "· вне КБ"}</span>
-                </span>
+                <input type="checkbox" checked={!!cur} onChange={() => toggleDept(d.id)} />
+                <span style={{ flex: 1 }}>{d.name} <span className="mut sm">{kb ? `· ${kb.name}` : '· вне КБ'}</span></span>
                 {cur && (
-                  <button className={"btn ghost sm" + (isPrimary ? " prim-btn" : "")} onClick={(e) => { e.preventDefault(); setPrimary(d.id); }}>
-                    {isPrimary ? "основное ✓" : "сделать основным"}
+                  <button className={'btn ghost sm' + (isPrimary ? ' prim-btn' : '')} onClick={(e) => { e.preventDefault(); setPrimary(d.id); }}>
+                    {isPrimary ? 'основное ✓' : 'сделать основным'}
                   </button>
                 )}
               </label>
               {isExtra && (
                 <div className="extra-position-field">
                   <label className="lbl" style={{ margin: 0, fontSize: 12 }}>Должность в этом отделе (дополнительная):</label>
-                  <input
-                    className="inp extra-position-input"
-                    value={cur.position || ''}
-                    onChange={(e) => setPosition(d.id, e.target.value)}
-                    placeholder="Например: Ведущий инженер (совмещение)"
-                  />
+                  <input className="inp extra-position-input" value={cur.position || ''} onChange={(e) => setPosition(d.id, e.target.value)} placeholder="Например: Ведущий инженер (совмещение)" />
                 </div>
               )}
             </div>
           );
         })}
       </div>
-      <div className="modal-foot">
-        <div className="spacer" />
-        <button className="btn ghost" onClick={onClose}>Отмена</button>
-        <button className="btn primary" onClick={save}>Сохранить</button>
-      </div>
-    </Modal>
+    </ModalShell>
   );
 };

@@ -1,7 +1,8 @@
-import  { createContext, useContext, useState, useEffect } from 'react';
-import DataStore from '../services/DataStore';
+import { createContext, useContext, useState, useEffect } from 'react';
+import dataStore from '../services/DataStore'; // импортируем готовый экземпляр
 
 const StoreContext = createContext(null);
+
 export const useStore = () => {
   const ctx = useContext(StoreContext);
   if (!ctx) throw new Error('useStore must be used within StoreProvider');
@@ -9,7 +10,8 @@ export const useStore = () => {
 };
 
 export const StoreProvider = ({ children }) => {
-  const [store] = useState(() => new DataStore());
+  // Используем уже существующий инстанс, не создаём новый
+  const [store] = useState(() => dataStore);
   const [data, setData] = useState(store.data);
 
   useEffect(() => {

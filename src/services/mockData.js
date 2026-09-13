@@ -466,7 +466,7 @@ export function buildMockData() {
     const createdAtStr = createdAtDate.toISOString();
     return {
       id, title, desc: desc || "", projectId,
-      assigneeId: assigneeId || null,  // один исполнитель
+      assigneeId: assigneeId || null,
       plannedHours: planned,
       start: startDate,
       deadline: deadlineDate,
@@ -495,6 +495,9 @@ export function buildMockData() {
       comments: [ { id: "c1", parentId: null, authorId: "e_morozov", ts: now - 3600000 * 20, text: "@Исаев Роман — подключите, пожалуйста, отдел прочности к пятнице." }, { id: "c2", parentId: "c1", authorId: "isaev", ts: now - 3600000 * 18, text: "Принято, сегодня подготовлю исходные данные." } ],
       creatorId: "e_morozov"
     }),
+    T("t01_sub1", "Подзадача 1: Расчёт подъёмной силы (детализация)", "p_lm24", "isaev", 8, -10, 0, "inwork", "mid", "Детальный расчёт по сечениям.", { parentTaskId: "t01", creatorId: "e_morozov" }),
+    T("t01_sub2", "Подзадача 2: Оформление отчёта по крылу", "p_lm24", "isaev", 4, -5, 5, "new", "low", "Графики и пояснительная записка.", { parentTaskId: "t01", creatorId: "e_morozov" }),
+
     T("t02", "3D-модель фюзеляжа", "p_lm24", "e_tolka", 40, -15, 12, "inwork", "mid", "Силовой набор и обводы.", {
       logs: [ { id: uid(), userId: "e_tolka", date: makeDate(-5), hours: 8, note: "Шпангоуты" } ],
       creatorId: "e_morozov"
@@ -518,6 +521,9 @@ export function buildMockData() {
       logs: [ { id: uid(), userId: "e_somova", date: makeDate(-7), hours: 10, note: "Комлевая часть" } ],
       creatorId: "e_gromov"
     }),
+    T("t08_sub1", "Подзадача 1: Чертежи комлевой части лопасти", "p_heli", "e_somova", 10, -15, 10, "inwork", "high", "Деталировка комлевой части.", { parentTaskId: "t08", creatorId: "e_gromov" }),
+    T("t08_sub2", "Подзадача 2: Прочностной расчёт лопастей", "p_heli", "e_somova", 8, -8, 2, "review", "high", "Расчёт на прочность.", { parentTaskId: "t08", creatorId: "e_gromov" }),
+
     T("t09", "Вибрационный расчёт главного редуктора", "p_heli", "isaev", 18, -6, 14, "new", "mid", "", { creatorId: "e_gromov" }),
     T("t10", "Термогазодинамический расчёт компрессора", "p_rd900", "e_tihonov", 48, -14, 28, "inwork", "crit", "Режимы взлёт/крейсер.", {
       logs: [ { id: uid(), userId: "e_tihonov", date: makeDate(-4), hours: 12, note: "Характеристики ступеней" } ],
@@ -584,13 +590,6 @@ export function buildMockData() {
     T("t35", "Расчёт ресурса лопаток", "p_rd900", "e_melnik", 24, -9, 14, "inwork", "mid", "Усталостный расчёт.", {
       logs: [ { id: uid(), userId: "e_melnik", date: makeDate(-4), hours: 10, note: "Нагрузки" } ]
     }),
-
-    // ===== НОВЫЕ ПОДЗАДАЧИ (добавлены в конец) =====
-    T("t01_sub1", "Подзадача 1: Расчёт подъёмной силы (детализация)", "p_lm24", "isaev", 12, -10, 0, "inwork", "mid", "Детальный расчёт по сечениям.", { parentTaskId: "t01", creatorId: "e_morozov" }),
-    T("t01_sub2", "Подзадача 2: Оформление отчёта по крылу", "p_lm24", "isaev", 8, -5, 5, "new", "low", "Графики и пояснительная записка.", { parentTaskId: "t01", creatorId: "e_morozov" }),
-
-    T("t08_sub1", "Подзадача 1: Чертежи комлевой части лопасти", "p_heli", "e_somova", 16, -15, 10, "inwork", "high", "Деталировка комлевой части.", { parentTaskId: "t08", creatorId: "e_gromov" }),
-    T("t08_sub2", "Подзадача 2: Прочностной расчёт лопастей", "p_heli", "e_somova", 14, -8, 2, "review", "high", "Расчёт на прочность.", { parentTaskId: "t08", creatorId: "e_gromov" }),
   ];
 
   const vacations = [

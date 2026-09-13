@@ -1,120 +1,185 @@
-// VacationModal.jsx
-import React, { useState } from 'react';
-import { Modal } from '../Modal';
+// src/components/Modals/VacationModal.jsx
+import { useCallback } from 'react';
+import { ModalShell } from '../ModalShell';
+import { FormField } from '../FormField';
+import { useForm } from '../../hooks/useForm';
+import { useAsyncSubmit } from '../../hooks/useAsyncSubmit';
 import { useDataHelpers } from '../../hooks';
 import { VACATION_TYPES, TASK_STATUSES } from '../../utils/constants';
 import { TODAY, iso, addDays, uid, fmtDMY } from '../../utils/date';
 import { canManageAllVacations } from '../../utils/permissions';
 import { getPrimaryDeptName } from '../../utils/helpers';
 
-export const VacationModal = ({ db, ur, vacationId, forEmpId, onClose, onSave }) => {
-  const existing = vacationId ? db.vacations.find((v) => v.id === vacationId) : null;
-  const canPick = canManageAllVacations(ur);
+export const VacationModal = ({ db, ur, vacationId, forEmpId, onClose, onSave, toast }) => {
   const { empName, primaryDept } = useDataHelpers(db);
-  const [f, setF] = useState(existing ? { ...existing, delegation: { ...existing.delegation } } : {
-    id: "v_" + uid(), empId: forEmpId || ur.id, start: TODAY, end: iso(addDays(new Date(), 7)), type: "annual", comment: "",
-    status: canManageAllVacations(ur) && forEmpId ? "approved" : "pending",
-    delegation: { enabled: false, subId: "", statuses: [], state: null },
+  const existing = vacationId ? db.vacations.find(v => v.id === vacationId) : null;
+  const isNew = !existing;
+  const canPick = canManageAllVacations(ur);
+
+  const initialValues = existing ? { ...existing, delegation: { ...existing.delegation } } : {
+    id: 'v_' + uid(),
+    empId: forEmpId || ur.id,
+    start: TODAY,
+    end: iso(addDays(new Date(), 7)),
+    type: 'annual',
+    comment: '',
+    status: canPick && forEmpId ? 'approved' : 'pending',
+    delegation: { enabled: false, subId: '', statuses: [], state: null },
+  };
+
+  const validate = useCallback((values) => {
+    const errors = {};
+    if (!values.start) errors.start = 'Дата начала обязательна';
+    if (!values.end) errors.end = 'Дата окончания обязательна';
+    if (values.end && values.start && values.end < values.start) {
+      errors.end = 'Дата окончания должна быть позже начала';
+    }
+    if (values.delegation.enabled && !values.delegation.subId) {
+      errors['delegation.subId'] = 'Выберите замещающего сотрудника';
+    }
+    // Проверка пересечения с другими отпусками того же сотрудника
+    if (values.empId) {
+      const overlapping = db.vacations.some(v =>
+        v.empId === values.empId &&
+        v.id !== values.id &&
+        v.status === 'approved' &&
+        v.start <= values.end &&
+        v.end >= values.start
+      );
+      if (overlapping) {
+        errors.start = 'У сотрудника уже есть утверждённый отпуск в этот период';
+      }
+    }
+    return errors;
+  }, [db, existing]);
+
+  const { values, handleChange, handleSubmit, errors, touched } = useForm(initialValues, validate);
+
+  const saveAsync = useCallback(async (vals) => {
+    await onSave(vals, isNew);
+    onClose();
+  }, [onSave, isNew, onClose]);
+
+  const { submit: save, isSubmitting } = useAsyncSubmit(saveAsync, (error) => {
+    toast(error.message || 'Ошибка сохранения отпуска', 'error');
   });
-  const [error, setError] = useState('');
-  const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
 
-  const save = () => {
-    setError('');
-    if (!f.start || !f.end || f.end < f.start) {
-      setError('Даты указаны некорректно');
-      return;
-    }
-    if (f.delegation.enabled && !f.delegation.subId) {
-      setError('Для делегирования необходимо выбрать замещающего сотрудника');
-      return;
-    }
-    onSave({ ...f }, !existing);
-  };
-
-  const renderEmployeeSelect = () => {
-    if (!canPick) return null;
-    return (
-      <>
-        <label className="lbl">Сотрудник *</label>
-        <select className="inp sel" value={f.empId} onChange={(e) => set("empId", e.target.value)}>
-          {db.employees.map((e) => (
-            <option key={e.id} value={e.id}>
-              {empName(e.id)} — {getPrimaryDeptName(e, db)}
-            </option>
-          ))}
-        </select>
-      </>
-    );
-  };
+  const employeeOptions = db.employees.map(e => ({ value: e.id, label: `${empName(e.id)} — ${getPrimaryDeptName(e, db)}` }));
+  const substituteOptions = db.employees.filter(e => e.id !== values.empId).map(e => ({ value: e.id, label: `${empName(e.id)} — ${getPrimaryDeptName(e, db)}` }));
+  const statusOptions = [
+    { value: 'pending', label: 'На утверждении' },
+    { value: 'approved', label: 'Утверждён' },
+    { value: 'rejected', label: 'Отклонён' },
+  ];
+  const typeOptions = Object.entries(VACATION_TYPES).map(([k, v]) => ({ value: k, label: v }));
+  const statusList = ['new', 'inwork', 'review'].map(s => ({ value: s, label: TASK_STATUSES[s].label }));
 
   return (
-    <Modal title={existing ? "Отпуск" : "Новый отпуск"} onClose={onClose} width={560}>
-      {error && <div className="login-err">{error}</div>}
-      <div className="form-grid">
-        {renderEmployeeSelect()}
-        <label className="lbl">Дата начала *</label><input className="inp" type="date" value={f.start} onChange={(e) => set("start", e.target.value)} />
-        <label className="lbl">Дата окончания *</label><input className="inp" type="date" value={f.end} onChange={(e) => set("end", e.target.value)} />
-        <label className="lbl">Тип отпуска *</label>
-        <select className="inp sel" value={f.type} onChange={(e) => set("type", e.target.value)}>
-          {Object.entries(VACATION_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-        </select>
-        <label className="lbl">Комментарий</label><input className="inp" value={f.comment} onChange={(e) => set("comment", e.target.value)} />
-        {canManageAllVacations(ur) && (
-          <>
-            <label className="lbl">Статус</label>
-            <select className="inp sel" value={f.status} onChange={(e) => set("status", e.target.value)}>
-              <option value="pending">На утверждении</option>
-              <option value="approved">Утверждён</option>
-              <option value="rejected">Отклонён</option>
-            </select>
-          </>
+    <ModalShell
+      title={existing ? 'Редактирование отпуска' : 'Новый отпуск'}
+      onClose={onClose}
+      onSave={handleSubmit(save)}
+      saveLabel="Сохранить"
+      width={560}
+      className="modal-vacation"
+      saveDisabled={isSubmitting}
+    >
+      <div className="project-info-fields">
+        {canPick && (
+          <FormField 
+            label="Сотрудник *" 
+            type="select" 
+            options={employeeOptions} 
+            value={values.empId} 
+            onChange={(v) => handleChange('empId', v)} 
+            disabled={!!existing} 
+          />
+        )}
+        <FormField 
+          label="Дата начала *" 
+          type="date" 
+          value={values.start} 
+          onChange={(v) => handleChange('start', v)} 
+          error={touched.start && errors.start} 
+        />
+        <FormField 
+          label="Дата окончания *" 
+          type="date" 
+          value={values.end} 
+          onChange={(v) => handleChange('end', v)} 
+          error={touched.end && errors.end} 
+        />
+        <FormField 
+          label="Тип отпуска *" 
+          type="select" 
+          options={typeOptions} 
+          value={values.type} 
+          onChange={(v) => handleChange('type', v)} 
+        />
+        <FormField 
+          label="Комментарий" 
+          value={values.comment} 
+          onChange={(v) => handleChange('comment', v)} 
+        />
+        {canPick && (
+          <FormField 
+            label="Статус" 
+            type="select" 
+            options={statusOptions} 
+            value={values.status} 
+            onChange={(v) => handleChange('status', v)} 
+          />
         )}
       </div>
+
       <div className="tm-block">
-        <label className="roles-item" style={{ border: "none", padding: 0 }}>
-          <input type="checkbox" checked={f.delegation.enabled} onChange={(e) => {
-            set("delegation", { ...f.delegation, enabled: e.target.checked });
-            if (!e.target.checked) set("delegation", { ...f.delegation, enabled: false, subId: "" });
-          }} />
-          <b>Делегировать задачи на время отпуска</b>
-        </label>
-        {f.delegation.enabled && (
+        <div className="field-row">
+          <label className="field-label">Делегирование</label>
+          <div className="flex-1">
+            <label className="roles-item" style={{ border: 'none', padding: 0 }}>
+              <input 
+                type="checkbox" 
+                checked={values.delegation.enabled} 
+                onChange={(e) => handleChange('delegation.enabled', e.target.checked)} 
+              />
+              <b>Делегировать задачи на время отпуска</b>
+            </label>
+          </div>
+        </div>
+        {values.delegation.enabled && (
           <>
-            <label className="lbl">Замещающий сотрудник *</label>
-            <select
-              className="inp sel"
-              value={f.delegation.subId}
-              onChange={(e) => set("delegation", { ...f.delegation, subId: e.target.value })}
-              style={{ borderColor: f.delegation.enabled && !f.delegation.subId ? '#dc2626' : '' }}
-            >
-              <option value="">— выберите —</option>
-              {db.employees.filter((e) => e.id !== f.empId).map((e) => (
-                <option key={e.id} value={e.id}>{empName(e.id)} — {getPrimaryDeptName(e, db)}</option>
-              ))}
-            </select>
-            {f.delegation.enabled && !f.delegation.subId && (
-              <div className="error-message show grid-col-2">Выберите замещающего сотрудника</div>
-            )}
-            <label className="lbl">Какие задачи делегировать</label>
-            <div className="sub-picks">
-              {["new", "inwork", "review"].map((st) => (
-                <label key={st} className="dept-pick">
-                  <input type="checkbox" checked={f.delegation.statuses.includes(st)} onChange={() => set("delegation", { ...f.delegation, statuses: f.delegation.statuses.includes(st) ? f.delegation.statuses.filter((x) => x !== st) : [...f.delegation.statuses, st] })} />
-                  {TASK_STATUSES[st].label}
-                </label>
-              ))}
-              <span className="mut sm">пусто = все активные задачи</span>
+            <FormField 
+              label="Замещающий сотрудник *" 
+              type="select" 
+              options={substituteOptions} 
+              value={values.delegation.subId} 
+              onChange={(v) => handleChange('delegation.subId', v)} 
+              error={touched['delegation.subId'] && errors['delegation.subId']} 
+            />
+            <div className="field-row">
+              <label className="field-label">Какие задачи</label>
+              <div className="sub-picks">
+                {statusList.map(s => (
+                  <label key={s.value} className="dept-pick">
+                    <input 
+                      type="checkbox" 
+                      checked={values.delegation.statuses.includes(s.value)} 
+                      onChange={(e) => {
+                        const newStatuses = e.target.checked
+                          ? [...values.delegation.statuses, s.value]
+                          : values.delegation.statuses.filter(x => x !== s.value);
+                        handleChange('delegation.statuses', newStatuses);
+                      }} 
+                    />
+                    {s.label}
+                  </label>
+                ))}
+                <span className="mut sm">пусто = все активные задачи</span>
+              </div>
             </div>
-            <p className="mut sm">Делегирование утверждает руководитель до начала отпуска. Задачи вернутся автоматически после окончания отпуска. Задачи, где сотрудник — ответственный по проекту, передаются только через делегирование ролей.</p>
           </>
         )}
       </div>
-      <div className="modal-foot">
-        <div className="spacer" />
-        <button className="btn ghost" onClick={onClose}>Отмена</button>
-        <button className="btn primary" onClick={save}>Сохранить</button>
-      </div>
-    </Modal>
+    </ModalShell>
   );
 };

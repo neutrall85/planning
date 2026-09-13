@@ -3,6 +3,37 @@ import { DOMAIN } from '../utils/constants';
 import { uid } from '../utils/date';
 import { Ic, ICONS } from './Icons';
 
+// ===== Вспомогательные функции (DRY, KISS) =====
+const ALLOWED_DOMAINS = ["@hor.ru", "@zont.ru", "@horizont.ru"];
+
+const validateEmailFormat = (email) => {
+  if (!email.trim()) return "E-mail обязателен";
+  const lower = email.trim().toLowerCase();
+  if (!lower.includes("@") || lower.startsWith("@") || lower.endsWith(".") || lower.includes("..")) {
+    return "Некорректный формат e-mail";
+  }
+  if (!ALLOWED_DOMAINS.some(domain => lower.endsWith(domain))) {
+    return "Допускаются домены " + ALLOWED_DOMAINS.join(', ');
+  }
+  return null;
+};
+
+// Проверка существования email в базе (имитация)
+const validateEmailExists = (email, employees) => {
+  if (!email.trim()) return "E-mail обязателен";
+  const lower = email.trim().toLowerCase();
+  const exists = employees.some(e => e.email && e.email.toLowerCase() === lower);
+  if (!exists) return "E-mail не найден в системе";
+  return null;
+};
+
+// Комбинированная проверка для восстановления: сначала формат, потом существование
+const validateForgotEmail = (email, employees) => {
+  const formatError = validateEmailFormat(email);
+  if (formatError) return formatError;
+  return validateEmailExists(email, employees);
+};
+
 function passIssues(p) {
   return [
     { ok: p.length >= 8, t: "Минимум 8 символов" },
@@ -18,17 +49,23 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
   const [lg, setLg] = useState("");
   const [pw, setPw] = useState("");
   const [showPass, setShowPass] = useState(false);
-  const [passTimer, setPassTimer] = useState(null);
   const passTimerRef = useRef(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const [shake, setShake] = useState(false);
   const [reg, setReg] = useState({ first: "", last: "", email: "", pass: "", pass2: "" });
+  
+  // Состояния для валидации email в регистрации
+  const [emailError, setEmailError] = useState(null);
+  const [emailTouched, setEmailTouched] = useState(false);
+  
+  // Состояния для валидации email в восстановлении
+  const [forgotError, setForgotError] = useState(null);
+  const [forgotTouched, setForgotTouched] = useState(false);
+  
   const [forgot, setForgot] = useState("");
-
   const [showPassword, setShowPassword] = useState(false);
   const passwordTimerRef = useRef(null);
-
   const [showRegPass, setShowRegPass] = useState(false);
   const regPassTimerRef = useRef(null);
 
@@ -77,13 +114,70 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
     }
   };
 
+  // Сброс состояний валидации при переключении режима
+  const switchMode = (newMode) => {
+    setMode(newMode);
+    setErr(null);
+    setEmailError(null);
+    setEmailTouched(false);
+    setForgotError(null);
+    setForgotTouched(false);
+  };
+
+  // Универсальный обработчик изменений для поля email регистрации (DRY)
+  const handleEmailChange = (value, setter) => {
+    setter(value);
+    if (emailTouched) {
+      setEmailError(validateEmailFormat(value));
+    }
+  };
+
+  const handleEmailBlur = (value) => {
+    setEmailTouched(true);
+    setEmailError(validateEmailFormat(value));
+  };
+
+  // Обработчики для поля восстановления
+  const handleForgotEmailChange = (value) => {
+    setForgot(value);
+    if (forgotTouched) {
+      setForgotError(validateForgotEmail(value, db.employees));
+    }
+  };
+
+  const handleForgotEmailBlur = () => {
+    setForgotTouched(true);
+    setForgotError(validateForgotEmail(forgot, db.employees));
+  };
+
+  // Проверка заполненности формы регистрации (для кнопки)
+  const isRegFormValid = () => {
+    if (!reg.first.trim() || !reg.last.trim()) return false;
+    if (validateEmailFormat(reg.email)) return false; // есть ошибка
+    if (db.employees.some(e => e.email && e.email.toLowerCase() === reg.email.trim().toLowerCase())) return false; // email занят
+    if (!passIssues(reg.pass).every(i => i.ok)) return false;
+    if (reg.pass !== reg.pass2) return false;
+    return true;
+  };
+
+  // Проверка заполненности формы восстановления
+  const isForgotFormValid = () => {
+    return !validateForgotEmail(forgot, db.employees); // возвращает true, если ошибки нет
+  };
+
   const submit = (e) => {
     if (e && e.preventDefault) e.preventDefault();
     try {
       if (mode === "login") { doLogin(lg, pw); return; }
       if (mode === "register") {
         if (!reg.first.trim() || !reg.last.trim() || !reg.email.trim()) return fail("Заполните все обязательные поля");
-        if (db.employees.some((x) => x.email.toLowerCase() === reg.email.trim().toLowerCase()) || db.regRequests.some((x) => x.email.toLowerCase() === reg.email.trim().toLowerCase())) return fail("Такой e-mail уже зарегистрирован");
+        
+        const email = reg.email.trim().toLowerCase();
+        if (!ALLOWED_DOMAINS.some(domain => email.endsWith(domain))) {
+            return fail("Недопустимый домен e-mail");
+        }
+
+        if (db.employees.some((x) => x.email && x.email.toLowerCase() === email) || db.regRequests.some((x) => x.email && x.email.toLowerCase() === email)) return fail("Такой e-mail уже зарегистрирован");
         if (passIssues(reg.pass).some((i) => !i.ok)) return fail("Пароль не соответствует требованиям безопасности");
         if (reg.pass !== reg.pass2) return fail("Пароли не совпадают");
 
@@ -121,13 +215,17 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
           fail("Ошибка автоматического входа после регистрации.");
         }
         setReg({ first: "", last: "", email: "", pass: "", pass2: "" });
+        setEmailError(null);
+        setEmailTouched(false);
         setMode("login");
         return;
       }
       if (mode === "forgot") {
         if (!forgot.trim()) return fail("Укажите e-mail");
-        toast("Ссылка для восстановления пароля отправлена на " + forgot.trim() + "@" + DOMAIN + " (действует 1 час). Заглушка.");
-        setMode("login");
+        // Финальная проверка на сервере
+        if (validateForgotEmail(forgot, db.employees)) return fail(validateForgotEmail(forgot, db.employees));
+        toast("Ссылка для восстановления пароля отправлена на " + forgot.trim() + " (действует 1 час). Заглушка.");
+        switchMode("login");
       }
     } catch (ex) {
       fail("Внутренняя ошибка: " + (ex && ex.message ? ex.message : ex));
@@ -169,7 +267,18 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
               {mode === "forgot" ? (
                 <>
                   <label className="lbl">E-mail</label>
-                  <div className="email-inp"><input className="inp" value={forgot} onChange={(e) => { setForgot(e.target.value); setErr(null); }} placeholder="ivanov" autoFocus /><span className="email-dom">{"@" + DOMAIN}</span></div>
+                  <div className="email-inp">
+                    <input 
+                      className="inp" 
+                      value={forgot} 
+                      onChange={(e) => handleForgotEmailChange(e.target.value)} 
+                      onBlur={handleForgotEmailBlur}
+                      placeholder="ivanov@hor.ru" 
+                      autoFocus 
+                    />
+                  </div>
+                  {/* Отображение ошибки email восстановления */}
+                  {forgotTouched && forgotError && <div className="login-err">{forgotError}</div>}
                 </>
               ) : (
                 <>
@@ -206,7 +315,17 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
                 <div><label className="lbl">Фамилия *</label><input className="inp" value={reg.last} onChange={(e) => setReg({ ...reg, last: e.target.value })} /></div>
               </div>
               <label className="lbl">E-mail *</label>
-              <div className="email-inp"><input className="inp" value={reg.email} onChange={(e) => setReg({ ...reg, email: e.target.value })} placeholder="ivanov" /><span className="email-dom">{"@" + DOMAIN}</span></div>
+              <div className="email-inp">
+                  <input 
+                    className="inp" 
+                    value={reg.email} 
+                    onChange={(e) => handleEmailChange(e.target.value, (v) => setReg(prev => ({ ...prev, email: v })))} 
+                    onBlur={() => handleEmailBlur(reg.email)}
+                    placeholder="ivanov@hor.ru" 
+                  />
+              </div>
+              {emailTouched && emailError && <div className="login-err">{emailError}</div>}
+              
               <label className="lbl">Пароль *</label>
               <div className="relative">
                 <input
@@ -230,13 +349,16 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
           )}
 
           {err && <div className="login-err">{err}</div>}
-          <button className="btn primary big" type="submit" disabled={busy}>{busy ? "Выполняется вход…" : mode === "login" ? "Войти" : mode === "register" ? "Зарегистрироваться" : "Отправить ссылку"}</button>
+          <button className="btn primary big" type="submit" disabled={busy || (mode === "register" && !isRegFormValid()) || (mode === "forgot" && !isForgotFormValid())}>
+            {busy ? "Выполняется вход…" : mode === "login" ? "Войти" : mode === "register" ? "Зарегистрироваться" : "Отправить ссылку"}
+          </button>
 
           {mode === "login" && (
             <>
               <div className="login-links">
-                <button type="button" className="link" onClick={() => { setMode("forgot"); setErr(null); }}>Забыли пароль?</button>
-                <button type="button" className="link" onClick={() => { setMode("register"); setErr(null); }}>Регистрация</button>
+                <button type="button" className="link" onClick={() => switchMode("forgot")}>Забыли пароль?</button>
+                <span className="link-sep">|</span>
+                <button type="button" className="link" onClick={() => switchMode("register")}>Регистрация</button>
               </div>
               <div className="cookie-note">Сессия хранится в cookie 30 дней (HttpOnly, Secure, SameSite=Lax — на стороне сервера).</div>
               <div className="demo-title">Демо-доступы — клик сразу выполняет вход</div>
@@ -250,7 +372,7 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
             </>
           )}
 
-          {mode !== "login" && <div className="login-links"><button type="button" className="link" onClick={() => { setMode("login"); setErr(null); }}>← Назад ко входу</button></div>}
+          {mode !== "login" && <div className="login-links"><button type="button" className="link" onClick={() => switchMode("login")}>← Назад ко входу</button></div>}
         </form>
       </div>
     </div>
