@@ -72,7 +72,7 @@ export default function Journal({ db }) {
     return allEntries.filter(entry => {
       const dateObj = safeDate(entry.ts);
       if (!dateObj) return false;
-      
+
       const entryDate = fmtDMY(entry.ts);
       if (filters.dateFrom && entryDate < filters.dateFrom) return false;
       if (filters.dateTo && entryDate > filters.dateTo) return false;
@@ -93,21 +93,21 @@ export default function Journal({ db }) {
     filteredEntries.forEach(entry => {
       const d = safeDate(entry.ts);
       if (!d) return;
-      
+
       const dayKey = fmtDMY(entry.ts);
       const monthKey = `${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
-      
+
       if (!groups[monthKey]) groups[monthKey] = {};
       if (!groups[monthKey][dayKey]) groups[monthKey][dayKey] = [];
       groups[monthKey][dayKey].push(entry);
     });
-    
+
     const sortedMonths = Object.keys(groups).sort((a, b) => {
       const [m1, y1] = a.split('.').map(Number);
       const [m2, y2] = b.split('.').map(Number);
       return y2 - y1 || m2 - m1;
     });
-    
+
     const result = [];
     sortedMonths.forEach(month => {
       const days = Object.keys(groups[month]).sort((a, b) => {
@@ -125,35 +125,35 @@ export default function Journal({ db }) {
   const flatEntries = useMemo(() => {
     const result = [];
     let lastMonth = null;
-    
+
     groupedEntries.forEach(group => {
       const monthDate = parseDayKey(group.date);
-      const monthLabel = monthDate && !isNaN(monthDate.getTime()) 
-        ? monthDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' }) 
+      const monthLabel = monthDate && !isNaN(monthDate.getTime())
+        ? monthDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })
         : 'Неизвестный месяц';
-      
+
       group.entries.forEach((entry, idx) => {
         const isFirstInDay = idx === 0;
         const dayObj = safeDate(entry.ts);
-        const dayLabel = isFirstInDay && dayObj 
-          ? dayObj.toLocaleDateString('ru-RU', { 
-              weekday: 'long', 
-              day: 'numeric' 
-            }) 
+        const dayLabel = isFirstInDay && dayObj
+          ? dayObj.toLocaleDateString('ru-RU', {
+              weekday: 'long',
+              day: 'numeric'
+            })
           : null;
-        
+
         result.push({
           ...entry,
           _monthLabel: lastMonth !== monthLabel ? monthLabel : null,
           _dayLabel: dayLabel,
         });
-        
+
         if (lastMonth !== monthLabel) {
           lastMonth = monthLabel;
         }
       });
     });
-    
+
     return result;
   }, [groupedEntries]);
 
@@ -212,25 +212,25 @@ export default function Journal({ db }) {
     <div className="rep">
       <div className="rep-panel p-4">
         <div className="rep-panel-title">Фильтры журнала</div>
-        <div className="toolbar flex flex-wrap gap-2 items-center">
-          <label className="lbl m-0">С даты:</label>
+        <div className="journal-filters">
+          <label className="lbl m-0 flex-none">С даты:</label>
           <input
-            className="inp w-150"
+            className="inp w-150 flex-none"
             type="date"
             value={filters.dateFrom}
             onChange={e => handleFilterChange('dateFrom', e.target.value)}
           />
-          <span>—</span>
+          <span className="flex-none">—</span>
           <input
-            className="inp w-150"
+            className="inp w-150 flex-none"
             type="date"
             value={filters.dateTo}
             onChange={e => handleFilterChange('dateTo', e.target.value)}
           />
 
-          <label className="lbl m-0">Пользователь:</label>
+          <label className="lbl m-0 flex-none">Пользователь:</label>
           <select
-            className="inp sel w-180"
+            className="inp sel w-180 flex-none"
             value={filters.userId}
             onChange={e => handleFilterChange('userId', e.target.value)}
           >
@@ -238,19 +238,19 @@ export default function Journal({ db }) {
             {userOptions.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
           </select>
 
-          <label className="lbl m-0">Действие:</label>
+          <label className="lbl m-0 flex-none">Действие:</label>
           <select
-            className="inp sel w-200"
+            className="inp sel w-200 flex-none"
             value={filters.action}
             onChange={e => handleFilterChange('action', e.target.value)}
           >
             {ACTIONS.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
           </select>
 
-          <div className="search-box flex-1 min-w-200">
+          <div className="search-box journal-search">
             <Ic d={ICONS.search} size={15} />
             <input
-              placeholder="Поиск по действию или деталям..."
+              placeholder="Поиск по журналу"
               value={filters.search}
               onChange={e => handleFilterChange('search', e.target.value)}
             />
@@ -270,7 +270,7 @@ export default function Journal({ db }) {
             Выгрузить CSV
           </button>
         </div>
-        
+
         <div className="mt-3">
           {paginatedFlat.length === 0 ? (
             <div className="mut text-center p-5">
@@ -289,10 +289,10 @@ export default function Journal({ db }) {
                 </tr>
               </thead>
               <tbody>
-                {paginatedFlat.map((entry, index) => {
+                {paginatedFlat.map((entry) => {
                   const showMonth = entry._monthLabel !== null;
                   const showDay = entry._dayLabel !== null;
-                  
+
                   return (
                     <React.Fragment key={entry.id}>
                       {showMonth && (

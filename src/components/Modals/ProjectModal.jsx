@@ -15,6 +15,8 @@ import { PROJECT_STATUSES, PROJECT_TYPES, PROJECT_PRIORITIES, ADMIN_PROJECT_PRIO
 import { TODAY, iso, addDays, uid, fmtDMY, fmtDT } from '../../utils/date';
 import { canEditProjectFields, canChangeProjectStatus, canCreateProject, hasRole } from '../../utils/permissions';
 import { getProjectColor } from '../../utils/projectHelpers';
+import { validateAttachment } from '../../utils/fileValidation';
+import { appendFileVersion } from '../../utils/fileVersions';
 import { Ic, ICONS } from '../Icons';
 
 const AIRCRAFT_TYPES = ['Су-57', 'МиГ-35', 'Ту-160', 'Ил-76', 'Ка-52', 'Другой'];
@@ -233,14 +235,22 @@ export const ProjectModal = ({
   }, [db, values.id, values.managerId]);
 
   const handleFileUpload = useCallback((file) => {
-    if (file.size > 10 * 1024 * 1024) {
-      toast('Файл слишком большой (максимум 10 МБ)', 'error');
+    const check = validateAttachment(file);
+    if (!check.ok) {
+      toast(check.reason, 'error');
       return;
     }
     const reader = new FileReader();
     reader.onload = (ev) => {
-      const newFile = { id: uid(), name: file.name, size: file.size, url: ev.target.result, uploadedBy: ur.id, uploadedAt: new Date().toISOString() };
-      const updatedFiles = [...(values.files || []), newFile];
+      const newFile = {
+        id: uid(),
+        name: file.name,
+        size: file.size,
+        url: ev.target.result,
+        uploadedBy: ur.id,
+        uploadedAt: new Date().toISOString(),
+      };
+      const updatedFiles = appendFileVersion(values.files || [], newFile);
       setFieldValue('files', updatedFiles);
       if (existing) store.upsertProject({ ...values, files: updatedFiles });
       toast('Файл загружен', 'success');

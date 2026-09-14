@@ -12,6 +12,8 @@ import { useToast } from '../../context/ToastContext';
 import { TASK_STATUSES, TASK_STATUS_ORDER, PRIORITIES, DEPENDENCY_TYPES } from '../../utils/constants';
 import { TODAY, iso, addDays, uid, fmtDMY, fmtD, fmtDT } from '../../utils/date';
 import { canEditTaskFields, canChangeTaskStatus, canCreateTask, computeScope } from '../../utils/permissions';
+import { validateAttachment } from '../../utils/fileValidation';
+import { appendFileVersion } from '../../utils/fileVersions';
 import { Ic, ICONS } from '../Icons';
 
 export const TaskModal = ({ 
@@ -31,10 +33,8 @@ export const TaskModal = ({
   const isAuthor = existing && existing.creatorId === ur.id;
   const canLog = !readOnly && (existing ? isAssignee : true) && !existing?.isSummary;
 
-  // Определяем, заблокировано ли поле проекта
   const isProjectLocked = !!(initialProjectId || parentTaskId);
 
-  // Вычисляем projectId для подзадачи
   const effectiveProjectId = useMemo(() => {
     if (initialProjectId) return initialProjectId;
     if (parentTaskId) {
@@ -99,7 +99,6 @@ export const TaskModal = ({
 
   const { values, handleChange, handleSubmit, errors, touched, setFieldValue, isValid, isDirty } = useForm(initialValues, validate);
 
-  // Если это новая подзадача и projectId не установлен, но родитель есть, подставляем
   useEffect(() => {
     if (isNew && parentTaskId && !values.projectId) {
       const parent = db.tasks.find(t => t.id === parentTaskId);
@@ -177,7 +176,6 @@ export const TaskModal = ({
   ];
   const [activeTab, setActiveTab] = useState(initialTab);
 
-  // Опции проектов с пустым значением
   const projectOptions = useMemo(() => {
     const scope = computeScope(ur, db);
     let list = scope.all ? db.projects : db.projects.filter(p => scope.projIds.has(p.id));
@@ -198,7 +196,6 @@ export const TaskModal = ({
     return options;
   }, [db, ur, isProjectLocked, effectiveProjectId]);
 
-  // Опции исполнителей с пустым значением
   const assigneeOptionsList = useMemo(() => {
     const scope = computeScope(ur, db);
     let list = scope.all ? db.employees : db.employees.filter(e => scope.empIds.has(e.id) || e.id === ur.id);
@@ -237,14 +234,22 @@ export const TaskModal = ({
   }, [db, values.projectId]);
 
   const handleFileUpload = useCallback((file) => {
-    if (file.size > 10 * 1024 * 1024) {
-      showToast('Файл слишком большой (максимум 10 МБ)', 'error');
+    const check = validateAttachment(file);
+    if (!check.ok) {
+      showToast(check.reason, 'error');
       return;
     }
     const reader = new FileReader();
     reader.onload = (ev) => {
-      const newFile = { id: uid(), name: file.name, size: file.size, url: ev.target.result, uploadedBy: ur.id, uploadedAt: new Date().toISOString() };
-      const updatedFiles = [...(values.files || []), newFile];
+      const newFile = {
+        id: uid(),
+        name: file.name,
+        size: file.size,
+        url: ev.target.result,
+        uploadedBy: ur.id,
+        uploadedAt: new Date().toISOString(),
+      };
+      const updatedFiles = appendFileVersion(values.files || [], newFile);
       setFieldValue('files', updatedFiles);
       if (existing) patchTask({ ...values, files: updatedFiles });
       showToast('Файл загружен', 'success');
@@ -283,7 +288,6 @@ export const TaskModal = ({
 
   const showBackButton = returnToProjectId || returnToTaskId;
 
-  // Кнопка сохранения активна только если есть права и форма валидна и (для существующей задачи есть изменения)
   const saveDisabled = !(canEditFields || (existing && canChangeStatus)) || (isNew ? !isValid : !isValid || !isDirty);
 
   const footer = (
@@ -305,7 +309,7 @@ export const TaskModal = ({
     <ModalShell
       title={readOnly ? 'Архивная задача — только чтение' : existing ? 'Карточка задачи' : 'Новая задача'}
       onClose={onClose}
-      width={760}
+      width={770}
       className="modal-task"
       showSave={false}
       footer={footer}
@@ -317,7 +321,7 @@ export const TaskModal = ({
     >
       {readOnly && <div className="info-box">Задача в архиве с {fmtDMY(existing.archivedAt)}. Редактирование запрещено.</div>}
 
-      <Tabs tabs={tabs} active={activeTab} onChange={setActiveTab} />
+      <Tabs tabs={tabs} active={activeTab} onChange={setActiveTab} className="tabs-nowrap" />
 
       {activeTab === 'form' && (
         <div className="project-info-fields">
@@ -454,26 +458,24 @@ export const TaskModal = ({
             </div>
           )}
 
-          <div className="fields-row">
-            <FormField
-              label="Зависит от задачи"
-              type="select"
-              options={dependencyOptions}
-              value={values.dependencyId ?? ''}
-              onChange={(v) => handleChange('dependencyId', v)}
-              disabled={!canEditFields}
-              inline
-            />
-            <FormField
-              label="Тип зависимости"
-              type="select"
-              options={dependencyTypeOptions}
-              value={values.dependencyType ?? ''}
-              onChange={(v) => handleChange('dependencyType', v)}
-              disabled={!canEditFields || !values.dependencyId}
-              inline
-            />
-          </div>
+          <FormField
+            label="Зависит от задачи"
+            type="select"
+            options={dependencyOptions}
+            value={values.dependencyId ?? ''}
+            onChange={(v) => handleChange('dependencyId', v)}
+            disabled={!canEditFields}
+            inline
+          />
+          <FormField
+            label="Тип зависимости"
+            type="select"
+            options={dependencyTypeOptions}
+            value={values.dependencyType ?? ''}
+            onChange={(v) => handleChange('dependencyType', v)}
+            disabled={!canEditFields || !values.dependencyId}
+            inline
+          />
 
           {values.isSummary && (
             <div className="info-box" style={{ marginLeft: '120px' }}>

@@ -3,7 +3,7 @@ import { buildMockData } from './mockData';
 import { TODAY, iso, addMonths, addDays, uid, fmtDMY } from '../utils/date';
 import { TASK_STATUSES, TASK_STATUS_ORDER, PRIORITIES, VACATION_TYPES, PROJECT_STATUSES, PROJECT_TYPES, DEPENDENCY_TYPES } from '../utils/constants';
 
-// Импорты репозиториев
+// Репозитории
 import { TaskRepository } from '../repositories/TaskRepository';
 import { ProjectRepository } from '../repositories/ProjectRepository';
 import { EmployeeRepository } from '../repositories/EmployeeRepository';
@@ -14,8 +14,9 @@ import { DepartmentRepository } from '../repositories/DepartmentRepository';
 import { KbRepository } from '../repositories/KbRepository';
 import { HoursRequestRepository } from '../repositories/HoursRequestRepository';
 import { RoleDelegationRepository } from '../repositories/RoleDelegationRepository';
+import { CommentRepository } from '../repositories/CommentRepository';
 
-// Импорты сервисов
+// Сервисы
 import { BudgetService } from './BudgetService';
 import { TaskService } from './TaskService';
 import { ProjectService } from './ProjectService';
@@ -28,8 +29,8 @@ import { DepartmentService } from './DepartmentService';
 import { KbService } from './KbService';
 import { HoursRequestService } from './HoursRequestService';
 import { RoleDelegationService } from './RoleDelegationService';
+import { CommentService } from './CommentService';
 
-// Миграции
 class DataMigrator {
   static migrate(data) {
     let changed = false;
@@ -81,20 +82,33 @@ class DataStore {
 
     this._listeners = [];
 
+    // === AuditService создаём ПЕРВЫМ ===
+    // Его использует _migrateComments() ниже; сервис не имеет собственных
+    // зависимостей кроме AuditRepository и notify-колбэка, поэтому его
+    // безболезненно можно инициализировать раньше остальных.
+    this._auditRepo = new AuditRepository(this._data.audit);
+    this._auditService = new AuditService(this._auditRepo, () => this._notify());
+
+    // === Миграция комментариев до создания CommentRepository ===
+    // Репозиторий получает уже готовый массив this._data.comments;
+    // если бы миграция запустилась позже, её пересборка массива создала бы
+    // вторую ссылку, и репо работал бы со старой.
+    this._data.comments = this._data.comments || [];
+    this._migrateComments();
+
     // Репозитории
     this._taskRepo = new TaskRepository(this._data.tasks);
     this._projectRepo = new ProjectRepository(this._data.projects);
     this._employeeRepo = new EmployeeRepository(this._data.employees);
     this._vacationRepo = new VacationRepository(this._data.vacations);
     this._notificationRepo = new NotificationRepository(this._data.notifications);
-    this._auditRepo = new AuditRepository(this._data.audit);
     this._deptRepo = new DepartmentRepository(this._data.departments);
     this._kbRepo = new KbRepository(this._data.kbs);
     this._hoursRequestRepo = new HoursRequestRepository(this._data.hoursRequests);
     this._roleDelegationRepo = new RoleDelegationRepository(this._data.roleDelegations);
+    this._commentRepo = new CommentRepository(this._data.comments);
 
-    // Сервисы
-    this._auditService = new AuditService(this._auditRepo, () => this._notify());
+    // Сервисы (AuditService уже создан выше)
     this._notificationService = new NotificationService(
       this._notificationRepo,
       () => this._notify(),
@@ -130,9 +144,12 @@ class DataStore {
     this._kbService = new KbService(this._kbRepo, this._auditService, () => this._notify());
     this._hoursRequestService = new HoursRequestService(this._hoursRequestRepo, () => this._notify());
     this._roleDelegationService = new RoleDelegationService(this._roleDelegationRepo, this._auditService, () => this._notify());
-
-    this._data.comments = this._data.comments || [];
-    this._migrateComments();
+    this._commentService = new CommentService(
+      this._commentRepo,
+      this._notificationService,
+      this._auditService,
+      () => this._notify()
+    );
 
     this._taskService.archiveOldTasks(3);
   }
@@ -146,8 +163,19 @@ class DataStore {
     return () => { this._listeners = this._listeners.filter(cb => cb !== callback); };
   }
 
+  /**
+   * Оповещает подписчиков о новых данных.
+   *
+   * ВАЖНО: передаём shallow-copy ({ ...this._data }), а не сам this._data.
+   * Репозитории мутируют вложенные массивы (push/splice/присваивание по индексу),
+   * из-за чего корневая ссылка this._data не меняется. StoreContext использует
+   * setData(snapshot) с Object.is-равенством — при передаче той же ссылки React
+   * не перерисует компоненты. Свежий объект на каждый notify решает это одним
+   * движением и не требует править 12 сервисов.
+   */
   _notify() {
-    this._listeners.forEach(cb => cb(this._data));
+    const snapshot = { ...this._data };
+    this._listeners.forEach(cb => cb(snapshot));
   }
 
   // Управление сессией
@@ -230,7 +258,6 @@ class DataStore {
   markNotificationRead(id) { this._notificationService.markRead(id); }
   markAllNotificationsRead(userId) { this._notificationService.markAllRead(userId); }
 
-  // Семантические уведомления (для UI-слоя)
   notifyHoursRequestCreated(request, directorIds, targetTitle) {
     const user = this._authService.getCurrentUser();
     this._notificationService.notifyHoursRequestCreated(request, directorIds, targetTitle, user?.id || 'system');
@@ -251,164 +278,103 @@ class DataStore {
     this._notificationService.notifyVacationDecision(vacation, approved);
   }
 
-  // Запросы часов
   addHoursRequest(req) { this._hoursRequestService.addRequest(req); }
 
-  // Делегирование ролей
   upsertRoleDelegation(rd) {
     const user = this._authService.getCurrentUser();
     this._roleDelegationService.upsertRoleDelegation(rd, user?.id || 'system');
   }
 
   // ---------- КОММЕНТАРИИ ----------
+  //
+  // Реализованы через CommentRepository + CommentService — как и остальные
+  // 11 сущностей. Раньше жили inline в DataStore; вынесены вместе с
+  // добавлением реакций (toggleReaction) и полнотекстового поиска
+  // (search — инкапсулирован в CommentRepository).
+  //
+  // DataStore остаётся единственной точкой входа для UI-слоя; все вызовы
+  // делегируются в CommentService и проходят через единый notify-канал.
 
   getComments(filter = {}) {
-    let list = this._data.comments || [];
-    if (filter.projectId) list = list.filter(c => c.projectId === filter.projectId);
-    if (filter.taskId !== undefined) list = list.filter(c => c.taskId === filter.taskId);
-    if (filter.parentId !== undefined) list = list.filter(c => c.parentId === filter.parentId);
-    return list.sort((a, b) => {
-      if (a.pinned && !b.pinned) return -1;
-      if (!a.pinned && b.pinned) return 1;
-      return b.createdAt - a.createdAt;
-    });
+    return this._commentService.getComments(filter);
   }
 
   addComment(data) {
-    const comment = {
-      id: uid(),
-      projectId: data.projectId,
-      taskId: data.taskId || null,
-      parentId: data.parentId || null,
-      authorId: data.authorId,
-      text: data.text || '',
-      attachments: data.attachments || [],
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      pinned: false,
-    };
-    this._data.comments.push(comment);
-    this._notificationService.notifyComment(comment); // ← автоуведомления
-    this._notify();
-    return comment;
+    return this._commentService.addComment(data);
   }
 
   updateComment(id, newText) {
-    const comment = this._data.comments.find(c => c.id === id);
-    if (!comment) throw new Error('Комментарий не найден');
-    comment.text = newText;
-    comment.updatedAt = Date.now();
-    this._notify();
-    return comment;
+    return this._commentService.updateComment(id, newText);
   }
 
   deleteComment(id) {
-    const toDelete = new Set();
-    const collect = (parentId) => {
-      this._data.comments.forEach(c => {
-        if (c.parentId === parentId && !toDelete.has(c.id)) {
-          toDelete.add(c.id);
-          collect(c.id);
-        }
-      });
-    };
-    toDelete.add(id);
-    collect(id);
-    this._data.comments = this._data.comments.filter(c => !toDelete.has(c.id));
-    this._notify();
+    this._commentService.deleteComment(id);
   }
 
   togglePinComment(commentId) {
-    const comment = this._data.comments.find(c => c.id === commentId);
-    if (!comment) throw new Error('Комментарий не найден');
-    comment.pinned = !comment.pinned;
-    this._notify();
-    const action = comment.pinned ? 'Закрепление комментария' : 'Открепление комментария';
-    const details = {
-      commentId: comment.id,
-      text: comment.text.substring(0, 50) + (comment.text.length > 50 ? '...' : ''),
-      projectId: comment.projectId,
-      taskId: comment.taskId,
-    };
     const user = this._authService.getCurrentUser();
-    this._auditService.addAudit(action, details, 'comment', comment.id, user?.id || 'system');
-    return comment;
+    return this._commentService.togglePin(commentId, user?.id || 'system');
+  }
+
+  toggleReaction(commentId, emoji) {
+    const user = this._authService.getCurrentUser();
+    if (!user) throw new Error('Требуется вход в систему');
+    return this._commentService.toggleReaction(commentId, user.id, emoji);
   }
 
   addAttachment(commentId, file) {
-    return new Promise((resolve, reject) => {
-      if (!file.type.startsWith('image/')) {
-        reject(new Error('Можно загружать только изображения'));
-        return;
-      }
-      if (file.size > 5 * 1024 * 1024) {
-        reject(new Error('Размер не более 5 МБ'));
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const attachment = {
-          id: uid(),
-          name: file.name,
-          url: e.target.result,
-          size: file.size,
-          mimeType: file.type,
-          uploadedAt: Date.now(),
-        };
-        const comment = this._data.comments.find(c => c.id === commentId);
-        if (!comment) { reject(new Error('Комментарий не найден')); return; }
-        comment.attachments = comment.attachments || [];
-        comment.attachments.push(attachment);
-        comment.updatedAt = Date.now();
-        this._notify();
-        resolve(attachment);
-      };
-      reader.onerror = () => reject(new Error('Ошибка чтения файла'));
-      reader.readAsDataURL(file);
-    });
+    return this._commentService.addAttachment(commentId, file);
   }
 
   // ---------- МИГРАЦИЯ КОММЕНТАРИЕВ ----------
+  //
+  // Переносит комментарии из устаревшего формата (comments внутри каждой
+  // задачи/проекта) в единую глобальную коллекцию this._data.comments.
+  // Идемпотентно: если глобальное хранилище непусто — миграция не запускается.
+  //
+  // ВАЖНО: вызывается из конструктора, поэтому использует только
+  // this._data и this._auditService — оба должны быть готовы к моменту
+  // вызова. В конструкторе это обеспечено порядком инициализации.
+
   _migrateComments() {
-    if (this._data.comments && this._data.comments.length > 0) return;
-    const migrated = [];
-    (this._data.projects || []).forEach(p => {
-      (p.comments || []).forEach(c => {
-        migrated.push({
-          id: c.id || uid(),
-          projectId: p.id,
-          taskId: null,
-          parentId: c.parentId || null,
-          authorId: c.authorId,
-          text: c.text,
-          attachments: c.attachments || [],
-          createdAt: c.ts || Date.now(),
-          updatedAt: c.ts || Date.now(),
-          pinned: c.pinned || false,
-        });
-      });
-      delete p.comments;
-    });
-    (this._data.tasks || []).forEach(t => {
-      (t.comments || []).forEach(c => {
-        migrated.push({
-          id: c.id || uid(),
-          projectId: t.projectId,
-          taskId: t.id,
-          parentId: c.parentId || null,
-          authorId: c.authorId,
-          text: c.text,
-          attachments: c.attachments || [],
-          createdAt: c.ts || Date.now(),
-          updatedAt: c.ts || Date.now(),
-          pinned: c.pinned || false,
-        });
-      });
-      delete t.comments;
-    });
+    if (this._data.comments?.length) return;
+
+    const pull = (entities, projectIdOf, taskIdOf) => {
+      const out = [];
+      for (const entity of entities) {
+        for (const c of entity.comments || []) {
+          out.push({
+            id: c.id || uid(),
+            projectId: projectIdOf(entity),
+            taskId: taskIdOf(entity),
+            parentId: c.parentId || null,
+            authorId: c.authorId,
+            text: c.text,
+            attachments: c.attachments || [],
+            reactions: {},
+            createdAt: c.ts || Date.now(),
+            updatedAt: c.ts || Date.now(),
+            pinned: c.pinned || false,
+          });
+        }
+        delete entity.comments;
+      }
+      return out;
+    };
+
+    const migrated = [
+      ...pull(this._data.projects || [], p => p.id, () => null),
+      ...pull(this._data.tasks || [], t => t.projectId, t => t.id),
+    ];
+
     this._data.comments = migrated;
+
     if (migrated.length) {
-      this._auditService.addAudit('Миграция комментариев', `Перенесено ${migrated.length} комментариев в глобальное хранилище`, null, null, 'system');
+      this._auditService.addAudit(
+        'Миграция комментариев',
+        `Перенесено ${migrated.length} комментариев в глобальное хранилище`,
+        null, null, 'system'
+      );
     }
   }
 

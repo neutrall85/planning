@@ -7,8 +7,14 @@ import { Ic, ICONS } from './Icons';
 import { COMMENT_EDIT_WINDOW } from '../utils/constants';
 import Avatar from './Avatar';
 import { Lightbox } from './Lightbox';
+import {
+  extractMentions,
+  filterMentionCandidates,
+  insertMention,
+} from '../utils/mentionParser';
 
-// Функция для подсветки совпадений в тексте
+const ALLOWED_REACTIONS = ['👍', '✅'];
+
 function highlightText(text, query) {
   if (!query || !query.trim()) return text;
   const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
@@ -18,34 +24,25 @@ function highlightText(text, query) {
 }
 
 function renderMentionText(text) {
-  return text.split("@").map((part, i) => {
+  return text.split('@').map((part, i) => {
     if (i === 0) return <span key={i}>{part}</span>;
     const tokens = part.split(/(\s+)/);
     let mention = tokens[0];
     let restStart = 1;
     if (tokens.length > 2 && /^[А-ЯA-ZЁ]/.test(tokens[2])) {
-      mention += " " + tokens[2];
+      mention += ' ' + tokens[2];
       restStart = 3;
     }
     return (
       <span key={i}>
         <span className="mention">@{mention}</span>
-        {tokens.slice(restStart).join("")}
+        {tokens.slice(restStart).join('')}
       </span>
     );
   });
 }
 
-export function extractMentions(text, employees) {
-  const found = [];
-  text.split("@").slice(1).forEach((part) => {
-    const token = part.trim().split(/[\s,.!?:;]/)[0].toLowerCase();
-    if (!token) return;
-    const emp = employees.find((e) => e.last.toLowerCase() === token);
-    if (emp && !found.includes(emp.id)) found.push(emp.id);
-  });
-  return found;
-}
+export { extractMentions };
 
 export default function Discussion({
   store,
@@ -60,11 +57,10 @@ export default function Discussion({
   showTaskLink = false,
   tasks = [],
 }) {
-  const [comments, setComments] = useState(() => store.getComments(filter));
-  const [text, setText] = useState("");
+  const [text, setText] = useState('');
   const [replyTo, setReplyTo] = useState(null);
   const [editingId, setEditingId] = useState(null);
-  const [editText, setEditText] = useState("");
+  const [editText, setEditText] = useState('');
   const [mentionQ, setMentionQ] = useState(null);
   const [mentionPopup, setMentionPopup] = useState({ visible: false, x: 0, y: 0 });
   const textareaRef = useRef(null);
@@ -73,83 +69,43 @@ export default function Discussion({
   const [isDragOver, setIsDragOver] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(null);
   const [lightboxAttachments, setLightboxAttachments] = useState([]);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
-  const allEmployees = employees;
+  // Единый источник комментариев — CommentService (через DataStore).
+  // Полный список без поиска — для тредов и закреплённых.
+  const [comments, setComments] = useState(() =>
+    store.getComments({ ...filter, search: undefined })
+  );
 
-  // Подписка на изменения
   useEffect(() => {
     const unsub = store.subscribe(() => {
-      setComments(store.getComments(filter));
+      setComments(store.getComments({ ...filter, search: undefined }));
     });
     return unsub;
   }, [store, filter]);
 
-  // Закреплённые комментарии
-  const pinnedComments = useMemo(() => {
-    return comments.filter(c => c.pinned);
-  }, [comments]);
-
-  // Фильтрация по поиску (с сохранением иерархии)
-  const filteredComments = useMemo(() => {
+  // Локальная выборка для отображения — с учётом поиска, но берётся из
+  // того же сервиса, что и полный список.
+  const visibleComments = useMemo(() => {
     if (!searchQuery.trim()) return comments;
+    return store.getComments({ ...filter, search: searchQuery });
+  }, [comments, searchQuery, store, filter]);
 
-    const query = searchQuery.trim().toLowerCase();
-    const filterRecursive = (items) => {
-      return items.filter(item => {
-        const textMatch = item.text.toLowerCase().includes(query);
-        const children = filterRecursive(
-          comments.filter(c => c.parentId === item.id)
-        );
-        if (textMatch || children.length > 0) {
-          item._children = children;
-          return true;
-        }
-        return false;
-      });
-    };
-    return filterRecursive(comments.filter(c => !c.parentId));
-  }, [comments, searchQuery]);
+  const pinnedComments = useMemo(
+    () => comments.filter(c => c.pinned),
+    [comments]
+  );
 
-  // Получение дочерних комментариев с учётом фильтра
-  const getFilteredChildren = (parentId) => {
-    if (!searchQuery.trim()) {
-      return comments.filter(c => (c.parentId || null) === parentId)
-        .sort((a, b) => a.createdAt - b.createdAt);
-    }
-    const filterRecursive = (items) => {
-      return items.filter(item => {
-        const textMatch = item.text.toLowerCase().includes(searchQuery.trim().toLowerCase());
-        const children = filterRecursive(
-          comments.filter(c => c.parentId === item.id)
-        );
-        if (textMatch || children.length > 0) {
-          item._children = children;
-          return true;
-        }
-        return false;
-      });
-    };
-    const root = filterRecursive(comments.filter(c => c.parentId === parentId));
-    return root.sort((a, b) => a.createdAt - b.createdAt);
-  };
-
-  const filteredCandidates = useMemo(() => {
-    if (mentionQ === null) return [];
-    return candidates.filter((e) =>
-      (`${e.last} ${e.first}`).toLowerCase().includes(mentionQ.toLowerCase())
-    );
-  }, [candidates, mentionQ]);
+  const filteredCandidates = useMemo(
+    () => filterMentionCandidates(mentionQ || '', candidates),
+    [mentionQ, candidates]
+  );
 
   useEffect(() => {
     if (mentionQ !== null && textareaRef.current) {
       const rect = textareaRef.current.getBoundingClientRect();
-      setMentionPopup({
-        visible: true,
-        x: rect.left,
-        y: rect.bottom + 4,
-      });
+      setMentionPopup({ visible: true, x: rect.left, y: rect.bottom + 4 });
     } else {
       setMentionPopup(prev => ({ ...prev, visible: false }));
     }
@@ -162,11 +118,11 @@ export default function Discussion({
     }
   }, [text]);
 
-  const getAuthor = (id) => allEmployees.find((e) => e.id === id);
+  const getAuthor = (id) => employees.find(e => e.id === id);
 
   const onType = (val) => {
     setText(val);
-    const lastAt = val.lastIndexOf("@");
+    const lastAt = val.lastIndexOf('@');
     if (lastAt >= 0) {
       const suffix = val.slice(lastAt + 1);
       if (!/\s/.test(suffix) && suffix.length <= 30) {
@@ -180,23 +136,13 @@ export default function Discussion({
   };
 
   const pickMention = (emp) => {
-    const lastAt = text.lastIndexOf("@");
+    const lastAt = text.lastIndexOf('@');
     if (lastAt === -1) return;
-
-    const prefix = text.slice(0, lastAt + 1);
-    const suffix = text.slice(lastAt + 1);
-    const insert = `${emp.last} ${emp.first}, `;
-    const newText = prefix + insert + suffix;
-
-    const cursorPos = prefix.length + insert.length;
-    cursorPosRef.current = cursorPos;
-
+    const { text: newText, cursor } = insertMention(text, lastAt, emp);
+    cursorPosRef.current = cursor;
     setText(newText);
     setMentionQ(null);
-
-    if (textareaRef.current) {
-      textareaRef.current.focus();
-    }
+    textareaRef.current?.focus();
   };
 
   const handleDragOver = useCallback((e) => {
@@ -212,12 +158,10 @@ export default function Discussion({
   const handleDrop = useCallback((e) => {
     e.preventDefault();
     setIsDragOver(false);
-
     if (readOnly || !canComment) {
       toast?.('У вас нет прав для загрузки файлов', 'warning');
       return;
     }
-
     const files = Array.from(e.dataTransfer.files);
     const validFiles = files.filter(f => f.type.startsWith('image/') && f.size <= 5 * 1024 * 1024);
     if (validFiles.length !== files.length) {
@@ -239,7 +183,6 @@ export default function Discussion({
       toast?.('Введите текст или прикрепите изображение', 'warning');
       return;
     }
-
     const commentData = {
       projectId: filter.projectId || null,
       taskId: filter.taskId || null,
@@ -248,9 +191,7 @@ export default function Discussion({
       text: text.trim(),
       attachments: [],
     };
-
     const created = store.addComment(commentData);
-
     for (const file of attachments) {
       try {
         await store.addAttachment(created.id, file);
@@ -258,15 +199,13 @@ export default function Discussion({
         toast?.(`Ошибка загрузки ${file.name}: ${err.message}`, 'error');
       }
     }
-
-    setText("");
+    setText('');
     setReplyTo(null);
     setAttachments([]);
     setMentionQ(null);
     toast?.('Комментарий добавлен', 'success');
   };
 
-  // Обработчик клавиш: Enter – отправка, Ctrl+Enter / Cmd+Enter – перенос строки
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') {
       if (e.ctrlKey || e.metaKey) {
@@ -287,8 +226,8 @@ export default function Discussion({
   };
 
   const canDelete = (c) => {
-    const hasReplies = comments.some((x) => x.parentId === c.id);
-    if (has(currentUser, "admin", "director")) return true;
+    const hasReplies = comments.some(x => x.parentId === c.id);
+    if (has(currentUser, 'admin', 'director')) return true;
     return c.authorId === currentUser.id && !hasReplies;
   };
 
@@ -296,20 +235,20 @@ export default function Discussion({
     c.authorId === currentUser.id &&
     Date.now() - c.createdAt < COMMENT_EDIT_WINDOW;
 
-  const canPin = (c) => has(currentUser, "admin", "director", "project_lead", "project_manager");
+  const canPin = (c) => has(currentUser, 'admin', 'director', 'project_lead', 'project_manager');
 
   const del = (c) => {
-    if (!window.confirm("Удалить комментарий и все ответы?")) return;
+    if (!window.confirm('Удалить комментарий и все ответы?')) return;
     store.deleteComment(c.id);
-    toast?.("Комментарий удалён");
+    toast?.('Комментарий удалён');
   };
 
   const saveEdit = (c) => {
     if (!editText.trim()) return;
     store.updateComment(c.id, editText.trim());
     setEditingId(null);
-    setEditText("");
-    toast?.("Комментарий обновлён");
+    setEditText('');
+    toast?.('Комментарий обновлён');
   };
 
   const togglePin = (c) => {
@@ -325,20 +264,26 @@ export default function Discussion({
     }
   };
 
+  const toggleReaction = (commentId, emoji) => {
+    try {
+      store.toggleReaction(commentId, emoji);
+    } catch (err) {
+      toast?.(err.message, 'error');
+    }
+  };
+
   const scrollToComment = (commentId) => {
     const el = document.getElementById(`comment-${commentId}`);
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       el.style.transition = 'background 0.3s';
       el.style.background = '#fef3c7';
-      setTimeout(() => {
-        el.style.background = '';
-      }, 2000);
+      setTimeout(() => { el.style.background = ''; }, 2000);
     }
   };
 
-  const openLightbox = (attachmentsList, index) => {
-    setLightboxAttachments(attachmentsList);
+  const openLightbox = (list, index) => {
+    setLightboxAttachments(list);
     setLightboxIndex(index);
   };
 
@@ -349,43 +294,45 @@ export default function Discussion({
 
   const handlePrev = () => {
     if (lightboxIndex === null || lightboxIndex === undefined) return;
-    setLightboxIndex((prev) => (prev === 0 ? lightboxAttachments.length - 1 : prev - 1));
+    setLightboxIndex(prev => (prev === 0 ? lightboxAttachments.length - 1 : prev - 1));
   };
 
   const handleNext = () => {
     if (lightboxIndex === null || lightboxIndex === undefined) return;
-    setLightboxIndex((prev) => (prev === lightboxAttachments.length - 1 ? 0 : prev + 1));
+    setLightboxIndex(prev => (prev === lightboxAttachments.length - 1 ? 0 : prev + 1));
+  };
+
+  const getFilteredChildren = (parentId) => {
+    const pool = searchQuery.trim() ? visibleComments : comments;
+    return pool
+      .filter(c => (c.parentId || null) === parentId)
+      .sort((a, b) => a.createdAt - b.createdAt);
   };
 
   const renderTree = (parentId, depth) => {
     const children = getFilteredChildren(parentId);
-
-    return children.map((c) => {
+    return children.map(c => {
       const author = getAuthor(c.authorId);
       const task = c.taskId ? tasks.find(t => t.id === c.taskId) : null;
       const attachmentsList = c.attachments || [];
       const textContent = searchQuery.trim()
         ? highlightText(c.text, searchQuery.trim())
         : renderMentionText(c.text);
+      const reactions = c.reactions || {};
 
       return (
         <div key={c.id} id={`comment-${c.id}`}>
-          <div className={"cm" + (depth > 0 ? " reply" : "") + (c.pinned ? " pinned" : "")}>
+          <div className={'cm' + (depth > 0 ? ' reply' : '') + (c.pinned ? ' pinned' : '')}>
             <div className="cm-head">
               <Avatar employee={author} size="xs" />
-              <span className="cm-author">
-                {author ? `${author.last} ${author.first}` : "—"}
-              </span>
+              <span className="cm-author">{author ? `${author.last} ${author.first}` : '—'}</span>
               <span className="mut sm">{fmtDT(c.createdAt)}</span>
               {c.updatedAt > c.createdAt && <span className="mut sm">(ред.)</span>}
               {c.pinned && <span className="pinned-badge" title="Закреплено">📌</span>}
               {showTaskLink && c.taskId && task && onTaskClick && (
                 <button
                   className="link"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onTaskClick(c.taskId);
-                  }}
+                  onClick={(e) => { e.stopPropagation(); onTaskClick(c.taskId); }}
                   title="Открыть задачу"
                 >
                   {task.title}
@@ -402,15 +349,8 @@ export default function Discussion({
                   onChange={(e) => setEditText(e.target.value)}
                 />
                 <div className="cm-actions">
-                  <button className="btn primary sm" onClick={() => saveEdit(c)}>
-                    Сохранить
-                  </button>
-                  <button
-                    className="btn ghost sm"
-                    onClick={() => setEditingId(null)}
-                  >
-                    Отмена
-                  </button>
+                  <button className="btn primary sm" onClick={() => saveEdit(c)}>Сохранить</button>
+                  <button className="btn ghost sm" onClick={() => setEditingId(null)}>Отмена</button>
                 </div>
               </div>
             ) : (
@@ -425,11 +365,7 @@ export default function Discussion({
                     className="attachment-item"
                     onClick={() => openLightbox(attachmentsList, idx)}
                   >
-                    <img
-                      src={att.url}
-                      alt={att.name}
-                      className="attachment-thumb"
-                    />
+                    <img src={att.url} alt={att.name} className="attachment-thumb" />
                     <div className="attachment-overlay">
                       <a
                         href={att.url}
@@ -445,18 +381,40 @@ export default function Discussion({
               </div>
             )}
 
+            {/* Реакции — фиксированный набор, защита от произвольных строк */}
+            <div className="cm-reactions">
+              {ALLOWED_REACTIONS.map(emoji => {
+                const users = reactions[emoji] || [];
+                const mine = users.includes(currentUser.id);
+                const title = users.length
+                  ? users.map(id => {
+                      const e = getAuthor(id);
+                      return e ? `${e.last} ${e.first}` : id;
+                    }).join(', ')
+                  : 'Поставить реакцию';
+                return (
+                  <button
+                    key={emoji}
+                    type="button"
+                    className={`reaction-btn${mine ? ' on' : ''}`}
+                    onClick={() => toggleReaction(c.id, emoji)}
+                    title={title}
+                    disabled={readOnly}
+                  >
+                    <span>{emoji}</span>
+                    {users.length > 0 && <span className="reaction-count">{users.length}</span>}
+                  </button>
+                );
+              })}
+            </div>
+
             {!readOnly && canComment && (
               <div className="cm-actions">
-                <button className="link" onClick={() => setReplyTo(c.id)}>
-                  Ответить
-                </button>
+                <button className="link" onClick={() => setReplyTo(c.id)}>Ответить</button>
                 {canEdit(c) && editingId !== c.id && (
                   <button
                     className="link"
-                    onClick={() => {
-                      setEditingId(c.id);
-                      setEditText(c.text);
-                    }}
+                    onClick={() => { setEditingId(c.id); setEditText(c.text); }}
                   >
                     Редактировать
                   </button>
@@ -467,9 +425,7 @@ export default function Discussion({
                   </button>
                 )}
                 {canDelete(c) && (
-                  <button className="link red-link" onClick={() => del(c)}>
-                    Удалить
-                  </button>
+                  <button className="link red-link" onClick={() => del(c)}>Удалить</button>
                 )}
               </div>
             )}
@@ -480,6 +436,23 @@ export default function Discussion({
     });
   };
 
+  const mentionPopupEl = mentionPopup.visible && filteredCandidates.length > 0
+    ? createPortal(
+        <div
+          className="mention-pop"
+          style={{ position: 'fixed', left: mentionPopup.x, top: mentionPopup.y, zIndex: 10001 }}
+        >
+          {filteredCandidates.map(e => (
+            <div key={e.id} className="mention-item" onClick={() => pickMention(e)}>
+              <span className="avatar xs">{initials(e.first, e.last)}</span>
+              {e.last} {e.first}
+            </div>
+          ))}
+        </div>,
+        document.body
+      )
+    : null;
+
   return (
     <div className="chat">
       <div className="discussion-header">
@@ -487,7 +460,7 @@ export default function Discussion({
           {pinnedComments.length > 0 && (
             <>
               <div className="pinned-label">📌 Закреплено</div>
-              {pinnedComments.map((c) => {
+              {pinnedComments.map(c => {
                 const author = getAuthor(c.authorId);
                 const canUnpin = canPin(c);
                 return (
@@ -499,7 +472,7 @@ export default function Discussion({
                   >
                     <Avatar employee={author} size="xs" />
                     <span className="pinned-author">
-                      {author ? `${author.last} ${author.first}` : "—"}
+                      {author ? `${author.last} ${author.first}` : '—'}
                     </span>
                     <span className="mut sm">{fmtDT(c.createdAt)}</span>
                     <span className="pinned-preview">
@@ -508,10 +481,7 @@ export default function Discussion({
                     {canUnpin && (
                       <button
                         className="icon-btn xs pinned-remove"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          togglePin(c);
-                        }}
+                        onClick={(e) => { e.stopPropagation(); togglePin(c); }}
                         title="Открепить"
                       >
                         <Ic d={ICONS.x} size={14} />
@@ -547,14 +517,14 @@ export default function Discussion({
               autoFocus
             />
             {searchQuery && (
-              <button className="icon-btn xs" onClick={() => setSearchQuery("")}>
+              <button className="icon-btn xs" onClick={() => setSearchQuery('')}>
                 <Ic d={ICONS.x} size={14} />
               </button>
             )}
           </div>
           {searchQuery && (
             <span className="search-result-count">
-              Найдено: {filteredComments.length}
+              Найдено: {visibleComments.length}
             </span>
           )}
         </div>
@@ -562,7 +532,7 @@ export default function Discussion({
 
       {renderTree(null, 0)}
 
-      {filteredComments.length === 0 && searchQuery && (
+      {visibleComments.length === 0 && searchQuery && (
         <div className="mut sm">Ничего не найдено</div>
       )}
 
@@ -574,15 +544,13 @@ export default function Discussion({
         <>
           {replyTo && (
             <div className="reply-banner">
-              Ответ на комментарий{" "}
+              Ответ на комментарий{' '}
               {(() => {
-                const parent = comments.find((x) => x.id === replyTo);
+                const parent = comments.find(x => x.id === replyTo);
                 const author = parent ? getAuthor(parent.authorId) : null;
-                return author ? `${author.last} ${author.first}` : "";
+                return author ? `${author.last} ${author.first}` : '';
               })()}
-              <button className="link" onClick={() => setReplyTo(null)}>
-                отменить
-              </button>
+              <button className="link" onClick={() => setReplyTo(null)}>отменить</button>
             </div>
           )}
 
@@ -592,34 +560,7 @@ export default function Discussion({
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
           >
-            {mentionPopup.visible && filteredCandidates.length > 0 &&
-              createPortal(
-                <div
-                  className="mention-pop"
-                  style={{
-                    position: 'fixed',
-                    left: mentionPopup.x,
-                    top: mentionPopup.y,
-                    zIndex: 10001,
-                  }}
-                >
-                  {filteredCandidates.map((e) => (
-                    <div
-                      key={e.id}
-                      className="mention-item"
-                      onClick={() => pickMention(e)}
-                    >
-                      <span className="avatar xs">
-                        {initials(e.first, e.last)}
-                      </span>
-                      {e.last} {e.first}
-                    </div>
-                  ))}
-                </div>,
-                document.body
-              )
-            }
-
+            {mentionPopupEl}
             <textarea
               ref={textareaRef}
               className="inp"
@@ -662,9 +603,7 @@ export default function Discussion({
         </div>
       ) : (
         !canComment && (
-          <div className="info-box">
-            У вас нет прав для комментирования этого объекта.
-          </div>
+          <div className="info-box">У вас нет прав для комментирования этого объекта.</div>
         )
       )}
 

@@ -3437,3 +3437,141 @@ input, select, textarea {
   line-height: 1.4;
   word-break: break-word;
 }
+
+/* Реакции на комментарии */
+.cm-reactions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.reaction-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1.4;
+  transition: border-color 0.15s, background 0.15s;
+}
+.reaction-btn:hover:not(:disabled) {
+  border-color: var(--acc2);
+  background: #f0f9ff;
+}
+.reaction-btn.on {
+  border-color: var(--acc);
+  background: #eff6ff;
+}
+.reaction-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.reaction-count {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--mut);
+}
+
+/* Версии файлов */
+.file-document {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+.file-document .file-item {
+  border: none;
+  border-radius: 0;
+}
+.file-version-badge {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #0369a1;
+  background: #e0f2fe;
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+.file-versions {
+  border-top: 1px solid var(--line);
+  background: #f8fafc;
+  padding: 6px 12px;
+}
+.file-version-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 5px 0;
+  font-size: 13px;
+  border-bottom: 1px dashed #e2e8f0;
+}
+.file-version-row:last-child {
+  border-bottom: none;
+}
+.file-version-row.current {
+  font-weight: 600;
+}
+.file-version-tag {
+  font-weight: 800;
+  color: #475569;
+  min-width: 32px;
+}
+.file-version-date { color: var(--mut); min-width: 130px; }
+.file-version-author { color: var(--mut); flex: 1; }
+.file-version-size { color: var(--mut); min-width: 60px; text-align: right; }
+
+/* Отсутствовавшие утилиты ширины */
+.w-180 { width: 180px; }
+.w-200 { width: 200px; }
+
+/* Журнал аудита: фильтры строго в одну строку */
+.journal-filters {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px; /* запас под горизонтальный скроллбар, если появится */
+}
+.journal-filters > .lbl {
+  flex: none;
+  margin: 0;
+}
+.journal-filters > .inp,
+.journal-filters > .sel {
+  flex: none;
+}
+.journal-search {
+  flex: 1 1 auto;
+  min-width: 180px;
+}
+.journal-search > input {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+}
+/* Вкладки в одну строку с горизонтальным скроллом.
+   Нужен там, где вкладок много и они не помещаются по ширине модалки
+   (например, «Карточка задачи»: 6 вкладок при width=760).
+   Скроллбар не показываем — он появляется только при переполнении
+   на узких экранах, визуально не мешает. */
+.tabs.tabs-nowrap {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge legacy */
+}
+.tabs.tabs-nowrap::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+.tabs.tabs-nowrap .tab {
+  flex: 0 0 auto;
+}

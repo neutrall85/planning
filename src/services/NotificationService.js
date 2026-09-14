@@ -1,6 +1,7 @@
 // src/services/NotificationService.js
 import { uid, fmtDMY } from '../utils/date';
 import { TASK_STATUSES, PROJECT_STATUSES, ROLES } from '../utils/constants';
+import { extractMentions } from '../utils/mentionParser';
 
 export class NotificationService {
   /**
@@ -230,20 +231,12 @@ export class NotificationService {
     const { tasks = [], projects = [], employees = [], comments = [] } = data;
     const author = employees.find(e => e.id === comment.authorId);
     if (!author) return;
+
     const authorName = `${author.last} ${author.first}`;
 
     const recipients = new Set();
-    const mentionedIds = [];
-
-    comment.text.split('@').slice(1).forEach(part => {
-      const token = part.trim().split(/[\s,.!?:;]/)[0].toLowerCase();
-      if (!token) return;
-      const emp = employees.find(e => e.last.toLowerCase() === token);
-      if (emp) {
-        mentionedIds.push(emp.id);
-        recipients.add(emp.id);
-      }
-    });
+    const mentionedIds = extractMentions(comment.text, employees);
+    mentionedIds.forEach(id => recipients.add(id));
 
     if (comment.taskId) {
       const task = tasks.find(t => t.id === comment.taskId);
@@ -268,8 +261,7 @@ export class NotificationService {
     const mentionedSet = new Set(mentionedIds);
 
     recipients.forEach(userId => {
-      const isMention = mentionedSet.has(userId);
-      const text = isMention
+      const text = mentionedSet.has(userId)
         ? `${authorName} упомянул(а) вас: «${shortText}»`
         : `${authorName} оставил(а) комментарий: «${shortText}»`;
       this._addNotification(userId, text, { targetType, targetId });
