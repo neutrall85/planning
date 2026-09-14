@@ -105,6 +105,7 @@ export default function MainLayout({ store, data, user }) {
       case 'staff':
         return (
           <Views.StaffView
+            store={store}                                    /* ← К1: пробрасываем store в StaffView */
             db={data}
             ur={user}
             setDb={(fn) => { store._data = fn(store._data); store._notify(); }}

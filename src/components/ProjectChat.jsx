@@ -14,7 +14,6 @@ const ProjectChat = ({ projectId, store, currentUser, toast, employees, candidat
       currentUser={currentUser}
       candidates={candidates || []}
       readOnly={false}
-      canComment={true}
       toast={toast}
       employees={employees}
       onTaskClick={handleTaskClick}

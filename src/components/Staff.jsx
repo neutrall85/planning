@@ -86,7 +86,8 @@ const EmployeeRow = React.memo(({
   );
 });
 
-export default function Staff({ db, setDb, ur, openRoles, openDepts, openVacation }) {
+export default function Staff({ store, db, setDb, ur, openRoles, openDepts, openVacation }) {
+  // ↑ К1: добавлен проп store, чтобы пробросить в CreateEmployeeModal/EditEmployeeModal
   const { getEmployeeLoad, empName } = useDataHelpers(db);
   const [showFired, setShowFired] = useState(false);
   const [editEmployeeId, setEditEmployeeId] = useState(null);
@@ -188,8 +189,10 @@ export default function Staff({ db, setDb, ur, openRoles, openDepts, openVacatio
 
       {showCreateModal && (
         <CreateEmployeeModal
+          store={store}                                     /* ← К1: без этого store === undefined */
           db={db}
           setDb={setDb}
+          ur={ur}                                           /* ← без этого падает на store.addNotification(ur.id, ...) */
           onClose={() => setShowCreateModal(false)}
           toast={(msg, type) => alert(msg)}
           audit={(action, details) => setDb(prev => ({ ...prev, audit: [{ id: uid(), ts: Date.now(), userId: ur.id, action, details }, ...prev.audit] }))}
@@ -198,6 +201,7 @@ export default function Staff({ db, setDb, ur, openRoles, openDepts, openVacatio
 
       {editEmployeeId && (
         <EditEmployeeModal
+          store={store}                                     /* ← К1: без этого store === undefined */
           db={db}
           setDb={setDb}
           employeeId={editEmployeeId}

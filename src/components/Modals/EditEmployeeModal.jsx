@@ -6,7 +6,7 @@ import { useModalForm } from '../../hooks/useModalForm';
 import { hasRole } from '../../utils/permissions';
 
 export const EditEmployeeModal = ({ store, ur, employeeId, onClose, toast }) => {
-  const db = store.getState();
+  const db = store.data;
   const emp = db.employees.find(e => e.id === employeeId);
   if (!emp) return null;
 
@@ -27,7 +27,7 @@ export const EditEmployeeModal = ({ store, ur, employeeId, onClose, toast }) => 
     if (!values.first.trim()) errors.first = 'Имя обязательно';
     if (!values.email.trim()) errors.email = 'E-mail обязателен';
     if (values.newPass && values.newPass.length < 8) errors.newPass = 'Пароль должен быть не менее 8 символов';
-    const employees = store.getState().employees;
+    const employees = store.data.employees;
     if (employees.some(e => e.email === values.email && e.id !== employeeId)) {
       errors.email = 'Этот email уже используется другим сотрудником';
     }

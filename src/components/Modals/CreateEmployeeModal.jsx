@@ -27,7 +27,7 @@ export const CreateEmployeeModal = ({ store, ur, onClose, toast }) => {
     if (!values.email.trim()) errors.email = 'E-mail обязателен';
     if (!values.pass.trim()) errors.pass = 'Пароль обязателен';
     if (values.pass.length < 8) errors.pass = 'Пароль должен быть не менее 8 символов';
-    const employees = store.getState().employees;
+    const employees = store.data.employees;
     if (employees.some(e => e.email === values.email)) {
       errors.email = 'Сотрудник с таким email уже существует';
     }

@@ -1,15 +1,26 @@
 import { StoreProvider } from './context/StoreContext';
-import { ToastProvider } from './context/ToastContext';
+import { ToastProvider, useToast } from './context/ToastContext';
 import { useStore, useAuth } from './hooks';
 import LoginScreen from './components/LoginScreen';
 import MainLayout from './components/MainLayout';
 
 function AppContent() {
-  const { store, data, login, logout } = useStore();
+  const { store, data, login } = useStore();
   const { user } = useAuth();
+  const { showToast } = useToast();
 
   if (!user) {
-    return <LoginScreen db={data} setDb={(fn) => { store._data = fn(store._data); store._notify(); }} onLogin={login} />;
+    return (
+      <LoginScreen
+        db={data}
+        // Регистрация идёт через сервис, а не мутацией store._data:
+        // иначе Repository теряет ссылку на массив employees и любой
+        // последующий апдейт сотрудника пишет в «мёртвый» массив.
+        registerEmployee={(payload) => store.registerEmployee(payload)}
+        onLogin={login}
+        toast={showToast}
+      />
+    );
   }
   return <MainLayout store={store} data={data} user={user} />;
 }

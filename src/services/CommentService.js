@@ -1,7 +1,7 @@
 // src/services/CommentService.js
 import { uid } from '../utils/date';
 
-const ALLOWED_REACTIONS = new Set(['👍', '✅']);
+const ALLOWED_REACTIONS = new Set(['👍', '❤️', '🔥', '😂', '😮', '😢', '✅']);
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 
 export class CommentService {
@@ -98,36 +98,60 @@ export class CommentService {
   }
 
   /**
-   * Переключение реакции. Набор допустимых эмодзи фиксирован — клиент
-   * не может записать в state произвольную строку. Это защита от stored XSS
-   * через текст реакции и от обхода логики уведомлений произвольными символами.
+   * Ставит реакцию пользователя.
+   * Одна реакция на пользователя на комментарий: клик по новой эмодзи
+   * заменяет старую, клик по своей — снимает.
    *
-   * Инвариант: у одного пользователя не более одной реакции одного типа
-   * на комментарий. Хранится как { [emoji]: userId[] }; пустой массив
-   * удаляется, чтобы не мусорить в state.
+   * Набор допустимых эмодзи фиксирован — клиент не может записать в state
+   * произвольную строку. Это защита от stored XSS через текст реакции и от
+   * обхода логики уведомлений произвольными символами.
+   *
+   * Хранится как { [emoji]: userId[] }; пустой массив удаляется, чтобы
+   * не мусорить в state.
+   *
+   * @param {string} commentId
+   * @param {string} userId
+   * @param {string} emoji
    */
-  toggleReaction(commentId, userId, emoji) {
+  setReaction(commentId, userId, emoji) {
     if (!ALLOWED_REACTIONS.has(emoji)) {
       throw new Error('Недопустимая реакция');
     }
+
     const comment = this._commentRepo.findById(commentId);
     if (!comment) throw new Error('Комментарий не найден');
 
-    comment.reactions = comment.reactions || {};
-    const list = comment.reactions[emoji] || [];
-    const idx = list.indexOf(userId);
+    const reactions = { ...(comment.reactions || {}) };
 
-    if (idx >= 0) {
-      const next = list.filter(id => id !== userId);
-      if (next.length === 0) delete comment.reactions[emoji];
-      else comment.reactions[emoji] = next;
-    } else {
-      comment.reactions[emoji] = [...list, userId];
+    // 1. Какая реакция уже стоит у пользователя?
+    let prevEmoji = null;
+    for (const [e, users] of Object.entries(reactions)) {
+      if (users.includes(userId)) { prevEmoji = e; break; }
     }
 
+    // 2. Убираем пользователя из всех реакций
+    for (const e of Object.keys(reactions)) {
+      const next = reactions[e].filter(id => id !== userId);
+      if (next.length === 0) delete reactions[e];
+      else reactions[e] = next;
+    }
+
+    // 3. Если клик по другой эмодзи — ставим её.
+    //    Клик по той же = toggle off (осталось только удаление выше).
+    if (emoji !== prevEmoji) {
+      reactions[emoji] = [...(reactions[emoji] || []), userId];
+    }
+
+    comment.reactions = reactions;
     this._commentRepo.save(comment);
     this._notify();
-    return comment;
+
+    return { commentId, emoji: emoji !== prevEmoji ? emoji : null };
+  }
+
+  // обратная совместимость
+  toggleReaction(commentId, userId, emoji) {
+    return this.setReaction(commentId, userId, emoji);
   }
 
   /**

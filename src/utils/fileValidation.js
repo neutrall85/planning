@@ -61,7 +61,11 @@ export function validateAttachment(file) {
   const mimeOk = ALLOWED_MIME.has(file.type);
   const extOk = ALLOWED_EXT_RE.test(file.name || '');
 
-  if (!mimeOk && !extOk) {
+  // Allowlist проверяет два независимых измерения. Требуем совпадения:
+  // расхождение MIME и расширения — классический признак подмены типа
+  // (fake-image с расширением .png и MIME text/html и наоборот). AND
+  // безопаснее OR: файл должен пройти оба фильтра, а не любой из них.
+  if (!mimeOk || !extOk) {
     return { ok: false, reason: `Недопустимый тип файла. Разрешены: ${ALLOWED_TYPES_HUMAN}` };
   }
 

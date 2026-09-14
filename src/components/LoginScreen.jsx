@@ -1,6 +1,6 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { DOMAIN } from '../utils/constants';
-import { uid } from '../utils/date';
+import { usePasswordReveal } from '../hooks';
 import { Ic, ICONS } from './Icons';
 
 // ===== Вспомогательные функции (DRY, KISS) =====
@@ -18,7 +18,6 @@ const validateEmailFormat = (email) => {
   return null;
 };
 
-// Проверка существования email в базе (имитация)
 const validateEmailExists = (email, employees) => {
   if (!email.trim()) return "E-mail обязателен";
   const lower = email.trim().toLowerCase();
@@ -27,7 +26,6 @@ const validateEmailExists = (email, employees) => {
   return null;
 };
 
-// Комбинированная проверка для восстановления: сначала формат, потом существование
 const validateForgotEmail = (email, employees) => {
   const formatError = validateEmailFormat(email);
   if (formatError) return formatError;
@@ -44,32 +42,27 @@ function passIssues(p) {
   ];
 }
 
-export default function LoginScreen({ db, setDb, onLogin, toast }) {
+export default function LoginScreen({ db, registerEmployee, onLogin, toast }) {
   const [mode, setMode] = useState("login");
   const [lg, setLg] = useState("");
   const [pw, setPw] = useState("");
-  const [showPass, setShowPass] = useState(false);
-  const passTimerRef = useRef(null);
+  const { shown: showPassword, toggle: togglePasswordVisibility } = usePasswordReveal();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const [shake, setShake] = useState(false);
   const [reg, setReg] = useState({ first: "", last: "", email: "", pass: "", pass2: "" });
-  
-  // Состояния для валидации email в регистрации
+
   const [emailError, setEmailError] = useState(null);
   const [emailTouched, setEmailTouched] = useState(false);
-  
-  // Состояния для валидации email в восстановлении
+
   const [forgotError, setForgotError] = useState(null);
   const [forgotTouched, setForgotTouched] = useState(false);
-  
+
   const [forgot, setForgot] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const passwordTimerRef = useRef(null);
-  const [showRegPass, setShowRegPass] = useState(false);
-  const regPassTimerRef = useRef(null);
+  const { shown: showRegPass, toggle: toggleRegPassVisibility } = usePasswordReveal();
 
   const fail = (m) => { setErr(m); setShake(true); setTimeout(() => setShake(false), 450); };
+
   const doLogin = (loginVal, passVal) => {
     setBusy(true);
     setErr(null);
@@ -80,41 +73,6 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
     }, 30);
   };
 
-  const togglePasswordVisibility = () => {
-    if (showPassword) {
-      setShowPassword(false);
-      if (passwordTimerRef.current) {
-        clearTimeout(passwordTimerRef.current);
-        passwordTimerRef.current = null;
-      }
-    } else {
-      setShowPassword(true);
-      if (passwordTimerRef.current) clearTimeout(passwordTimerRef.current);
-      passwordTimerRef.current = setTimeout(() => {
-        setShowPassword(false);
-        passwordTimerRef.current = null;
-      }, 10000);
-    }
-  };
-
-  const toggleRegPassVisibility = () => {
-    if (showRegPass) {
-      setShowRegPass(false);
-      if (regPassTimerRef.current) {
-        clearTimeout(regPassTimerRef.current);
-        regPassTimerRef.current = null;
-      }
-    } else {
-      setShowRegPass(true);
-      if (regPassTimerRef.current) clearTimeout(regPassTimerRef.current);
-      regPassTimerRef.current = setTimeout(() => {
-        setShowRegPass(false);
-        regPassTimerRef.current = null;
-      }, 10000);
-    }
-  };
-
-  // Сброс состояний валидации при переключении режима
   const switchMode = (newMode) => {
     setMode(newMode);
     setErr(null);
@@ -124,7 +82,6 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
     setForgotTouched(false);
   };
 
-  // Универсальный обработчик изменений для поля email регистрации (DRY)
   const handleEmailChange = (value, setter) => {
     setter(value);
     if (emailTouched) {
@@ -137,7 +94,6 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
     setEmailError(validateEmailFormat(value));
   };
 
-  // Обработчики для поля восстановления
   const handleForgotEmailChange = (value) => {
     setForgot(value);
     if (forgotTouched) {
@@ -150,79 +106,60 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
     setForgotError(validateForgotEmail(forgot, db.employees));
   };
 
-  // Проверка заполненности формы регистрации (для кнопки)
   const isRegFormValid = () => {
     if (!reg.first.trim() || !reg.last.trim()) return false;
-    if (validateEmailFormat(reg.email)) return false; // есть ошибка
-    if (db.employees.some(e => e.email && e.email.toLowerCase() === reg.email.trim().toLowerCase())) return false; // email занят
+    if (validateEmailFormat(reg.email)) return false;
+    if (db.employees.some(e => e.email && e.email.toLowerCase() === reg.email.trim().toLowerCase())) return false;
     if (!passIssues(reg.pass).every(i => i.ok)) return false;
     if (reg.pass !== reg.pass2) return false;
     return true;
   };
 
-  // Проверка заполненности формы восстановления
   const isForgotFormValid = () => {
-    return !validateForgotEmail(forgot, db.employees); // возвращает true, если ошибки нет
+    return !validateForgotEmail(forgot, db.employees);
   };
 
   const submit = (e) => {
     if (e && e.preventDefault) e.preventDefault();
     try {
       if (mode === "login") { doLogin(lg, pw); return; }
+
       if (mode === "register") {
         if (!reg.first.trim() || !reg.last.trim() || !reg.email.trim()) return fail("Заполните все обязательные поля");
-        
+
         const email = reg.email.trim().toLowerCase();
         if (!ALLOWED_DOMAINS.some(domain => email.endsWith(domain))) {
-            return fail("Недопустимый домен e-mail");
+          return fail("Недопустимый домен e-mail");
         }
-
-        if (db.employees.some((x) => x.email && x.email.toLowerCase() === email) || db.regRequests.some((x) => x.email && x.email.toLowerCase() === email)) return fail("Такой e-mail уже зарегистрирован");
-        if (passIssues(reg.pass).some((i) => !i.ok)) return fail("Пароль не соответствует требованиям безопасности");
+        if (db.employees.some(x => x.email && x.email.toLowerCase() === email)
+            || db.regRequests.some(x => x.email && x.email.toLowerCase() === email)) {
+          return fail("Такой e-mail уже зарегистрирован");
+        }
+        if (passIssues(reg.pass).some(i => !i.ok)) return fail("Пароль не соответствует требованиям безопасности");
         if (reg.pass !== reg.pass2) return fail("Пароли не совпадают");
 
-        const newEmployee = {
-          id: "e_" + uid(),
-          last: reg.last.trim(),
-          first: reg.first.trim(),
-          email: reg.email.trim().toLowerCase(),
-          pass: reg.pass,
-          position: "Сотрудник",
-          departments: [],
-          roles: ["executor"],
-          kbIds: [],
-          headDeptIds: [],
-          phone: "",
-          extension: "",
-          tab: String(1000 + Math.floor(Math.random() * 8999)),
-          notif: { deadlineEmail: true, overdueDigest: false, commentSub: true },
-          failed: 0,
-          lockUntil: 0,
-          fired: false,
-          photo: null
-        };
-        setDb((s) => ({
-          ...s,
-          employees: [...s.employees, newEmployee],
-          notifications: [
-            { id: uid(), userId: "sergey.adminov", text: `Новая регистрация: ${newEmployee.last} ${newEmployee.first}`, ts: Date.now(), read: false, targetType: null, targetId: null },
-            ...s.notifications
-          ]
-        }));
-        toast("Регистрация успешна! Выполняется вход...");
-        const loginOk = onLogin(reg.email.trim().toLowerCase(), reg.pass);
-        if (!loginOk) {
-          fail("Ошибка автоматического входа после регистрации.");
+        try {
+          const newEmp = registerEmployee({
+            first: reg.first,
+            last: reg.last,
+            email,
+            pass: reg.pass,
+          });
+          toast('Регистрация успешна! Выполняется вход…');
+          const loginOk = onLogin(newEmp.email, reg.pass);
+          if (!loginOk) fail("Ошибка автоматического входа после регистрации.");
+          setReg({ first: "", last: "", email: "", pass: "", pass2: "" });
+          setEmailError(null);
+          setEmailTouched(false);
+          setMode("login");
+        } catch (ex) {
+          fail(ex.message || "Не удалось зарегистрироваться");
         }
-        setReg({ first: "", last: "", email: "", pass: "", pass2: "" });
-        setEmailError(null);
-        setEmailTouched(false);
-        setMode("login");
         return;
       }
+
       if (mode === "forgot") {
         if (!forgot.trim()) return fail("Укажите e-mail");
-        // Финальная проверка на сервере
         if (validateForgotEmail(forgot, db.employees)) return fail(validateForgotEmail(forgot, db.employees));
         toast("Ссылка для восстановления пароля отправлена на " + forgot.trim() + " (действует 1 час). Заглушка.");
         switchMode("login");
@@ -268,16 +205,15 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
                 <>
                   <label className="lbl">E-mail</label>
                   <div className="email-inp">
-                    <input 
-                      className="inp" 
-                      value={forgot} 
-                      onChange={(e) => handleForgotEmailChange(e.target.value)} 
+                    <input
+                      className="inp"
+                      value={forgot}
+                      onChange={(e) => handleForgotEmailChange(e.target.value)}
                       onBlur={handleForgotEmailBlur}
-                      placeholder="ivanov@hor.ru" 
-                      autoFocus 
+                      placeholder="ivanov@hor.ru"
+                      autoFocus
                     />
                   </div>
-                  {/* Отображение ошибки email восстановления */}
                   {forgotTouched && forgotError && <div className="login-err">{forgotError}</div>}
                 </>
               ) : (
@@ -316,16 +252,16 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
               </div>
               <label className="lbl">E-mail *</label>
               <div className="email-inp">
-                  <input 
-                    className="inp" 
-                    value={reg.email} 
-                    onChange={(e) => handleEmailChange(e.target.value, (v) => setReg(prev => ({ ...prev, email: v })))} 
-                    onBlur={() => handleEmailBlur(reg.email)}
-                    placeholder="ivanov@hor.ru" 
-                  />
+                <input
+                  className="inp"
+                  value={reg.email}
+                  onChange={(e) => handleEmailChange(e.target.value, (v) => setReg(prev => ({ ...prev, email: v })))}
+                  onBlur={() => handleEmailBlur(reg.email)}
+                  placeholder="ivanov@hor.ru"
+                />
               </div>
               {emailTouched && emailError && <div className="login-err">{emailError}</div>}
-              
+
               <label className="lbl">Пароль *</label>
               <div className="relative">
                 <input

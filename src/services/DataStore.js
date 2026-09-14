@@ -2,6 +2,7 @@
 import { buildMockData } from './mockData';
 import { TODAY, iso, addMonths, addDays, uid, fmtDMY } from '../utils/date';
 import { TASK_STATUSES, TASK_STATUS_ORDER, PRIORITIES, VACATION_TYPES, PROJECT_STATUSES, PROJECT_TYPES, DEPENDENCY_TYPES } from '../utils/constants';
+import { canChangeTaskStatus } from '../utils/permissions';
 
 // Репозитории
 import { TaskRepository } from '../repositories/TaskRepository';
@@ -83,16 +84,10 @@ class DataStore {
     this._listeners = [];
 
     // === AuditService создаём ПЕРВЫМ ===
-    // Его использует _migrateComments() ниже; сервис не имеет собственных
-    // зависимостей кроме AuditRepository и notify-колбэка, поэтому его
-    // безболезненно можно инициализировать раньше остальных.
     this._auditRepo = new AuditRepository(this._data.audit);
     this._auditService = new AuditService(this._auditRepo, () => this._notify());
 
     // === Миграция комментариев до создания CommentRepository ===
-    // Репозиторий получает уже готовый массив this._data.comments;
-    // если бы миграция запустилась позже, её пересборка массива создала бы
-    // вторую ссылку, и репо работал бы со старой.
     this._data.comments = this._data.comments || [];
     this._migrateComments();
 
@@ -123,7 +118,9 @@ class DataStore {
       this._budgetService,
       this._notificationService,
       this._auditService,
-      () => this._notify()
+      () => this._notify(),
+      canChangeTaskStatus,
+      () => this._data,
     );
     this._projectService = new ProjectService(
       this._projectRepo,
@@ -166,15 +163,31 @@ class DataStore {
   /**
    * Оповещает подписчиков о новых данных.
    *
-   * ВАЖНО: передаём shallow-copy ({ ...this._data }), а не сам this._data.
-   * Репозитории мутируют вложенные массивы (push/splice/присваивание по индексу),
-   * из-за чего корневая ссылка this._data не меняется. StoreContext использует
-   * setData(snapshot) с Object.is-равенством — при передаче той же ссылки React
-   * не перерисует компоненты. Свежий объект на каждый notify решает это одним
-   * движением и не требует править 12 сервисов.
+   * Repository.save() мутирует элементы массива по индексу, поэтому
+   * корневой {...this._data} не меняет ссылки вложенных коллекций. Без
+   * shallow-copy массивов useMemo с deps [data.employees] / [data.tasks]
+   * не пересчитается. Копируем все коллекции явным перечислением: дороже
+   * на 12 аллокаций, зато поведение предсказуемо и не зависит от того,
+   * добавит ли кто-то новую коллекцию в _data.
    */
   _notify() {
-    const snapshot = { ...this._data };
+    const d = this._data;
+    const snapshot = {
+      ...d,
+      settings: { ...d.settings },
+      employees: [...d.employees],
+      projects: [...d.projects],
+      tasks: [...d.tasks],
+      vacations: [...d.vacations],
+      notifications: [...d.notifications],
+      audit: [...d.audit],
+      comments: [...d.comments],
+      departments: [...d.departments],
+      kbs: [...d.kbs],
+      hoursRequests: [...d.hoursRequests],
+      roleDelegations: [...d.roleDelegations],
+      regRequests: [...d.regRequests],
+    };
     this._listeners.forEach(cb => cb(snapshot));
   }
 
@@ -229,9 +242,24 @@ class DataStore {
   // Сотрудники
   upsertEmployee(emp) {
     const user = this._authService.getCurrentUser();
+    const isSelf = !!(user && emp.id === user.id);
     this._employeeService.upsertEmployee(emp, user?.id || 'system');
+    // EmployeeService уже дёрнул _notify с прежней ссылкой сессии.
+    // Синхронизируем _currentUser: иначе правки своего профиля
+    // (пароль, фото, телефон) не долетают до useAuth.
+    if (isSelf) this._authService.refreshCurrentUser();
   }
   empName(id) { return this._employeeService.getEmployeeName(id); }
+
+  /**
+   * Самостоятельная регистрация сотрудника — единственная точка входа для
+   * LoginScreen. Идёт через EmployeeService, а не через прямую мутацию
+   * _data: Repository держит ссылку на массив employees, и подмена массива
+   * «снаружи» оставила бы репозиторий смотреть в старый массив.
+   */
+  registerEmployee(payload) {
+    return this._employeeService.registerEmployee(payload, 'system');
+  }
 
   // Отделы
   upsertDepartment(dept) {
@@ -286,14 +314,6 @@ class DataStore {
   }
 
   // ---------- КОММЕНТАРИИ ----------
-  //
-  // Реализованы через CommentRepository + CommentService — как и остальные
-  // 11 сущностей. Раньше жили inline в DataStore; вынесены вместе с
-  // добавлением реакций (toggleReaction) и полнотекстового поиска
-  // (search — инкапсулирован в CommentRepository).
-  //
-  // DataStore остаётся единственной точкой входа для UI-слоя; все вызовы
-  // делегируются в CommentService и проходят через единый notify-канал.
 
   getComments(filter = {}) {
     return this._commentService.getComments(filter);
@@ -316,10 +336,15 @@ class DataStore {
     return this._commentService.togglePin(commentId, user?.id || 'system');
   }
 
-  toggleReaction(commentId, emoji) {
+  setReaction(commentId, emoji) {
     const user = this._authService.getCurrentUser();
     if (!user) throw new Error('Требуется вход в систему');
-    return this._commentService.toggleReaction(commentId, user.id, emoji);
+    return this._commentService.setReaction(commentId, user.id, emoji);
+  }
+
+  // обратная совместимость
+  toggleReaction(commentId, emoji) {
+    return this.setReaction(commentId, emoji);
   }
 
   addAttachment(commentId, file) {
@@ -327,14 +352,6 @@ class DataStore {
   }
 
   // ---------- МИГРАЦИЯ КОММЕНТАРИЕВ ----------
-  //
-  // Переносит комментарии из устаревшего формата (comments внутри каждой
-  // задачи/проекта) в единую глобальную коллекцию this._data.comments.
-  // Идемпотентно: если глобальное хранилище непусто — миграция не запускается.
-  //
-  // ВАЖНО: вызывается из конструктора, поэтому использует только
-  // this._data и this._auditService — оба должны быть готовы к моменту
-  // вызова. В конструкторе это обеспечено порядком инициализации.
 
   _migrateComments() {
     if (this._data.comments?.length) return;

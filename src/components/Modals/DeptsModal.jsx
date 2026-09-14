@@ -4,7 +4,7 @@ import { ModalShell } from '../ModalShell';
 import { useAsyncSubmit } from '../../hooks/useAsyncSubmit';
 
 export const DeptsModal = ({ store, empId, onClose, toast }) => {
-  const db = store.getState();
+  const db = store.data;
   const emp = db.employees.find(e => e.id === empId);
   if (!emp) return null;
 

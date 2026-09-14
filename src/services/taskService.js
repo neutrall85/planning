@@ -10,7 +10,9 @@ export class TaskService {
     budgetService,
     notificationService,
     auditService,
-    notifyCallback
+    notifyCallback,
+    canChangeStatus,
+    getData,
   ) {
     this._taskRepo = taskRepo;
     this._projectRepo = projectRepo;
@@ -19,6 +21,10 @@ export class TaskService {
     this._notifications = notificationService;
     this._audit = auditService;
     this._notify = notifyCallback;
+    // Внедряем правило перехода статуса, чтобы оно было единственным
+    // источником правды и для drag-and-drop (TasksView), и для модалки.
+    this._canChangeStatus = canChangeStatus;
+    this._getData = getData;
   }
 
   getAll() { return this._taskRepo.findAll(); }
@@ -26,6 +32,18 @@ export class TaskService {
   upsertTask(task, currentUserId) {
     const existing = this._taskRepo.findById(task.id);
     const isNew = !existing;
+
+    // Инвариант: смена статуса проходит через тот же whitelist, что
+    // используется в drag-and-drop. Иначе правило можно обойти, сохранив
+    // задачу через модалку. Системные вызовы (currentUserId === 'system')
+    // пропускаются: они идут из archiveOldTasks и не меняют status.
+    if (!isNew && existing.status !== task.status && currentUserId !== 'system') {
+      const user = this._employeeRepo.findById(currentUserId);
+      const allowed = user && this._canChangeStatus(user, existing, task.status, this._getData());
+      if (!allowed) {
+        throw new Error('Переход в этот статус не разрешён для вашей роли');
+      }
+    }
 
     if (task.logs && Array.isArray(task.logs)) {
       task.actualHours = task.logs.reduce((sum, log) => sum + (log.hours || 0), 0);
@@ -187,12 +205,25 @@ export class TaskService {
     }
   }
 
+  /**
+   * Проход по цепочке родителей вверх. Реальные суммы BudgetService
+   * считает «на лету», но флаг isSummary должен быть согласован:
+   * любой родитель, у которого появился ребёнок, обязан стать суммарным —
+   * иначе UI (TaskModal) отрисует некорректную форму и валидация
+   * plannedHours сработает неверно. Заодно защищаемся от циклов.
+   */
   _recalcSummaryChain(task) {
     let current = task;
-    while (current) {
-      if (current.parentTaskId) {
-        current = this._taskRepo.findById(current.parentTaskId);
-      } else break;
+    const visited = new Set();
+    while (current?.parentTaskId && !visited.has(current.id)) {
+      visited.add(current.id);
+      const parent = this._taskRepo.findById(current.parentTaskId);
+      if (!parent) break;
+      if (!parent.isSummary) {
+        parent.isSummary = true;
+        this._taskRepo.save(parent);
+      }
+      current = parent;
     }
   }
 

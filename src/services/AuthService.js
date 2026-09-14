@@ -11,6 +11,27 @@ export class AuthService {
     return this._currentUser;
   }
 
+  /**
+   * Перечитывает данные текущего пользователя из репозитория.
+   *
+   * Repository.save() заменяет элемент на новый объект, поэтому после
+   * любого апдейта сотрудника ссылка _currentUser устаревает. Метод
+   * вызывается из DataStore.upsertEmployee при изменении себя же.
+   *
+   * Если сотрудника уволили — сессия сбрасывается.
+   */
+  refreshCurrentUser() {
+    if (!this._currentUser) return;
+    const fresh = this._employeeService.getAll().find(e => e.id === this._currentUser.id);
+    if (!fresh || fresh.fired) {
+      this._currentUser = null;
+      this._notify();
+      return;
+    }
+    this._currentUser = fresh;
+    this._notify();
+  }
+
   login(email, password) {
     const found = this._employeeService.findByEmail(email);
     if (found && found.lockUntil && Date.now() < found.lockUntil) {
@@ -27,7 +48,10 @@ export class AuthService {
       this._notify();
       return true;
     }
-    if (found) {
+    // Инкрементим счётчик неудачных попыток только для активных учёток:
+    // уволенный сотрудник не должен накапливать lockUntil и мешать
+    // восстановлению при повторном приёме на работу.
+    if (found && !found.fired) {
       found.failed = (found.failed || 0) + 1;
       if (found.failed >= 5) {
         found.lockUntil = Date.now() + 15 * 60 * 1000;

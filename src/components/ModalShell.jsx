@@ -1,11 +1,11 @@
 import { Modal } from './Modal';
 
-export const ModalShell = ({ 
-  title, 
-  onClose, 
-  children, 
-  onSave, 
-  saveLabel = 'Сохранить', 
+export const ModalShell = ({
+  title,
+  onClose,
+  children,
+  onSave,
+  saveLabel = 'Сохранить',
   width = 640,
   className = '',
   footer = null,
@@ -14,20 +14,29 @@ export const ModalShell = ({
   headerBefore = null,
   headerAfter = null,
 }) => {
+  const footerEl = footer !== null
+    ? footer
+    : (showSave ? (
+        <div className="modal-foot">
+          <div className="spacer" />
+          <button className="btn ghost" onClick={onClose}>Отмена</button>
+          <button className="btn primary" onClick={onSave} disabled={saveDisabled}>
+            {saveLabel}
+          </button>
+        </div>
+      ) : null);
+
   return (
-    <Modal title={title} onClose={onClose} width={width} className={className} headerBefore={headerBefore} headerAfter={headerAfter}>
+    <Modal
+      title={title}
+      onClose={onClose}
+      width={width}
+      className={className}
+      headerBefore={headerBefore}
+      headerAfter={headerAfter}
+      footer={footerEl}
+    >
       {children}
-      {footer !== null ? footer : (
-        showSave && (
-          <div className="modal-foot">
-            <div className="spacer" />
-            <button className="btn ghost" onClick={onClose}>Отмена</button>
-            <button className="btn primary" onClick={onSave} disabled={saveDisabled}>
-              {saveLabel}
-            </button>
-          </div>
-        )
-      )}
     </Modal>
   );
 };

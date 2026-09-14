@@ -10,7 +10,6 @@ import { ProjectGallery } from '../ProjectGallery';
 import { Lightbox } from '../Lightbox';
 import { useForm } from '../../hooks/useForm';
 import { useDataHelpers } from '../../hooks';
-import { useToast } from '../../context/ToastContext';
 import { PROJECT_STATUSES, PROJECT_TYPES, PROJECT_PRIORITIES, ADMIN_PROJECT_PRIORITIES } from '../../utils/constants';
 import { TODAY, iso, addDays, uid, fmtDMY, fmtDT } from '../../utils/date';
 import { canEditProjectFields, canChangeProjectStatus, canCreateProject, hasRole } from '../../utils/permissions';
@@ -34,7 +33,6 @@ export const ProjectModal = ({
   openTask,
   store,
 }) => {
-  const { showToast } = useToast();
   const { empName, getTaskSpent, getProjectStats } = useDataHelpers(db);
   const existing = projectId ? db.projects.find(p => p.id === projectId) : null;
   const isNew = !existing;
@@ -66,10 +64,11 @@ export const ProjectModal = ({
     aircraftType: '',
     projectType: '',
     priority: 'NORM',
-    comments: existing?.comments || [],
-    history: existing?.history || [{ ts: Date.now(), who: ur.id, text: 'Проект создан' }],
-    files: existing?.files || [],
-    photos: existing?.photos || [],
+    history: [{ ts: Date.now(), who: ur.id, text: 'Проект создан' }],
+    files: [],
+    photos: [],
+    // Поле comments удалено: обсуждение живёт в глобальной коллекции
+    // data.comments (см. миграцию в DataStore._migrateComments).
   };
 
   const validate = useCallback((values) => {
@@ -294,8 +293,8 @@ export const ProjectModal = ({
       <Tabs tabs={tabs} active={activeTab} onChange={setActiveTab} />
 
       {activeTab === 'info' && (
-        <div className="project-info-layout" style={{ display: 'flex', gap: '20px' }}>
-          <div style={{ flex: '0 0 220px' }}>
+        <div className="project-info-layout">
+          <div className="project-info-photos">
             <ProjectGallery
               photos={values.photos || []}
               onUpload={handlePhotoUpload}
@@ -308,7 +307,7 @@ export const ProjectModal = ({
             />
           </div>
 
-          <div style={{ flex: 1 }}>
+          <div className="project-info-fields-wrap">
             <div className="project-info-fields">
               <FormField label="Название" required value={values.name} onChange={(v) => handleChange('name', v)} error={touched.name && errors.name} disabled={!canEditFields} inline />
               <FormField label="Описание" type="textarea" rows={2} value={values.desc} onChange={(v) => handleChange('desc', v)} disabled={!canEditFields} inline />

@@ -1,20 +1,23 @@
-import { useState, useEffect } from 'react';
 import { useStore } from './useStore';
 
+/**
+ * Возвращает актуального пользователя сессии.
+ *
+ * Сравнение по ссылке здесь ненадёжно: Repository.save() заменяет
+ * элемент на новый, а AuthService._currentUser может остаться старым.
+ * Поэтому источник правды — data.employees, а _currentUser нужен только
+ * чтобы знать id сессии. useStore уже держит подписку, derived-значение
+ * пересчитывается автоматически — без useState/useEffect и без
+ * re-render loop'ов.
+ */
 export const useAuth = () => {
-  const { store } = useStore();
-  const [user, setUser] = useState(store.getCurrentUser() || null);
+  const { store, data } = useStore();
+  const sessionUser = store.getCurrentUser();
+  const userId = sessionUser?.id || null;
 
-  useEffect(() => {
-    const checkUser = () => {
-      const currentUser = store.getCurrentUser() || null;
-      if (currentUser !== user) {
-        setUser(currentUser);
-      }
-    };
-    const unsubscribe = store.subscribe(checkUser);
-    return unsubscribe;
-  }, [store, user]);
+  const user = userId
+    ? (data.employees.find(e => e.id === userId) || null)
+    : null;
 
   const roles = user ? user.roles : [];
   const hasRole = (role) => roles.includes(role);

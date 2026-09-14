@@ -5,7 +5,7 @@ import { ROLES } from '../../utils/constants';
 import { useAsyncSubmit } from '../../hooks/useAsyncSubmit';
 
 export const RolesModal = ({ store, empId, onClose, toast }) => {
-  const db = store.getState();
+  const db = store.data;
   const emp = db.employees.find(e => e.id === empId);
   if (!emp) return null;
 

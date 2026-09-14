@@ -8,7 +8,6 @@ import { FormField } from '../FormField';
 import Discussion from '../Discussion';
 import { useForm } from '../../hooks/useForm';
 import { useDataHelpers } from '../../hooks';
-import { useToast } from '../../context/ToastContext';
 import { TASK_STATUSES, TASK_STATUS_ORDER, PRIORITIES, DEPENDENCY_TYPES } from '../../utils/constants';
 import { TODAY, iso, addDays, uid, fmtDMY, fmtD, fmtDT } from '../../utils/date';
 import { canEditTaskFields, canChangeTaskStatus, canCreateTask, computeScope } from '../../utils/permissions';
@@ -16,13 +15,12 @@ import { validateAttachment } from '../../utils/fileValidation';
 import { appendFileVersion } from '../../utils/fileVersions';
 import { Ic, ICONS } from '../Icons';
 
-export const TaskModal = ({ 
+export const TaskModal = ({
   db, ur, taskId, initialTab = 'form', parentTaskId, initialProjectId, returnToProjectId,
   returnToTaskId,
   onClose, onSave, onDelete, onHoursReq, patchTask, notify, store,
-  openTask, spent, planSum,
+  openTask, spent, planSum, toast,
 }) => {
-  const { showToast } = useToast();
   const { empName, getTaskSpent, vacOverlap } = useDataHelpers(db);
   const existing = taskId ? db.tasks.find(t => t.id === taskId) : null;
   const isNew = !existing;
@@ -56,7 +54,6 @@ export const TaskModal = ({
     deadline: iso(addDays(new Date(), 14)),
     status: 'new',
     logs: [],
-    comments: [],
     history: [],
     delegatedFrom: null,
     archived: false,
@@ -68,11 +65,8 @@ export const TaskModal = ({
     files: [],
     isSummary: false,
     parentTaskId: parentTaskId || null,
-    repeatType: 'none',
-    repeatInterval: 1,
-    repeatDays: [],
-    repeatEndType: 'date',
-    repeatEndValue: '',
+    // Поля repeatType/repeatInterval/repeatDays/repeatEndType/repeatEndValue
+    // удалены: фича повторов не реализована, UI и сервисов под них нет.
   };
 
   const validate = useCallback((values) => {
@@ -118,21 +112,21 @@ export const TaskModal = ({
   const saveHandler = useCallback((vals) => {
     const proj = db.projects.find(p => p.id === vals.projectId);
     const isAdminProj = proj && proj.ptype === 'admin';
-    if (!vals.title.trim()) { showToast('Укажите название', 'error'); return; }
-    if (!vals.projectId) { showToast('Выберите проект', 'error'); return; }
-    if (!vals.assigneeId) { showToast('Выберите исполнителя', 'error'); return; }
-    if (!vals.start) { showToast('Укажите дату начала', 'error'); return; }
-    if (!vals.priority) { showToast('Выберите приоритет', 'error'); return; }
-    if (!vals.status) { showToast('Выберите статус', 'error'); return; }
+    if (!vals.title.trim()) { toast('Укажите название', 'error'); return; }
+    if (!vals.projectId) { toast('Выберите проект', 'error'); return; }
+    if (!vals.assigneeId) { toast('Выберите исполнителя', 'error'); return; }
+    if (!vals.start) { toast('Укажите дату начала', 'error'); return; }
+    if (!vals.priority) { toast('Выберите приоритет', 'error'); return; }
+    if (!vals.status) { toast('Выберите статус', 'error'); return; }
     if (!isAdminProj) {
       const planned = parseFloat(vals.plannedHours);
-      if (isNaN(planned) || planned <= 0) { showToast('Плановые часы обязательны (число > 0)', 'error'); return; }
-      if (!vals.deadline) { showToast('Срок исполнения обязателен', 'error'); return; }
+      if (isNaN(planned) || planned <= 0) { toast('Плановые часы обязательны (число > 0)', 'error'); return; }
+      if (!vals.deadline) { toast('Срок исполнения обязателен', 'error'); return; }
     }
     if (proj && proj.budget != null && !proj.archived && !isAdminProj) {
       const currentPlanSum = db.tasks.filter(t => t.projectId === proj.id && t.id !== vals.id).reduce((s, t) => s + (t.plannedHours || 0), 0);
       if (currentPlanSum + (parseFloat(vals.plannedHours) || 0) > proj.budget) {
-        showToast(`Превышение бюджета проекта! Бюджет: ${proj.budget} ч, текущая сумма: ${currentPlanSum} ч`, 'error');
+        toast(`Превышение бюджета проекта! Бюджет: ${proj.budget} ч, текущая сумма: ${currentPlanSum} ч`, 'error');
         return;
       }
     }
@@ -154,7 +148,7 @@ export const TaskModal = ({
       creatorId: existing?.creatorId || ur.id,
     };
     onSave(taskToSave, isNew);
-  }, [existing, isNew, db, vacOverlap, showToast, onSave, ur, subtasks]);
+  }, [existing, isNew, db, vacOverlap, toast, onSave, ur, subtasks]);
 
   const deleteHandler = useCallback(() => {
     if (window.confirm('Удалить задачу?')) {
@@ -236,7 +230,7 @@ export const TaskModal = ({
   const handleFileUpload = useCallback((file) => {
     const check = validateAttachment(file);
     if (!check.ok) {
-      showToast(check.reason, 'error');
+      toast(check.reason, 'error');
       return;
     }
     const reader = new FileReader();
@@ -252,18 +246,18 @@ export const TaskModal = ({
       const updatedFiles = appendFileVersion(values.files || [], newFile);
       setFieldValue('files', updatedFiles);
       if (existing) patchTask({ ...values, files: updatedFiles });
-      showToast('Файл загружен', 'success');
+      toast('Файл загружен', 'success');
     };
     reader.readAsDataURL(file);
-  }, [values, existing, patchTask, setFieldValue, showToast, ur.id]);
+  }, [values, existing, patchTask, setFieldValue, toast, ur.id]);
 
   const handleFileDelete = useCallback((fileId) => {
     if (!window.confirm('Удалить файл?')) return;
     const updatedFiles = (values.files || []).filter(f => f.id !== fileId);
     setFieldValue('files', updatedFiles);
     if (existing) patchTask({ ...values, files: updatedFiles });
-    showToast('Файл удалён', 'info');
-  }, [values, existing, patchTask, setFieldValue, showToast]);
+    toast('Файл удалён', 'info');
+  }, [values, existing, patchTask, setFieldValue, toast]);
 
   const [logHours, setLogHours] = useState('');
   const [logNote, setLogNote] = useState('');
@@ -271,10 +265,10 @@ export const TaskModal = ({
 
   const addLog = useCallback(() => {
     const h = parseFloat(logHours);
-    if (!h || h <= 0) { showToast('Введите корректное количество часов', 'error'); return; }
+    if (!h || h <= 0) { toast('Введите корректное количество часов', 'error'); return; }
     const sp = getTaskSpent(values);
     if (values.plannedHours && sp + h > values.plannedHours) {
-      showToast(`Нельзя внести больше плановых: доступно ещё ${Math.max(0, values.plannedHours - sp)} ч`, 'error');
+      toast(`Нельзя внести больше плановых: доступно ещё ${Math.max(0, values.plannedHours - sp)} ч`, 'error');
       return;
     }
     const newLog = { id: uid(), userId: ur.id, date: logDate, hours: h, note: logNote.trim() };
@@ -283,8 +277,8 @@ export const TaskModal = ({
     setFieldValue('logs', [...values.logs, newLog]);
     setLogHours('');
     setLogNote('');
-    showToast('Часы учтены', 'success');
-  }, [logHours, logNote, logDate, values, store, ur, showToast, setFieldValue, getTaskSpent]);
+    toast('Часы учтены', 'success');
+  }, [logHours, logNote, logDate, values, store, ur, toast, setFieldValue, getTaskSpent]);
 
   const showBackButton = returnToProjectId || returnToTaskId;
 
@@ -309,7 +303,7 @@ export const TaskModal = ({
     <ModalShell
       title={readOnly ? 'Архивная задача — только чтение' : existing ? 'Карточка задачи' : 'Новая задача'}
       onClose={onClose}
-      width={770}
+      width={800}
       className="modal-task"
       showSave={false}
       footer={footer}
@@ -345,8 +339,7 @@ export const TaskModal = ({
                   onChange={(e) => handleChange('isSummary', e.target.checked)}
                   disabled={isSummaryDisabled}
                 />
-                Суммарная задача (плановые часы = сумма подзадач)
-                {subtasks.length > 0 && <span className="mut sm ml-2">(задача имеет подзадачи, флаг зафиксирован)</span>}
+                Суммарная задача
               </label>
             </div>
           </div>
@@ -385,18 +378,30 @@ export const TaskModal = ({
               disabled={!canEditFields}
               inline
             />
-            <FormField
-              label="Плановые часы"
-              required={!isAdminProject}
-              type="number"
-              min="0.5"
-              step="0.5"
-              value={values.plannedHours ?? ''}
-              onChange={(v) => handleChange('plannedHours', v)}
-              error={touched.plannedHours && errors.plannedHours}
-              disabled={!canEditFields || values.isSummary}
-              inline
-            />
+
+            <div className="field-with-action">
+              <FormField
+                label="Плановые часы"
+                required={!isAdminProject}
+                type="number"
+                min="0.5"
+                step="0.5"
+                value={values.plannedHours ?? ''}
+                onChange={(v) => handleChange('plannedHours', v)}
+                error={touched.plannedHours && errors.plannedHours}
+                disabled={!canEditFields || values.isSummary}
+                inline
+              />
+              {!readOnly && onHoursReq && existing && isAssignee && (
+                <button
+                  type="button"
+                  className="btn ghost field-action"
+                  onClick={() => onHoursReq('task', values.id)}
+                >
+                  <Ic d={ICONS.clock} size={14} /> Запросить изменение часов
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="fields-row">
@@ -447,16 +452,7 @@ export const TaskModal = ({
             />
           </div>
 
-          {!readOnly && onHoursReq && existing && isAssignee && (
-            <div className="field-row">
-              <label className="field-label"></label>
-              <div className="flex-1">
-                <button className="btn ghost" onClick={() => onHoursReq('task', values.id)}>
-                  <Ic d={ICONS.clock} size={14} /> Запросить изменение часов
-                </button>
-              </div>
-            </div>
-          )}
+          
 
           <FormField
             label="Зависит от задачи"
@@ -476,12 +472,6 @@ export const TaskModal = ({
             disabled={!canEditFields || !values.dependencyId}
             inline
           />
-
-          {values.isSummary && (
-            <div className="info-box" style={{ marginLeft: '120px' }}>
-              Суммарная задача – плановые часы рассчитываются как сумма подзадач.
-            </div>
-          )}
         </div>
       )}
 
@@ -545,8 +535,7 @@ export const TaskModal = ({
           currentUser={ur}
           candidates={candidates}
           readOnly={readOnly}
-          canComment={!readOnly && (canEditFields || isAssignee || isAuthor)}
-          toast={showToast}
+          toast={toast}
           employees={db.employees}
         />
       )}

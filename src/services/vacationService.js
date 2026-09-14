@@ -38,21 +38,43 @@ export class VacationService {
     this._notify();
   }
 
+  /**
+   * Передача задач от отпускника к замещающему.
+   *
+   * Идемпотентность обязательна: upsertVacation вызывает этот метод при
+   * любом сохранении «уже активного» отпуска (например, HR правит
+   * комментарий), и без guard'а задачи переназначаются повторно. Тогда:
+   *   - в истории задачи появляется дубликат «переназначена с …»;
+   *   - revertDelegation (ищет по тексту в истории) начнёт работать
+   *     непредсказуемо;
+   *   - уведомление о передаче отправится повторно.
+   * Поэтому пишем флаг state = 'applied' и выходим на повторном заходе.
+   */
   applyDelegation(vacationId) {
     const vac = this._vacationRepo.findById(vacationId);
     if (!vac || !vac.delegation.enabled || vac.status !== 'approved') return;
+    if (vac.delegation.state === 'applied') return;
+
     const fromId = vac.empId;
     const toId = vac.delegation.subId;
     const statuses = vac.delegation.statuses.length ? vac.delegation.statuses : ['new', 'inwork', 'review'];
     this._taskService.applyDelegation(fromId, toId, vac.start, vac.end, statuses);
     this._notifications.notifyVacationDelegationApplied(vac, fromId, toId);
+
+    vac.delegation.state = 'applied';
+    this._vacationRepo.save(vac);
   }
 
   revertDelegation(vacationId) {
     const vac = this._vacationRepo.findById(vacationId);
     if (!vac || !vac.delegation.enabled) return;
+    if (vac.delegation.state !== 'applied') return;
+
     const fromId = vac.empId;
     const toId = vac.delegation.subId;
     this._taskService.revertDelegation(fromId, toId);
+
+    vac.delegation.state = null;
+    this._vacationRepo.save(vac);
   }
 }
