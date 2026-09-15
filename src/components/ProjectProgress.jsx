@@ -1,5 +1,4 @@
 // components/ProjectProgress.jsx
-import React from 'react';
 import { getProjectColor } from '../utils/projectHelpers';
 
 export default function ProjectProgress({ project, plan, fact }) {

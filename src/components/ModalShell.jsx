@@ -13,6 +13,7 @@ export const ModalShell = ({
   saveDisabled = false,
   headerBefore = null,
   headerAfter = null,
+  bodyRef = null,
 }) => {
   const footerEl = footer !== null
     ? footer
@@ -35,6 +36,7 @@ export const ModalShell = ({
       headerBefore={headerBefore}
       headerAfter={headerAfter}
       footer={footerEl}
+      bodyRef={bodyRef}
     >
       {children}
     </Modal>

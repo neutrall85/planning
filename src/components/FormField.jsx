@@ -21,7 +21,7 @@ export const FormField = ({
   };
 
   // Для <select multiple> e.target.value отдаёт только первую выбранную
-  // опцию, а не массив — нужно явно собрать значения из selectedOptions.
+  // опцию, а не массив - нужно явно собрать значения из selectedOptions.
   const handleMultiSelectChange = (e) => {
     const selected = Array.from(e.target.selectedOptions, (opt) => opt.value);
     onChange(selected);
@@ -29,7 +29,7 @@ export const FormField = ({
 
   const inputElement = (() => {
     if (type === 'select') {
-      // Мультивыбор — нативный (кастомный не поддерживает multiple)
+      // Мультивыбор - нативный (кастомный не поддерживает multiple)
       if (props.multiple) {
         return (
           <select

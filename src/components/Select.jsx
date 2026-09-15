@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 const POPUP_MAX = 300;   // максимальная высота выпадающего меню
 const SEARCH_THRESHOLD = 10; // при каком количестве опций показывать поиск
 
-export const Select = ({ value, onChange, options, disabled, placeholder = '—', className = '' }) => {
+export const Select = ({ value, onChange, options, disabled, placeholder = '-', className = '' }) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [pos, setPos] = useState({ top: undefined, bottom: undefined, left: 0, width: 0 });

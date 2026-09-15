@@ -6,3 +6,4 @@ export { default as ReportsView } from './ReportsView';
 export { default as ArchiveView } from './ArchiveView';
 export { default as RequestsView } from './RequestsView';
 export { default as JournalView } from './JournalView';
+export { default as TemplatesView } from './TemplatesView';

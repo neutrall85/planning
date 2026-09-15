@@ -1,20 +1,51 @@
 // src/services/ProjectService.js
-import { TODAY, iso } from '../utils/date';
+import { TODAY } from '../utils/date';
 
 export class ProjectService {
-  constructor(projectRepo, taskRepo, notificationService, auditService, notifyCallback) {
+  constructor(
+    projectRepo,
+    taskRepo,
+    employeeRepo,
+    notificationService,
+    auditService,
+    notifyCallback,
+    canChangeStatus,
+    canManageAccess,
+  ) {
     this._projectRepo = projectRepo;
     this._taskRepo = taskRepo;
+    this._employeeRepo = employeeRepo;
     this._notifications = notificationService;
     this._audit = auditService;
     this._notify = notifyCallback;
+    this._canChangeStatus = canChangeStatus;
+    this._canManageAccess = canManageAccess;
   }
 
   getAll() { return this._projectRepo.findAll(); }
 
-  upsertProject(project, currentUserId) {
+  /**
+   * Сохранение проекта.
+   *
+   * Аргумент `currentUser` — полный объект пользователя (не id), потому
+   * что право на смену статуса проверяется через canChangeProjectStatus,
+   * а она смотрит роли и kbIds.
+   *
+   * Системные вызовы (user === null) пропускаются: они идут из
+   * автоматических сценариев (архивация, восстановление).
+   */
+  upsertProject(project, currentUser) {
     const existing = this._projectRepo.findById(project.id);
     const isNew = !existing;
+    const currentUserId = currentUser?.id || 'system';
+
+    if (!isNew && existing.status !== project.status && currentUserId !== 'system') {
+      const allowed = this._canChangeStatus
+        && this._canChangeStatus(currentUser, existing, project.status);
+      if (!allowed) {
+        throw new Error('Переход в этот статус не разрешён для вашей роли');
+      }
+    }
 
     if (!isNew) {
       this._audit.addAudit('Изменение проекта', `Обновлён проект "${project.name}"`, 'project', project.id, currentUserId);
@@ -65,5 +96,57 @@ export class ProjectService {
     const tasks = this._taskRepo.findByProject(id);
     for (const task of tasks) this._taskRepo.delete(task.id);
     this._notify();
+  }
+
+  /**
+   * Обновление списка явного доступа к проекту.
+   *
+   * Единственная точка входа: форма проекта это поле не трогает.
+   * Роль-доступ сюда не попадает — он часть computeBaseScope и
+   * настраивается ролями сотрудника, а не этим методом.
+   *
+   * Право проверяется тем же предикатом, что и в UI —
+   * canManageProjectAccess. Массив копируется, чтобы состояние формы
+   * не становилось частью store.
+   *
+   * Аудит фиксирует имена, а не только количество: журнал должен
+   * отвечать на вопрос «кому именно», а не «сколько». Разрешение
+   * id → ФИО живёт здесь, потому что это часть формирования записи
+   * аудита; никакой UI-логики сюда не протекает.
+   */
+  setAccess(projectId, access, currentUser) {
+    const project = this._projectRepo.findById(projectId);
+    if (!project) throw new Error('Проект не найден');
+
+    const allowed = currentUser && this._canManageAccess
+      && this._canManageAccess(currentUser, project);
+    if (!allowed) {
+      throw new Error('Недостаточно прав для управления доступом к проекту');
+    }
+
+    const userIds = Array.isArray(access?.userIds) ? [...access.userIds] : [];
+
+    // Имена для журнала. Отсутствующие id молча пропускаем — данные
+    // могут быть устаревшими, но это не должно валить сохранение.
+    const names = userIds
+      .map(id => this._employeeRepo.findById(id))
+      .filter(Boolean)
+      .map(e => `${e.last} ${e.first}`);
+
+    project.access = { userIds };
+    this._projectRepo.save(project);
+
+    this._audit.addAudit(
+      'Изменение доступа к проекту',
+      {
+        project: project.name,
+        grantedTo: names.length ? names.join(', ') : '—',
+      },
+      'project',
+      project.id,
+      currentUser.id,
+    );
+    this._notify();
+    return project;
   }
 }

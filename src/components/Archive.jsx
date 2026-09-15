@@ -86,7 +86,7 @@ export default function Archive({ db, ur, openTask, openProject, restoreTask, re
               <tr key={t.id}>
                 <td><b>{t.title}</b></td>
                 <td>{db.projects.find(x => x.id === t.projectId)?.code}</td>
-                <td>{t.assigneeId ? empName(t.assigneeId) : '—'}</td>
+                <td>{t.assigneeId ? empName(t.assigneeId) : '-'}</td>
                 <td>{fmtDMY(t.archivedAt)}</td>
                 <td>
                   <button className="btn ghost sm" onClick={() => openTask(t.id)}>Открыть</button>

@@ -55,7 +55,7 @@ export const DeptsModal = ({ store, empId, onClose, toast }) => {
 
   return (
     <ModalShell
-      title={`Подразделения — ${emp.last} ${emp.first}`}
+      title={`Подразделения - ${emp.last} ${emp.first}`}
       onClose={onClose}
       onSave={save}
       width={560}

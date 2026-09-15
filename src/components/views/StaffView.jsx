@@ -1,4 +1,3 @@
-import React from 'react';
 import Staff from '../Staff';
 
 export default function StaffView({ store, db, ur, setDb, openRoles, openDepts, openVacation }) {

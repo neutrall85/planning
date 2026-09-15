@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+// src/components/discussion/CommentItem.jsx
+import { useRef } from 'react';
 import Avatar from '../Avatar';
 import { fmtDT } from '../../utils/date';
 import { highlightText, renderMentionText } from './render';
@@ -9,6 +10,7 @@ import CommentReactions from './CommentReactions';
 import CommentAttachments from './CommentAttachments';
 import CommentActions from './CommentActions';
 import ReactionPicker from './ReactionPicker';
+import { useReactionPicker } from '../../hooks';
 
 export default function CommentItem({ comment, depth, children }) {
   const {
@@ -17,8 +19,8 @@ export default function CommentItem({ comment, depth, children }) {
     readOnly, setReaction,
   } = useDiscussion();
 
-  const [pickerOpen, setPickerOpen] = useState(false);
   const rootRef = useRef(null);
+  const picker = useReactionPicker(rootRef);
 
   const author = getAuthor(comment.authorId);
   const task = comment.taskId && tasks?.find(t => t.id === comment.taskId);
@@ -28,30 +30,28 @@ export default function CommentItem({ comment, depth, children }) {
     ? highlightText(comment.text, searchQuery.trim())
     : renderMentionText(comment.text);
 
-  useEffect(() => {
-    if (!pickerOpen) return;
-    const onOutside = (e) => {
-      if (rootRef.current && !rootRef.current.contains(e.target)) {
-        setPickerOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', onOutside);
-    return () => document.removeEventListener('mousedown', onOutside);
-  }, [pickerOpen]);
-
   const handleCommentClick = (e) => {
     if (readOnly || editingId === comment.id) return;
     if (e.target.closest('button, a, input, textarea')) return;
-    setPickerOpen(prev => !prev);
+    picker.toggle();
   };
 
   const pick = (emoji) => {
     setReaction(comment.id, emoji);
-    setPickerOpen(false);
+    picker.close();
   };
 
+  // Класс на обёртке: отступ накапливается за счёт вложенности самих обёрток.
+  // depth === 0 → без отступа; depth >= 1 → 26px, но каждый уровень вложен
+  // в предыдущий, поэтому суммарный отступ = 26 * depth.
+  const wrapperClass = 'cm-item' + (depth > 0 ? ' cm-item--nested' : '');
+
   return (
-    <div id={`comment-${comment.id}`} ref={rootRef}>
+    <div
+      id={`comment-${comment.id}`}
+      ref={rootRef}
+      className={wrapperClass}
+    >
       <div
         className={'cm' + (depth > 0 ? ' reply' : '') + (comment.pinned ? ' pinned' : '')}
         onClick={handleCommentClick}
@@ -79,8 +79,9 @@ export default function CommentItem({ comment, depth, children }) {
 
         <CommentAttachments attachments={comment.attachments || []} />
 
-        {pickerOpen && (
+        {picker.open && (
           <ReactionPicker
+            containerRef={picker.pickerRef}
             activeEmoji={myReaction}
             onPick={pick}
           />

@@ -1,12 +1,19 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { Ic, ICONS } from '../Icons';
+import { FILE_LIMITS, FILE_MESSAGES } from '../../utils/constants';
 import MentionPopup from './MentionPopup';
-import { useMentions } from './useMentions';
+import { useMentions } from '../../hooks';
+
+// Префикс «@Фамилия Имя, » в начале текста — маркер адресата ответа.
+// Совпадает с форматом @-упоминаний (mentionParser), поэтому адресат
+// получит отдельное уведомление об упоминании. Используется и при вставке
+// нового адресата, и при отмене ответа.
+const REPLY_PREFIX_RE = /^@?[^\s,]+\s+[^\s,]+,\s*/;
 
 export default function CommentComposer({
   store, filter, currentUser, candidates, toast,
   replyTo, setReplyTo, comments, getAuthor,
-  readOnly,
+  readOnly, onCommentCreated,
 }) {
   const [text, setText] = useState('');
   const [attachments, setAttachments] = useState([]);
@@ -14,6 +21,29 @@ export default function CommentComposer({
   const textareaRef = useRef(null);
 
   const mentions = useMentions({ text, setText, candidates, textareaRef });
+
+  useLayoutEffect(() => {
+    if (!replyTo) return;
+    const parent = comments.find(c => c.id === replyTo);
+    const author = parent ? getAuthor(parent.authorId) : null;
+    if (!author) return;
+
+    const prefix = `@${author.last} ${author.first}, `;
+    setText(prev => prefix + prev.replace(REPLY_PREFIX_RE, ''));
+
+    requestAnimationFrame(() => {
+      const ta = textareaRef.current;
+      if (!ta) return;
+      ta.focus();
+      ta.setSelectionRange(ta.value.length, ta.value.length);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [replyTo]);
+
+  const cancelReply = useCallback(() => {
+    setReplyTo(null);
+    setText(prev => prev.replace(REPLY_PREFIX_RE, ''));
+  }, [setReplyTo]);
 
   const onDragOver = useCallback((e) => {
     e.preventDefault();
@@ -33,9 +63,9 @@ export default function CommentComposer({
       return;
     }
     const files = Array.from(e.dataTransfer.files);
-    const valid = files.filter(f => f.type.startsWith('image/') && f.size <= 5 * 1024 * 1024);
+    const valid = files.filter(f => f.type.startsWith('image/') && f.size <= FILE_LIMITS.image);
     if (valid.length !== files.length) {
-      toast?.('Некоторые файлы пропущены (только изображения до 5 МБ)', 'warning');
+      toast?.(FILE_MESSAGES.someImagesSkipped, 'warning');
     }
     if (valid.length) {
       setAttachments(prev => [...prev, ...valid]);
@@ -52,6 +82,7 @@ export default function CommentComposer({
       toast?.('Введите текст или прикрепите изображение', 'warning');
       return;
     }
+
     const created = store.addComment({
       projectId: filter.projectId || null,
       taskId: filter.taskId || null,
@@ -60,6 +91,9 @@ export default function CommentComposer({
       text: text.trim(),
       attachments: [],
     });
+
+    if (created?.id) onCommentCreated?.(created.id);
+
     for (const file of attachments) {
       try {
         await store.addAttachment(created.id, file);
@@ -67,6 +101,7 @@ export default function CommentComposer({
         toast?.(`Ошибка загрузки ${file.name}: ${err.message}`, 'error');
       }
     }
+
     setText('');
     setReplyTo(null);
     setAttachments([]);
@@ -98,7 +133,7 @@ export default function CommentComposer({
         <div className="reply-banner">
           Ответ на комментарий{' '}
           {parentAuthor ? `${parentAuthor.last} ${parentAuthor.first}` : ''}
-          <button className="link" onClick={() => setReplyTo(null)}>отменить</button>
+          <button className="link" onClick={cancelReply}>отменить</button>
         </div>
       )}
 

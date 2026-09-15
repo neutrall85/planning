@@ -1,4 +1,3 @@
-import React from 'react';
 import { fmtDT, fmtDMY, iso } from '../utils/date';
 import { Ic, ICONS } from './Icons';
 

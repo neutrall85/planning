@@ -56,14 +56,14 @@ export const RolesModal = ({ store, empId, onClose, toast }) => {
 
   return (
     <ModalShell
-      title={`Роли — ${emp.last} ${emp.first}`}
+      title={`Роли - ${emp.last} ${emp.first}`}
       onClose={onClose}
       onSave={save}
       width={520}
       className="modal-roles"
       saveDisabled={isSubmitting}
     >
-      <p className="mut sm">Сотрудник может иметь несколько ролей. Для «Главного конструктора» укажите КБ, для «Руководителя отдела» — перечень отделов.</p>
+      <p className="mut sm">Сотрудник может иметь несколько ролей. Для «Главного конструктора» укажите КБ, для «Руководителя отдела» - перечень отделов.</p>
       <div className="roles-list">
         {Object.entries(ROLES).map(([k, v]) => (
           <div key={k}>

@@ -1,4 +1,3 @@
-// src/components/MainLayout.jsx
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useAuth, useStore } from '../hooks';
 import { hasRole, canExport, computeScope } from '../utils/permissions';
@@ -29,6 +28,8 @@ export default function MainLayout({ store, data, user }) {
     openVacation,
     openDelegation,
     openVacNow,
+    openCopyTask,
+    openCopyProject,
     closeModal,
   } = useModals({ store, data, user });
 
@@ -39,6 +40,7 @@ export default function MainLayout({ store, data, user }) {
     { id: 'gantt', label: 'Диаграмма Ганта', icon: ICONS.gantt },
     { id: 'calendar', label: 'Календарь', icon: ICONS.cal },
     { id: 'projects', label: 'Проекты', icon: ICONS.folder },
+    { id: 'templates', label: 'Шаблоны', icon: ICONS.bookmark },
     { id: 'staff', label: 'Персонал', icon: ICONS.users },
     ...(canExport(user) || hasRole(user, 'kb_chief', 'head', 'project_lead', 'hr')
       ? [{ id: 'reports', label: 'Отчёты', icon: ICONS.chart }]
@@ -91,6 +93,7 @@ export default function MainLayout({ store, data, user }) {
       case 'gantt': return <Gantt {...commonProps} />;
       case 'calendar': return <Calendar {...commonProps} />;
       case 'projects': return <Views.ProjectsView {...commonProps} openHoursReq={openHoursReq} />;
+      case 'templates': return <Views.TemplatesView />;
       case 'cabinet':
         return (
           <Views.CabinetView
@@ -105,7 +108,7 @@ export default function MainLayout({ store, data, user }) {
       case 'staff':
         return (
           <Views.StaffView
-            store={store}                                    /* ← К1: пробрасываем store в StaffView */
+            store={store}
             db={data}
             ur={user}
             setDb={(fn) => { store._data = fn(store._data); store._notify(); }}
@@ -230,6 +233,7 @@ export default function MainLayout({ store, data, user }) {
 
       {modal && (
         <ModalRenderer
+          key={modal._seq}
           modal={modal}
           onClose={closeModal}
           db={data}
@@ -242,6 +246,8 @@ export default function MainLayout({ store, data, user }) {
           openDepts={openDepts}
           openVacation={openVacation}
           openDelegation={openDelegation}
+          openCopyTask={openCopyTask}
+          openCopyProject={openCopyProject}
           toast={showToast}
         />
       )}

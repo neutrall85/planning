@@ -1,7 +1,13 @@
 // src/utils/fileValidation.js
 
 /**
- * Валидация вложений для вкладки «Файлы» в задачах и проектах.
+ * Валидация вложений для вкладки «Вложения» в задачах и проектах.
+ *
+ * Проверяется только тип файла (MIME + расширение). Ограничение по размеру
+ * сознательно отсутствует: файлы не отправляются на сервер, а хранятся в
+ * клиентском state (url: dataURL). Если в будущем появится загрузка на бэк,
+ * лимит нужно будет задать рядом с FILE_LIMITS в constants.js — здесь, чтобы
+ * не разъезжаться с остальными компонентами.
  *
  * Allowlist, а не denylist — безопаснее по умолчанию: новые/неизвестные типы
  * блокируются, а не пропускаются. Сознательно исключены:
@@ -25,6 +31,7 @@ const ALLOWED_MIME = new Set([
   'application/vnd.openxmlformats-officedocument.presentationml.presentation',
   // Архивы
   'application/zip',
+  'application/x-zip-compressed',
   // Текст
   'text/plain',
   'text/csv',
@@ -37,8 +44,6 @@ const ALLOWED_MIME = new Set([
 
 const ALLOWED_EXT_RE = /\.(pdf|docx?|xlsx?|pptx?|zip|txt|csv|png|jpe?g|gif|webp)$/i;
 
-export const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024; // 10 МБ
-
 export const ALLOWED_TYPES_HUMAN =
   'PDF, DOC(X), XLS(X), PPT(X), ZIP, TXT, CSV, PNG, JPEG, GIF, WEBP';
 
@@ -50,12 +55,6 @@ export const ALLOWED_TYPES_HUMAN =
 export function validateAttachment(file) {
   if (!file) {
     return { ok: false, reason: 'Файл не выбран' };
-  }
-  if (file.size > MAX_ATTACHMENT_SIZE) {
-    return {
-      ok: false,
-      reason: `Файл слишком большой (максимум ${MAX_ATTACHMENT_SIZE / 1024 / 1024} МБ)`,
-    };
   }
 
   const mimeOk = ALLOWED_MIME.has(file.type);

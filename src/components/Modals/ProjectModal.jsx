@@ -8,68 +8,147 @@ import { FormField } from '../FormField';
 import ProjectChat from '../ProjectChat';
 import { ProjectGallery } from '../ProjectGallery';
 import { Lightbox } from '../Lightbox';
+import { ProjectAccessModal } from './ProjectAccessModal';
 import { useForm } from '../../hooks/useForm';
-import { useDataHelpers } from '../../hooks';
-import { PROJECT_STATUSES, PROJECT_TYPES, PROJECT_PRIORITIES, ADMIN_PROJECT_PRIORITIES } from '../../utils/constants';
-import { TODAY, iso, addDays, uid, fmtDMY, fmtDT } from '../../utils/date';
-import { canEditProjectFields, canChangeProjectStatus, canCreateProject, hasRole } from '../../utils/permissions';
+import { useDataHelpers, useStableModalHeight } from '../../hooks';
+import { useConfirm } from '../../context/ConfirmContext';
+import {
+  PROJECT_STATUSES,
+  PROJECT_TYPES,
+  PROJECT_PRIORITIES,
+  ADMIN_PROJECT_PRIORITIES,
+  DIALOGS,
+  TOASTS,
+  FILE_LIMITS,
+  FILE_MESSAGES,
+} from '../../utils/constants';
+import { TODAY, iso, addDays, uid } from '../../utils/date';
+import {
+  canEditProjectFields,
+  canChangeProjectStatus,
+  canCreateProject,
+  canManageManager,
+  canManageProjectAccess,
+  hasRole,
+} from '../../utils/permissions';
 import { getProjectColor } from '../../utils/projectHelpers';
-import { validateAttachment } from '../../utils/fileValidation';
-import { appendFileVersion } from '../../utils/fileVersions';
+import { prepareAttachments } from '../../utils/fileUpload';
+import { createFolder } from '../../utils/fileTree';
 import { Ic, ICONS } from '../Icons';
+import { TemplateSelect, TemplateActions } from '../Templates';
+import { applyTemplatePayload } from '../../utils/templateSchemas';
+import { collectTaskPayloads } from '../../utils/templateNesting';
 
 const AIRCRAFT_TYPES = ['Су-57', 'МиГ-35', 'Ту-160', 'Ил-76', 'Ка-52', 'Другой'];
 const PROJECT_TYPE_OPTIONS = ['Ремонт', 'Модификация', 'КС', 'ИКУ'];
+
+/**
+ * Копия проекта без поля access.
+ *
+ * access — не поле формы, а отдельная сущность со своим окном и
+ * своим сервисным методом. Если он попадёт в initialValues, любой
+ * внешний вызов setProjectAccess изменит initialValues в useForm,
+ * JSON-сравнение покажет «dirty», и кнопка Сохранить активируется —
+ * при том что форма проекта никаких правок не делает.
+ */
+const stripAccess = (project) => {
+  if (!project) return project;
+  const { access, ...rest } = project;
+  return rest;
+};
 
 export const ProjectModal = ({
   db,
   ur,
   projectId,
   initialTab = 'info',
+  copyFromId,
+  returnToProjectId,
   onClose,
   onSave,
   onDelete,
+  onCopy,
   toast,
   openTask,
   store,
 }) => {
-  const { empName, getTaskSpent, getProjectStats } = useDataHelpers(db);
+  const { empName, getTaskSpent } = useDataHelpers(db);
+  const { confirm } = useConfirm();
   const existing = projectId ? db.projects.find(p => p.id === projectId) : null;
+  const copySource = copyFromId ? db.projects.find(p => p.id === copyFromId) : null;
+  const isCopy = !existing && !!copySource;
   const isNew = !existing;
   const readOnly = !!(existing && existing.archived);
   const canEditFields = !readOnly && (existing ? canEditProjectFields(ur, existing) : canCreateProject(ur));
   const canChangeStatus = !readOnly && existing && canChangeProjectStatus(ur, existing, null);
+  const canChangeManager = !readOnly && (existing ? canManageManager(ur) : canCreateProject(ur));
+
+  const canCopy = canCreateProject(ur);
+  const canMakeTemplate = canCreateProject(ur);
+  const canManageAccess = !readOnly && existing && canManageProjectAccess(ur, existing);
 
   const [lightboxIndex, setLightboxIndex] = useState(null);
+  const [appliedTemplateName, setAppliedTemplateName] = useState(null);
+  const [accessOpen, setAccessOpen] = useState(false);
 
-  const initialValues = existing ? { ...existing } : {
-    id: 'p_' + uid(),
-    code: '',
-    name: '',
-    desc: '',
-    kbId: '',
-    managerId: '',
-    start: TODAY,
-    end: iso(addDays(new Date(), 30)),
-    status: 'active',
-    budget: 100,
-    color: '#64748b',
-    ptype: 'prod',
-    longterm: false,
-    archived: false,
-    archivedAt: null,
-    closedAt: null,
-    creatorId: ur.id,
-    customer: '',
-    aircraftType: '',
-    projectType: '',
-    priority: 'NORM',
-    history: [{ ts: Date.now(), who: ur.id, text: 'Проект создан' }],
-    files: [],
-    photos: [],
-    // Поле comments удалено: обсуждение живёт в глобальной коллекции
-    // data.comments (см. миграцию в DataStore._migrateComments).
-  };
+  const [pendingTemplateTasks, setPendingTemplateTasks] = useState(() =>
+    isCopy
+      ? collectTaskPayloads(
+          db.tasks.filter(t => t.projectId === copySource.id && !t.archived)
+        )
+      : []
+  );
+
+  const [activeTab, setActiveTab] = useState(initialTab);
+
+  const bodyRef = useStableModalHeight('info', activeTab);
+
+  const initialValues = existing
+    ? stripAccess(existing)
+    : isCopy
+      ? {
+          ...stripAccess(copySource),
+          id: 'p_' + uid(),
+          managerId: '',
+          status: 'active',
+          archived: false,
+          archivedAt: null,
+          closedAt: null,
+          creatorId: ur.id,
+          history: [
+            { ts: Date.now(), who: ur.id, text: `Скопирован из «${copySource.name}»` },
+          ],
+          files: [],
+          folders: [],
+          photos: [],
+        }
+      : {
+          id: 'p_' + uid(),
+          code: '',
+          name: '',
+          desc: '',
+          kbId: '',
+          managerId: '',
+          start: TODAY,
+          end: iso(addDays(new Date(), 30)),
+          status: 'active',
+          budget: 100,
+          color: '#64748b',
+          ptype: 'prod',
+          longterm: false,
+          archived: false,
+          archivedAt: null,
+          closedAt: null,
+          creatorId: ur.id,
+          customer: '',
+          aircraftType: '',
+          projectType: '',
+          priority: 'NORM',
+          history: [{ ts: Date.now(), who: ur.id, text: 'Проект создан' }],
+          files: [],
+          folders: [],
+          photos: [],
+        };
 
   const validate = useCallback((values) => {
     const errors = {};
@@ -93,9 +172,41 @@ export const ProjectModal = ({
 
   const { values, handleChange, handleSubmit, errors, touched, setFieldValue, isValid, isDirty } = useForm(initialValues, validate);
 
+  const draftTasks = useMemo(() => {
+    if (!isNew || pendingTemplateTasks.length === 0) return [];
+    return pendingTemplateTasks.map((node, idx) => ({
+      id: `draft_${idx}`,
+      _draft: true,
+      title: node.title || 'Без названия',
+      assigneeId: null,
+      status: 'new',
+      plannedHours: node.plannedHours ?? null,
+      priority: node.priority || 'mid',
+      deadline: null,
+      logs: [],
+      projectId: values.id,
+    }));
+  }, [isNew, pendingTemplateTasks, values.id]);
+
+  const applyTemplate = useCallback((template) => {
+    if (!template) {
+      setAppliedTemplateName(null);
+      setPendingTemplateTasks([]);
+      return;
+    }
+
+    const patch = applyTemplatePayload('project', template.payload);
+    const { tasks: nestedTasks, ...projectFields } = patch;
+    Object.keys(projectFields).forEach(field => setFieldValue(field, projectFields[field]));
+
+    const cleanTasks = Array.isArray(nestedTasks) ? nestedTasks : [];
+    setPendingTemplateTasks(cleanTasks);
+    setAppliedTemplateName(template.name);
+  }, [setFieldValue]);
+
   const handlePhotoUpload = useCallback((file, onDone) => {
-    if (file.size > 5 * 1024 * 1024) {
-      toast('Файл слишком большой (максимум 5 МБ)', 'error');
+    if (file.size > FILE_LIMITS.image) {
+      toast(FILE_MESSAGES.imageTooLarge, 'error');
       onDone?.();
       return;
     }
@@ -119,8 +230,9 @@ export const ProjectModal = ({
     reader.readAsDataURL(file);
   }, [values, existing, setFieldValue, store, toast, ur.id]);
 
-  const handlePhotoDelete = useCallback((photoId) => {
-    if (!window.confirm('Удалить фото?')) return;
+  const handlePhotoDelete = useCallback(async (photoId) => {
+    const ok = await confirm(DIALOGS.deleteProjectPhoto);
+    if (!ok) return;
     const currentPhotos = values.photos || [];
     const updatedPhotos = currentPhotos.filter(p => p.id !== photoId);
     const deletedWasMain = currentPhotos.find(p => p.id === photoId)?.isMain;
@@ -129,8 +241,8 @@ export const ProjectModal = ({
     }
     setFieldValue('photos', updatedPhotos);
     if (existing) store.upsertProject({ ...values, photos: updatedPhotos });
-    toast('Фото удалено', 'info');
-  }, [values.photos, existing, setFieldValue, store, toast]);
+    toast(TOASTS.photoDeleted, 'info');
+  }, [values.photos, existing, setFieldValue, store, toast, confirm]);
 
   const handleSetMain = useCallback((photoId) => {
     const currentPhotos = values.photos || [];
@@ -181,6 +293,10 @@ export const ProjectModal = ({
     if (!vals.status) { toast('Выберите статус', 'error'); return; }
 
     const finalColor = getProjectColor(vals);
+    // access в форму не входит — берём актуальное значение из стора
+    // (или пустой объект для нового проекта/копии). Так сохранение формы
+    // не откатывает свежие изменения, сделанные через ProjectAccessModal.
+    const storeProject = db.projects.find(p => p.id === vals.id);
     const projectToSave = {
       ...vals,
       color: finalColor,
@@ -188,31 +304,37 @@ export const ProjectModal = ({
       budget: isAdmin ? null : +vals.budget,
       managerId: isAdmin ? '' : vals.managerId,
       end: isAdmin ? null : vals.end,
+      access: storeProject?.access || { userIds: [] },
     };
-    onSave(projectToSave, isNew);
-  }, [isNew, toast, onSave]);
+    onSave(projectToSave, isNew, { templateTasks: pendingTemplateTasks });
+  }, [isNew, db.projects, toast, onSave, pendingTemplateTasks]);
 
-  const deleteHandler = useCallback(() => {
-    if (window.confirm('Удалить проект?')) {
-      onDelete(existing.id);
-    }
-  }, [existing, onDelete]);
+  const deleteHandler = useCallback(async () => {
+    const ok = await confirm(DIALOGS.deleteProject(existing.name));
+    if (!ok) return;
+    onDelete(existing.id);
+  }, [existing, onDelete, confirm]);
 
   const filesCount = values.files?.length || 0;
-  const tasksCount = db.tasks.filter(t => t.projectId === values.id && !t.archived).length;
-
-  const tabs = [
-    { id: 'info', label: 'Информация' },
-    { id: 'tasks', label: `Задачи (${tasksCount})` },
-    { id: 'chat', label: `Чат проекта (${store.getComments({ projectId: values.id }).length})` },
-    { id: 'files', label: `Файлы (${filesCount})` },
-  ];
-  const [activeTab, setActiveTab] = useState(initialTab);
 
   const taskList = useMemo(() => {
     if (!existing) return [];
     return db.tasks.filter(t => t.projectId === projectId && !t.archived);
   }, [db.tasks, projectId, existing]);
+
+  const displayedTasks = useMemo(
+    () => [...draftTasks, ...taskList],
+    [draftTasks, taskList]
+  );
+
+  const tasksCount = displayedTasks.length;
+
+  const tabs = [
+    { id: 'info', label: 'Информация' },
+    { id: 'tasks', label: `Задачи (${tasksCount})` },
+    { id: 'chat', label: `Чат проекта (${store.getComments({ projectId: values.id }).length})` },
+    { id: 'files', label: `Вложения (${filesCount})` },
+  ];
 
   const kbOptions = useMemo(() => db.kbs.map(k => ({ value: k.id, label: k.name })), [db.kbs]);
   const employeeOptions = useMemo(() => db.employees.filter(e => !e.fired).map(e => ({ value: e.id, label: `${e.last} ${e.first}` })), [db.employees]);
@@ -233,39 +355,56 @@ export const ProjectModal = ({
     return [...ids].map(id => db.employees.find(e => e.id === id)).filter(Boolean);
   }, [db, values.id, values.managerId]);
 
-  const handleFileUpload = useCallback((file) => {
-    const check = validateAttachment(file);
-    if (!check.ok) {
-      toast(check.reason, 'error');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const newFile = {
-        id: uid(),
-        name: file.name,
-        size: file.size,
-        url: ev.target.result,
-        uploadedBy: ur.id,
-        uploadedAt: new Date().toISOString(),
-      };
-      const updatedFiles = appendFileVersion(values.files || [], newFile);
-      setFieldValue('files', updatedFiles);
-      if (existing) store.upsertProject({ ...values, files: updatedFiles });
-      toast('Файл загружен', 'success');
-    };
-    reader.readAsDataURL(file);
-  }, [values, existing, setFieldValue, toast, ur.id, store]);
+  const handleFileUpload = useCallback(async (files, folderId = null) => {
+    const result = await prepareAttachments(files, values.files, folderId, ur.id);
 
-  const handleFileDelete = useCallback((fileId) => {
-    if (!window.confirm('Удалить файл?')) return;
+    if (result.accepted > 0) {
+      setFieldValue('files', result.nextFiles);
+      if (existing) store.upsertProject({ ...values, files: result.nextFiles });
+      toast(
+        result.accepted === 1 ? TOASTS.fileUploaded : TOASTS.filesUploaded(result.accepted),
+        'success'
+      );
+    }
+    if (result.rejected > 0) {
+      toast(TOASTS.filesRejected(result.errors.join('; ')), 'warning');
+    }
+  }, [values, existing, setFieldValue, store, toast, ur.id]);
+
+  const handleFileDelete = useCallback(async (fileId) => {
+    const ok = await confirm(DIALOGS.deleteFile);
+    if (!ok) return;
     const updatedFiles = (values.files || []).filter(f => f.id !== fileId);
     setFieldValue('files', updatedFiles);
     if (existing) store.upsertProject({ ...values, files: updatedFiles });
-    toast('Файл удалён', 'info');
-  }, [values, existing, setFieldValue, toast, store]);
+    toast(TOASTS.fileDeleted, 'info');
+  }, [values, existing, setFieldValue, toast, store, confirm]);
 
-  const saveDisabled = !(canEditFields || (existing && canChangeStatus)) || (isNew ? !isValid : !isValid || !isDirty);
+  const handleCreateFolder = useCallback((name, parentId) => {
+    const newFolder = createFolder(name, parentId, ur.id);
+    const updatedFolders = [...(values.folders || []), newFolder];
+    setFieldValue('folders', updatedFolders);
+    if (existing) store.upsertProject({ ...values, folders: updatedFolders });
+  }, [values, existing, setFieldValue, store, ur.id]);
+
+  const handleDeleteFolder = useCallback((folderId) => {
+    const updatedFolders = (values.folders || []).filter(f => f.id !== folderId);
+    setFieldValue('folders', updatedFolders);
+    if (existing) store.upsertProject({ ...values, folders: updatedFolders });
+  }, [values, existing, setFieldValue, store]);
+
+  const saveDisabled = !(canEditFields || (existing && canChangeStatus) || canChangeManager)
+    || (isNew ? !isValid : !isValid || !isDirty);
+
+  const showBackButton = !!returnToProjectId;
+
+  const modalTitle = readOnly
+    ? 'Проект (Архив)'
+    : existing
+      ? 'Карточка проекта'
+      : isCopy
+        ? `Копирование проекта: ${copySource.name}`
+        : 'Новый проект';
 
   const footer = (
     <div className="modal-foot">
@@ -274,6 +413,41 @@ export const ProjectModal = ({
           <Ic d={ICONS.trash} size={14} /> Удалить проект
         </button>
       )}
+
+      {!readOnly && existing && onCopy && canCopy && (
+        <button
+          type="button"
+          className="btn ghost sm"
+          onClick={() => onCopy(existing.id)}
+          title="Создать новый проект на основе этого"
+        >
+          <Ic d={ICONS.copy} size={13} /> Копировать
+        </button>
+      )}
+
+      {!readOnly && canMakeTemplate && (
+        <TemplateActions
+          kind="project"
+          source={values}
+          nested={existing ? collectTaskPayloads(
+            db.tasks.filter(t => t.projectId === existing.id && !t.archived)
+          ) : []}
+          toast={toast}
+          disabled={!values.name?.trim()}
+        />
+      )}
+
+      {canManageAccess && (
+        <button
+          type="button"
+          className="btn ghost sm"
+          onClick={() => setAccessOpen(true)}
+          title="Управление доступом к проекту"
+        >
+          <Ic d={ICONS.shield} size={13} /> Доступ
+        </button>
+      )}
+
       <div className="spacer" />
       <button className="btn ghost" onClick={onClose}>Отмена</button>
       <button className="btn primary" onClick={handleSubmit(saveHandler)} disabled={saveDisabled}>
@@ -283,123 +457,170 @@ export const ProjectModal = ({
   );
 
   return (
-    <ModalShell
-      title={readOnly ? 'Проект (Архив)' : existing ? 'Редактирование проекта' : 'Новый проект'}
-      onClose={onClose}
-      width={900}
-      showSave={false}
-      footer={footer}
-    >
-      <Tabs tabs={tabs} active={activeTab} onChange={setActiveTab} />
+    <>
+      <ModalShell
+        title={modalTitle}
+        onClose={onClose}
+        width={900}
+        showSave={false}
+        footer={footer}
+        bodyRef={bodyRef}
+        headerBefore={showBackButton ? (
+          <button className="btn ghost sm" onClick={onClose}>
+            <Ic d={ICONS.left} size={14} /> Назад
+          </button>
+        ) : undefined}
+      >
+        <Tabs tabs={tabs} active={activeTab} onChange={setActiveTab} />
 
-      {activeTab === 'info' && (
-        <div className="project-info-layout">
-          <div className="project-info-photos">
-            <ProjectGallery
-              photos={values.photos || []}
-              onUpload={handlePhotoUpload}
-              onDelete={handlePhotoDelete}
-              onSetMain={handleSetMain}
-              onOpenLightbox={handleOpenLightbox}
-              canUpload={!readOnly && canEditFields}
-              canDelete={!readOnly && canEditFields}
-              employeeName={empName}
-            />
-          </div>
+        {activeTab === 'info' && (
+          <div className="project-info-layout">
+            <div className="project-info-photos">
+              <ProjectGallery
+                photos={values.photos || []}
+                onUpload={handlePhotoUpload}
+                onDelete={handlePhotoDelete}
+                onSetMain={handleSetMain}
+                onOpenLightbox={handleOpenLightbox}
+                canUpload={!readOnly && canEditFields}
+                canDelete={!readOnly && canEditFields}
+                employeeName={empName}
+              />
+            </div>
 
-          <div className="project-info-fields-wrap">
-            <div className="project-info-fields">
-              <FormField label="Название" required value={values.name} onChange={(v) => handleChange('name', v)} error={touched.name && errors.name} disabled={!canEditFields} inline />
-              <FormField label="Описание" type="textarea" rows={2} value={values.desc} onChange={(v) => handleChange('desc', v)} disabled={!canEditFields} inline />
-              <FormField label="Заказчик" required value={values.customer} onChange={(v) => handleChange('customer', v)} error={touched.customer && errors.customer} disabled={!canEditFields} inline />
+            <div className="project-info-fields-wrap">
+              <div className="project-info-fields">
+                {isNew && !isCopy && (
+                  <TemplateSelect kind="project" onApply={applyTemplate} />
+                )}
 
-              <div className="fields-row">
-                <FormField label="Тип проекта" required type="select" options={Object.entries(PROJECT_TYPES).map(([k, v]) => ({ value: k, label: v }))} value={values.ptype} onChange={(v) => handleChange('ptype', v)} disabled={!canEditFields} inline />
-                <FormField label="Код" required value={values.code} onChange={(v) => handleChange('code', v)} error={touched.code && errors.code} disabled={!canEditFields} inline />
-              </div>
+                {isNew && appliedTemplateName && (
+                  <div className="info-box">
+                    Применён шаблон: <b>{appliedTemplateName}</b>
+                  </div>
+                )}
 
-              {!isAdminProject && (
+                <FormField label="Название" required value={values.name} onChange={(v) => handleChange('name', v)} error={touched.name && errors.name} disabled={!canEditFields} inline />
+                <FormField label="Описание" type="textarea" rows={2} value={values.desc} onChange={(v) => handleChange('desc', v)} disabled={!canEditFields} inline />
+                <FormField label="Заказчик" required value={values.customer} onChange={(v) => handleChange('customer', v)} error={touched.customer && errors.customer} disabled={!canEditFields} inline />
+
                 <div className="fields-row">
-                  <FormField label="Тип ВС" required type="select" options={AIRCRAFT_TYPES.map(t => ({ value: t, label: t }))} value={values.aircraftType} onChange={(v) => handleChange('aircraftType', v)} error={touched.aircraftType && errors.aircraftType} disabled={!canEditFields} inline />
-                  <FormField label="Категория" required type="select" options={PROJECT_TYPE_OPTIONS.map(t => ({ value: t, label: t }))} value={values.projectType} onChange={(v) => handleChange('projectType', v)} error={touched.projectType && errors.projectType} disabled={!canEditFields} inline />
+                  <FormField label="Тип проекта" required type="select" options={Object.entries(PROJECT_TYPES).map(([k, v]) => ({ value: k, label: v }))} value={values.ptype} onChange={(v) => handleChange('ptype', v)} disabled={!canEditFields} inline />
+                  <FormField label="Код" required value={values.code} onChange={(v) => handleChange('code', v)} error={touched.code && errors.code} disabled={!canEditFields} inline />
                 </div>
-              )}
 
-              <div className="fields-row">
-                <FormField label="Приоритет" required type="select" options={priorityOptions} value={values.priority} onChange={(v) => handleChange('priority', v)} error={touched.priority && errors.priority} disabled={!canEditFields} inline />
-                <FormField label="Подразделение" required={!isAdminProject} type="select" options={kbOptions} value={values.kbId} onChange={(v) => handleChange('kbId', v)} error={touched.kbId && errors.kbId} disabled={!canEditFields} inline />
+                {!isAdminProject && (
+                  <div className="fields-row">
+                    <FormField label="Тип ВС" required type="select" options={AIRCRAFT_TYPES.map(t => ({ value: t, label: t }))} value={values.aircraftType} onChange={(v) => handleChange('aircraftType', v)} error={touched.aircraftType && errors.aircraftType} disabled={!canEditFields} inline />
+                    <FormField label="Категория" required type="select" options={PROJECT_TYPE_OPTIONS.map(t => ({ value: t, label: t }))} value={values.projectType} onChange={(v) => handleChange('projectType', v)} error={touched.projectType && errors.projectType} disabled={!canEditFields} inline />
+                  </div>
+                )}
+
+                <div className="fields-row">
+                  <FormField label="Приоритет" required type="select" options={priorityOptions} value={values.priority} onChange={(v) => handleChange('priority', v)} error={touched.priority && errors.priority} disabled={!canEditFields} inline />
+                  <FormField label="Подразделение" required={!isAdminProject} type="select" options={kbOptions} value={values.kbId} onChange={(v) => handleChange('kbId', v)} error={touched.kbId && errors.kbId} disabled={!canEditFields} inline />
+                </div>
+
+                <div className="fields-row">
+                  <FormField label="Дата начала" required type="date" value={values.start} onChange={(v) => handleChange('start', v)} error={touched.start && errors.start} disabled={!canEditFields} inline />
+                  <FormField label="Дата окончания" required={!isAdminProject} type="date" value={values.end} onChange={(v) => handleChange('end', v)} error={touched.end && errors.end} disabled={!canEditFields || isAdminProject} inline />
+                </div>
+
+                <div className="fields-row">
+                  <FormField label="Бюджет, ч" required={!isAdminProject} type="number" min="0" step="0.5" value={values.budget} onChange={(v) => handleChange('budget', v)} error={touched.budget && errors.budget} disabled={!canEditFields || isAdminProject} inline />
+                  <FormField label="Статус" required type="select" options={statusOptions} value={values.status} onChange={(v) => handleChange('status', v)} error={touched.status && errors.status} disabled={!canChangeStatus} inline />
+                </div>
+
+                {!isAdminProject && (
+                  <FormField
+                    label="Ответственный"
+                    required
+                    type="select"
+                    options={employeeOptions}
+                    value={values.managerId}
+                    onChange={(v) => handleChange('managerId', v)}
+                    error={touched.managerId && errors.managerId}
+                    disabled={!canChangeManager}
+                    inline
+                  />
+                )}
               </div>
-
-              <div className="fields-row">
-                <FormField label="Дата начала" required type="date" value={values.start} onChange={(v) => handleChange('start', v)} error={touched.start && errors.start} disabled={!canEditFields} inline />
-                <FormField label="Дата окончания" required={!isAdminProject} type="date" value={values.end} onChange={(v) => handleChange('end', v)} error={touched.end && errors.end} disabled={!canEditFields || isAdminProject} inline />
-              </div>
-
-              <div className="fields-row">
-                <FormField label="Бюджет, ч" required={!isAdminProject} type="number" min="0" step="0.5" value={values.budget} onChange={(v) => handleChange('budget', v)} error={touched.budget && errors.budget} disabled={!canEditFields || isAdminProject} inline />
-                <FormField label="Статус" required type="select" options={statusOptions} value={values.status} onChange={(v) => handleChange('status', v)} error={touched.status && errors.status} disabled={!canChangeStatus} inline />
-              </div>
-
-              {!isAdminProject && (
-                <FormField label="Ответственный" required type="select" options={employeeOptions} value={values.managerId} onChange={(v) => handleChange('managerId', v)} error={touched.managerId && errors.managerId} disabled={!canEditFields} inline />
-              )}
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {activeTab === 'tasks' && existing && (
-        <div className="tm-block">
-          <div className="subtask-header">
-            <div className="rep-panel-title">Задачи проекта</div>
-            <button className="btn primary sm" onClick={() => { openTask(null, 'form', null, existing.id, existing.id); }} disabled={readOnly}>
-              <Ic d={ICONS.plus} size={14} /> Создать задачу
-            </button>
+        {activeTab === 'tasks' && (existing || draftTasks.length > 0) && (
+          <div className="tm-block">
+            <div className="subtask-header">
+              <div className="rep-panel-title">Задачи проекта</div>
+              {existing && (
+                <button
+                  className="btn primary sm"
+                  onClick={() => { openTask(null, 'form', null, existing.id, existing.id); }}
+                  disabled={readOnly}
+                >
+                  <Ic d={ICONS.plus} size={14} /> Создать задачу
+                </button>
+              )}
+            </div>
+            <TaskTable
+              tasks={displayedTasks}
+              onRowClick={(id) => { openTask(id, 'form', null, null, existing.id); }}
+              columns={['title', 'assignee', 'status', 'planned', 'fact', 'deadline']}
+              db={db}
+              getTaskSpent={getTaskSpent}
+              empName={empName}
+            />
           </div>
-          <TaskTable
-            tasks={taskList}
-            onRowClick={(id) => { openTask(id, 'form', null, null, existing.id); }}
-            columns={['title', 'assignee', 'status', 'planned', 'fact', 'deadline']}
-            db={db}
-            getTaskSpent={getTaskSpent}
-            empName={empName}
+        )}
+
+        {activeTab === 'chat' && (
+          <ProjectChat
+            projectId={values.id}
+            store={store}
+            currentUser={ur}
+            toast={toast}
+            employees={db.employees}
+            candidates={candidates}
+            openTask={openTask}
+            tasks={db.tasks}
           />
-        </div>
-      )}
+        )}
 
-      {activeTab === 'chat' && (
-        <ProjectChat
-          projectId={values.id}
+        {activeTab === 'files' && (
+          <FileManager
+            files={values.files || []}
+            folders={values.folders || []}
+            onUpload={handleFileUpload}
+            onDelete={handleFileDelete}
+            onCreateFolder={handleCreateFolder}
+            onDeleteFolder={handleDeleteFolder}
+            canUpload={!readOnly && (canEditFields || values.managerId === ur.id || hasRole(ur, 'admin', 'director', 'project_manager'))}
+            canDelete={!readOnly && (canEditFields || values.managerId === ur.id || hasRole(ur, 'admin', 'director', 'project_manager'))}
+            employeeName={empName}
+          />
+        )}
+
+        {lightboxIndex !== null && (values.photos || []).length > 0 && (
+          <Lightbox
+            photos={values.photos || []}
+            currentIndex={lightboxIndex}
+            onClose={handleCloseLightbox}
+            onPrev={handlePrevPhoto}
+            onNext={handleNextPhoto}
+          />
+        )}
+      </ModalShell>
+
+      {accessOpen && existing && (
+        <ProjectAccessModal
+          db={db}
+          projectId={existing.id}
           store={store}
-          currentUser={ur}
           toast={toast}
-          employees={db.employees}
-          candidates={candidates}
-          openTask={openTask}
-          tasks={db.tasks}
+          onClose={() => setAccessOpen(false)}
         />
       )}
-
-      {activeTab === 'files' && (
-        <FileManager
-          files={values.files || []}
-          onUpload={handleFileUpload}
-          onDelete={handleFileDelete}
-          canUpload={!readOnly && (canEditFields || values.managerId === ur.id || hasRole(ur, 'admin', 'director', 'project_manager'))}
-          canDelete={!readOnly && (canEditFields || values.managerId === ur.id || hasRole(ur, 'admin', 'director', 'project_manager'))}
-          employeeName={empName}
-        />
-      )}
-
-      {lightboxIndex !== null && (values.photos || []).length > 0 && (
-        <Lightbox
-          photos={values.photos || []}
-          currentIndex={lightboxIndex}
-          onClose={handleCloseLightbox}
-          onPrev={handlePrevPhoto}
-          onNext={handleNextPhoto}
-        />
-      )}
-    </ModalShell>
+    </>
   );
 };

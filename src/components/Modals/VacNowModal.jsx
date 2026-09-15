@@ -42,13 +42,13 @@ export const VacNowModal = ({ db, onClose, toast }) => {
         <tbody>
           {rows.map(r => (
             <tr key={r.v.id}>
-              <td><b>{r.e ? `${r.e.last} ${r.e.first}` : '—'}</b></td>
-              <td>{r.dept?.name || '—'}</td>
+              <td><b>{r.e ? `${r.e.last} ${r.e.first}` : '-'}</b></td>
+              <td>{r.dept?.name || '-'}</td>
               <td>{fmtDMY(r.v.start)}</td>
               <td>{fmtDMY(r.v.end)}</td>
               <td>{VACATION_TYPES[r.v.type]}</td>
-              <td>{r.v.delegation.enabled ? `→ ${empName(r.v.delegation.subId)}` : '—'}</td>
-              <td className="mut">{r.v.comment || '—'}</td>
+              <td>{r.v.delegation.enabled ? `→ ${empName(r.v.delegation.subId)}` : '-'}</td>
+              <td className="mut">{r.v.comment || '-'}</td>
             </tr>
           ))}
           {rows.length === 0 && <tr><td colSpan="7" className="mut">Сейчас никто не находится в отпуске</td></tr>}

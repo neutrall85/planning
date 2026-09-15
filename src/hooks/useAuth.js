@@ -5,9 +5,9 @@ import { useStore } from './useStore';
  *
  * Сравнение по ссылке здесь ненадёжно: Repository.save() заменяет
  * элемент на новый, а AuthService._currentUser может остаться старым.
- * Поэтому источник правды — data.employees, а _currentUser нужен только
+ * Поэтому источник правды - data.employees, а _currentUser нужен только
  * чтобы знать id сессии. useStore уже держит подписку, derived-значение
- * пересчитывается автоматически — без useState/useEffect и без
+ * пересчитывается автоматически - без useState/useEffect и без
  * re-render loop'ов.
  */
 export const useAuth = () => {

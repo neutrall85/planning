@@ -227,20 +227,20 @@ export const daysDiff = (a,b) => Math.round((parseISO(b)-parseISO(a))/86400000);
 export const MS_SHORT = ["янв","фев","мар","апр","мая","июн","июл","авг","сен","окт","ноя","дек"];
 export const MS_FULL = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
 export const fmtD = (s) => { 
-  if (!s) return "—";
+  if (!s) return "-";
   const d = new Date(s);
-  if (isNaN(d.getTime())) return "—";
+  if (isNaN(d.getTime())) return "-";
   return `${d.getDate()} ${MS_SHORT[d.getMonth()]}`;
 };
 export const fmtDMY = (s) => {
-  if (!s) return "—";
+  if (!s) return "-";
   const d = new Date(s);
-  if (isNaN(d.getTime())) return "—";
+  if (isNaN(d.getTime())) return "-";
   return `${pad2(d.getDate())}.${pad2(d.getMonth()+1)}.${d.getFullYear()}`;
 };
 export const fmtDT = (ts) => {
   const d = new Date(ts);
-  if (isNaN(d.getTime())) return "—";
+  if (isNaN(d.getTime())) return "-";
   return `${fmtDMY(iso(d))} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 };
 export const uid = () => Math.random().toString(36).slice(2,10);
@@ -291,7 +291,7 @@ export function getEmployeePrimaryDepartment(employee, db) {
 // Упрощённая версия, возвращающая только название
 export function getPrimaryDeptName(employee, db) {
   const dept = getEmployeePrimaryDepartment(employee, db);
-  return dept ? dept.name : '—';
+  return dept ? dept.name : '-';
 }
 ```
 ### `src/utils/permissions.js`
@@ -521,7 +521,7 @@ export function taskVisible(u, scope, t, db) {
 
 export function empName(db, id) {
   const e = db.employees.find(x => x.id === id);
-  return e ? `${e.last} ${e.first}` : "—";
+  return e ? `${e.last} ${e.first}` : "-";
 }
 export function primaryDept(db, e) {
   if (!e) return null;
@@ -763,12 +763,12 @@ export default class DataStore {
       const changes = [];
       if (old.title !== task.title) changes.push(`Название: "${old.title}" → "${task.title}"`);
       if (!task.isSummary && old.plannedHours !== task.plannedHours) {
-        changes.push(`Плановые часы: ${old.plannedHours ?? '—'} → ${task.plannedHours ?? '—'}`);
+        changes.push(`Плановые часы: ${old.plannedHours ?? '-'} → ${task.plannedHours ?? '-'}`);
       }
       // Сравниваем assigneeId
       if (old.assigneeId !== task.assigneeId) {
-        const oldName = old.assigneeId ? this.empName(old.assigneeId) : '—';
-        const newName = task.assigneeId ? this.empName(task.assigneeId) : '—';
+        const oldName = old.assigneeId ? this.empName(old.assigneeId) : '-';
+        const newName = task.assigneeId ? this.empName(task.assigneeId) : '-';
         changes.push(`Исполнитель: ${oldName} → ${newName}`);
       }
       if (old.status !== task.status) {
@@ -854,7 +854,7 @@ export default class DataStore {
       const changes = [];
       if (oldProject.name !== project.name) changes.push(`Название: "${oldProject.name}" → "${project.name}"`);
       if (oldProject.code !== project.code) changes.push(`Код: "${oldProject.code}" → "${project.code}"`);
-      if (oldProject.budget !== project.budget) changes.push(`Бюджет: ${oldProject.budget ?? '—'} → ${project.budget ?? '—'}`);
+      if (oldProject.budget !== project.budget) changes.push(`Бюджет: ${oldProject.budget ?? '-'} → ${project.budget ?? '-'}`);
       if (oldProject.status !== project.status) {
         changes.push(`Статус: ${PROJECT_STATUSES[oldProject.status]} → ${PROJECT_STATUSES[project.status]}`);
         if ((project.status === 'closed' || project.status === 'cancelled') && oldProject.status !== project.status) {
@@ -905,11 +905,11 @@ export default class DataStore {
     let vacations;
     if (idx >= 0) {
       const old = this._data.vacations[idx];
-      this.addAudit('Изменение отпуска', `${vac.empId} ${fmtDMY(vac.start)}—${fmtDMY(vac.end)}`);
+      this.addAudit('Изменение отпуска', `${vac.empId} ${fmtDMY(vac.start)}-${fmtDMY(vac.end)}`);
       vacations = this._data.vacations.map(v => v.id === vac.id ? vac : v);
     } else {
       vacations = [...this._data.vacations, vac];
-      this.addAudit('Создание отпуска', `${vac.empId} ${fmtDMY(vac.start)}—${fmtDMY(vac.end)}`);
+      this.addAudit('Создание отпуска', `${vac.empId} ${fmtDMY(vac.start)}-${fmtDMY(vac.end)}`);
     }
     this._data = { ...this._data, vacations };
     this._notify();
@@ -921,7 +921,7 @@ export default class DataStore {
   deleteVacation(id) {
     const vac = this._data.vacations.find(v => v.id === id);
     if (vac) {
-      this.addAudit('Удаление отпуска', `${vac.empId} ${fmtDMY(vac.start)}—${fmtDMY(vac.end)}`);
+      this.addAudit('Удаление отпуска', `${vac.empId} ${fmtDMY(vac.start)}-${fmtDMY(vac.end)}`);
       if (vac.delegation.enabled) {
         this.revertDelegation(id);
       }
@@ -1094,7 +1094,7 @@ export default class DataStore {
 
   empName(id) {
     const e = this._data.employees.find(x => x.id === id);
-    return e ? `${e.last} ${e.first}` : '—';
+    return e ? `${e.last} ${e.first}` : '-';
   }
 }
 ```
@@ -1350,7 +1350,7 @@ export function buildMockData() {
       id: "p_old",
       code: "ИТ-15",
       name: "Модернизация локальной сети предприятия",
-      desc: "Проект завершён более полугода назад — подлежит архивации.",
+      desc: "Проект завершён более полугода назад - подлежит архивации.",
       kbId: null,
       managerId: "e_morozov",
       start: D(-300),
@@ -1376,7 +1376,7 @@ export function buildMockData() {
       id: "p_long",
       code: "АДМ-0",
       name: "Многолетняя программа внутренних мероприятий",
-      desc: "Долгосрочный административный проект — исключение из архивации.",
+      desc: "Долгосрочный административный проект - исключение из архивации.",
       kbId: null,
       managerId: "olga.personalova",
       start: D(-400),
@@ -1594,7 +1594,7 @@ export function buildMockData() {
   const tasks = [
     T("t01", "Расчёт подъёмной силы крыла", "p_lm24", "isaev", 24, -12, 6, "inwork", "high", "Расчёт и оформление отчёта.", {
       logs: [ { id: uid(), userId: "isaev", date: makeDate(-6), hours: 6, note: "Проверка методики" }, { id: uid(), userId: "isaev", date: makeDate(-2), hours: 5, note: "Расчётная сетка" } ],
-      comments: [ { id: "c1", parentId: null, authorId: "e_morozov", ts: now - 3600000 * 20, text: "@Исаев Роман — подключите, пожалуйста, отдел прочности к пятнице." }, { id: "c2", parentId: "c1", authorId: "isaev", ts: now - 3600000 * 18, text: "Принято, сегодня подготовлю исходные данные." } ],
+      comments: [ { id: "c1", parentId: null, authorId: "e_morozov", ts: now - 3600000 * 20, text: "@Исаев Роман - подключите, пожалуйста, отдел прочности к пятнице." }, { id: "c2", parentId: "c1", authorId: "isaev", ts: now - 3600000 * 18, text: "Принято, сегодня подготовлю исходные данные." } ],
       creatorId: "e_morozov"
     }),
     T("t02", "3D-модель фюзеляжа", "p_lm24", "e_tolka", 40, -15, 12, "inwork", "mid", "Силовой набор и обводы.", {
@@ -1654,7 +1654,7 @@ export function buildMockData() {
       closedAt: D(-220),
       creatorId: "e_morozov"
     }),
-    T("t_a3", "Подготовка регламента мероприятий", "p_long", "olga.personalova", 10, -320, -305, "closed", "low", "Задача долгосрочного административного проекта — не архивируется.", {
+    T("t_a3", "Подготовка регламента мероприятий", "p_long", "olga.personalova", 10, -320, -305, "closed", "low", "Задача долгосрочного административного проекта - не архивируется.", {
       logs: [ { id: uid(), userId: "olga.personalova", date: makeDate(-310), hours: 9, note: "Регламент готов" } ],
       closedAt: D(-300),
       creatorId: "olga.personalova"
@@ -1707,7 +1707,7 @@ export function buildMockData() {
 
   const notifications = [
     { id: uid(), userId: "aleksey.gendirov", text: "Запрос на изменение плановых часов по задаче «Отчёт по прочности фюзеляжа» ожидает решения.", ts: now - 3600000 * 5, read: false, targetType: 'hours', targetId: 'hr1' },
-    { id: uid(), userId: "e_fedorov", text: "Тихонов Е. подал заявку на отпуск с делегированием задач — требуется утверждение.", ts: now - 3600000 * 8, read: false, targetType: 'vacation', targetId: 'v2' },
+    { id: uid(), userId: "e_fedorov", text: "Тихонов Е. подал заявку на отпуск с делегированием задач - требуется утверждение.", ts: now - 3600000 * 8, read: false, targetType: 'vacation', targetId: 'v2' },
     { id: uid(), userId: "e_anokhin", text: "Вам переданы задачи Сомовой Е. на период отпуска.", ts: now - 3600000 * 30, read: false, targetType: 'task', targetId: 't08' },
     { id: uid(), userId: "nikolay.managerov", text: "Новая заявка на регистрацию: Новиков Олег.", ts: now - 3600000 * 26, read: false, targetType: 'registration', targetId: 'rg1' },
   ];
@@ -1776,9 +1776,9 @@ import { useMemo } from 'react';
 
 export const useDataHelpers = (data) => {
   const empName = (id) => {
-    if (!data || !data.employees) return '—';
+    if (!data || !data.employees) return '-';
     const e = data.employees.find(x => x.id === id);
-    return e ? `${e.last} ${e.first}` : '—';
+    return e ? `${e.last} ${e.first}` : '-';
   };
 
   const primaryDept = (emp) => {
@@ -4373,7 +4373,7 @@ input, select, textarea {
 .cal-dot-crit { background: #f59e0b; }
 .cal-dot-norm { background: #10b981; }
 
-/* Кастомный тултип для аватара — работает для всех аватаров */
+/* Кастомный тултип для аватара - работает для всех аватаров */
 .avatar-tooltip {
   position: fixed;
   background: #1e293b;
@@ -4427,7 +4427,7 @@ input, select, textarea {
   min-width: 0;
 }
 
-/* Парные строки — в одну линию */
+/* Парные строки - в одну линию */
 .pj-pair-row {
   display: flex;
   flex-wrap: nowrap;
@@ -4686,7 +4686,7 @@ export default function Archive({ db, ur, openTask, openProject, restoreTask, re
               <tr key={t.id}>
                 <td><b>{t.title}</b></td>
                 <td>{db.projects.find(x => x.id === t.projectId)?.code}</td>
-                <td>{t.assigneeId ? empName(t.assigneeId) : '—'}</td>
+                <td>{t.assigneeId ? empName(t.assigneeId) : '-'}</td>
                 <td>{fmtDMY(t.archivedAt)}</td>
                 <td>
                   <button className="btn ghost sm" onClick={() => openTask(t.id)}>Открыть</button>
@@ -4911,7 +4911,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
             date: l.date,
             hours: l.hours,
             task: t.title,
-            project: project?.code || '—'
+            project: project?.code || '-'
           });
         }
       });
@@ -4987,7 +4987,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
             <div className="toolbar" style={{ marginBottom: 12, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
               <span className="mut sm">Экспорт:</span>
               <input className="inp" type="date" style={{ width: 150 }} value={expFrom} onChange={e => setExpFrom(e.target.value)} />
-              <span className="mut sm">—</span>
+              <span className="mut sm">-</span>
               <input className="inp" type="date" style={{ width: 150 }} value={expTo} onChange={e => setExpTo(e.target.value)} />
               <button className="btn primary sm" onClick={exportMyReport}>
                 <Ic d={ICONS.download} size={13} /> Выгрузить в Excel (CSV)
@@ -5012,7 +5012,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
                       <td style={{ textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #f1f5f9' }}>
                         {task.title}
                         <span className="mut sm" style={{ marginLeft: 8, fontWeight: 400 }}>
-                          ({data.projects.find(p => p.id === task.projectId)?.code || '—'})
+                          ({data.projects.find(p => p.id === task.projectId)?.code || '-'})
                         </span>
                       </td>
                       {days.map(d => (
@@ -5046,7 +5046,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
                     <div key={t.id} className="cab-task" onClick={() => openTask(t.id)}>
                       <span className="pdot" style={{ background: data.projects.find(p => p.id === t.projectId)?.color }} />
                       {t.title}
-                      <span className="mut sm"> · {t.deadline ? `до ${fmtD(t.deadline)}` : 'без срока исполнения'} · {t.plannedHours ?? '—'} ч</span>
+                      <span className="mut sm"> · {t.deadline ? `до ${fmtD(t.deadline)}` : 'без срока исполнения'} · {t.plannedHours ?? '-'} ч</span>
                     </div>
                   ))}
                 </div>
@@ -5060,7 +5060,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
             {myProjects.map(p => (
               <div key={p.id} className="cab-proj">
                 <span className="pdot" style={{ background: p.color }} />
-                {p.code} — {p.name}
+                {p.code} - {p.name}
                 {p.ptype === 'admin' && <span className="adm-badge" style={{ marginLeft: 8 }}>адм</span>}
               </div>
             ))}
@@ -5086,8 +5086,8 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
                   <tr key={v.id}>
                     <td>{fmtDMY(v.start)}</td><td>{fmtDMY(v.end)}</td>
                     <td>{VACATION_TYPES[v.type]}</td>
-                    <td>{v.comment || '—'}</td>
-                    <td>{v.delegation.enabled ? `→ ${empName(v.delegation.subId)}` : '—'}</td>
+                    <td>{v.comment || '-'}</td>
+                    <td>{v.delegation.enabled ? `→ ${empName(v.delegation.subId)}` : '-'}</td>
                     <td><span className={`st-chip ${v.status}`}>
                       {{ pending: 'На утверждении', approved: 'Утверждён', rejected: 'Отклонён' }[v.status]}
                     </span></td>
@@ -5124,7 +5124,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
                 <tr key={r.id}>
                   <td>{empName(r.fromId)}</td><td>{empName(r.toId)}</td>
                   <td>{r.roles.join(', ')}</td>
-                  <td>{fmtDMY(r.start)} — {r.end ? fmtDMY(r.end) : 'до отмены'}</td>
+                  <td>{fmtDMY(r.start)} - {r.end ? fmtDMY(r.end) : 'до отмены'}</td>
                   <td><span className={`st-chip ${r.status}`}>
                     {{ pending: 'Ожидает принятия', active: 'Активно', rejected: 'Отклонено', revoked: 'Отозвано', expired: 'Истекло' }[r.status]}
                   </span></td>
@@ -5236,8 +5236,8 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
             <div className="rep-panel">
               <div className="rep-panel-title">Уведомления</div>
               {[
-                ['deadlineEmail', 'E-mail о сроках — за 3 дня до срока исполнения задачи'],
-                ['overdueDigest', 'Контроль просрочек — ежедневная сводка'],
+                ['deadlineEmail', 'E-mail о сроках - за 3 дня до срока исполнения задачи'],
+                ['overdueDigest', 'Контроль просрочек - ежедневная сводка'],
                 ['commentSub', 'Подписка на обсуждение задач, где я исполнитель или ответственный']
               ].map(([k, label]) => (
                 <label key={k} className="toggle-row">
@@ -5252,7 +5252,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
 
               <div className="rep-panel-title" style={{ marginTop: 16 }}>История делегирований</div>
               {data.roleDelegations.filter(r => r.fromId === user.id).map(r => (
-                <div key={r.id} className="mut sm">→ {empName(r.toId)}: {r.roles.join(', ')} ({fmtDMY(r.start)} — {r.end ? fmtDMY(r.end) : 'до отмены'})</div>
+                <div key={r.id} className="mut sm">→ {empName(r.toId)}: {r.roles.join(', ')} ({fmtDMY(r.start)} - {r.end ? fmtDMY(r.end) : 'до отмены'})</div>
               ))}
               {data.roleDelegations.filter(r => r.fromId === user.id).length === 0 && <div className="mut sm">Передач ролей не было</div>}
             </div>
@@ -5340,7 +5340,7 @@ export default function Calendar({ db, ur, openTask }) {
     else setAnchor(addDays(anchor, dir));
   };
   const title = mode === 'month' ? `${['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'][anchor.getMonth()]} ${anchor.getFullYear()}` :
-    mode === 'week' ? `Неделя ${fmtDMY(iso(addDays(anchor, -((anchor.getDay()+6)%7))))} — ${fmtDMY(iso(addDays(anchor, 6-((anchor.getDay()+6)%7))))}` : fmtDMY(iso(anchor));
+    mode === 'week' ? `Неделя ${fmtDMY(iso(addDays(anchor, -((anchor.getDay()+6)%7))))} - ${fmtDMY(iso(addDays(anchor, 6-((anchor.getDay()+6)%7))))}` : fmtDMY(iso(anchor));
 
   let body = null;
   if (mode === 'month') {
@@ -5724,7 +5724,7 @@ export default function Discussion({
             <div className="cm-head">
               <Avatar employee={author} size="xs" />
               <span className="cm-author">
-                {author ? `${author.last} ${author.first}` : "—"}
+                {author ? `${author.last} ${author.first}` : "-"}
               </span>
               <span className="mut sm">{fmtDT(c.ts)}</span>
               {!readOnly &&
@@ -5794,7 +5794,7 @@ export default function Discussion({
       {renderTree(null, 0)}
 
       {comments.length === 0 && (
-        <div className="mut sm">Обсуждений пока нет — начните диалог.</div>
+        <div className="mut sm">Обсуждений пока нет - начните диалог.</div>
       )}
 
       {!readOnly && canComment ? (
@@ -5856,7 +5856,7 @@ export default function Discussion({
 
           <div className="cm-foot">
             <span className="mut sm">
-              Участники получат уведомление; упомянутые — отдельно.
+              Участники получат уведомление; упомянутые - отдельно.
             </span>
             <button className="btn primary sm" onClick={send}>
               <Ic d={ICONS.chat} size={13} /> Отправить
@@ -5944,7 +5944,7 @@ export default function EditEmployeeModal({ db, setDb, employeeId, onClose, toas
   };
 
   return (
-    <Modal title={`Редактирование сотрудника — ${emp.last} ${emp.first}`} onClose={onClose} width={560}>
+    <Modal title={`Редактирование сотрудника - ${emp.last} ${emp.first}`} onClose={onClose} width={560}>
       <div className="form-grid">
         <label className="lbl">Фамилия *</label>
         <input className="inp" name="last" value={form.last} onChange={handleChange} />
@@ -6264,7 +6264,7 @@ export default function Gantt({ db, ur, openTask, openProject }) {
                     const pct = Math.min(100, (sp / Math.max(1, t.plannedHours || 0)) * 100);
                     const fillWidth = pct > 0 ? Math.max(pct, 2) : 0;
                     const vac = assignee ? vacOverlap(assignee.id, t.start, t.deadline) : null;
-                    const tip = `${t.title}: ${fmtD(t.start)} — ${fmtD(t.deadline)}, план ${t.plannedHours ?? '—'} ч${vac ? `. Исполнитель в отпуске ${fmtDMY(vac.start)}–${fmtDMY(vac.end)}` : ''}`;
+                    const tip = `${t.title}: ${fmtD(t.start)} - ${fmtD(t.deadline)}, план ${t.plannedHours ?? '-'} ч${vac ? `. Исполнитель в отпуске ${fmtDMY(vac.start)}–${fmtDMY(vac.end)}` : ''}`;
                     const depTask = taskDeps[t.id];
                     let depLine = null;
                     if (depTask) {
@@ -6308,7 +6308,7 @@ export default function Gantt({ db, ur, openTask, openProject }) {
                         <div className="gantt-label" onClick={() => openTask(t.id)}>
                           <span className={`gtitle${t.status === 'cancelled' ? ' dim' : ''}`}>{t.title}</span>
                           <span className="gsub">
-                            {assignee && <Avatar employee={assignee} size="xs" />} · {t.plannedHours ?? '—'} ч · {TASK_STATUSES[t.status].label}
+                            {assignee && <Avatar employee={assignee} size="xs" />} · {t.plannedHours ?? '-'} ч · {TASK_STATUSES[t.status].label}
                           </span>
                         </div>
                         <div className="gantt-track">
@@ -6341,8 +6341,8 @@ export default function Gantt({ db, ur, openTask, openProject }) {
       <div className="gantt-legend" style={{ padding: '8px 16px', borderTop: '1px solid var(--line)' }}>
         <span><span className="lg-dot" style={{ background: '#ef4444' }} /> сегодня</span>
         <span><span className="lg-dot" style={{ background: '#e2e8f0' }} /> выходные</span>
-        <span>🏖 — исполнитель в отпуске</span>
-        <span>Заполнение полосы — факт / план</span>
+        <span>🏖 - исполнитель в отпуске</span>
+        <span>Заполнение полосы - факт / план</span>
       </div>
     </div>
   );
@@ -6595,7 +6595,7 @@ export default function Journal({ db }) {
     const rows = filteredEntries.map(e => {
       const d = safeDate(e.ts);
       const date = d ? fmtDMY(e.ts) : 'неизвестно';
-      const time = d ? d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '—';
+      const time = d ? d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '-';
       const user = e.userId === 'system' ? 'Система' : empName(e.userId) || e.userId;
       const details = typeof e.details === 'string' ? e.details.replace(/"/g, '""') : '';
       return [date, time, user, e.action, `"${details}"`].join(';');
@@ -6623,7 +6623,7 @@ export default function Journal({ db }) {
             onChange={e => handleFilterChange('dateFrom', e.target.value)}
             style={{ width: '150px' }}
           />
-          <span>—</span>
+          <span>-</span>
           <input
             className="inp"
             type="date"
@@ -6759,7 +6759,7 @@ export default function Journal({ db }) {
                           color: 'var(--mut)',
                           fontFamily: 'monospace',
                         }}>
-                          {safeDate(entry.ts) ? fmtDT(entry.ts) : '—'}
+                          {safeDate(entry.ts) ? fmtDT(entry.ts) : '-'}
                         </td>
                         <td>
                           <div style={{ 
@@ -7147,7 +7147,7 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
           {mode !== "register" && (
             <>
               <h3>{mode === "forgot" ? "Восстановление пароля" : "Вход в систему"}</h3>
-              <div className="login-sub">{mode === "forgot" ? "Ссылка будет отправлена на зарегистрированный e-mail" : "Логин — e-mail без домена " + "@" + DOMAIN}</div>
+              <div className="login-sub">{mode === "forgot" ? "Ссылка будет отправлена на зарегистрированный e-mail" : "Логин - e-mail без домена " + "@" + DOMAIN}</div>
               {mode === "forgot" ? (
                 <>
                   <label className="lbl">E-mail</label>
@@ -7220,8 +7220,8 @@ export default function LoginScreen({ db, setDb, onLogin, toast }) {
                 <button type="button" className="link" onClick={() => { setMode("forgot"); setErr(null); }}>Забыли пароль?</button>
                 <button type="button" className="link" onClick={() => { setMode("register"); setErr(null); }}>Регистрация</button>
               </div>
-              <div className="cookie-note">Сессия хранится в cookie 30 дней (HttpOnly, Secure, SameSite=Lax — на стороне сервера).</div>
-              <div className="demo-title">Демо-доступы — клик сразу выполняет вход</div>
+              <div className="cookie-note">Сессия хранится в cookie 30 дней (HttpOnly, Secure, SameSite=Lax - на стороне сервера).</div>
+              <div className="demo-title">Демо-доступы - клик сразу выполняет вход</div>
               <div className="demo-grid">
                 {demos.map((d) => (
                   <button type="button" key={d.l} className="demo-chip" onClick={() => { setLg(d.l); setPw(d.p); setErr(null); doLogin(d.l, d.p); }}>
@@ -7593,11 +7593,11 @@ export default function ModalRenderer({
             const old = db.tasks.find(x => x.id === task.id);
             if (old && hasRole(ur, 'admin')) {
               const changes = {};
-              if (old.plannedHours !== task.plannedHours) changes.plannedHours = `${old.plannedHours ?? '—'} → ${task.plannedHours ?? '—'}`;
+              if (old.plannedHours !== task.plannedHours) changes.plannedHours = `${old.plannedHours ?? '-'} → ${task.plannedHours ?? '-'}`;
               if (old.status !== task.status) changes.status = `${TASK_STATUSES[old.status].label} → ${TASK_STATUSES[task.status].label}`;
               if (JSON.stringify(old.assigneeIds || []) !== JSON.stringify(task.assigneeIds || []))
                 changes.assignees = `${(old.assigneeIds || []).map(id => empName(id)).join(', ')} → ${(task.assigneeIds || []).map(id => empName(id)).join(', ')}`;
-              if (old.deadline !== task.deadline) changes.deadline = `${old.deadline ? fmtDMY(old.deadline) : '—'} → ${task.deadline ? fmtDMY(task.deadline) : '—'}`;
+              if (old.deadline !== task.deadline) changes.deadline = `${old.deadline ? fmtDMY(old.deadline) : '-'} → ${task.deadline ? fmtDMY(task.deadline) : '-'}`;
               if (Object.keys(changes).length) {
                 store.addAudit('Административное изменение задачи (прямое)', changes, 'task', task.id);
               }
@@ -7606,7 +7606,7 @@ export default function ModalRenderer({
             if (isNew) {
               (task.assigneeIds || []).forEach(id => {
                 if (id !== ur.id) {
-                  store.addNotification(id, `Вам назначена задача "${task.title}" (проект ${db.projects.find(p => p.id === task.projectId)?.code || '—'}).`, { targetType: 'task', targetId: task.id });
+                  store.addNotification(id, `Вам назначена задача "${task.title}" (проект ${db.projects.find(p => p.id === task.projectId)?.code || '-'}).`, { targetType: 'task', targetId: task.id });
                 }
               });
             }
@@ -7639,7 +7639,7 @@ export default function ModalRenderer({
             const old = db.projects.find(x => x.id === p.id);
             if (old && hasRole(ur, 'admin')) {
               const changes = {};
-              if (old.budget !== p.budget) changes.budget = `${old.budget ?? '—'} → ${p.budget ?? '—'}`;
+              if (old.budget !== p.budget) changes.budget = `${old.budget ?? '-'} → ${p.budget ?? '-'}`;
               if (old.name !== p.name) changes.name = `${old.name} → ${p.name}`;
               if (old.managerId !== p.managerId) changes.manager = `${empName(old.managerId)} → ${empName(p.managerId)}`;
               if (old.status !== p.status) changes.status = `${PROJECT_STATUSES[old.status]} → ${PROJECT_STATUSES[p.status]}`;
@@ -7727,7 +7727,7 @@ export default function ModalRenderer({
           onClose={onClose}
           onSave={(v, isNew) => {
             store.upsertVacation(v);
-            store.addAudit(isNew ? 'Создание отпуска' : 'Изменение отпуска', { employee: empName(v.empId), period: `${fmtDMY(v.start)}—${fmtDMY(v.end)}` }, 'vacation', v.id);
+            store.addAudit(isNew ? 'Создание отпуска' : 'Изменение отпуска', { employee: empName(v.empId), period: `${fmtDMY(v.start)}-${fmtDMY(v.end)}` }, 'vacation', v.id);
             onClose();
           }}
         />
@@ -7880,7 +7880,7 @@ export default function Projects({ db, ur, openProject, openHoursReq, closeProje
               </div>
               <div className="pj-name">{p.name}</div>
               <div className="pj-row">
-                <span className="mut">Сроки:</span> {fmtDMY(p.start)} — {p.end ? fmtDMY(p.end) : 'не задан'}
+                <span className="mut">Сроки:</span> {fmtDMY(p.start)} - {p.end ? fmtDMY(p.end) : 'не задан'}
               </div>
               <ProjectProgress project={p} plan={plan} fact={fact} />
               <div className="pj-foot">
@@ -8187,13 +8187,13 @@ export default function Reports({ db, ur }) {
                   <tr key={t.id}>
                     <td>{idx + 1}</td>
                     <td><b>{t.title}</b></td>
-                    <td>{project?.code || '—'}</td>
-                    <td>{t.assigneeId ? empName(t.assigneeId) : '—'}</td>
+                    <td>{project?.code || '-'}</td>
+                    <td>{t.assigneeId ? empName(t.assigneeId) : '-'}</td>
                     <td><span className="st-chip" style={{ background: statusDef.color + '22', color: statusDef.color }}>{statusDef.label}</span></td>
                     <td><span style={{ color: priorityDef.color }}>{priorityDef.label}</span></td>
-                    <td>{t.plannedHours ?? '—'}</td>
+                    <td>{t.plannedHours ?? '-'}</td>
                     <td>{getTaskSpent(t)}</td>
-                    <td>{t.deadline ? fmtDMY(t.deadline) : '—'}</td>
+                    <td>{t.deadline ? fmtDMY(t.deadline) : '-'}</td>
                   </tr>
                 );
               })}
@@ -8227,8 +8227,8 @@ export default function Reports({ db, ur }) {
                     <td><b>{p.code}</b></td>
                     <td>{p.name}</td>
                     <td><span className={`st-chip ${p.status === 'active' ? 'active' : ''}`}>{PROJECT_STATUSES[p.status] || p.status}</span></td>
-                    <td>{p.customer || '—'}</td>
-                    <td>{p.budget ?? '—'}</td>
+                    <td>{p.customer || '-'}</td>
+                    <td>{p.budget ?? '-'}</td>
                     <td>{stats.plan}</td>
                     <td>{stats.fact}</td>
                     <td>{empName(p.managerId)}</td>
@@ -8297,11 +8297,11 @@ export default function Reports({ db, ur }) {
                   <tr key={idx}>
                     <td>{idx + 1}</td>
                     <td>{fmtDMY(l.date)}</td>
-                    <td>{user ? `${user.last} ${user.first}` : '—'}</td>
+                    <td>{user ? `${user.last} ${user.first}` : '-'}</td>
                     <td>{l.taskTitle}</td>
-                    <td>{project?.code || '—'}</td>
+                    <td>{project?.code || '-'}</td>
                     <td><b>{l.hours}</b></td>
-                    <td>{l.note || '—'}</td>
+                    <td>{l.note || '-'}</td>
                   </tr>
                 );
               })}
@@ -8350,7 +8350,7 @@ export default function Reports({ db, ur }) {
                 onChange={e => handleFilterChange('dateFrom', e.target.value)}
                 style={{ width: '150px' }}
               />
-              <span>—</span>
+              <span>-</span>
               <input
                 className="inp"
                 type="date"
@@ -8373,7 +8373,7 @@ export default function Reports({ db, ur }) {
                 onChange={e => handleFilterChange('deadlineFrom', e.target.value)}
                 style={{ width: '150px' }}
               />
-              <span>—</span>
+              <span>-</span>
               <input
                 className="inp"
                 type="date"
@@ -8392,7 +8392,7 @@ export default function Reports({ db, ur }) {
             style={{ width: '180px' }}
           >
             <option value="all">Все проекты</option>
-            {visibleProjects.map(p => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
+            {visibleProjects.map(p => <option key={p.id} value={p.id}>{p.code} - {p.name}</option>)}
           </select>
 
           <label className="lbl" style={{ margin: 0 }}>Исполнитель:</label>
@@ -8473,20 +8473,20 @@ export default function Reports({ db, ur }) {
               if (f.filters.dateFrom || f.filters.dateTo) {
                 const from = f.filters.dateFrom ? fmtDMY(f.filters.dateFrom) : '';
                 const to = f.filters.dateTo ? fmtDMY(f.filters.dateTo) : '';
-                criteria.push(`Период: ${from} — ${to}`);
+                criteria.push(`Период: ${from} - ${to}`);
               }
               if (f.filters.deadlineFrom || f.filters.deadlineTo) {
                 const from = f.filters.deadlineFrom ? fmtDMY(f.filters.deadlineFrom) : '';
                 const to = f.filters.deadlineTo ? fmtDMY(f.filters.deadlineTo) : '';
-                criteria.push(`Срок исполнения: ${from} — ${to}`);
+                criteria.push(`Срок исполнения: ${from} - ${to}`);
               }
               if (f.filters.projectId !== 'all') {
                 const proj = (safeDb.projects || []).find(p => p.id === f.filters.projectId);
-                criteria.push(`Проект: ${proj?.code || '—'}`);
+                criteria.push(`Проект: ${proj?.code || '-'}`);
               }
               if (f.filters.assigneeId !== 'all') {
                 const emp = (safeDb.employees || []).find(e => e.id === f.filters.assigneeId);
-                criteria.push(`Исполнитель: ${emp ? emp.last : '—'}`);
+                criteria.push(`Исполнитель: ${emp ? emp.last : '-'}`);
               }
               if (f.filters.status !== 'all') criteria.push(`Статус: ${TASK_STATUSES[f.filters.status]?.label || f.filters.status}`);
               if (f.filters.priority !== 'all') criteria.push(`Приоритет: ${PRIORITIES[f.filters.priority]?.label || f.filters.priority}`);
@@ -8594,7 +8594,7 @@ export default function Requests({ db, setDb, ur, initialTab = 'hours', addAudit
 
   const decideVac = (v, ok) => {
     const employeeName = empName(v.empId);
-    const period = `${fmtDMY(v.start)}—${fmtDMY(v.end)}`;
+    const period = `${fmtDMY(v.start)}-${fmtDMY(v.end)}`;
     
     setDb((s) => {
       const updated = { ...s, vacations: s.vacations.map((x) => (x.id === v.id ? { ...x, status: ok ? "approved" : "rejected" } : x)) };
@@ -8753,15 +8753,15 @@ export default function Requests({ db, setDb, ur, initialTab = 'hours', addAudit
 
       {tab === "vac" && (
         <div className="rep-panel">
-          <div className="rep-panel-title">Отпуска с делегированием — на утверждение</div>
+          <div className="rep-panel-title">Отпуска с делегированием - на утверждение</div>
           <table className="tbl">
             <thead><tr><th>Сотрудник</th><th>Период</th><th>Замещающий</th><th>Решение</th></tr></thead>
             <tbody>
               {db.vacations.filter(v => v.status === "pending" && canApproveVacation(ur, v, db)).map(v => (
                 <tr key={v.id}>
                   <td><b>{empName(v.empId)}</b></td>
-                  <td>{fmtDMY(v.start)} — {fmtDMY(v.end)}</td>
-                  <td>{v.delegation.enabled ? empName(v.delegation.subId) : '—'}</td>
+                  <td>{fmtDMY(v.start)} - {fmtDMY(v.end)}</td>
+                  <td>{v.delegation.enabled ? empName(v.delegation.subId) : '-'}</td>
                   <td><button className="btn primary sm" onClick={() => decideVac(v, true)}>Утвердить</button> <button className="btn danger sm" onClick={() => decideVac(v, false)}>Отклонить</button></td>
                 </tr>
               ))}
@@ -8882,7 +8882,7 @@ const EmployeeRow = React.memo(({
           <span className={`st-load-txt${l.plan > norm ? ' over' : ''}`}>{l.plan} ч · {Math.round((l.plan / norm) * 100)}%</span>
         </div>
       )}
-      <div className="st-nums"><b>{isFired ? '—' : l.cnt}</b><span>{isFired ? 'задач' : 'задач'}</span></div>
+      <div className="st-nums"><b>{isFired ? '-' : l.cnt}</b><span>{isFired ? 'задач' : 'задач'}</span></div>
       {canEditDepartments(ur) && !isFired && <button className="btn ghost sm" title="Подразделения" onClick={() => openDepts(employee.id)}><Ic d={ICONS.users} size={13} /> Отделы</button>}
       {canEditRoles(ur) && !isFired && <button className="btn ghost sm" onClick={() => openRoles(employee.id)}><Ic d={ICONS.shield} size={13} /> Роли</button>}
       {canFire && (
@@ -8955,7 +8955,7 @@ export default function Staff({ db, setDb, ur, openRoles, openDepts, openVacatio
       <div className="st-dept" key={deptId}>
         <div className="st-dept-head">
           <span className="st-dept-name">{dept.name}</span>
-          <span className="mut">руководитель: {headNames || '—'}</span>
+          <span className="mut">руководитель: {headNames || '-'}</span>
           <span className="kcount">{members.length}</span>
         </div>
         {members.map(e => (
@@ -8980,7 +8980,7 @@ export default function Staff({ db, setDb, ur, openRoles, openDepts, openVacatio
   return (
     <div className="staff">
       <div className="sec-head">
-        <div className="sec-note">Привязку сотрудников к отделам меняют только HR-менеджер, суперадминистратор и генеральный директор. Загрузка — по плановым часам открытых задач, норма 160 ч/мес.</div>
+        <div className="sec-note">Привязку сотрудников к отделам меняют только HR-менеджер, суперадминистратор и генеральный директор. Загрузка - по плановым часам открытых задач, норма 160 ч/мес.</div>
         {canEditRoles(ur) && (
           <div className="sec-actions">
             <button className="btn ghost sm" onClick={() => {
@@ -9050,7 +9050,7 @@ export default function Staff({ db, setDb, ur, openRoles, openDepts, openVacatio
         <div className="st-section" key={kb.id}>
           <div className="st-sec-head">
             <div className="st-sec-title">{kb.name}</div>
-            <div className="st-sec-sub">{kb.full} · главный конструктор: {chiefs.map(e => `${e.last} ${e.first}`).join(', ') || '—'}</div>
+            <div className="st-sec-sub">{kb.full} · главный конструктор: {chiefs.map(e => `${e.last} ${e.first}`).join(', ') || '-'}</div>
           </div>
           {chiefs.length > 0 && (
             <div className="st-dept" style={{ borderTop: '1px solid var(--line)' }}>
@@ -9106,9 +9106,9 @@ export default function Staff({ db, setDb, ur, openRoles, openDepts, openVacatio
                     <tr key={v.id}>
                       <td><b>{empName(v.empId)}</b></td>
                       <td>{getPrimaryDeptName(e, db)}</td>
-                      <td>{fmtDMY(v.start)} — {fmtDMY(v.end)}</td>
+                      <td>{fmtDMY(v.start)} - {fmtDMY(v.end)}</td>
                       <td>{VACATION_TYPES[v.type]}</td>
-                      <td>{v.delegation.enabled ? `→ ${empName(v.delegation.subId)}` : '—'}</td>
+                      <td>{v.delegation.enabled ? `→ ${empName(v.delegation.subId)}` : '-'}</td>
                       <td><span className={`st-chip ${v.status}`}>
                         {{ pending: 'На утверждении', approved: 'Утверждён', rejected: 'Отклонён' }[v.status]}
                       </span></td>
@@ -9580,7 +9580,7 @@ export default function TasksList({ tasks, db, openTask }) {
             </div>
             <div className="pj-budget" style={{ marginTop: 8 }}>
               <div className="pj-budget-row">
-                <span>Часы: <b>{factHours}</b> / <b>{task.plannedHours ?? '—'}</b></span>
+                <span>Часы: <b>{factHours}</b> / <b>{task.plannedHours ?? '-'}</b></span>
               </div>
               {task.plannedHours > 0 && (
                 <div className="pj-progress">
@@ -9685,7 +9685,7 @@ export default function TasksView({ db, ur, openTask, store }) {
               <Avatar employee={assignee} size="xs" />
             </span>
           )}
-          <span className="khours"><Ic d={ICONS.clock} size={13} /> {sp}/{task.plannedHours ?? '—'} ч</span>
+          <span className="khours"><Ic d={ICONS.clock} size={13} /> {sp}/{task.plannedHours ?? '-'} ч</span>
           <span className="prio-chip" style={{ color: priority.color, fontWeight: 700, fontSize: '12px' }}>
             {priority.label}
           </span>
@@ -9815,7 +9815,7 @@ export const DelegationModal = ({ db, ur, onClose, onSubmit }) => {
       <div className="form-grid">
         <label className="lbl">Сотрудник-получатель *</label>
         <select className="inp sel" value={toId} onChange={(e) => setToId(e.target.value)}>
-          <option value="">— выберите —</option>
+          <option value="">- выберите -</option>
           {db.employees.filter((e) => e.id !== ur.id).map((e) => <option key={e.id} value={e.id}>{e.last} {e.first}</option>)}
         </select>
         <label className="lbl">Передаваемые роли *</label>
@@ -9888,7 +9888,7 @@ export const DeptsModal = ({ db, setDb, empId, onClose, toast, audit }) => {
   };
 
   return (
-    <Modal title={`Подразделения — ${emp.last} ${emp.first}`} onClose={onClose} width={560}>
+    <Modal title={`Подразделения - ${emp.last} ${emp.first}`} onClose={onClose} width={560}>
       <p className="mut sm">
         Сотрудник может числиться в нескольких отделах. Отметьте основное подразделение. 
         <strong> Для дополнительных (совмещаемых) отделов вы можете указать отдельную должность.</strong>
@@ -9925,7 +9925,7 @@ export const DeptsModal = ({ db, setDb, empId, onClose, toast, audit }) => {
                   />
                 </div>
               )}
-              {/* Для основного отдела не показываем поле — должность редактируется в карточке сотрудника */}
+              {/* Для основного отдела не показываем поле - должность редактируется в карточке сотрудника */}
             </div>
           );
         })}
@@ -9951,10 +9951,10 @@ export const HoursRequestModal = ({ db, ur, kind, targetId, onClose, onSubmit })
   const [newH, setNewH] = useState(cur);
   const [reason, setReason] = useState("");
   return (
-    <Modal title={`Запрос изменения часов — ${kind === "task" ? "задача" : "бюджет проекта"}`} onClose={onClose} width={480}>
+    <Modal title={`Запрос изменения часов - ${kind === "task" ? "задача" : "бюджет проекта"}`} onClose={onClose} width={480}>
       <p className="mut sm">{kind === "task" ? target?.title : target?.name}. Запрос будет направлен генеральному директору.</p>
       <div className="form-grid">
-        <label className="lbl">Текущее значение</label><input className="inp" disabled value={(cur ?? "—") + " ч"} />
+        <label className="lbl">Текущее значение</label><input className="inp" disabled value={(cur ?? "-") + " ч"} />
         <label className="lbl">Новое значение *</label><input className="inp" type="number" min="1" step="0.5" value={newH} onChange={(e) => setNewH(e.target.value)} />
         <label className="lbl">Обоснование *</label><textarea className="inp" rows="3" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Почему требуется изменение…" />
       </div>
@@ -10311,14 +10311,14 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
               <div className="pj-pair-item">
                 <label className="pj-pair-label">Тип ВС *</label>
                 <select className="inp sel pj-pair-input" disabled={!canEditFields} value={f.aircraftType} onChange={(e) => set("aircraftType", e.target.value)}>
-                  <option value="">— выберите —</option>
+                  <option value="">- выберите -</option>
                   {AIRCRAFT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
               <div className="pj-pair-item">
                 <label className="pj-pair-label">Категория *</label>
                 <select className="inp sel pj-pair-input" disabled={!canEditFields} value={f.projectType} onChange={(e) => set("projectType", e.target.value)}>
-                  <option value="">— выберите —</option>
+                  <option value="">- выберите -</option>
                   {PROJECT_TYPE_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
@@ -10382,7 +10382,7 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
             <div className="field-row">
               <label className="field-label">Ответственный *</label>
               <select className="inp sel" disabled={!canEditFields} value={f.managerId || ""} onChange={(e) => set("managerId", e.target.value)}>
-                <option value="">— выберите —</option>
+                <option value="">- выберите -</option>
                 {db.employees.map((e) => <option key={e.id} value={e.id}>{e.last} {e.first}</option>)}
               </select>
             </div>
@@ -10438,13 +10438,13 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
                   return (
                     <tr key={t.id} className="clickable-row" onClick={() => { onClose(); openTask(t.id); }}>
                       <td><b>{t.title}</b></td>
-                      <td>{assignee ? `${assignee.last} ${assignee.first}` : '—'}</td>
+                      <td>{assignee ? `${assignee.last} ${assignee.first}` : '-'}</td>
                       <td><span className="st-chip" style={{ background: TASK_STATUSES[t.status].color + '22', color: TASK_STATUSES[t.status].color }}>{TASK_STATUSES[t.status].label}</span></td>
-                      <td>{t.plannedHours ?? '—'}</td>
+                      <td>{t.plannedHours ?? '-'}</td>
                       <td>{spent}</td>
-                      <td className={remaining < 0 ? 'text-danger' : ''}>{t.plannedHours ? remaining : '—'}</td>
+                      <td className={remaining < 0 ? 'text-danger' : ''}>{t.plannedHours ? remaining : '-'}</td>
                       <td className="mut sm">{creator ? `${creator.last} ${creator.first}` : 'Система'}</td>
-                      <td className="mut sm">{t.deadline ? fmtDMY(t.deadline) : '—'}</td>
+                      <td className="mut sm">{t.deadline ? fmtDMY(t.deadline) : '-'}</td>
                     </tr>
                   );
                 })}
@@ -10456,8 +10456,8 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
             Проект создан: {existing && existing.history?.length > 0 ? (() => {
               const creatorId = existing.history.find(h => h.who !== 'system')?.who || existing.history[0]?.who;
               const creator = creatorId ? db.employees.find(e => e.id === creatorId) : null;
-              return `${creator ? creator.last + ' ' + creator.first : '—'}, ${fmtDT(existing.history[0].ts)}`;
-            })() : '—'}
+              return `${creator ? creator.last + ' ' + creator.first : '-'}, ${fmtDT(existing.history[0].ts)}`;
+            })() : '-'}
           </div>
         </div>
       )}
@@ -10500,7 +10500,7 @@ export const ProjectModal = ({ db, ur, projectId, onClose, onSave, onDelete, toa
                     <Ic d={ICONS.file} size={24} />
                     <div className="file-info">
                       <div className="file-name">{file.name}</div>
-                      <div className="file-meta">{fileSize} · загрузил {uploader ? `${uploader.last} ${uploader.first}` : '—'} {file.uploadedAt ? fmtDMY(file.uploadedAt) : ''}</div>
+                      <div className="file-meta">{fileSize} · загрузил {uploader ? `${uploader.last} ${uploader.first}` : '-'} {file.uploadedAt ? fmtDMY(file.uploadedAt) : ''}</div>
                     </div>
                     <a href={file.url} download={file.name} target="_blank" rel="noopener noreferrer" className="btn ghost sm">Скачать</a>
                     {!existing?.archived && canUploadFiles && (
@@ -10580,9 +10580,9 @@ export const RolesModal = ({ db, setDb, empId, onClose, toast, audit }) => {
   };
 
   return (
-    <Modal title={`Роли — ${emp.last} ${emp.first}`} onClose={onClose} width={520}>
+    <Modal title={`Роли - ${emp.last} ${emp.first}`} onClose={onClose} width={520}>
       <p className="mut sm">
-        Сотрудник может иметь несколько ролей. Для «Главного конструктора» укажите КБ, для «Руководителя отдела» — перечень отделов.
+        Сотрудник может иметь несколько ролей. Для «Главного конструктора» укажите КБ, для «Руководителя отдела» - перечень отделов.
       </p>
       <div className="roles-list">
         {Object.entries(ROLES).map(([k, v]) => (
@@ -11178,12 +11178,12 @@ export const TaskModal = ({
   }, [db, f.parentTaskId]);
 
   return (
-    <Modal title={(readOnly ? "Архивная задача — только чтение" : existing ? "Карточка задачи" : "Новая задача")} onClose={onClose} width={800}>
+    <Modal title={(readOnly ? "Архивная задача - только чтение" : existing ? "Карточка задачи" : "Новая задача")} onClose={onClose} width={800}>
       {readOnly && <div className="info-box">Задача в архиве с {fmtDMY(existing.archivedAt)}. Редактирование, изменение статусов и комментирование запрещены.</div>}
       <div className="tabs sm">
         {[
           ["form", "Данные"],
-          ["time", `Учёт времени (${sp}/${f.plannedHours ?? "—"})`],
+          ["time", `Учёт времени (${sp}/${f.plannedHours ?? "-"})`],
           ...((f.isSummary || hasSubtasks) ? [["subtasks", `Подзадачи (${subtasks.length})`]] : []),
           ...(existing ? [["chat", `Обсуждение (${f.comments.length})`], ["files", `Файлы (${f.files?.length || 0})`], ["hist", "История"]] : [])
         ].map(([id, l]) => 
@@ -11195,7 +11195,7 @@ export const TaskModal = ({
         <>
           {vacWarn && <div className="warn-box"><Ic d={ICONS.beach} size={15} /> Ответственный исполнитель находится в отпуске с {fmtDMY(vacWarn.start)} по {fmtDMY(vacWarn.end)}. Даты пересекаются с периодом задачи.</div>}
           {remainProj !== null && remainProj - (+f.plannedHours || 0) < 0 && <div className="warn-box">Внимание: задача превысит остаток бюджета проекта ({remainProj} ч). Потребуется утверждение ГД.</div>}
-          {isAdminProj && !readOnly && <div className="info-box">Административный проект: срок исполнения и плановые часы задачи — по желанию.</div>}
+          {isAdminProj && !readOnly && <div className="info-box">Административный проект: срок исполнения и плановые часы задачи - по желанию.</div>}
 
           <div className="project-info-fields">
             {/* Название */}
@@ -11243,17 +11243,17 @@ export const TaskModal = ({
               <textarea className="inp" rows="2" disabled={!canEditFields} value={f.desc} onChange={(e) => set("desc", e.target.value)} />
             </div>
 
-            {/* Проект — заблокирован, если передан initialProjectId */}
+            {/* Проект - заблокирован, если передан initialProjectId */}
             <div className="field-row">
               <label className="field-label">Проект * <span className="mut">(активные)</span></label>
               {readOnly ? (
-                <input className="inp" disabled value={proj ? `${proj.code} — ${proj.name}` : ""} />
+                <input className="inp" disabled value={proj ? `${proj.code} - ${proj.name}` : ""} />
               ) : initialProjectId ? (
-                <input className="inp" disabled value={proj ? `${proj.code} — ${proj.name}` : ""} />
+                <input className="inp" disabled value={proj ? `${proj.code} - ${proj.name}` : ""} />
               ) : (
                 <select className="inp sel" disabled={!canEditFields || isSubtask} value={f.projectId} onChange={(e) => set("projectId", e.target.value)} style={{ flex: 1 }}>
-                  <option value="">— выберите проект —</option>
-                  {projs.map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}{p.ptype === "admin" ? " (административный)" : ""}</option>)}
+                  <option value="">- выберите проект -</option>
+                  {projs.map((p) => <option key={p.id} value={p.id}>{p.code} - {p.name}{p.ptype === "admin" ? " (административный)" : ""}</option>)}
                 </select>
               )}
             </div>
@@ -11266,7 +11266,7 @@ export const TaskModal = ({
               </select>
             </div>
 
-            {/* Исполнитель (ответственный) — один select */}
+            {/* Исполнитель (ответственный) - один select */}
             <div className="field-row">
               <label className="field-label">Ответственный *</label>
               {readOnly ? (
@@ -11279,7 +11279,7 @@ export const TaskModal = ({
                   onChange={(e) => set("assigneeId", e.target.value || null)}
                   style={{ flex: 1 }}
                 >
-                  <option value="">— выберите —</option>
+                  <option value="">- выберите -</option>
                   {asOpts.map(e => (
                     <option key={e.id} value={e.id}>{e.last} {e.first}</option>
                   ))}
@@ -11345,10 +11345,10 @@ export const TaskModal = ({
             </div>
 
             {isExec && !canEditFields && !readOnly && (
-              <div className="info-box">Исполнитель может переводить задачу в «В работе» и «На проверке»; закрытие и отмена — у ответственного/руководителя.</div>
+              <div className="info-box">Исполнитель может переводить задачу в «В работе» и «На проверке»; закрытие и отмена - у ответственного/руководителя.</div>
             )}
 
-            {/* Зависимости — поля одно под другим */}
+            {/* Зависимости - поля одно под другим */}
             <div className="field-row">
               <label className="field-label">Зависит от задачи</label>
               <select
@@ -11357,7 +11357,7 @@ export const TaskModal = ({
                 value={f.dependencyId || ''}
                 onChange={(e) => set("dependencyId", e.target.value || null)}
               >
-                <option value="">— нет зависимости —</option>
+                <option value="">- нет зависимости -</option>
                 {db.tasks
                   .filter(t => t.id !== f.id && t.projectId === f.projectId && t.status !== 'closed' && t.status !== 'cancelled')
                   .map(t => (
@@ -11376,7 +11376,7 @@ export const TaskModal = ({
                 onChange={(e) => set("dependencyType", e.target.value)}
               >
                 {Object.entries(DEPENDENCY_TYPES).map(([key, val]) => (
-                  <option key={key} value={key}>{val.label} — {val.desc}</option>
+                  <option key={key} value={key}>{val.label} - {val.desc}</option>
                 ))}
               </select>
             </div>
@@ -11511,7 +11511,7 @@ export const TaskModal = ({
                 </button>
               </div>
               <div className="mut sm" style={{ marginTop: 8 }}>
-                {f.plannedHours ? `Часы не могут превышать плановые: доступно ещё ${Math.max(0, f.plannedHours - sp)} ч.` : "Плановые часы не заданы — ограничение не применяется."}
+                {f.plannedHours ? `Часы не могут превышать плановые: доступно ещё ${Math.max(0, f.plannedHours - sp)} ч.` : "Плановые часы не заданы - ограничение не применяется."}
                 <br />
                 <span style={{ fontSize: '13px', color: 'var(--mut)' }}>Выберите дату за прошлые дни или сегодня (будущие даты недоступны).</span>
               </div>
@@ -11553,7 +11553,7 @@ export const TaskModal = ({
                     <tr key={sub.id}>
                       <td><b>{sub.title}</b></td>
                       <td><span className="st-chip" style={{ background: TASK_STATUSES[sub.status]?.color + '22', color: TASK_STATUSES[sub.status]?.color }}>{TASK_STATUSES[sub.status]?.label}</span></td>
-                      <td>{sub.assigneeId ? empName(sub.assigneeId) : '—'}</td>
+                      <td>{sub.assigneeId ? empName(sub.assigneeId) : '-'}</td>
                       <td>
                         <button 
                           className="btn ghost sm" 
@@ -11640,7 +11640,7 @@ export const TaskModal = ({
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 600 }}>{file.name}</div>
                       <div className="mut sm">
-                        {fileSize} · загрузил {uploader ? `${uploader.last} ${uploader.first}` : '—'}{' '}
+                        {fileSize} · загрузил {uploader ? `${uploader.last} ${uploader.first}` : '-'}{' '}
                         {file.uploadedAt ? fmtDMY(file.uploadedAt) : ''}
                       </div>
                     </div>
@@ -11754,7 +11754,7 @@ export const VacationModal = ({ db, ur, vacationId, forEmpId, onClose, onSave })
         <select className="inp sel" value={f.empId} onChange={(e) => set("empId", e.target.value)}>
           {db.employees.map((e) => (
             <option key={e.id} value={e.id}>
-              {empName(e.id)} — {getPrimaryDeptName(e, db)}
+              {empName(e.id)} - {getPrimaryDeptName(e, db)}
             </option>
           ))}
         </select>
@@ -11802,9 +11802,9 @@ export const VacationModal = ({ db, ur, vacationId, forEmpId, onClose, onSave })
               onChange={(e) => set("delegation", { ...f.delegation, subId: e.target.value })}
               style={{ borderColor: f.delegation.enabled && !f.delegation.subId ? '#dc2626' : '' }}
             >
-              <option value="">— выберите —</option>
+              <option value="">- выберите -</option>
               {db.employees.filter((e) => e.id !== f.empId).map((e) => (
-                <option key={e.id} value={e.id}>{empName(e.id)} — {getPrimaryDeptName(e, db)}</option>
+                <option key={e.id} value={e.id}>{empName(e.id)} - {getPrimaryDeptName(e, db)}</option>
               ))}
             </select>
             {f.delegation.enabled && !f.delegation.subId && (
@@ -11820,7 +11820,7 @@ export const VacationModal = ({ db, ur, vacationId, forEmpId, onClose, onSave })
               ))}
               <span className="mut sm">пусто = все активные задачи</span>
             </div>
-            <p className="mut sm">Делегирование утверждает руководитель до начала отпуска. Задачи вернутся автоматически после окончания отпуска. Задачи, где сотрудник — ответственный по проекту, передаются только через делегирование ролей.</p>
+            <p className="mut sm">Делегирование утверждает руководитель до начала отпуска. Задачи вернутся автоматически после окончания отпуска. Задачи, где сотрудник - ответственный по проекту, передаются только через делегирование ролей.</p>
           </>
         )}
       </div>
@@ -11894,16 +11894,16 @@ export const VacNowModal = ({ db, onClose, toast }) => {
           {rows.map((r) => {
             const delegationText = r.v.delegation.enabled
               ? `→ ${empName(r.v.delegation.subId)}`
-              : '—';
+              : '-';
             return (
               <tr key={r.v.id}>
-                <td><b>{r.e ? `${r.e.last} ${r.e.first}` : "—"}</b></td>
-                <td>{r.dept?.name || "—"}</td>
+                <td><b>{r.e ? `${r.e.last} ${r.e.first}` : "-"}</b></td>
+                <td>{r.dept?.name || "-"}</td>
                 <td>{fmtDMY(r.v.start)}</td>
                 <td>{fmtDMY(r.v.end)}</td>
                 <td>{VACATION_TYPES[r.v.type]}</td>
                 <td>{delegationText}</td>
-                <td className="mut">{r.v.comment || "—"}</td>
+                <td className="mut">{r.v.comment || "-"}</td>
               </tr>
             );
           })}

@@ -1,5 +1,4 @@
-import { TODAY, iso, addDays, addMonths, uid } from '../utils/date';
-import { TASK_STATUSES, VACATION_TYPES, PROJECT_STATUSES } from '../utils/constants';
+import { iso, addDays, uid } from '../utils/date';
 
 export function buildMockData() {
   const D = (off) => iso(addDays(new Date(), off));
@@ -248,7 +247,7 @@ export function buildMockData() {
       id: "p_old",
       code: "ИТ-15",
       name: "Модернизация локальной сети предприятия",
-      desc: "Проект завершён более полугода назад — подлежит архивации.",
+      desc: "Проект завершён более полугода назад - подлежит архивации.",
       kbId: null,
       managerId: "e_morozov",
       start: D(-300),
@@ -274,7 +273,7 @@ export function buildMockData() {
       id: "p_long",
       code: "АДМ-0",
       name: "Многолетняя программа внутренних мероприятий",
-      desc: "Долгосрочный административный проект — исключение из архивации.",
+      desc: "Долгосрочный административный проект - исключение из архивации.",
       kbId: null,
       managerId: "olga.personalova",
       start: D(-400),
@@ -455,7 +454,6 @@ export function buildMockData() {
     },
   ];
 
-  // Вспомогательная функция для создания задач с одним исполнителем (assigneeId)
   const T = (id, title, projectId, assigneeId, planned, s, dl, status, priority, desc, extra = {}) => {
     const history = extra.history || [{ ts: now - 86400000 * 6, who: extra.creatorId || "aleksey.gendirov", text: "Задача создана" }];
     const creatorId = extra.creatorId || (history.length > 0 ? history[0].who : "aleksey.gendirov");
@@ -492,7 +490,7 @@ export function buildMockData() {
   const tasks = [
     T("t01", "Расчёт подъёмной силы крыла", "p_lm24", "isaev", 24, -12, 6, "inwork", "high", "Расчёт и оформление отчёта.", {
       logs: [ { id: uid(), userId: "isaev", date: makeDate(-6), hours: 6, note: "Проверка методики" }, { id: uid(), userId: "isaev", date: makeDate(-2), hours: 5, note: "Расчётная сетка" } ],
-      comments: [ { id: "c1", parentId: null, authorId: "e_morozov", ts: now - 3600000 * 20, text: "@Исаев Роман — подключите, пожалуйста, отдел прочности к пятнице." }, { id: "c2", parentId: "c1", authorId: "isaev", ts: now - 3600000 * 18, text: "Принято, сегодня подготовлю исходные данные." } ],
+      comments: [ { id: "c1", parentId: null, authorId: "e_morozov", ts: now - 3600000 * 20, text: "@Исаев Роман - подключите, пожалуйста, отдел прочности к пятнице." }, { id: "c2", parentId: "c1", authorId: "isaev", ts: now - 3600000 * 18, text: "Принято, сегодня подготовлю исходные данные." } ],
       creatorId: "e_morozov"
     }),
     T("t01_sub1", "Подзадача 1: Расчёт подъёмной силы (детализация)", "p_lm24", "isaev", 8, -10, 0, "inwork", "mid", "Детальный расчёт по сечениям.", { parentTaskId: "t01", creatorId: "e_morozov" }),
@@ -558,7 +556,7 @@ export function buildMockData() {
       closedAt: D(-220),
       creatorId: "e_morozov"
     }),
-    T("t_a3", "Подготовка регламента мероприятий", "p_long", "olga.personalova", 10, -320, -305, "closed", "low", "Задача долгосрочного административного проекта — не архивируется.", {
+    T("t_a3", "Подготовка регламента мероприятий", "p_long", "olga.personalova", 10, -320, -305, "closed", "low", "Задача долгосрочного административного проекта - не архивируется.", {
       logs: [ { id: uid(), userId: "olga.personalova", date: makeDate(-310), hours: 9, note: "Регламент готов" } ],
       closedAt: D(-300),
       creatorId: "olga.personalova"
@@ -611,7 +609,7 @@ export function buildMockData() {
 
   const notifications = [
     { id: uid(), userId: "aleksey.gendirov", text: "Запрос на изменение плановых часов по задаче «Отчёт по прочности фюзеляжа» ожидает решения.", ts: now - 3600000 * 5, read: false, targetType: 'hours', targetId: 'hr1' },
-    { id: uid(), userId: "e_fedorov", text: "Тихонов Е. подал заявку на отпуск с делегированием задач — требуется утверждение.", ts: now - 3600000 * 8, read: false, targetType: 'vacation', targetId: 'v2' },
+    { id: uid(), userId: "e_fedorov", text: "Тихонов Е. подал заявку на отпуск с делегированием задач - требуется утверждение.", ts: now - 3600000 * 8, read: false, targetType: 'vacation', targetId: 'v2' },
     { id: uid(), userId: "e_anokhin", text: "Вам переданы задачи Сомовой Е. на период отпуска.", ts: now - 3600000 * 30, read: false, targetType: 'task', targetId: 't08' },
     { id: uid(), userId: "nikolay.managerov", text: "Новая заявка на регистрацию: Новиков Олег.", ts: now - 3600000 * 26, read: false, targetType: 'registration', targetId: 'rg1' },
   ];
@@ -635,5 +633,6 @@ export function buildMockData() {
     regRequests,
     notifications,
     audit,
+    templates: [],
   };
 }

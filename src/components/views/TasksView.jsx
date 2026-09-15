@@ -2,6 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import Kanban from '../Kanban';
 import TasksList from './TasksList';
+import { SearchBox } from '../SearchBox';
 import { TASK_STATUSES, TASK_STATUS_ORDER, PRIORITIES } from '../../utils/constants';
 import { fmtDMY, daysDiff, TODAY, isTaskActive } from '../../utils/date';
 import { taskVisible, computeScope, hasRole, canChangeTaskStatus, canCreateTask } from '../../utils/permissions';
@@ -80,7 +81,7 @@ export default function TasksView({ db, ur, openTask, store }) {
               <Avatar employee={assignee} size="xs" />
             </span>
           )}
-          <span className="khours"><Ic d={ICONS.clock} size={13} /> {sp}/{task.plannedHours ?? '—'} ч</span>
+          <span className="khours"><Ic d={ICONS.clock} size={13} /> {sp}/{task.plannedHours ?? '-'} ч</span>
           <span className="prio-chip" style={{ color: priority.color }}>
             {priority.label}
           </span>
@@ -127,11 +128,11 @@ export default function TasksView({ db, ur, openTask, store }) {
           </button>
         </div>
 
-        <input
-          className="inp sm filter-search"
-          placeholder="Поиск..."
+        <SearchBox
           value={q}
-          onChange={e => setQ(e.target.value)}
+          onChange={setQ}
+          placeholder="Поиск..."
+          className="filter-search"
         />
 
         <select className="inp sel sm filter-select" value={fProj} onChange={e => setFProj(e.target.value)}>

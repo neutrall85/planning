@@ -49,7 +49,7 @@ export const HoursRequestModal = ({ db, ur, kind, targetId, onClose, onSubmit, t
 
   return (
     <ModalShell
-      title={`Запрос изменения часов — ${kind === 'task' ? 'задача' : 'бюджет проекта'}`}
+      title={`Запрос изменения часов - ${kind === 'task' ? 'задача' : 'бюджет проекта'}`}
       onClose={onClose}
       onSave={handleSubmit(save)}
       saveLabel="Отправить запрос"
@@ -66,7 +66,7 @@ export const HoursRequestModal = ({ db, ur, kind, targetId, onClose, onSubmit, t
         <FormField 
           label="Текущее значение" 
           disabled 
-          value={(current ?? '—') + ' ч'} 
+          value={(current ?? '-') + ' ч'} 
         />
         <FormField 
           label="Новое значение *" 

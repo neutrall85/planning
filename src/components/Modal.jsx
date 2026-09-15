@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useLayoutEffect, useRef } from 'react';
 import { Ic, ICONS } from './Icons';
 
 export const Modal = ({
@@ -10,7 +10,17 @@ export const Modal = ({
   className = '',
   headerBefore = null,
   headerAfter = null,
+  bodyRef = null,
 }) => {
+  const rootRef = useRef(null);
+
+  // Ширина передаётся через CSS-переменную, а не inline-стилем: значение
+  // по умолчанию живёт в styles.css рядом с остальным описанием .modal.
+  // Это устраняет style={{ maxWidth }} в JSX — разметка остаётся чистой.
+  useLayoutEffect(() => {
+    rootRef.current?.style.setProperty('--modal-max-w', `${width}px`);
+  }, [width]);
+
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', handler);
@@ -22,7 +32,7 @@ export const Modal = ({
       className="overlay"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className={`modal ${className}`} style={{ maxWidth: width }}>
+      <div ref={rootRef} className={`modal ${className}`}>
         <div className="modal-head">
           {headerBefore && <div className="modal-header-before">{headerBefore}</div>}
           <h3>{title}</h3>
@@ -32,7 +42,9 @@ export const Modal = ({
           </button>
         </div>
 
-        <div className="modal-body">{children}</div>
+        <div className="modal-body" ref={bodyRef}>
+          {children}
+        </div>
 
         {footer}
       </div>

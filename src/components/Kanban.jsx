@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Ic, ICONS } from './Icons';
+import { SearchBox } from './SearchBox';
 
 export default function Kanban({
   items,
@@ -33,14 +34,11 @@ export default function Kanban({
     <div>
       <div className="toolbar">
         {onSearchChange && (
-          <div className="search-box">
-            <Ic d={ICONS.search} size={15} />
-            <input
-              placeholder="Поиск…"
-              value={searchQuery}
-              onChange={(e) => onSearchChange(e.target.value)}
-            />
-          </div>
+          <SearchBox
+            value={searchQuery}
+            onChange={onSearchChange}
+            placeholder="Поиск…"
+          />
         )}
         {extraFilters}
         {onToggleMy && (

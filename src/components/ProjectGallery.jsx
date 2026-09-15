@@ -2,6 +2,8 @@
 import { useState } from 'react';
 import { Ic, ICONS } from './Icons';
 import { fmtDMY } from '../utils/date';
+import { useToast } from '../context/ToastContext';
+import { FILE_LIMITS, FILE_MESSAGES } from '../utils/constants';
 
 export const ProjectGallery = ({
   photos = [],
@@ -13,6 +15,7 @@ export const ProjectGallery = ({
   canDelete = true,
   employeeName = (id) => id,
 }) => {
+  const { showToast } = useToast();
   const [uploading, setUploading] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
   const photoList = photos || [];
@@ -31,12 +34,12 @@ export const ProjectGallery = ({
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) {
-      alert('Можно загружать только изображения');
+      showToast(FILE_MESSAGES.notImage, 'error');
       e.target.value = '';
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      alert('Размер файла не должен превышать 5 МБ');
+    if (file.size > FILE_LIMITS.image) {
+      showToast(FILE_MESSAGES.imageTooLarge, 'error');
       e.target.value = '';
       return;
     }
@@ -57,7 +60,6 @@ export const ProjectGallery = ({
     setCurrentIndex((prev) => (prev === photoList.length - 1 ? 0 : prev + 1));
   };
 
-  // Если фото нет — центрированный блок с надписью и кнопкой
   if (photoList.length === 0) {
     return (
       <div className="gallery-empty-state">
@@ -81,7 +83,6 @@ export const ProjectGallery = ({
     );
   }
 
-  // Если фото есть — галерея с кнопкой внизу
   return (
     <div className="gallery-with-photos">
       <div

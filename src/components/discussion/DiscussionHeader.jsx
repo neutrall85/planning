@@ -1,8 +1,18 @@
+// src/components/discussion/DiscussionHeader.jsx
 import React, { useState } from 'react';
 import { Ic, ICONS } from '../Icons';
+import { SearchBox } from '../SearchBox';
 import PinnedMessages from './PinnedMessages';
 
-export default function DiscussionHeader({ pinned, onJump, onSearchChange, resultCount }) {
+export default function DiscussionHeader({
+  pinned,
+  onJump,
+  onSearchChange,
+  totalMatches = 0,
+  currentMatch = 0,
+  onPrevMatch,
+  onNextMatch,
+}) {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
 
@@ -36,23 +46,40 @@ export default function DiscussionHeader({ pinned, onJump, onSearchChange, resul
 
         {isSearchOpen && (
           <div className="chat-search-inline">
-            <div className="search-box">
-              <Ic d={ICONS.search} size={15} />
-              <input
-                type="text"
-                placeholder="Поиск по обсуждению..."
-                value={query}
-                onChange={(e) => update(e.target.value)}
-                className="chat-search-input"
-                autoFocus
-              />
-              {query && (
-                <button className="icon-btn xs" onClick={() => update('')}>
-                  <Ic d={ICONS.x} size={14} />
-                </button>
-              )}
-            </div>
-            {query && <span className="search-result-count">{resultCount}</span>}
+            <SearchBox
+              value={query}
+              onChange={update}
+              placeholder="Поиск по обсуждению..."
+              autoFocus
+            />
+
+            {query && (
+              <div className="search-navigation">
+                <span className="search-result-count">
+                  {currentMatch} / {totalMatches}
+                </span>
+                {totalMatches > 0 && (
+                  <>
+                    <button
+                      type="button"
+                      className="icon-btn xs"
+                      onClick={onPrevMatch}
+                      title="Предыдущее совпадение"
+                    >
+                      <Ic d={ICONS.up} size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      className="icon-btn xs"
+                      onClick={onNextMatch}
+                      title="Следующее совпадение"
+                    >
+                      <Ic d={ICONS.down} size={14} />
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

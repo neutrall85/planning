@@ -9,20 +9,20 @@ export const daysDiff = (a,b) => Math.round((parseISO(b)-parseISO(a))/86400000);
 export const MS_SHORT = ["янв","фев","мар","апр","мая","июн","июл","авг","сен","окт","ноя","дек"];
 export const MS_FULL = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
 export const fmtD = (s) => { 
-  if (!s) return "—";
+  if (!s) return "-";
   const d = new Date(s);
-  if (isNaN(d.getTime())) return "—";
+  if (isNaN(d.getTime())) return "-";
   return `${d.getDate()} ${MS_SHORT[d.getMonth()]}`;
 };
 export const fmtDMY = (s) => {
-  if (!s) return "—";
+  if (!s) return "-";
   const d = new Date(s);
-  if (isNaN(d.getTime())) return "—";
+  if (isNaN(d.getTime())) return "-";
   return `${pad2(d.getDate())}.${pad2(d.getMonth()+1)}.${d.getFullYear()}`;
 };
 export const fmtDT = (ts) => {
   const d = new Date(ts);
-  if (isNaN(d.getTime())) return "—";
+  if (isNaN(d.getTime())) return "-";
   return `${fmtDMY(iso(d))} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 };
 export const uid = () => Math.random().toString(36).slice(2,10);

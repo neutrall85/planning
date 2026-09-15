@@ -55,7 +55,7 @@ export default function Requests({
 
   const decideVac = (v, ok) => {
     const employeeName = empName(v.empId);
-    const period = `${fmtDMY(v.start)}—${fmtDMY(v.end)}`;
+    const period = `${fmtDMY(v.start)}-${fmtDMY(v.end)}`;
 
     setDb((s) => {
       const updated = { ...s, vacations: s.vacations.map((x) => (x.id === v.id ? { ...x, status: ok ? "approved" : "rejected" } : x)) };
@@ -198,15 +198,15 @@ export default function Requests({
 
       {tab === "vac" && (
         <div className="rep-panel">
-          <div className="rep-panel-title">Отпуска с делегированием — на утверждение</div>
+          <div className="rep-panel-title">Отпуска с делегированием - на утверждение</div>
           <table className="tbl">
             <thead><tr><th>Сотрудник</th><th>Период</th><th>Замещающий</th><th>Решение</th></tr></thead>
             <tbody>
               {db.vacations.filter(v => v.status === "pending" && canApproveVacation(ur, v, db)).map(v => (
                 <tr key={v.id}>
                   <td><b>{empName(v.empId)}</b></td>
-                  <td>{fmtDMY(v.start)} — {fmtDMY(v.end)}</td>
-                  <td>{v.delegation.enabled ? empName(v.delegation.subId) : '—'}</td>
+                  <td>{fmtDMY(v.start)} - {fmtDMY(v.end)}</td>
+                  <td>{v.delegation.enabled ? empName(v.delegation.subId) : '-'}</td>
                   <td>
                     <button className="btn primary sm" onClick={() => decideVac(v, true)}>Утвердить</button>{' '}
                     <button className="btn danger sm" onClick={() => decideVac(v, false)}>Отклонить</button>

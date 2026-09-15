@@ -18,7 +18,7 @@ export class AuthService {
    * любого апдейта сотрудника ссылка _currentUser устаревает. Метод
    * вызывается из DataStore.upsertEmployee при изменении себя же.
    *
-   * Если сотрудника уволили — сессия сбрасывается.
+   * Если сотрудника уволили - сессия сбрасывается.
    */
   refreshCurrentUser() {
     if (!this._currentUser) return;

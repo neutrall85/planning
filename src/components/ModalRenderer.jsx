@@ -1,5 +1,4 @@
 // src/components/ModalRenderer.jsx
-import React from 'react';
 import {
   TaskModal,
   ProjectModal,
@@ -30,6 +29,8 @@ export default function ModalRenderer({
   openDepts,
   openVacation,
   openDelegation,
+  openCopyTask,
+  openCopyProject,
   toast,
 }) {
   const { empName } = useDataHelpers(db);
@@ -41,47 +42,84 @@ export default function ModalRenderer({
     if (toast) toast(error.message || 'Произошла ошибка', 'error');
   };
 
+  const reportTemplateResult = (label, res) => {
+    if (!res) return;
+    if (res.failed > 0) {
+      toast?.(`${label}: создано ${res.created}, с ошибками ${res.failed}`, 'warning');
+    } else if (res.created > 0) {
+      toast?.(`${label}: создано ${res.created}`, 'success');
+    }
+  };
+
+  // Возврат из дочерней модалки к «родителю». Работает для двух сценариев:
+  //   - задача создавалась как подзадача → вернуться к родителю на вкладку «Подзадачи»;
+  //   - задача открыта в режиме копирования → вернуться к источнику на «Данные».
+  const closeTaskWithReturn = () => {
+    if (modal.returnToTaskId) {
+      const sourceId = modal.returnToTaskId;
+      const tab = modal.returnToTaskTab || 'subtasks';
+      onClose();
+      setTimeout(() => openTask(sourceId, tab), 0);
+      return;
+    }
+    if (modal.returnToProjectId) {
+      const sourceId = modal.returnToProjectId;
+      const tab = modal.returnToProjectTab || 'info';
+      onClose();
+      setTimeout(() => openProject(sourceId, tab), 0);
+      return;
+    }
+    onClose();
+  };
+
+  const closeProjectWithReturn = () => {
+    if (modal.returnToProjectId) {
+      const sourceId = modal.returnToProjectId;
+      const tab = modal.returnToProjectTab || 'info';
+      onClose();
+      setTimeout(() => openProject(sourceId, tab), 0);
+      return;
+    }
+    onClose();
+  };
+
   switch (modal.type) {
     case 'task': {
-      const handleTaskClose = () => {
-        if (modal.returnToTaskId) {
-          onClose();
-          setTimeout(() => openTask(modal.returnToTaskId, 'subtasks', null, null, null), 0);
-        } else if (modal.returnToProjectId) {
-          onClose();
-          setTimeout(() => openProject(modal.returnToProjectId, modal.returnToProjectTab || 'info'), 0);
-        } else {
-          onClose();
-        }
-      };
-
       return (
         <TaskModal
           db={db}
           ur={ur}
           taskId={modal.taskId}
+          copyFromId={modal.copyFromId}
           initialTab={modal.initialTab || 'form'}
           parentTaskId={modal.parentTaskId}
           initialProjectId={modal.initialProjectId}
           returnToProjectId={modal.returnToProjectId}
           returnToTaskId={modal.returnToTaskId}
-          onClose={handleTaskClose}
-          onSave={async (task, isNew) => {
+          onClose={closeTaskWithReturn}
+          onCopy={openCopyTask}
+          onSave={async (task, isNew, extras = {}) => {
             try {
               const old = db.tasks.find(x => x.id === task.id);
               if (old && hasRole(ur, 'admin')) {
                 const changes = {};
-                if (old.plannedHours !== task.plannedHours) changes.plannedHours = `${old.plannedHours ?? '—'} → ${task.plannedHours ?? '—'}`;
+                if (old.plannedHours !== task.plannedHours) changes.plannedHours = `${old.plannedHours ?? '-'} → ${task.plannedHours ?? '-'}`;
                 if (old.status !== task.status) changes.status = `${TASK_STATUSES[old.status].label} → ${TASK_STATUSES[task.status].label}`;
                 if (old.assigneeId !== task.assigneeId) changes.assignee = `${empName(old.assigneeId)} → ${empName(task.assigneeId)}`;
-                if (old.deadline !== task.deadline) changes.deadline = `${old.deadline ? fmtDMY(old.deadline) : '—'} → ${task.deadline ? fmtDMY(task.deadline) : '—'}`;
+                if (old.deadline !== task.deadline) changes.deadline = `${old.deadline ? fmtDMY(old.deadline) : '-'} → ${task.deadline ? fmtDMY(task.deadline) : '-'}`;
                 if (Object.keys(changes).length) {
                   store.addAudit('Административное изменение задачи (прямое)', changes, 'task', task.id);
                 }
               }
+
               await store.upsertTask(task);
-              // Уведомления о назначении/изменениях автоматически создаются внутри TaskService
-              handleTaskClose();
+
+              if (extras.templateSubtasks?.length) {
+                const res = store.instantiateTemplateSubtasks(task.id, extras.templateSubtasks);
+                reportTemplateResult('Подзадачи из шаблона', res);
+              }
+
+              closeTaskWithReturn();
             } catch (error) {
               handleError(error);
             }
@@ -108,20 +146,23 @@ export default function ModalRenderer({
       );
     }
 
-    case 'project':
+    case 'project': {
       return (
         <ProjectModal
           db={db}
           ur={ur}
           projectId={modal.projectId}
+          copyFromId={modal.copyFromId}
+          returnToProjectId={modal.returnToProjectId}
           initialTab={modal.initialTab || 'info'}
-          onClose={onClose}
-          onSave={async (p, isNew) => {
+          onClose={closeProjectWithReturn}
+          onCopy={openCopyProject}
+          onSave={async (p, isNew, extras = {}) => {
             try {
               const old = db.projects.find(x => x.id === p.id);
               if (old && hasRole(ur, 'admin')) {
                 const changes = {};
-                if (old.budget !== p.budget) changes.budget = `${old.budget ?? '—'} → ${p.budget ?? '—'}`;
+                if (old.budget !== p.budget) changes.budget = `${old.budget ?? '-'} → ${p.budget ?? '-'}`;
                 if (old.name !== p.name) changes.name = `${old.name} → ${p.name}`;
                 if (old.managerId !== p.managerId) changes.manager = `${empName(old.managerId)} → ${empName(p.managerId)}`;
                 if (old.status !== p.status) changes.status = `${PROJECT_STATUSES[old.status]} → ${PROJECT_STATUSES[p.status]}`;
@@ -129,9 +170,21 @@ export default function ModalRenderer({
                   store.addAudit('Административное изменение проекта (прямое)', changes, 'project', p.id);
                 }
               }
+
               await store.upsertProject(p);
-              store.addAudit(isNew ? 'Создание проекта' : 'Изменение проекта', { name: p.name, code: p.code, budget: p.budget }, 'project', p.id);
-              onClose();
+              store.addAudit(
+                isNew ? 'Создание проекта' : 'Изменение проекта',
+                { name: p.name, code: p.code, budget: p.budget },
+                'project',
+                p.id,
+              );
+
+              if (extras.templateTasks?.length) {
+                const res = store.instantiateTemplateTasks(p.id, extras.templateTasks);
+                reportTemplateResult('Задачи из шаблона', res);
+              }
+
+              closeProjectWithReturn();
             } catch (error) {
               handleError(error);
             }
@@ -150,6 +203,7 @@ export default function ModalRenderer({
           toast={toast}
         />
       );
+    }
 
     case 'hours':
       return (
@@ -209,7 +263,7 @@ export default function ModalRenderer({
           onSave={async (v, isNew) => {
             try {
               await store.upsertVacation(v);
-              store.addAudit(isNew ? 'Создание отпуска' : 'Изменение отпуска', { employee: empName(v.empId), period: `${fmtDMY(v.start)}—${fmtDMY(v.end)}` }, 'vacation', v.id);
+              store.addAudit(isNew ? 'Создание отпуска' : 'Изменение отпуска', { employee: empName(v.empId), period: `${fmtDMY(v.start)}-${fmtDMY(v.end)}` }, 'vacation', v.id);
               onClose();
             } catch (error) {
               handleError(error);

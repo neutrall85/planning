@@ -1,8 +1,7 @@
 // src/services/DataStore.js
 import { buildMockData } from './mockData';
-import { TODAY, iso, addMonths, addDays, uid, fmtDMY } from '../utils/date';
-import { TASK_STATUSES, TASK_STATUS_ORDER, PRIORITIES, VACATION_TYPES, PROJECT_STATUSES, PROJECT_TYPES, DEPENDENCY_TYPES } from '../utils/constants';
-import { canChangeTaskStatus } from '../utils/permissions';
+import { uid } from '../utils/date';
+import { canChangeTaskStatus, canChangeProjectStatus, canManageProjectAccess } from '../utils/permissions';
 
 // Репозитории
 import { TaskRepository } from '../repositories/TaskRepository';
@@ -16,6 +15,7 @@ import { KbRepository } from '../repositories/KbRepository';
 import { HoursRequestRepository } from '../repositories/HoursRequestRepository';
 import { RoleDelegationRepository } from '../repositories/RoleDelegationRepository';
 import { CommentRepository } from '../repositories/CommentRepository';
+import { TemplateRepository } from '../repositories/TemplateRepository';
 
 // Сервисы
 import { BudgetService } from './BudgetService';
@@ -31,6 +31,7 @@ import { KbService } from './KbService';
 import { HoursRequestService } from './HoursRequestService';
 import { RoleDelegationService } from './RoleDelegationService';
 import { CommentService } from './CommentService';
+import { TemplateService } from './TemplateService';
 
 class DataMigrator {
   static migrate(data) {
@@ -87,8 +88,9 @@ class DataStore {
     this._auditRepo = new AuditRepository(this._data.audit);
     this._auditService = new AuditService(this._auditRepo, () => this._notify());
 
-    // === Миграция комментариев до создания CommentRepository ===
+    // === Миграция глобальных коллекций до создания репозиториев ===
     this._data.comments = this._data.comments || [];
+    this._data.templates = this._data.templates || [];
     this._migrateComments();
 
     // Репозитории
@@ -102,6 +104,7 @@ class DataStore {
     this._hoursRequestRepo = new HoursRequestRepository(this._data.hoursRequests);
     this._roleDelegationRepo = new RoleDelegationRepository(this._data.roleDelegations);
     this._commentRepo = new CommentRepository(this._data.comments);
+    this._templateRepo = new TemplateRepository(this._data.templates);
 
     // Сервисы (AuditService уже создан выше)
     this._notificationService = new NotificationService(
@@ -125,9 +128,12 @@ class DataStore {
     this._projectService = new ProjectService(
       this._projectRepo,
       this._taskRepo,
+      this._employeeRepo,
       this._notificationService,
       this._auditService,
-      () => this._notify()
+      () => this._notify(),
+      canChangeProjectStatus,
+      canManageProjectAccess,
     );
     this._vacationService = new VacationService(
       this._vacationRepo,
@@ -147,6 +153,12 @@ class DataStore {
       this._auditService,
       () => this._notify()
     );
+    this._templateService = new TemplateService(
+      this._templateRepo,
+      this._auditService,
+      () => this._notify(),
+      { taskService: this._taskService }
+    );
 
     this._taskService.archiveOldTasks(3);
   }
@@ -160,16 +172,6 @@ class DataStore {
     return () => { this._listeners = this._listeners.filter(cb => cb !== callback); };
   }
 
-  /**
-   * Оповещает подписчиков о новых данных.
-   *
-   * Repository.save() мутирует элементы массива по индексу, поэтому
-   * корневой {...this._data} не меняет ссылки вложенных коллекций. Без
-   * shallow-copy массивов useMemo с deps [data.employees] / [data.tasks]
-   * не пересчитается. Копируем все коллекции явным перечислением: дороже
-   * на 12 аллокаций, зато поведение предсказуемо и не зависит от того,
-   * добавит ли кто-то новую коллекцию в _data.
-   */
   _notify() {
     const d = this._data;
     const snapshot = {
@@ -182,6 +184,7 @@ class DataStore {
       notifications: [...d.notifications],
       audit: [...d.audit],
       comments: [...d.comments],
+      templates: [...d.templates],
       departments: [...d.departments],
       kbs: [...d.kbs],
       hoursRequests: [...d.hoursRequests],
@@ -220,11 +223,15 @@ class DataStore {
   // Проекты
   upsertProject(project) {
     const user = this._authService.getCurrentUser();
-    this._projectService.upsertProject(project, user?.id || 'system');
+    this._projectService.upsertProject(project, user);
   }
   deleteProject(id) {
     const user = this._authService.getCurrentUser();
     this._projectService.deleteProject(id, user?.id || 'system');
+  }
+  setProjectAccess(projectId, access) {
+    const user = this._authService.getCurrentUser();
+    return this._projectService.setAccess(projectId, access, user);
   }
 
   // Отпуска
@@ -244,19 +251,10 @@ class DataStore {
     const user = this._authService.getCurrentUser();
     const isSelf = !!(user && emp.id === user.id);
     this._employeeService.upsertEmployee(emp, user?.id || 'system');
-    // EmployeeService уже дёрнул _notify с прежней ссылкой сессии.
-    // Синхронизируем _currentUser: иначе правки своего профиля
-    // (пароль, фото, телефон) не долетают до useAuth.
     if (isSelf) this._authService.refreshCurrentUser();
   }
   empName(id) { return this._employeeService.getEmployeeName(id); }
 
-  /**
-   * Самостоятельная регистрация сотрудника — единственная точка входа для
-   * LoginScreen. Идёт через EmployeeService, а не через прямую мутацию
-   * _data: Repository держит ссылку на массив employees, и подмена массива
-   * «снаружи» оставила бы репозиторий смотреть в старый массив.
-   */
   registerEmployee(payload) {
     return this._employeeService.registerEmployee(payload, 'system');
   }
@@ -319,6 +317,10 @@ class DataStore {
     return this._commentService.getComments(filter);
   }
 
+  getCommentMatches(filter = {}) {
+    return this._commentService.getMatches(filter);
+  }
+
   addComment(data) {
     return this._commentService.addComment(data);
   }
@@ -342,13 +344,64 @@ class DataStore {
     return this._commentService.setReaction(commentId, user.id, emoji);
   }
 
-  // обратная совместимость
   toggleReaction(commentId, emoji) {
     return this.setReaction(commentId, emoji);
   }
 
   addAttachment(commentId, file) {
     return this._commentService.addAttachment(commentId, file);
+  }
+
+  // ---------- ШАБЛОНЫ ----------
+
+  getTemplates(kind) {
+    const user = this._authService.getCurrentUser();
+    return this._templateService.getVisible(kind, user);
+  }
+
+  getAllTemplates() {
+    const user = this._authService.getCurrentUser();
+    return this._templateService.getAllVisible(user);
+  }
+
+  saveTemplate(input) {
+    const user = this._authService.getCurrentUser();
+    return this._templateService.create(input, user);
+  }
+
+  updateTemplate(id, patch) {
+    const user = this._authService.getCurrentUser();
+    return this._templateService.update(id, patch, user);
+  }
+
+  deleteTemplate(id) {
+    const user = this._authService.getCurrentUser();
+    this._templateService.remove(id, user);
+  }
+
+  instantiateTemplateTasks(projectId, payloads) {
+    const user = this._authService.getCurrentUser();
+    return this._templateService.instantiateTaskTree(payloads, {
+      projectId,
+      actorId: user?.id || 'system',
+    });
+  }
+
+  instantiateTemplateSubtasks(parentTaskId, payloads) {
+    const user = this._authService.getCurrentUser();
+    const parent = this._taskRepo.findById(parentTaskId);
+    if (!parent) {
+      return {
+        created: 0,
+        failed: 0,
+        errors: [{ title: null, message: 'Родительская задача не найдена' }],
+      };
+    }
+    return this._templateService.instantiateTaskTree(payloads, {
+      projectId: parent.projectId,
+      parentTaskId,
+      actorId: user?.id || 'system',
+    });
   }
 
   // ---------- МИГРАЦИЯ КОММЕНТАРИЕВ ----------

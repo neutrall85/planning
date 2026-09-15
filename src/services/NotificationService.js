@@ -24,7 +24,7 @@ export class NotificationService {
     return n;
   }
 
-  /** Внутреннее создание (без рендера — для батчинга в семантических методах). */
+  /** Внутреннее создание (без рендера - для батчинга в семантических методах). */
   _addNotification(userId, text, target = null) {
     if (!userId) return null;
     const notif = {
@@ -127,8 +127,8 @@ export class NotificationService {
 
   notifyTaskDeadlineChanged(task, oldDeadline, actorId) {
     if (!task.assigneeId || task.assigneeId === actorId) return;
-    const from = oldDeadline ? fmtDMY(oldDeadline) : '—';
-    const to = task.deadline ? fmtDMY(task.deadline) : '—';
+    const from = oldDeadline ? fmtDMY(oldDeadline) : '-';
+    const to = task.deadline ? fmtDMY(task.deadline) : '-';
     this._addNotification(
       task.assigneeId,
       `Изменён срок задачи "${task.title}": ${from} → ${to}`,
@@ -141,7 +141,7 @@ export class NotificationService {
     if (!task.assigneeId || task.assigneeId === actorId) return;
     this._addNotification(
       task.assigneeId,
-      `Изменены плановые часы задачи "${task.title}": ${oldHours ?? '—'} → ${task.plannedHours ?? '—'} ч`,
+      `Изменены плановые часы задачи "${task.title}": ${oldHours ?? '-'} → ${task.plannedHours ?? '-'} ч`,
       { targetType: 'task', targetId: task.id }
     );
     this._notify();
@@ -273,7 +273,7 @@ export class NotificationService {
   // ==================== ОТПУСКА ====================
 
   notifyVacationDecision(vacation, approved) {
-    const period = `${fmtDMY(vacation.start)}—${fmtDMY(vacation.end)}`;
+    const period = `${fmtDMY(vacation.start)}-${fmtDMY(vacation.end)}`;
     this._addNotification(
       vacation.empId,
       `Ваш отпуск ${period} ${approved ? 'утверждён' : 'отклонён'}.`,

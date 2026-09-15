@@ -200,7 +200,7 @@ export default function LoginScreen({ db, registerEmployee, onLogin, toast }) {
           {mode !== "register" && (
             <>
               <h3>{mode === "forgot" ? "Восстановление пароля" : "Вход в систему"}</h3>
-              <div className="login-sub">{mode === "forgot" ? "Ссылка будет отправлена на зарегистрированный e-mail" : "Логин — e-mail без домена " + "@" + DOMAIN}</div>
+              <div className="login-sub">{mode === "forgot" ? "Ссылка будет отправлена на зарегистрированный e-mail" : "Логин - e-mail без домена " + "@" + DOMAIN}</div>
               {mode === "forgot" ? (
                 <>
                   <label className="lbl">E-mail</label>
@@ -296,8 +296,8 @@ export default function LoginScreen({ db, registerEmployee, onLogin, toast }) {
                 <span className="link-sep">|</span>
                 <button type="button" className="link" onClick={() => switchMode("register")}>Регистрация</button>
               </div>
-              <div className="cookie-note">Сессия хранится в cookie 30 дней (HttpOnly, Secure, SameSite=Lax — на стороне сервера).</div>
-              <div className="demo-title">Демо-доступы — клик сразу выполняет вход</div>
+              <div className="cookie-note">Сессия хранится в cookie 30 дней (HttpOnly, Secure, SameSite=Lax - на стороне сервера).</div>
+              <div className="demo-title">Демо-доступы - клик сразу выполняет вход</div>
               <div className="demo-grid">
                 {demos.map((d) => (
                   <button type="button" key={d.l} className="demo-chip" onClick={() => { setLg(d.l); setPw(d.p); setErr(null); doLogin(d.l, d.p); }}>

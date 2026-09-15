@@ -1,4 +1,3 @@
-import React from 'react';
 import { Ic, ICONS } from '../Icons';
 import { useDiscussion } from './context';
 

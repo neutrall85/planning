@@ -2,15 +2,24 @@
 import React, { useState, useMemo } from 'react';
 import Kanban from '../Kanban';
 import Projects from '../Projects';
-import { PROJECT_STATUSES, PROJECT_TYPES, PROJECT_STATUS_CONFIG, PROJECT_STATUS_ORDER, PROJECT_PRIORITIES } from '../../utils/constants';
+import { SearchBox } from '../SearchBox';
+import {
+  PROJECT_STATUSES,
+  PROJECT_TYPES,
+  PROJECT_STATUS_CONFIG,
+  PROJECT_STATUS_ORDER,
+  PROJECT_PRIORITIES,
+} from '../../utils/constants';
 import { TODAY } from '../../utils/date';
-import { computeScope, hasRole } from '../../utils/permissions';
+import { computeScope, hasRole, canChangeProjectStatus } from '../../utils/permissions';
 import { Ic, ICONS } from '../Icons';
 import Avatar from '../Avatar';
 import { getProjectColor } from '../../utils/projectHelpers';
 import ProjectProgress from '../ProjectProgress';
+import { useToast } from '../../context/ToastContext';
 
 export default function ProjectsView({ db, ur, openProject, openHoursReq, store }) {
+  const { showToast } = useToast();
   const scope = useMemo(() => computeScope(ur, db), [ur, db]);
   const [viewMode, setViewMode] = useState('kanban');
   const [showOnlyMyProjects, setShowOnlyMyProjects] = useState(false);
@@ -106,11 +115,9 @@ export default function ProjectsView({ db, ur, openProject, openHoursReq, store 
     const plan = tasks.reduce((s, t) => s + (t.plannedHours || 0), 0);
     const fact = tasks.reduce((s, t) => s + t.logs.reduce((lsum, l) => lsum + l.hours, 0), 0);
     const uniqueAssignees = [...new Set(tasks.map(t => t.assigneeId).filter(Boolean))];
-    const canClose = () => {
-      const creatorId = project.creatorId || project.history?.find(h => h.who !== 'system')?.who;
-      return hasRole(ur, 'admin') || hasRole(ur, 'director') || (creatorId && creatorId === ur.id);
-    };
     const projectColor = getProjectColor(project);
+    const canCloseOrCancel = canChangeProjectStatus(ur, project, 'closed');
+
     return (
       <div onClick={() => openProject(project.id)}>
         <div className="kcard-title">{project.name}</div>
@@ -133,7 +140,7 @@ export default function ProjectsView({ db, ur, openProject, openHoursReq, store 
             {uniqueAssignees.length > 4 && <span className="mut sm">+{uniqueAssignees.length-4}</span>}
           </div>
           <div className="pj-actions" onClick={(e) => e.stopPropagation()}>
-            {canClose() && project.status !== 'closed' && project.status !== 'cancelled' && (
+            {canCloseOrCancel && project.status !== 'closed' && project.status !== 'cancelled' && (
               <button className="icon-btn danger" title="Закрыть/Отменить проект" onClick={() => {
                 const action = window.confirm(`Закрыть проект "${project.name}"?`) ? 'close' : window.confirm(`Отменить проект "${project.name}"?`) ? 'cancel' : null;
                 if (action === 'close') store.upsertProject({ ...project, status: 'closed', closedAt: TODAY });
@@ -150,9 +157,12 @@ export default function ProjectsView({ db, ur, openProject, openHoursReq, store 
 
   const handleMoveProject = (id, newStatus) => {
     const project = db.projects.find(p => p.id === id);
-    if (project && project.status !== newStatus) {
-      store.upsertProject({ ...project, status: newStatus });
+    if (!project || project.status === newStatus) return;
+    if (!canChangeProjectStatus(ur, project, newStatus)) {
+      showToast('У вас нет прав на изменение статуса этого проекта.', 'error');
+      return;
     }
+    store.upsertProject({ ...project, status: newStatus });
   };
 
   const closeProject = (p) => store.upsertProject({ ...p, status: 'closed', closedAt: TODAY });
@@ -172,11 +182,11 @@ export default function ProjectsView({ db, ur, openProject, openHoursReq, store 
           </button>
         </div>
 
-        <input
-          className="inp sm filter-search"
-          placeholder="Поиск..."
+        <SearchBox
           value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
+          onChange={setSearchQuery}
+          placeholder="Поиск..."
+          className="filter-search"
         />
 
         <select className="inp sel sm filter-select" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>

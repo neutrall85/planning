@@ -1,16 +1,17 @@
 // Staff.jsx
 import React, { useState, useMemo, useCallback } from "react";
-import { ROLES, VACATION_TYPES } from "../utils/constants";
+import { ROLES, VACATION_TYPES, DIALOGS, TOASTS } from "../utils/constants";
 import { TODAY, fmtDMY, uid } from "../utils/date";
 import {
   canEditDepartments,
   canEditRoles,
   canManageAllVacations,
-  hasRole,
   canFireEmployee,
 } from "../utils/permissions";
 import { Ic, ICONS } from "./Icons";
 import { useDataHelpers } from "../hooks";
+import { useToast } from "../context/ToastContext";
+import { useConfirm } from "../context/ConfirmContext";
 import { EditEmployeeModal } from "./Modals/EditEmployeeModal";
 import { CreateEmployeeModal } from "./Modals/CreateEmployeeModal";
 import Avatar from "./Avatar";
@@ -69,7 +70,7 @@ const EmployeeRow = React.memo(({
           <span className={`st-load-txt${l.plan > norm ? ' over' : ''}`}>{l.plan} ч · {Math.round((l.plan / norm) * 100)}%</span>
         </div>
       )}
-      <div className="st-nums"><b>{isFired ? '—' : l.cnt}</b><span>{isFired ? 'задач' : 'задач'}</span></div>
+      <div className="st-nums"><b>{isFired ? '-' : l.cnt}</b><span>{isFired ? 'задач' : 'задач'}</span></div>
       {canEditDepartments(ur) && !isFired && <button className="btn ghost sm" title="Подразделения" onClick={() => openDepts(employee.id)}><Ic d={ICONS.users} size={13} /> Отделы</button>}
       {canEditRoles(ur) && !isFired && <button className="btn ghost sm" onClick={() => openRoles(employee.id)}><Ic d={ICONS.shield} size={13} /> Роли</button>}
       {canFire && (
@@ -87,8 +88,9 @@ const EmployeeRow = React.memo(({
 });
 
 export default function Staff({ store, db, setDb, ur, openRoles, openDepts, openVacation }) {
-  // ↑ К1: добавлен проп store, чтобы пробросить в CreateEmployeeModal/EditEmployeeModal
   const { getEmployeeLoad, empName } = useDataHelpers(db);
+  const { showToast } = useToast();
+  const { prompt } = useConfirm();
   const [showFired, setShowFired] = useState(false);
   const [editEmployeeId, setEditEmployeeId] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -132,6 +134,26 @@ export default function Staff({ store, db, setDb, ur, openRoles, openDepts, open
   const openEditEmployee = useCallback((id) => setEditEmployeeId(id), []);
   const closeEditEmployee = useCallback(() => setEditEmployeeId(null), []);
 
+  const handleCreateKb = useCallback(async () => {
+    const name = await prompt(DIALOGS.createKb);
+    if (!name) return;
+    setDb((s) => ({
+      ...s,
+      kbs: [...s.kbs, { id: 'kb_' + Math.random().toString(36).slice(2, 6), name, full: name }],
+    }));
+    showToast(TOASTS.kbCreated(name), 'success');
+  }, [prompt, setDb, showToast]);
+
+  const handleCreateDept = useCallback(async () => {
+    const name = await prompt(DIALOGS.createDept);
+    if (!name) return;
+    setDb((s) => ({
+      ...s,
+      departments: [...s.departments, { id: 'd_' + Math.random().toString(36).slice(2, 6), name, kbId: null }],
+    }));
+    showToast(TOASTS.deptCreated(name), 'success');
+  }, [prompt, setDb, showToast]);
+
   const renderDepartment = useCallback((deptId) => {
     const members = deptMap.get(deptId) || [];
     if (!members.length) return null;
@@ -142,7 +164,7 @@ export default function Staff({ store, db, setDb, ur, openRoles, openDepts, open
       <div className="st-dept" key={deptId}>
         <div className="st-dept-head">
           <span className="st-dept-name">{dept.name}</span>
-          <span className="mut">руководитель: {headNames || '—'}</span>
+          <span className="mut">руководитель: {headNames || '-'}</span>
           <span className="kcount">{members.length}</span>
         </div>
         {members.map(e => (
@@ -167,17 +189,15 @@ export default function Staff({ store, db, setDb, ur, openRoles, openDepts, open
   return (
     <div className="staff">
       <div className="sec-head">
-        <div className="sec-note">Привязку сотрудников к отделам меняют только HR-менеджер, суперадминистратор и генеральный директор. Загрузка — по плановым часам открытых задач, норма 160 ч/мес.</div>
+        <div className="sec-note">Привязку сотрудников к отделам меняют только HR-менеджер, суперадминистратор и генеральный директор. Загрузка - по плановым часам открытых задач, норма 160 ч/мес.</div>
         {canEditRoles(ur) && (
           <div className="sec-actions">
-            <button className="btn ghost sm" onClick={() => {
-              const name = window.prompt('Название нового КБ:');
-              if (name) setDb((s) => ({ ...s, kbs: [...s.kbs, { id: 'kb_' + Math.random().toString(36).slice(2,6), name, full: name }] }));
-            }}><Ic d={ICONS.plus} size={13} /> КБ</button>
-            <button className="btn ghost sm" onClick={() => {
-              const name = window.prompt('Название нового отдела:');
-              if (name) setDb((s) => ({ ...s, departments: [...s.departments, { id: 'd_' + Math.random().toString(36).slice(2,6), name, kbId: null }] }));
-            }}><Ic d={ICONS.plus} size={13} /> Отдел</button>
+            <button className="btn ghost sm" onClick={handleCreateKb}>
+              <Ic d={ICONS.plus} size={13} /> КБ
+            </button>
+            <button className="btn ghost sm" onClick={handleCreateDept}>
+              <Ic d={ICONS.plus} size={13} /> Отдел
+            </button>
             {canEditDepartments(ur) && (
               <button className="btn primary sm" onClick={() => setShowCreateModal(true)}>
                 <Ic d={ICONS.plus} size={13} /> Добавить сотрудника
@@ -189,24 +209,24 @@ export default function Staff({ store, db, setDb, ur, openRoles, openDepts, open
 
       {showCreateModal && (
         <CreateEmployeeModal
-          store={store}                                     /* ← К1: без этого store === undefined */
+          store={store}
           db={db}
           setDb={setDb}
-          ur={ur}                                           /* ← без этого падает на store.addNotification(ur.id, ...) */
+          ur={ur}
           onClose={() => setShowCreateModal(false)}
-          toast={(msg, type) => alert(msg)}
+          toast={(msg, type) => showToast(msg, type || 'error')}
           audit={(action, details) => setDb(prev => ({ ...prev, audit: [{ id: uid(), ts: Date.now(), userId: ur.id, action, details }, ...prev.audit] }))}
         />
       )}
 
       {editEmployeeId && (
         <EditEmployeeModal
-          store={store}                                     /* ← К1: без этого store === undefined */
+          store={store}
           db={db}
           setDb={setDb}
           employeeId={editEmployeeId}
           onClose={closeEditEmployee}
-          toast={(msg, type) => alert(msg)}
+          toast={(msg, type) => showToast(msg, type || 'error')}
           audit={(action, details) => setDb(prev => ({ ...prev, audit: [{ id: uid(), ts: Date.now(), userId: ur.id, action, details }, ...prev.audit] }))}
           ur={ur}
         />
@@ -216,7 +236,6 @@ export default function Staff({ store, db, setDb, ur, openRoles, openDepts, open
         <div className="st-section">
           <div className="st-sec-head">
             <div className="st-sec-title">Руководство</div>
-            {/* <div className="st-sec-sub">{noDeptEmployees.length} чел.</div> */}
           </div>
           {noDeptEmployees.map(e => (
             <EmployeeRow
@@ -240,7 +259,6 @@ export default function Staff({ store, db, setDb, ur, openRoles, openDepts, open
         <div className="st-section" key={kb.id}>
           <div className="st-sec-head">
             <div className="st-sec-title">{kb.name}</div>
-            {/* <div className="st-sec-sub">{kb.full} · главный конструктор: {chiefs.map(e => `${e.last} ${e.first}`).join(', ') || '—'}</div> */}
           </div>
           {chiefs.length > 0 && (
             <div className="st-dept" style={{ borderTop: '1px solid var(--line)' }}>
@@ -292,9 +310,9 @@ export default function Staff({ store, db, setDb, ur, openRoles, openDepts, open
                     <tr key={v.id}>
                       <td><b>{empName(v.empId)}</b></td>
                       <td>{getPrimaryDeptName(e, db)}</td>
-                      <td>{fmtDMY(v.start)} — {fmtDMY(v.end)}</td>
+                      <td>{fmtDMY(v.start)} - {fmtDMY(v.end)}</td>
                       <td>{VACATION_TYPES[v.type]}</td>
-                      <td>{v.delegation.enabled ? `→ ${empName(v.delegation.subId)}` : '—'}</td>
+                      <td>{v.delegation.enabled ? `→ ${empName(v.delegation.subId)}` : '-'}</td>
                       <td><span className={`st-chip ${v.status}`}>
                         {{ pending: 'На утверждении', approved: 'Утверждён', rejected: 'Отклонён' }[v.status]}
                       </span></td>

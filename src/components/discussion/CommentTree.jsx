@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import CommentItem from './CommentItem';
-import { CommentPolicy } from './CommentPolicy';
+import { sortSiblings } from '../../utils/commentTree';
 import { useDiscussion } from './context';
 
 export default function CommentTree({ parentId = null, depth = 0 }) {
@@ -9,8 +9,7 @@ export default function CommentTree({ parentId = null, depth = 0 }) {
   const children = useMemo(() => {
     const pool = searchQuery.trim() ? visibleComments : comments;
     const list = pool.filter(c => (c.parentId || null) === parentId);
-    if (parentId === null) return CommentPolicy.sort(list, sortOrder);
-    return [...list].sort((a, b) => a.createdAt - b.createdAt);
+    return sortSiblings(list, parentId === null, sortOrder);
   }, [comments, visibleComments, parentId, sortOrder, searchQuery]);
 
   return children.map(c => (

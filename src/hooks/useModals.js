@@ -1,7 +1,19 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 export function useModals({ store, data, user }) {
   const [modal, setModal] = useState(null);
+
+  // Счётчик монтирований модалок. MainLayout использует его как key у
+  // ModalRenderer: при каждом открытии модалка монтируется с нуля, поэтому
+  // внутреннее состояние useForm инициализируется новыми initialValues.
+  // Без этого React переиспользовал бы инстанс (тот же тип на той же
+  // позиции в дереве), и форма показала бы значения предыдущей сущности.
+  const seqRef = useRef(0);
+
+  const open = (state) => {
+    seqRef.current += 1;
+    setModal({ ...state, _seq: seqRef.current });
+  };
 
   const openTask = (
     taskId = null,
@@ -10,9 +22,10 @@ export function useModals({ store, data, user }) {
     initialProjectId = null,
     returnToProjectId = null,
     returnToProjectTab = 'info',
-    returnToTaskId = null
+    returnToTaskId = null,
+    returnToTaskTab = 'subtasks'
   ) =>
-    setModal({
+    open({
       type: 'task',
       taskId,
       initialTab,
@@ -20,29 +33,58 @@ export function useModals({ store, data, user }) {
       initialProjectId,
       returnToProjectId,
       returnToProjectTab,
-      returnToTaskId
+      returnToTaskId,
+      returnToTaskTab,
     });
 
-  const openProject = (projectId = null, initialTab = 'info') =>
-    setModal({ type: 'project', projectId, initialTab });
+  const openProject = (
+    projectId = null,
+    initialTab = 'info',
+    returnToProjectId = null,
+    returnToProjectTab = 'info'
+  ) =>
+    open({
+      type: 'project',
+      projectId,
+      initialTab,
+      returnToProjectId,
+      returnToProjectTab,
+    });
 
-  const openHoursReq = (kind, targetId) =>
-    setModal({ type: 'hours', kind, targetId });
-
-  const openRoles = (empId) =>
-    setModal({ type: 'roles', empId });
-
-  const openDepts = (empId) =>
-    setModal({ type: 'depts', empId });
-
+  const openHoursReq = (kind, targetId) => open({ type: 'hours', kind, targetId });
+  const openRoles = (empId) => open({ type: 'roles', empId });
+  const openDepts = (empId) => open({ type: 'depts', empId });
   const openVacation = (vacationId = null, forEmpId = null) =>
-    setModal({ type: 'vacation', vacationId, forEmpId });
+    open({ type: 'vacation', vacationId, forEmpId });
+  const openDelegation = () => open({ type: 'delegation' });
+  const openVacNow = () => open({ type: 'vacnow' });
 
-  const openDelegation = () =>
-    setModal({ type: 'delegation' });
+  // Копирование = «шаблон из живой сущности»: тот же конвейер черновиков
+  // (collectTaskPayloads → pendingTemplate* → instantiateTemplate*), что и
+  // при сохранении в шаблон. Никаких новых путей создания задач/подзадач.
+  const openCopyTask = (sourceTaskId) =>
+    open({
+      type: 'task',
+      taskId: null,
+      copyFromId: sourceTaskId,
+      initialTab: 'form',
+      parentTaskId: null,
+      initialProjectId: null,
+      returnToProjectId: null,
+      returnToProjectTab: 'info',
+      returnToTaskId: sourceTaskId,
+      returnToTaskTab: 'form',
+    });
 
-  const openVacNow = () =>
-    setModal({ type: 'vacnow' });
+  const openCopyProject = (sourceProjectId) =>
+    open({
+      type: 'project',
+      projectId: null,
+      copyFromId: sourceProjectId,
+      initialTab: 'info',
+      returnToProjectId: sourceProjectId,
+      returnToProjectTab: 'info',
+    });
 
   const closeModal = () => setModal(null);
 
@@ -56,6 +98,8 @@ export function useModals({ store, data, user }) {
     openVacation,
     openDelegation,
     openVacNow,
+    openCopyTask,
+    openCopyProject,
     closeModal,
   };
 }

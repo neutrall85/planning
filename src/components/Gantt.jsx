@@ -126,11 +126,11 @@ const TaskRow = ({
 
   const tooltipLines = [
     `${task.title}`,
-    `Проект: ${project?.code || '—'}`,
+    `Проект: ${project?.code || '-'}`,
     `Статус: ${TASK_STATUSES[task.status]?.label || task.status}`,
     `Приоритет: ${PRIORITIES[task.priority]?.label || task.priority}`,
-    `План: ${task.plannedHours ?? '—'} ч, Факт: ${sp} ч`,
-    `Срок: ${fmtD(task.start)} — ${fmtD(task.deadline)}`,
+    `План: ${task.plannedHours ?? '-'} ч, Факт: ${sp} ч`,
+    `Срок: ${fmtD(task.start)} - ${fmtD(task.deadline)}`,
     ...(assignee ? [`Исполнитель: ${assignee.last} ${assignee.first}`] : []),
     ...(vac ? [`⚠️ В отпуске ${fmtDMY(vac.start)}–${fmtDMY(vac.end)}`] : []),
     ...(isCritical ? ['🔴 Критическая задача'] : []),
@@ -161,7 +161,7 @@ const TaskRow = ({
           </span>
         </div>
         <span className="gsub">
-          {assignee && <Avatar employee={assignee} size="xs" />} · {task.plannedHours ?? '—'} ч · {TASK_STATUSES[task.status]?.label || task.status}
+          {assignee && <Avatar employee={assignee} size="xs" />} · {task.plannedHours ?? '-'} ч · {TASK_STATUSES[task.status]?.label || task.status}
         </span>
       </div>
       <div className="gantt-track">
@@ -656,9 +656,9 @@ export default function Gantt({ db, ur, openTask, openProject }) {
       </div>
 
       <div className="gantt-legend p-2 border-t flex flex-wrap gap-4 items-center">
-        <span className="legend-item">🏖 — исполнитель в отпуске</span>
-        <span className="legend-item">Заполнение полосы — факт / план</span>
-        <span className="legend-item">→ — зависимость задач</span>
+        <span className="legend-item">🏖 - исполнитель в отпуске</span>
+        <span className="legend-item">Заполнение полосы - факт / план</span>
+        <span className="legend-item">→ - зависимость задач</span>
       </div>
     </div>
   );

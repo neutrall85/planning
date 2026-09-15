@@ -1,4 +1,3 @@
-import React from 'react';
 import Avatar from '../Avatar';
 import { fmtDT } from '../../utils/date';
 import { Ic, ICONS } from '../Icons';
@@ -22,7 +21,7 @@ export default function PinnedMessages({ pinned, onJump }) {
           >
             <Avatar employee={author} size="xs" />
             <span className="pinned-author">
-              {author ? `${author.last} ${author.first}` : '—'}
+              {author ? `${author.last} ${author.first}` : '-'}
             </span>
             <span className="mut sm">{fmtDT(c.createdAt)}</span>
             <span className="pinned-preview">

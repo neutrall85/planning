@@ -29,5 +29,5 @@ export function getEmployeePrimaryDepartment(employee, db) {
 // Упрощённая версия, возвращающая только название
 export function getPrimaryDeptName(employee, db) {
   const dept = getEmployeePrimaryDepartment(employee, db);
-  return dept ? dept.name : '—';
+  return dept ? dept.name : '-';
 }

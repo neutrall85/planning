@@ -64,8 +64,8 @@ export const VacationModal = ({ db, ur, vacationId, forEmpId, onClose, onSave, t
     toast(error.message || 'Ошибка сохранения отпуска', 'error');
   });
 
-  const employeeOptions = db.employees.map(e => ({ value: e.id, label: `${empName(e.id)} — ${getPrimaryDeptName(e, db)}` }));
-  const substituteOptions = db.employees.filter(e => e.id !== values.empId).map(e => ({ value: e.id, label: `${empName(e.id)} — ${getPrimaryDeptName(e, db)}` }));
+  const employeeOptions = db.employees.map(e => ({ value: e.id, label: `${empName(e.id)} - ${getPrimaryDeptName(e, db)}` }));
+  const substituteOptions = db.employees.filter(e => e.id !== values.empId).map(e => ({ value: e.id, label: `${empName(e.id)} - ${getPrimaryDeptName(e, db)}` }));
   const statusOptions = [
     { value: 'pending', label: 'На утверждении' },
     { value: 'approved', label: 'Утверждён' },

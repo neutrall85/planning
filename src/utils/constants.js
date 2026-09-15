@@ -20,16 +20,16 @@ export const TASK_STATUSES = {
 export const TASK_STATUS_ORDER = ["new", "inwork", "review", "closed", "cancelled"];
 
 export const PRIORITIES = {
-  low:  { label: "Низкий", color: "#10b981" },   // зелёный
-  mid:  { label: "Средний", color: "#f59e0b" },  // жёлтый
-  high: { label: "Высокий", color: "#f97316" },  // оранжевый
-  crit: { label: "Критический", color: "#dc2626" }, // красный
+  low:  { label: "Низкий", color: "#10b981" },
+  mid:  { label: "Средний", color: "#f59e0b" },
+  high: { label: "Высокий", color: "#f97316" },
+  crit: { label: "Критический", color: "#dc2626" },
 };
 
 export const PROJECT_PRIORITIES = {
-  AOG:  { label: 'AOG',  color: '#dc2626', order: 1 },   // красный
-  CRIT: { label: 'CRIT', color: '#f59e0b', order: 2 },   // жёлтый
-  NORM: { label: 'NORM', color: '#10b981', order: 3 },   // зелёный
+  AOG:  { label: 'AOG',  color: '#dc2626', order: 1 },
+  CRIT: { label: 'CRIT', color: '#f59e0b', order: 2 },
+  NORM: { label: 'NORM', color: '#10b981', order: 3 },
 };
 
 export const DEPENDENCY_TYPES = {
@@ -71,3 +71,166 @@ export const PROJECT_STATUS_ORDER = ['inactive', 'active', 'closed', 'cancelled'
 export const PROJECT_TYPES = { prod: "Производственный", admin: "Административный" };
 export const COMMENT_EDIT_WINDOW = 15 * 60000; // 15 минут
 export const DOMAIN = "aviahorizont.ru";
+
+// ---------------------------------------------------------------------------
+// Статус черновика
+// ---------------------------------------------------------------------------
+//
+// Отдельная константа, а не ключ в TASK_STATUSES: у черновика нет ни
+// переходов, ни прав, ни отображения в канбане. Это визуальный маркер
+// «ещё не задача», который используется списком черновиков шаблона и
+// модалкой-редактором. Единая точка правды.
+export const DRAFT_STATUS = Object.freeze({
+  value: 'draft',
+  label: 'Черновик',
+});
+
+// ---------------------------------------------------------------------------
+// Ограничения на размер загружаемых файлов
+// ---------------------------------------------------------------------------
+//
+// Единственное место, где заданы числовые лимиты. Все компоненты и сервисы
+// берут значения отсюда, чтобы лимит не расходился по файлам.
+//
+// Вложения вкладки «Вложения» (задачи и проекты) ограничений по размеру НЕ
+// имеют — см. fileValidation.js. Валидация там касается только типа файла.
+export const FILE_LIMITS = {
+  // Изображения: комментарии, галерея проекта, фото проекта
+  image: 10 * 1024 * 1024,
+  // Фото профиля в личном кабинете
+  profilePhoto: 5 * 1024 * 1024,
+};
+
+// Человекочитаемое представление размера: 10485760 → "10 МБ".
+const mb = (bytes) => `${Math.round(bytes / 1024 / 1024)} МБ`;
+
+// ---------------------------------------------------------------------------
+// Тексты сообщений для файловых операций
+// ---------------------------------------------------------------------------
+export const FILE_MESSAGES = {
+  notImage: 'Можно загружать только изображения',
+  imageTooLarge: `Изображение слишком большое (максимум ${mb(FILE_LIMITS.image)})`,
+  profilePhotoTooLarge: `Фото слишком большое (максимум ${mb(FILE_LIMITS.profilePhoto)})`,
+  someImagesSkipped: `Некоторые файлы пропущены (только изображения до ${mb(FILE_LIMITS.image)})`,
+};
+
+// ---------------------------------------------------------------------------
+// Ограничения на имена папок
+// ---------------------------------------------------------------------------
+export const FOLDER_NAME_MAX_LENGTH = 64;
+export const FILE_ROOT_LABEL = 'Корень';
+
+// ---------------------------------------------------------------------------
+// Диалоги подтверждения и ввода (используются через useConfirm)
+// ---------------------------------------------------------------------------
+//
+// Статические диалоги — просто объект. Диалоги с интерполяцией — функция,
+// принимающая аргументы и возвращающая объект.
+export const DIALOGS = {
+  // --- confirm: удаления ---
+  deleteProfilePhoto: {
+    message: 'Удалить фото профиля?',
+    confirmLabel: 'Удалить',
+    danger: true,
+  },
+  deleteProjectPhoto: {
+    message: 'Удалить фото?',
+    confirmLabel: 'Удалить',
+    danger: true,
+  },
+  deleteFile: {
+    message: 'Удалить файл?',
+    confirmLabel: 'Удалить',
+    danger: true,
+  },
+  deleteProject: (name) => ({
+    title: 'Удалить проект',
+    message: `Удалить проект «${name}»? Это действие необратимо.`,
+    confirmLabel: 'Удалить проект',
+    danger: true,
+  }),
+  deleteTask: (title) => ({
+    title: 'Удалить задачу',
+    message: `Удалить задачу «${title}»?`,
+    confirmLabel: 'Удалить',
+    danger: true,
+  }),
+
+  // --- confirm: предупреждения ---
+  vacationOverlap: (start, end) => ({
+    message: `Исполнитель в отпуске ${start}–${end}. Продолжить?`,
+    confirmLabel: 'Продолжить',
+  }),
+
+  // --- confirm: проекты ---
+  closeProject: (name) => ({
+    title: 'Закрыть проект',
+    message: `Закрыть проект «${name}»? Все задачи будут закрыты.`,
+    confirmLabel: 'Закрыть',
+    danger: true,
+  }),
+  cancelProject: (name) => ({
+    title: 'Отменить проект',
+    message: `Отменить проект «${name}»?`,
+    confirmLabel: 'Отменить',
+    danger: true,
+  }),
+
+  // --- confirm: шаблоны ---
+  deleteTemplate: (name) => ({
+    title: 'Удалить шаблон',
+    message: `Удалить шаблон «${name}»?`,
+    confirmLabel: 'Удалить',
+    danger: true,
+  }),
+
+  // --- confirm/prompt: папки ---
+  createFolder: {
+    title: 'Новая папка',
+    message: 'Введите название папки',
+    placeholder: 'Например: Чертёж',
+    confirmLabel: 'Создать',
+  },
+  deleteFolder: (name) => ({
+    title: 'Удалить папку',
+    message: `Удалить папку «${name}»?`,
+    confirmLabel: 'Удалить',
+    danger: true,
+  }),
+
+  // --- prompt: ввод текста ---
+  createKb: {
+    title: 'Новое конструкторское бюро',
+    message: 'Введите название КБ',
+    placeholder: 'Например: КБ «ЛА»',
+    confirmLabel: 'Создать',
+  },
+  createDept: {
+    title: 'Новый отдел',
+    message: 'Введите название отдела',
+    placeholder: 'Например: Отдел аэродинамики',
+    confirmLabel: 'Создать',
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Тексты toast-уведомлений
+// ---------------------------------------------------------------------------
+export const TOASTS = {
+  commentDeleted: 'Комментарий удалён',
+  photoDeleted: 'Фото удалено',
+  fileDeleted: 'Файл удалён',
+  fileUploaded: 'Файл загружен',
+  filesUploaded: (n) => `Загружено файлов: ${n}`,
+  filesRejected: (list) => `Пропущено: ${list}`,
+  projectClosed: 'Проект закрыт',
+  projectCancelled: 'Проект отменён',
+  templateDeleted: 'Шаблон удалён',
+  taskRestored: (title) => `Задача «${title}» восстановлена`,
+  projectRestored: (name) => `Проект «${name}» восстановлен`,
+  kbCreated: (name) => `КБ «${name}» создано`,
+  deptCreated: (name) => `Отдел «${name}» создан`,
+  folderCreated: (name) => `Папка «${name}» создана`,
+  folderDeleted: 'Папка удалена',
+  folderNotEmpty: 'Нельзя удалить непустую папку',
+};

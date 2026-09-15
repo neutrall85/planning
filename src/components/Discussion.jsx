@@ -1,17 +1,34 @@
 // src/components/Discussion.jsx
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { extractMentions } from '../utils/mentionParser';
+import { TOASTS } from '../utils/constants';
 import { Lightbox } from './Lightbox';
 
 import { DiscussionProvider } from './discussion/context';
 import { CommentPolicy } from './discussion/CommentPolicy';
-import { useCommentList } from './discussion/useCommentList';
+import { useCommentList } from '../hooks';
 import DiscussionHeader from './discussion/DiscussionHeader';
 import SortToolbar from './discussion/SortToolbar';
 import CommentTree from './discussion/CommentTree';
 import CommentComposer from './discussion/CommentComposer';
 
 export { extractMentions };
+
+function useScrollToComment(comments) {
+  const [targetId, setTargetId] = useState(null);
+
+  useLayoutEffect(() => {
+    if (!targetId) return;
+    const el = document.getElementById(`comment-${targetId}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.add('comment-flash');
+    setTimeout(() => el.classList.remove('comment-flash'), 2000);
+    setTargetId(null);
+  }, [targetId, comments]);
+
+  return setTargetId;
+}
 
 export default function Discussion({
   store,
@@ -32,7 +49,36 @@ export default function Discussion({
   const [editText, setEditText] = useState('');
   const [lightbox, setLightbox] = useState({ index: null, list: [] });
 
-  const { comments, visibleComments } = useCommentList(store, filter, searchQuery);
+  const { comments, visibleComments, matchSteps } = useCommentList(
+    store, filter, searchQuery, sortOrder
+  );
+
+  const scrollToComment = useScrollToComment(comments);
+
+  /**
+   * Текущий шаг навигации. -1 — «ещё не переходили»: первое «вниз»
+   * ведёт на первое вхождение, первое «вверх» — на последнее.
+   */
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
+
+  useEffect(() => {
+    setCurrentMatchIndex(-1);
+  }, [searchQuery]);
+
+  const goToMatch = useCallback((delta) => {
+    if (!matchSteps.length) return;
+    const next = currentMatchIndex === -1
+      ? (delta > 0 ? 0 : matchSteps.length - 1)
+      : (currentMatchIndex + delta + matchSteps.length) % matchSteps.length;
+    setCurrentMatchIndex(next);
+    scrollToComment(matchSteps[next].commentId);
+  }, [currentMatchIndex, matchSteps, scrollToComment]);
+
+  const goToPrevMatch = useCallback(() => goToMatch(-1), [goToMatch]);
+  const goToNextMatch = useCallback(() => goToMatch(1), [goToMatch]);
+
+  const currentMatchNumber = currentMatchIndex === -1 ? 0 : currentMatchIndex + 1;
+  const activeStep = currentMatchIndex >= 0 ? matchSteps[currentMatchIndex] : null;
 
   const getAuthor = useCallback(
     (id) => employees.find(e => e.id === id),
@@ -41,21 +87,13 @@ export default function Discussion({
 
   const policy = useMemo(
     () => new CommentPolicy({ currentUser, comments, readOnly }),
-    [currentUser, comments, readOnly ]
+    [currentUser, comments, readOnly]
   );
 
   const pinnedComments = useMemo(
     () => comments.filter(c => c.pinned),
     [comments]
   );
-
-  const scrollToComment = useCallback((id) => {
-    const el = document.getElementById(`comment-${id}`);
-    if (!el) return;
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    el.classList.add('comment-flash');
-    setTimeout(() => el.classList.remove('comment-flash'), 2000);
-  }, []);
 
   const saveEdit = (c) => {
     if (!editText.trim()) return;
@@ -87,9 +125,8 @@ export default function Discussion({
   }, [store, toast]);
 
   const onDelete = (c) => {
-    if (!window.confirm('Удалить комментарий и все ответы?')) return;
     store.deleteComment(c.id);
-    toast?.('Комментарий удалён');
+    toast?.(TOASTS.commentDeleted, 'success');
   };
 
   const openLightbox = (list, index) => setLightbox({ list, index });
@@ -108,6 +145,7 @@ export default function Discussion({
     visibleComments,
     sortOrder,
     searchQuery,
+    activeOccurrence: activeStep,
     editingId, setEditingId,
     editText, setEditText,
     saveEdit,
@@ -129,7 +167,10 @@ export default function Discussion({
           pinned={pinnedComments}
           onJump={scrollToComment}
           onSearchChange={setSearchQuery}
-          resultCount={visibleComments.length}
+          totalMatches={matchSteps.length}
+          currentMatch={currentMatchNumber}
+          onPrevMatch={goToPrevMatch}
+          onNextMatch={goToNextMatch}
         />
 
         {comments.length > 1 && (
@@ -157,6 +198,7 @@ export default function Discussion({
             comments={comments}
             getAuthor={getAuthor}
             readOnly={readOnly}
+            onCommentCreated={scrollToComment}
           />
         ) : readOnly ? (
           <div className="info-box">

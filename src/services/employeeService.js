@@ -25,7 +25,7 @@ export class EmployeeService {
 
   getEmployeeName(id) {
     const e = this._employeeRepo.findById(id);
-    return e ? `${e.last} ${e.first}` : '—';
+    return e ? `${e.last} ${e.first}` : '-';
   }
 
   findByEmail(email) {
@@ -35,7 +35,7 @@ export class EmployeeService {
   /**
    * Самостоятельная регистрация сотрудника (через экран LoginScreen).
    *
-   * Единственный путь создания сотрудника «снаружи» — без прав admin/hr.
+   * Единственный путь создания сотрудника «снаружи» - без прав admin/hr.
    * Возвращает созданного сотрудника, чтобы вызывающий код выполнил login
    * без гонок по стору: регистрация и вход идут в одном такте.
    *

@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { DOMAIN, TASK_STATUSES, TASK_STATUS_ORDER, VACATION_TYPES } from '../utils/constants';
+import { DOMAIN, TASK_STATUSES, TASK_STATUS_ORDER, VACATION_TYPES, DIALOGS, TOASTS, FILE_LIMITS, FILE_MESSAGES } from '../utils/constants';
 import { TODAY, fmtDMY, fmtD, iso, addDays, initials, isTaskActive } from '../utils/date';
 import { useDataHelpers } from '../hooks';
 import { useToast } from '../context/ToastContext';
+import { useConfirm } from '../context/ConfirmContext';
 import { Ic, ICONS } from './Icons';
 import { getPrimaryDeptName } from '../utils/helpers';
 import { Modal } from './Modal';
@@ -75,6 +76,7 @@ const PasswordChangeModal = ({ user, store, onClose }) => {
 
 export default function Cabinet({ store, data, user, openTask, openVacation, openDelegation }) {
   const { showToast } = useToast();
+  const { confirm } = useConfirm();
   const { empName, getEmployeeLoad } = useDataHelpers(data);
   const [tab, setTab] = useState('overview');
 
@@ -137,7 +139,7 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
 
     const rows = [['Проект', 'Задача', 'Дата', 'Часы']];
     allLogs.forEach(l => rows.push([l.project, l.task, fmtDMY(l.date), l.hours]));
-    
+
     downloadCSV(`отчет_${user.last}_${expFrom}_${expTo}`, rows);
     showToast('Отчёт выгружен!', 'success');
   };
@@ -168,6 +170,16 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
   const handlePhotoUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      showToast(FILE_MESSAGES.notImage, 'error');
+      e.target.value = '';
+      return;
+    }
+    if (file.size > FILE_LIMITS.profilePhoto) {
+      showToast(FILE_MESSAGES.profilePhotoTooLarge, 'error');
+      e.target.value = '';
+      return;
+    }
     const reader = new FileReader();
     reader.onload = (ev) => {
       const photoData = ev.target.result;
@@ -177,12 +189,14 @@ export default function Cabinet({ store, data, user, openTask, openVacation, ope
     };
     reader.readAsDataURL(file);
   };
-  const handlePhotoDelete = () => {
-    if (user.photo && window.confirm('Удалить фото?')) {
-      const updated = { ...user, photo: null };
-      store.upsertEmployee(updated);
-      showToast('Фото удалено', 'info');
-    }
+
+  const handlePhotoDelete = async () => {
+    if (!user.photo) return;
+    const ok = await confirm(DIALOGS.deleteProfilePhoto);
+    if (!ok) return;
+    const updated = { ...user, photo: null };
+    store.upsertEmployee(updated);
+    showToast(TOASTS.photoDeleted, 'info');
   };
 
   return (

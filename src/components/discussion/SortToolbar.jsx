@@ -1,4 +1,3 @@
-import React from 'react';
 import { SORT_OPTIONS } from './constants';
 
 export default function SortToolbar({ value, onChange }) {

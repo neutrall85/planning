@@ -1,5 +1,4 @@
 // src/components/ProjectChat.jsx
-import React from 'react';
 import Discussion from './Discussion';
 
 const ProjectChat = ({ projectId, store, currentUser, toast, employees, candidates, openTask, tasks }) => {

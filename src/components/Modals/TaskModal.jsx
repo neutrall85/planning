@@ -7,29 +7,50 @@ import { TaskTable } from '../TaskTable';
 import { FormField } from '../FormField';
 import Discussion from '../Discussion';
 import { useForm } from '../../hooks/useForm';
-import { useDataHelpers } from '../../hooks';
-import { TASK_STATUSES, TASK_STATUS_ORDER, PRIORITIES, DEPENDENCY_TYPES } from '../../utils/constants';
+import { useDataHelpers, useStableModalHeight } from '../../hooks';
+import { useConfirm } from '../../context/ConfirmContext';
+import { TASK_STATUSES, TASK_STATUS_ORDER, PRIORITIES, DEPENDENCY_TYPES, DIALOGS, TOASTS } from '../../utils/constants';
 import { TODAY, iso, addDays, uid, fmtDMY, fmtD, fmtDT } from '../../utils/date';
-import { canEditTaskFields, canChangeTaskStatus, canCreateTask, computeScope } from '../../utils/permissions';
-import { validateAttachment } from '../../utils/fileValidation';
-import { appendFileVersion } from '../../utils/fileVersions';
+import {
+  canEditTaskFields,
+  canChangeTaskStatus,
+  canCreateTask,
+  computeScope,
+} from '../../utils/permissions';
+import { prepareAttachments } from '../../utils/fileUpload';
+import { createFolder } from '../../utils/fileTree';
 import { Ic, ICONS } from '../Icons';
+import { TemplateSelect, TemplateActions } from '../Templates';
+import { applyTemplatePayload } from '../../utils/templateSchemas';
+import { collectTaskPayloads } from '../../utils/templateNesting';
+import { applyHourlyMode, hoursBetween } from '../../utils/hourlyTask';
 
 export const TaskModal = ({
   db, ur, taskId, initialTab = 'form', parentTaskId, initialProjectId, returnToProjectId,
   returnToTaskId,
+  copyFromId,
   onClose, onSave, onDelete, onHoursReq, patchTask, notify, store,
-  openTask, spent, planSum, toast,
+  openTask, spent, planSum, toast, onCopy,
 }) => {
   const { empName, getTaskSpent, vacOverlap } = useDataHelpers(db);
+  const { confirm } = useConfirm();
   const existing = taskId ? db.tasks.find(t => t.id === taskId) : null;
+  const copySource = copyFromId ? db.tasks.find(t => t.id === copyFromId) : null;
+  const isCopy = !existing && !!copySource;
   const isNew = !existing;
   const readOnly = !!(existing && existing.archived);
   const canEditFields = !readOnly && (existing ? canEditTaskFields(ur, existing, db) : canCreateTask(ur));
   const canChangeStatus = !readOnly && existing && canChangeTaskStatus(ur, existing, null, db);
   const isAssignee = existing && existing.assigneeId === ur.id;
   const isAuthor = existing && existing.creatorId === ur.id;
-  const canLog = !readOnly && (existing ? isAssignee : true) && !existing?.isSummary;
+  const canLog = !readOnly && (existing ? isAssignee : true) && !existing?.isSummary && !existing?.isHourly;
+
+  // Копия задачи создаёт новую задачу → право определяется canCreateTask.
+  // Шаблон задачи — заготовка именно задачи → тот же предикат, а не
+  // композитный canCreateTemplate: у шаблона задачи и у шаблона проекта
+  // разный круг ролей, смешивать их здесь нельзя.
+  const canCopy = canCreateTask(ur);
+  const canMakeTemplate = canCreateTask(ur);
 
   const isProjectLocked = !!(initialProjectId || parentTaskId);
 
@@ -42,32 +63,67 @@ export const TaskModal = ({
     return '';
   }, [initialProjectId, parentTaskId, db.tasks]);
 
-  const initialValues = existing ? { ...existing } : {
-    id: 't_' + uid(),
-    title: '',
-    desc: '',
-    projectId: effectiveProjectId,
-    assigneeId: null,
-    priority: 'mid',
-    plannedHours: 8,
-    start: TODAY,
-    deadline: iso(addDays(new Date(), 14)),
-    status: 'new',
-    logs: [],
-    history: [],
-    delegatedFrom: null,
-    archived: false,
-    archivedAt: null,
-    closedAt: null,
-    creatorId: ur.id,
-    dependencyId: null,
-    dependencyType: 'FS',
-    files: [],
-    isSummary: false,
-    parentTaskId: parentTaskId || null,
-    // Поля repeatType/repeatInterval/repeatDays/repeatEndType/repeatEndValue
-    // удалены: фича повторов не реализована, UI и сервисов под них нет.
-  };
+  const initialValues = applyHourlyMode(
+    existing
+      ? {
+          ...existing,
+          isHourly:  existing.isHourly  ?? false,
+          startTime: existing.startTime || '09:00',
+          endTime:   existing.endTime   || '18:00',
+        }
+      : isCopy
+        ? {
+            ...copySource,
+            id: 't_' + uid(),
+            assigneeId: null,
+            status: 'new',
+            parentTaskId: null,
+            isSummary: false,
+            isHourly: copySource.isHourly ?? false,
+            startTime: copySource.startTime || '09:00',
+            endTime: copySource.endTime || '18:00',
+            logs: [],
+            history: [
+              { ts: Date.now(), who: ur.id, text: `Скопирована из «${copySource.title}»` },
+            ],
+            delegatedFrom: null,
+            archived: false,
+            archivedAt: null,
+            closedAt: null,
+            creatorId: ur.id,
+            dependencyId: null,
+            files: [],
+            folders: [],
+          }
+        : {
+            id: 't_' + uid(),
+            title: '',
+            desc: '',
+            projectId: effectiveProjectId,
+            assigneeId: null,
+            priority: 'mid',
+            plannedHours: 8,
+            start: TODAY,
+            deadline: iso(addDays(new Date(), 14)),
+            status: 'new',
+            isHourly:  false,
+            startTime: '09:00',
+            endTime:   '18:00',
+            logs: [],
+            history: [],
+            delegatedFrom: null,
+            archived: false,
+            archivedAt: null,
+            closedAt: null,
+            creatorId: ur.id,
+            dependencyId: null,
+            dependencyType: 'FS',
+            files: [],
+            folders: [],
+            isSummary: false,
+            parentTaskId: parentTaskId || null,
+          }
+  );
 
   const validate = useCallback((values) => {
     const errors = {};
@@ -86,12 +142,43 @@ export const TaskModal = ({
       if (isNaN(planned) || planned <= 0) errors.plannedHours = 'Плановые часы обязательны (число > 0)';
       if (!values.deadline) errors.deadline = 'Срок исполнения обязателен';
     }
+    if (values.isHourly) {
+      if (!values.startTime) errors.startTime = 'Укажите время начала';
+      if (!values.endTime)   errors.endTime   = 'Укажите время окончания';
+      if (values.startTime && values.endTime
+          && hoursBetween(values.startTime, values.endTime) === null) {
+        errors.endTime = 'Время окончания должно быть позже времени начала';
+      }
+    }
     if (!values.priority) errors.priority = 'Приоритет обязателен';
     if (!values.status) errors.status = 'Статус обязателен';
     return errors;
   }, [db, isProjectLocked]);
 
-  const { values, handleChange, handleSubmit, errors, touched, setFieldValue, isValid, isDirty } = useForm(initialValues, validate);
+  const {
+    values, handleChange, handleSubmit, errors, touched,
+    setValues, setTouched, setFieldValue, isValid, isDirty,
+  } = useForm(initialValues, validate);
+
+  // Единая точка применения инвариантов часовой задачи.
+  const updateValues = useCallback((patch) => {
+    setValues(prev => applyHourlyMode({ ...prev, ...patch }));
+    setTouched(prev => {
+      const next = { ...prev };
+      Object.keys(patch).forEach(key => { next[key] = true; });
+      return next;
+    });
+  }, [setValues, setTouched]);
+
+  const [appliedTemplateName, setAppliedTemplateName] = useState(null);
+
+  const [pendingTemplateSubtasks, setPendingTemplateSubtasks] = useState(() =>
+    isCopy ? collectTaskPayloads(db.tasks, copySource.id) : []
+  );
+
+  const [activeTab, setActiveTab] = useState(initialTab);
+
+  const bodyRef = useStableModalHeight('form', activeTab);
 
   useEffect(() => {
     if (isNew && parentTaskId && !values.projectId) {
@@ -106,10 +193,31 @@ export const TaskModal = ({
   const isAdminProject = project && project.ptype === 'admin';
   const subtasks = useMemo(() => db.tasks.filter(t => t.parentTaskId === values.id), [db.tasks, values.id]);
 
-  const isSummaryChecked = values.isSummary || subtasks.length > 0;
+  const draftSubtasks = useMemo(() => {
+    if (!isNew || pendingTemplateSubtasks.length === 0) return [];
+    return pendingTemplateSubtasks.map((node, idx) => ({
+      id: `draft_${idx}`,
+      _draft: true,
+      title: node.title || 'Без названия',
+      assigneeId: null,
+      status: 'new',
+      plannedHours: node.plannedHours ?? null,
+      priority: node.priority || 'mid',
+      deadline: null,
+      logs: [],
+      projectId: values.projectId,
+    }));
+  }, [isNew, pendingTemplateSubtasks, values.projectId]);
+
+  const displayedSubtasks = useMemo(
+    () => [...draftSubtasks, ...subtasks],
+    [draftSubtasks, subtasks]
+  );
+
+  const isSummaryChecked = values.isSummary || subtasks.length > 0 || draftSubtasks.length > 0;
   const isSummaryDisabled = !canEditFields || (!isNew && subtasks.length > 0) || subtasks.length > 0;
 
-  const saveHandler = useCallback((vals) => {
+  const saveHandler = useCallback(async (vals) => {
     const proj = db.projects.find(p => p.id === vals.projectId);
     const isAdminProj = proj && proj.ptype === 'admin';
     if (!vals.title.trim()) { toast('Укажите название', 'error'); return; }
@@ -123,6 +231,16 @@ export const TaskModal = ({
       if (isNaN(planned) || planned <= 0) { toast('Плановые часы обязательны (число > 0)', 'error'); return; }
       if (!vals.deadline) { toast('Срок исполнения обязателен', 'error'); return; }
     }
+    if (vals.isHourly) {
+      if (!vals.startTime || !vals.endTime) {
+        toast('Укажите время начала и окончания', 'error');
+        return;
+      }
+      if (hoursBetween(vals.startTime, vals.endTime) === null) {
+        toast('Время окончания должно быть позже времени начала', 'error');
+        return;
+      }
+    }
     if (proj && proj.budget != null && !proj.archived && !isAdminProj) {
       const currentPlanSum = db.tasks.filter(t => t.projectId === proj.id && t.id !== vals.id).reduce((s, t) => s + (t.plannedHours || 0), 0);
       if (currentPlanSum + (parseFloat(vals.plannedHours) || 0) > proj.budget) {
@@ -131,44 +249,93 @@ export const TaskModal = ({
       }
     }
     const vacWarn = vals.assigneeId && vals.deadline ? vacOverlap(vals.assigneeId, vals.start || vals.deadline, vals.deadline) : null;
-    if (vacWarn && !window.confirm(`Исполнитель в отпуске ${fmtDMY(vacWarn.start)}–${fmtDMY(vacWarn.end)}. Продолжить?`)) return;
+    if (vacWarn) {
+      const ok = await confirm(DIALOGS.vacationOverlap(fmtDMY(vacWarn.start), fmtDMY(vacWarn.end)));
+      if (!ok) return;
+    }
 
-    if (subtasks.length > 0) {
+    if (subtasks.length > 0 || draftSubtasks.length > 0) {
       vals.isSummary = true;
     }
 
-    const taskToSave = {
+    const taskToSave = applyHourlyMode({
       ...vals,
       plannedHours: vals.plannedHours === '' ? null : parseFloat(vals.plannedHours),
       closedAt: vals.status === 'closed' && (!existing || existing.status !== 'closed') ? TODAY : existing?.closedAt || null,
       history: [
-        ...(existing?.history || []),
+        ...(vals.history || []),
         ...(existing && existing.status !== vals.status ? [{ ts: Date.now(), who: ur.id, text: `Статус: ${TASK_STATUSES[existing.status].label} → ${TASK_STATUSES[vals.status].label}` }] : [])
       ],
       creatorId: existing?.creatorId || ur.id,
-    };
-    onSave(taskToSave, isNew);
-  }, [existing, isNew, db, vacOverlap, toast, onSave, ur, subtasks]);
+    });
+    onSave(taskToSave, isNew, { templateSubtasks: pendingTemplateSubtasks });
+  }, [existing, isNew, db, vacOverlap, toast, onSave, ur, subtasks, draftSubtasks, pendingTemplateSubtasks, confirm]);
 
-  const deleteHandler = useCallback(() => {
-    if (window.confirm('Удалить задачу?')) {
-      onDelete(existing.id);
-    }
-  }, [existing, onDelete]);
+  const deleteHandler = useCallback(async () => {
+    const ok = await confirm(DIALOGS.deleteTask(existing.title));
+    if (!ok) return;
+    onDelete(existing.id);
+  }, [existing, onDelete, confirm]);
 
-  const hasSubtasks = subtasks.length > 0 || values.isSummary;
+  const hasSubtasks = subtasks.length > 0 || values.isSummary || draftSubtasks.length > 0;
 
   const tabs = [
     { id: 'form', label: 'Данные' },
-    { id: 'time', label: `Учёт времени (${getTaskSpent(values)}/${values.plannedHours ?? '—'})` },
-    ...(hasSubtasks ? [{ id: 'subtasks', label: `Подзадачи (${subtasks.length})` }] : []),
+    ...(!values.isHourly ? [{ id: 'time', label: `Учёт времени (${getTaskSpent(values)}/${values.plannedHours ?? '—'})` }] : []),
+    ...(hasSubtasks ? [{ id: 'subtasks', label: `Подзадачи (${displayedSubtasks.length})` }] : []),
     ...(existing ? [
       { id: 'chat', label: `Обсуждение (${store.getComments({ taskId: values.id }).length})` },
-      { id: 'files', label: `Файлы (${values.files?.length || 0})` },
+      { id: 'files', label: `Вложения (${values.files?.length || 0})` },
       { id: 'hist', label: 'История' }
     ] : []),
   ];
-  const [activeTab, setActiveTab] = useState(initialTab);
+
+  useEffect(() => {
+    if (activeTab === 'time' && values.isHourly) setActiveTab('form');
+  }, [activeTab, values.isHourly]);
+
+  const applyTemplate = useCallback((template) => {
+    if (!template) {
+      setAppliedTemplateName(null);
+      setPendingTemplateSubtasks([]);
+      return;
+    }
+
+    const patch = applyTemplatePayload('task', template.payload);
+    const {
+      subtasks: nestedSubtasks,
+      projectId: templateProjectId,
+      ...taskFields
+    } = patch;
+
+    Object.keys(taskFields).forEach(field => setFieldValue(field, taskFields[field]));
+
+    const cleanSubtasks = Array.isArray(nestedSubtasks) ? nestedSubtasks : [];
+    setPendingTemplateSubtasks(cleanSubtasks);
+    setAppliedTemplateName(template.name);
+
+    if (cleanSubtasks.length > 0) {
+      setFieldValue('isSummary', true);
+    }
+
+    if (!templateProjectId) return;
+
+    if (isProjectLocked) {
+      if (templateProjectId !== effectiveProjectId) {
+        toast('Проект из шаблона не применён: задача создаётся в фиксированном проекте', 'info');
+      }
+      return;
+    }
+
+    const projectEntry = db.projects.find(p => p.id === templateProjectId);
+    const accessible = projectEntry && projectEntry.status === 'active' && !projectEntry.archived;
+    if (!accessible) {
+      toast('Проект из шаблона недоступен — выберите проект вручную', 'warning');
+      return;
+    }
+
+    setFieldValue('projectId', templateProjectId);
+  }, [setFieldValue, isProjectLocked, effectiveProjectId, db.projects, toast]);
 
   const projectOptions = useMemo(() => {
     const scope = computeScope(ur, db);
@@ -227,37 +394,43 @@ export const TaskModal = ({
     return [...ids].map(id => db.employees.find(e => e.id === id)).filter(Boolean);
   }, [db, values.projectId]);
 
-  const handleFileUpload = useCallback((file) => {
-    const check = validateAttachment(file);
-    if (!check.ok) {
-      toast(check.reason, 'error');
-      return;
+  const handleFileUpload = useCallback(async (files, folderId = null) => {
+    const result = await prepareAttachments(files, values.files, folderId, ur.id);
+
+    if (result.accepted > 0) {
+      setFieldValue('files', result.nextFiles);
+      if (existing) patchTask({ ...values, files: result.nextFiles });
+      toast(
+        result.accepted === 1 ? TOASTS.fileUploaded : TOASTS.filesUploaded(result.accepted),
+        'success'
+      );
     }
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const newFile = {
-        id: uid(),
-        name: file.name,
-        size: file.size,
-        url: ev.target.result,
-        uploadedBy: ur.id,
-        uploadedAt: new Date().toISOString(),
-      };
-      const updatedFiles = appendFileVersion(values.files || [], newFile);
-      setFieldValue('files', updatedFiles);
-      if (existing) patchTask({ ...values, files: updatedFiles });
-      toast('Файл загружен', 'success');
-    };
-    reader.readAsDataURL(file);
+    if (result.rejected > 0) {
+      toast(TOASTS.filesRejected(result.errors.join('; ')), 'warning');
+    }
   }, [values, existing, patchTask, setFieldValue, toast, ur.id]);
 
-  const handleFileDelete = useCallback((fileId) => {
-    if (!window.confirm('Удалить файл?')) return;
+  const handleFileDelete = useCallback(async (fileId) => {
+    const ok = await confirm(DIALOGS.deleteFile);
+    if (!ok) return;
     const updatedFiles = (values.files || []).filter(f => f.id !== fileId);
     setFieldValue('files', updatedFiles);
     if (existing) patchTask({ ...values, files: updatedFiles });
-    toast('Файл удалён', 'info');
-  }, [values, existing, patchTask, setFieldValue, toast]);
+    toast(TOASTS.fileDeleted, 'info');
+  }, [values, existing, patchTask, setFieldValue, toast, confirm]);
+
+  const handleCreateFolder = useCallback((name, parentId) => {
+    const newFolder = createFolder(name, parentId, ur.id);
+    const updatedFolders = [...(values.folders || []), newFolder];
+    setFieldValue('folders', updatedFolders);
+    if (existing) patchTask({ ...values, folders: updatedFolders });
+  }, [values, existing, patchTask, setFieldValue, ur.id]);
+
+  const handleDeleteFolder = useCallback((folderId) => {
+    const updatedFolders = (values.folders || []).filter(f => f.id !== folderId);
+    setFieldValue('folders', updatedFolders);
+    if (existing) patchTask({ ...values, folders: updatedFolders });
+  }, [values, existing, patchTask, setFieldValue]);
 
   const [logHours, setLogHours] = useState('');
   const [logNote, setLogNote] = useState('');
@@ -268,7 +441,7 @@ export const TaskModal = ({
     if (!h || h <= 0) { toast('Введите корректное количество часов', 'error'); return; }
     const sp = getTaskSpent(values);
     if (values.plannedHours && sp + h > values.plannedHours) {
-      toast(`Нельзя внести больше плановых: доступно ещё ${Math.max(0, values.plannedHours - sp)} ч`, 'error');
+      toast(`Нельзя внести больше плановых: доступно ещё ${Math.max(0, values.plannedHours - sp)} часов`, 'error');
       return;
     }
     const newLog = { id: uid(), userId: ur.id, date: logDate, hours: h, note: logNote.trim() };
@@ -284,6 +457,14 @@ export const TaskModal = ({
 
   const saveDisabled = !(canEditFields || (existing && canChangeStatus)) || (isNew ? !isValid : !isValid || !isDirty);
 
+  const modalTitle = readOnly
+    ? 'Архивная задача — только чтение'
+    : existing
+      ? 'Карточка задачи'
+      : isCopy
+        ? `Копирование задачи: ${copySource.title}`
+        : 'Новая задача';
+
   const footer = (
     <div className="modal-foot">
       {!readOnly && existing && (canEditFields || isAuthor) && (
@@ -291,6 +472,28 @@ export const TaskModal = ({
           <Ic d={ICONS.trash} size={14} /> Удалить
         </button>
       )}
+
+      {!readOnly && existing && onCopy && canCopy && (
+        <button
+          type="button"
+          className="btn ghost sm"
+          onClick={() => onCopy(existing.id)}
+          title="Создать новую задачу на основе этой"
+        >
+          <Ic d={ICONS.copy} size={13} /> Копировать
+        </button>
+      )}
+
+      {!readOnly && canMakeTemplate && (
+        <TemplateActions
+          kind="task"
+          source={values}
+          nested={existing ? collectTaskPayloads(db.tasks, existing.id) : []}
+          toast={toast}
+          disabled={!values.title?.trim()}
+        />
+      )}
+
       <div className="spacer" />
       <button className="btn ghost" onClick={onClose}>Отмена</button>
       <button className="btn primary" onClick={handleSubmit(saveHandler)} disabled={saveDisabled}>
@@ -301,12 +504,13 @@ export const TaskModal = ({
 
   return (
     <ModalShell
-      title={readOnly ? 'Архивная задача — только чтение' : existing ? 'Карточка задачи' : 'Новая задача'}
+      title={modalTitle}
       onClose={onClose}
       width={800}
       className="modal-task"
       showSave={false}
       footer={footer}
+      bodyRef={bodyRef}
       headerBefore={showBackButton ? (
         <button className="btn ghost sm" onClick={onClose}>
           <Ic d={ICONS.left} size={14} /> Назад
@@ -319,6 +523,16 @@ export const TaskModal = ({
 
       {activeTab === 'form' && (
         <div className="project-info-fields">
+          {isNew && !isCopy && (
+            <TemplateSelect kind="task" onApply={applyTemplate} />
+          )}
+
+          {isNew && appliedTemplateName && (
+            <div className="info-box">
+              Применён шаблон: <b>{appliedTemplateName}</b>
+            </div>
+          )}
+
           <FormField
             label="Название"
             required
@@ -331,8 +545,8 @@ export const TaskModal = ({
 
           <div className="field-row">
             <label className="field-label"></label>
-            <div className="flex-1">
-              <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '14px' }}>
+            <div className="flex-1 flex gap-4">
+              <label className="checkbox-inline">
                 <input
                   type="checkbox"
                   checked={isSummaryChecked}
@@ -340,6 +554,15 @@ export const TaskModal = ({
                   disabled={isSummaryDisabled}
                 />
                 Суммарная задача
+              </label>
+              <label className="checkbox-inline">
+                <input
+                  type="checkbox"
+                  checked={values.isHourly}
+                  onChange={(e) => updateValues({ isHourly: e.target.checked })}
+                  disabled={!canEditFields}
+                />
+                Часовая задача
               </label>
             </div>
           </div>
@@ -389,10 +612,10 @@ export const TaskModal = ({
                 value={values.plannedHours ?? ''}
                 onChange={(v) => handleChange('plannedHours', v)}
                 error={touched.plannedHours && errors.plannedHours}
-                disabled={!canEditFields || values.isSummary}
+                disabled={!canEditFields || values.isSummary || values.isHourly}
                 inline
               />
-              {!readOnly && onHoursReq && existing && isAssignee && (
+              {!readOnly && onHoursReq && existing && isAssignee && !values.isHourly && (
                 <button
                   type="button"
                   className="btn ghost field-action"
@@ -435,7 +658,7 @@ export const TaskModal = ({
               required
               type="date"
               value={values.start}
-              onChange={(v) => handleChange('start', v)}
+              onChange={(v) => updateValues({ start: v })}
               error={touched.start && errors.start}
               disabled={!canEditFields}
               inline
@@ -447,12 +670,35 @@ export const TaskModal = ({
               value={values.deadline}
               onChange={(v) => handleChange('deadline', v)}
               error={touched.deadline && errors.deadline}
-              disabled={!canEditFields || isAdminProject}
+              disabled={!canEditFields || isAdminProject || values.isHourly}
               inline
             />
           </div>
 
-          
+          {values.isHourly && (
+            <div className="fields-row">
+              <FormField
+                label="Время начала"
+                required
+                type="time"
+                value={values.startTime}
+                onChange={(v) => updateValues({ startTime: v })}
+                error={touched.startTime && errors.startTime}
+                disabled={!canEditFields}
+                inline
+              />
+              <FormField
+                label="Время окончания"
+                required
+                type="time"
+                value={values.endTime}
+                onChange={(v) => updateValues({ endTime: v })}
+                error={touched.endTime && errors.endTime}
+                disabled={!canEditFields}
+                inline
+              />
+            </div>
+          )}
 
           <FormField
             label="Зависит от задачи"
@@ -475,7 +721,7 @@ export const TaskModal = ({
         </div>
       )}
 
-      {activeTab === 'time' && (
+      {activeTab === 'time' && !values.isHourly && (
         <div className="tm-block">
           <div className="tm-progress">
             <div className="tm-progress-fill" style={{ width: Math.min(100, (getTaskSpent(values) / Math.max(1, values.plannedHours || 0)) * 100) + '%' }} />
@@ -503,19 +749,21 @@ export const TaskModal = ({
         <div className="tm-block">
           <div className="subtask-header">
             <div className="rep-panel-title">Подзадачи</div>
-            <button
-              className="btn primary sm"
-              onClick={() => {
-                onClose();
-                setTimeout(() => openTask(null, 'form', values.id, null, null, null, values.id), 50);
-              }}
-              disabled={readOnly}
-            >
-              <Ic d={ICONS.plus} size={14} /> Создать подзадачу
-            </button>
+            {existing && (
+              <button
+                className="btn primary sm"
+                onClick={() => {
+                  onClose();
+                  setTimeout(() => openTask(null, 'form', values.id, null, null, null, values.id), 50);
+                }}
+                disabled={readOnly}
+              >
+                <Ic d={ICONS.plus} size={14} /> Создать подзадачу
+              </button>
+            )}
           </div>
           <TaskTable
-            tasks={subtasks}
+            tasks={displayedSubtasks}
             onRowClick={(id) => {
               onClose();
               setTimeout(() => openTask(id, 'form', null, null, null, null, values.id), 50);
@@ -543,8 +791,11 @@ export const TaskModal = ({
       {activeTab === 'files' && existing && (
         <FileManager
           files={values.files}
+          folders={values.folders}
           onUpload={handleFileUpload}
           onDelete={handleFileDelete}
+          onCreateFolder={handleCreateFolder}
+          onDeleteFolder={handleDeleteFolder}
           canUpload={!readOnly && (canEditFields || isAssignee || isAuthor)}
           canDelete={!readOnly && (canEditFields || isAssignee || isAuthor)}
           employeeName={empName}
@@ -552,7 +803,7 @@ export const TaskModal = ({
       )}
 
       {activeTab === 'hist' && existing && (
-        <div className="tm-logs" style={{ maxHeight: 260 }}>
+        <div className="tm-logs tm-logs-hist">
           {[...values.history].reverse().map((h, i) => (
             <div key={i} className="tm-log">
               <span className="tm-log-name">{h.who === 'system' ? 'Система' : empName(h.who)}</span>

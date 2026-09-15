@@ -1,8 +1,6 @@
 // src/components/TasksList.jsx
-import React from 'react';
 import { TASK_STATUSES, PRIORITIES } from '../../utils/constants';
 import { fmtDMY, TODAY } from '../../utils/date';
-import Avatar from '../Avatar';
 
 export default function TasksList({ tasks, db, openTask }) {
   if (!tasks.length) {
@@ -48,7 +46,7 @@ export default function TasksList({ tasks, db, openTask }) {
             </div>
             <div className="pj-budget mt-8">
               <div className="pj-budget-row">
-                <span>Часы: <b>{factHours}</b> / <b>{task.plannedHours ?? '—'}</b></span>
+                <span>Часы: <b>{factHours}</b> / <b>{task.plannedHours ?? '-'}</b></span>
               </div>
               {task.plannedHours > 0 && (
                 <div className="pj-progress">

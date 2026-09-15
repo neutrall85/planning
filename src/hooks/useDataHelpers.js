@@ -2,9 +2,9 @@ import { useMemo } from 'react';
 
 export const useDataHelpers = (data) => {
   const empName = (id) => {
-    if (!data || !data.employees) return '—';
+    if (!data || !data.employees) return '-';
     const e = data.employees.find(x => x.id === id);
-    return e ? `${e.last} ${e.first}` : '—';
+    return e ? `${e.last} ${e.first}` : '-';
   };
 
   const primaryDept = (emp) => {

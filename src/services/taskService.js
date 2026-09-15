@@ -1,6 +1,5 @@
 // src/services/TaskService.js
-import { TODAY, iso, addMonths, uid, fmtDMY } from '../utils/date';
-import { TASK_STATUSES, TASK_STATUS_ORDER, PRIORITIES, DEPENDENCY_TYPES } from '../utils/constants';
+import { TODAY, iso, fmtDMY } from '../utils/date';
 
 export class TaskService {
   constructor(
@@ -100,7 +99,7 @@ export class TaskService {
       if (!task.createdAt) task.createdAt = new Date().toISOString();
     }
 
-    // Гарантия: если у задачи есть подзадачи — она суммарная
+    // Гарантия: если у задачи есть подзадачи - она суммарная
     if (task.parentTaskId) {
       const parent = this._taskRepo.findById(task.parentTaskId);
       if (parent && !parent.isSummary) {
@@ -208,7 +207,7 @@ export class TaskService {
   /**
    * Проход по цепочке родителей вверх. Реальные суммы BudgetService
    * считает «на лету», но флаг isSummary должен быть согласован:
-   * любой родитель, у которого появился ребёнок, обязан стать суммарным —
+   * любой родитель, у которого появился ребёнок, обязан стать суммарным -
    * иначе UI (TaskModal) отрисует некорректную форму и валидация
    * plannedHours сработает неверно. Заодно защищаемся от циклов.
    */

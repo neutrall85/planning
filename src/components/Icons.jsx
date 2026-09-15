@@ -1,5 +1,3 @@
-import React from 'react';
-
 export const Ic = ({ d, size = 18, w = 1.8 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={w} strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>
 );
@@ -15,11 +13,13 @@ export const ICONS = {
   plus: "M12 5v14M5 12h14",
   out: "M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3M16 8l4 4-4 4M20 12H9",
   x: "M6 6l12 12M18 6L6 18",
+  check: "M20 6L9 17l-5-5",
   left: "M15 6l-6 6 6 6",
   right: "M9 6l6 6-6 6",
   search: "M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3",
   trash: "M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13M10 11v6M14 11v6",
   edit: "M4 20l1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19zM13 6l5 5",
+  copy: "M8 8h12v12H8zM4 16V4h12v4",
   shield: "M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z",
   download: "M12 4v11M7 11l5 5 5-5M4 20h16",
   bell: "M18 9a6 6 0 1 0-12 0c0 5-2 6-2 6h16s-2-1-2-6M10 19a2 2 0 0 0 4 0",
@@ -41,4 +41,7 @@ export const ICONS = {
   external: "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3",
   star: "M12 2l2.4 7.2h7.6l-6 4.8 2.4 7.2-6-4.8-6 4.8 2.4-7.2-6-4.8h7.6z",
   pin: "M12 2a8 8 0 0 0-8 8c0 3.5 2.5 6.5 5.5 7.5L12 22l2.5-4.5A8 8 0 0 0 20 10a8 8 0 0 0-8-8zM12 6a4 4 0 1 0 0 8 4 4 0 0 0 0-8z",
+  bookmark: "M6 2h12v20l-6-4-6 4z",
+  up: "M6 15l6-6 6 6",
+  down: "M6 9l6 6 6-6",
 };

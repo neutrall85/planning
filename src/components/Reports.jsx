@@ -253,13 +253,13 @@ export default function Reports({ db, ur }) {
                   <tr key={t.id}>
                     <td>{idx + 1}</td>
                     <td><b>{t.title}</b></td>
-                    <td>{project?.code || '—'}</td>
-                    <td>{t.assigneeId ? empName(t.assigneeId) : '—'}</td>
+                    <td>{project?.code || '-'}</td>
+                    <td>{t.assigneeId ? empName(t.assigneeId) : '-'}</td>
                     <td><span className="st-chip" style={{ background: statusDef.color + '22', color: statusDef.color }}>{statusDef.label}</span></td>
                     <td><span style={{ color: priorityDef.color }}>{priorityDef.label}</span></td>
-                    <td>{t.plannedHours ?? '—'}</td>
+                    <td>{t.plannedHours ?? '-'}</td>
                     <td>{getTaskSpent(t)}</td>
-                    <td>{t.deadline ? fmtDMY(t.deadline) : '—'}</td>
+                    <td>{t.deadline ? fmtDMY(t.deadline) : '-'}</td>
                   </tr>
                 );
               })}
@@ -293,8 +293,8 @@ export default function Reports({ db, ur }) {
                     <td><b>{p.code}</b></td>
                     <td>{p.name}</td>
                     <td><span className={`st-chip ${p.status === 'active' ? 'active' : ''}`}>{PROJECT_STATUSES[p.status] || p.status}</span></td>
-                    <td>{p.customer || '—'}</td>
-                    <td>{p.budget ?? '—'}</td>
+                    <td>{p.customer || '-'}</td>
+                    <td>{p.budget ?? '-'}</td>
                     <td>{stats.plan}</td>
                     <td>{stats.fact}</td>
                     <td>{empName(p.managerId)}</td>
@@ -363,11 +363,11 @@ export default function Reports({ db, ur }) {
                   <tr key={idx}>
                     <td>{idx + 1}</td>
                     <td>{fmtDMY(l.date)}</td>
-                    <td>{user ? `${user.last} ${user.first}` : '—'}</td>
+                    <td>{user ? `${user.last} ${user.first}` : '-'}</td>
                     <td>{l.taskTitle}</td>
-                    <td>{project?.code || '—'}</td>
+                    <td>{project?.code || '-'}</td>
                     <td><b>{l.hours}</b></td>
-                    <td>{l.note || '—'}</td>
+                    <td>{l.note || '-'}</td>
                   </tr>
                 );
               })}
@@ -415,7 +415,7 @@ export default function Reports({ db, ur }) {
                 value={filters.dateFrom}
                 onChange={e => handleFilterChange('dateFrom', e.target.value)}
               />
-              <span>—</span>
+              <span>-</span>
               <input
                 className="inp w-150"
                 type="date"
@@ -436,7 +436,7 @@ export default function Reports({ db, ur }) {
                 value={filters.deadlineFrom}
                 onChange={e => handleFilterChange('deadlineFrom', e.target.value)}
               />
-              <span>—</span>
+              <span>-</span>
               <input
                 className="inp w-150"
                 type="date"
@@ -453,7 +453,7 @@ export default function Reports({ db, ur }) {
             onChange={e => handleFilterChange('projectId', e.target.value)}
           >
             <option value="all">Все проекты</option>
-            {visibleProjects.map(p => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
+            {visibleProjects.map(p => <option key={p.id} value={p.id}>{p.code} - {p.name}</option>)}
           </select>
 
           <label className="lbl m-0">Исполнитель:</label>
@@ -529,20 +529,20 @@ export default function Reports({ db, ur }) {
               if (f.filters.dateFrom || f.filters.dateTo) {
                 const from = f.filters.dateFrom ? fmtDMY(f.filters.dateFrom) : '';
                 const to = f.filters.dateTo ? fmtDMY(f.filters.dateTo) : '';
-                criteria.push(`Период: ${from} — ${to}`);
+                criteria.push(`Период: ${from} - ${to}`);
               }
               if (f.filters.deadlineFrom || f.filters.deadlineTo) {
                 const from = f.filters.deadlineFrom ? fmtDMY(f.filters.deadlineFrom) : '';
                 const to = f.filters.deadlineTo ? fmtDMY(f.filters.deadlineTo) : '';
-                criteria.push(`Срок исполнения: ${from} — ${to}`);
+                criteria.push(`Срок исполнения: ${from} - ${to}`);
               }
               if (f.filters.projectId !== 'all') {
                 const proj = (safeDb.projects || []).find(p => p.id === f.filters.projectId);
-                criteria.push(`Проект: ${proj?.code || '—'}`);
+                criteria.push(`Проект: ${proj?.code || '-'}`);
               }
               if (f.filters.assigneeId !== 'all') {
                 const emp = (safeDb.employees || []).find(e => e.id === f.filters.assigneeId);
-                criteria.push(`Исполнитель: ${emp ? emp.last : '—'}`);
+                criteria.push(`Исполнитель: ${emp ? emp.last : '-'}`);
               }
               if (f.filters.status !== 'all') criteria.push(`Статус: ${TASK_STATUSES[f.filters.status]?.label || f.filters.status}`);
               if (f.filters.priority !== 'all') criteria.push(`Приоритет: ${PRIORITIES[f.filters.priority]?.label || f.filters.priority}`);

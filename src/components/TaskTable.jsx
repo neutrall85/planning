@@ -2,9 +2,9 @@ import { useState, useMemo } from 'react';
 import { TASK_STATUSES } from '../utils/constants';
 import { fmtDMY } from '../utils/date';
 
-export const TaskTable = ({ 
-  tasks, 
-  onRowClick, 
+export const TaskTable = ({
+  tasks,
+  onRowClick,
   columns = ['title', 'assignee', 'status', 'planned', 'fact', 'deadline'],
   db,
   getTaskSpent,
@@ -17,11 +17,14 @@ export const TaskTable = ({
   const sortedTasks = useMemo(() => {
     const sorted = [...tasks];
     sorted.sort((a, b) => {
+      // Черновые всегда выше реальных, независимо от сортировки.
+      if (a._draft !== b._draft) return a._draft ? -1 : 1;
+
       let valA, valB;
       switch (sortField) {
         case 'title':
-          valA = a.title.toLowerCase();
-          valB = b.title.toLowerCase();
+          valA = (a.title || '').toLowerCase();
+          valB = (b.title || '').toLowerCase();
           break;
         case 'assignee':
           const nameA = a.assigneeId ? empName(a.assigneeId) : '';
@@ -90,25 +93,47 @@ export const TaskTable = ({
           {sortedTasks.length === 0 ? (
             <tr><td colSpan={columns.length} className="mut text-center">Нет задач</td></tr>
           ) : (
-            sortedTasks.map(task => (
-              <tr key={task.id} className="clickable-row" onClick={() => onRowClick(task.id)}>
-                {columns.includes('title') && <td><b>{task.title}</b></td>}
-                {columns.includes('assignee') && <td>{task.assigneeId ? empName(task.assigneeId) : '—'}</td>}
-                {columns.includes('status') && (
-                  <td>
-                    <span className="st-chip" style={{ background: TASK_STATUSES[task.status]?.color + '22', color: TASK_STATUSES[task.status]?.color }}>
-                      {TASK_STATUSES[task.status]?.label || task.status}
-                    </span>
-                  </td>
-                )}
-                {columns.includes('planned') && <td>{task.plannedHours ?? '—'}</td>}
-                {columns.includes('fact') && <td>{getTaskSpent(task)}</td>}
-                {columns.includes('deadline') && <td>{task.deadline ? fmtDMY(task.deadline) : '—'}</td>}
-                {showProject && columns.includes('project') && (
-                  <td>{db.projects.find(p => p.id === task.projectId)?.code || '—'}</td>
-                )}
-              </tr>
-            ))
+            sortedTasks.map(task => {
+              const isDraft = task._draft === true;
+              return (
+                <tr
+                  key={task.id}
+                  className={isDraft ? 'draft-row' : 'clickable-row'}
+                  onClick={isDraft ? undefined : () => onRowClick(task.id)}
+                >
+                  {columns.includes('title') && (
+                    <td>
+                      <b>{task.title}</b>
+                      {isDraft && <span className="task-draft-badge">черновик</span>}
+                    </td>
+                  )}
+                  {columns.includes('assignee') && (
+                    <td>{task.assigneeId ? empName(task.assigneeId) : '-'}</td>
+                  )}
+                  {columns.includes('status') && (
+                    <td>
+                      <span
+                        className="st-chip"
+                        style={{
+                          background: (TASK_STATUSES[task.status]?.color || '#64748b') + '22',
+                          color: TASK_STATUSES[task.status]?.color || '#64748b',
+                        }}
+                      >
+                        {TASK_STATUSES[task.status]?.label || task.status}
+                      </span>
+                    </td>
+                  )}
+                  {columns.includes('planned') && <td>{task.plannedHours ?? '-'}</td>}
+                  {columns.includes('fact') && <td>{getTaskSpent(task)}</td>}
+                  {columns.includes('deadline') && (
+                    <td>{task.deadline ? fmtDMY(task.deadline) : '-'}</td>
+                  )}
+                  {showProject && columns.includes('project') && (
+                    <td>{db.projects.find(p => p.id === task.projectId)?.code || '-'}</td>
+                  )}
+                </tr>
+              );
+            })
           )}
         </tbody>
       </table>

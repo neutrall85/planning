@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { filterMentionCandidates, insertMention } from '../../utils/mentionParser';
+import { filterMentionCandidates, insertMention } from '../utils/mentionParser';
 
 export function useMentions({ text, setText, candidates, textareaRef }) {
   const [mentionQ, setMentionQ] = useState(null);

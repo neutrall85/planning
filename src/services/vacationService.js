@@ -1,6 +1,5 @@
 // src/services/VacationService.js
 import { fmtDMY } from '../utils/date';
-import { VACATION_TYPES } from '../utils/constants';
 
 export class VacationService {
   constructor(vacationRepo, taskService, notificationService, auditService, notifyCallback) {
@@ -16,9 +15,9 @@ export class VacationService {
   upsertVacation(vac, currentUserId) {
     const existing = this._vacationRepo.findById(vac.id);
     if (existing) {
-      this._audit.addAudit('Изменение отпуска', `${vac.empId} ${fmtDMY(vac.start)}—${fmtDMY(vac.end)}`, 'vacation', vac.id, currentUserId);
+      this._audit.addAudit('Изменение отпуска', `${vac.empId} ${fmtDMY(vac.start)}-${fmtDMY(vac.end)}`, 'vacation', vac.id, currentUserId);
     } else {
-      this._audit.addAudit('Создание отпуска', `${vac.empId} ${fmtDMY(vac.start)}—${fmtDMY(vac.end)}`, 'vacation', vac.id, currentUserId);
+      this._audit.addAudit('Создание отпуска', `${vac.empId} ${fmtDMY(vac.start)}-${fmtDMY(vac.end)}`, 'vacation', vac.id, currentUserId);
     }
     this._vacationRepo.save(vac);
 
@@ -31,7 +30,7 @@ export class VacationService {
   deleteVacation(id, currentUserId) {
     const vac = this._vacationRepo.findById(id);
     if (vac) {
-      this._audit.addAudit('Удаление отпуска', `${vac.empId} ${fmtDMY(vac.start)}—${fmtDMY(vac.end)}`, 'vacation', id, currentUserId);
+      this._audit.addAudit('Удаление отпуска', `${vac.empId} ${fmtDMY(vac.start)}-${fmtDMY(vac.end)}`, 'vacation', id, currentUserId);
       if (vac.delegation.enabled) this.revertDelegation(id);
     }
     this._vacationRepo.delete(id);

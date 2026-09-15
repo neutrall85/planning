@@ -1,4 +1,3 @@
-import React from 'react';
 import Cabinet from '../Cabinet';
 
 export default function CabinetView({ store, data, user, openTask, openVacation, openDelegation }) {

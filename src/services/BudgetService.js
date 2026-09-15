@@ -1,5 +1,4 @@
 // src/services/BudgetService.js
-import { TASK_STATUSES } from '../utils/constants';
 
 export class BudgetService {
   constructor(taskRepo, projectRepo, employeeRepo) {
@@ -56,7 +55,7 @@ export class BudgetService {
       return budget - actual - childrenSum;
     }
 
-    // Обычная задача: если есть подзадачи — учитываем их, если нет — только план минус факт
+    // Обычная задача: если есть подзадачи - учитываем их, если нет - только план минус факт
     const planned = parseFloat(task.plannedHours) || 0;
     return planned - actual - childrenSum;
   }

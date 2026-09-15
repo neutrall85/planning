@@ -2,28 +2,31 @@
 
 /**
  * Определяет номер следующей версии для файла с заданным именем.
- * Ключ группировки — точное совпадение name (чертёж «ТЗ-24.dwg», загруженный
- * заново, становится v2 того же документа).
+ * Ключ группировки — точное совпадение name в пределах одной папки
+ * (folderId). Так один и тот же файл в разных папках не становится
+ * «новой версией» чужого документа.
  */
-export function nextVersionFor(files, name) {
-  const sameName = files.filter(f => f.name === name);
+export function nextVersionFor(files, name, folderId = null) {
+  const targetFolder = folderId || null;
+  const sameName = files.filter(
+    f => f.name === name && (f.folderId || null) === targetFolder
+  );
   if (sameName.length === 0) return 1;
   return Math.max(...sameName.map(f => f.version || 1)) + 1;
 }
 
 /**
  * Добавляет файл в список как новую версию. Не мутирует входной список.
- * Безопасность: имя файла используется только как метка группировки
- * на клиенте, никогда не как часть URL или пути.
+ * Имя файла используется только как метка группировки на клиенте,
+ * никогда не как часть URL или пути.
  */
 export function appendFileVersion(files, file) {
-  return [...files, { ...file, version: nextVersionFor(files, file.name) }];
+  return [...files, { ...file, version: nextVersionFor(files, file.name, file.folderId) }];
 }
 
 /**
  * Группирует плоский список файлов в документы с историей версий.
- * Возвращает массив документов, отсортированный по дате последней загрузки
- * (DESC). Внутри каждого документа версии отсортированы по номеру (DESC).
+ * На вход ожидается список в пределах одной папки (вызывающий фильтрует).
  */
 export function groupByDocument(files) {
   const groups = new Map();

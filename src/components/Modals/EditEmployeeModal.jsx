@@ -69,7 +69,7 @@ export const EditEmployeeModal = ({ store, ur, employeeId, onClose, toast }) => 
 
   return (
     <ModalShell
-      title={`Редактирование сотрудника — ${emp.last} ${emp.first}`}
+      title={`Редактирование сотрудника - ${emp.last} ${emp.first}`}
       onClose={onClose}
       onSave={handleSubmit()}
       saveLabel="Сохранить"

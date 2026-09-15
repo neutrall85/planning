@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { fmtDT, fmtDMY } from '../utils/date';
 import { useDataHelpers } from '../hooks';
-import { Ic, ICONS } from './Icons';
+import { SearchBox } from './SearchBox';
 
 const safeDate = (ts) => {
   const d = new Date(ts);
@@ -193,7 +193,7 @@ export default function Journal({ db }) {
     const rows = filteredEntries.map(e => {
       const d = safeDate(e.ts);
       const date = d ? fmtDMY(e.ts) : 'неизвестно';
-      const time = d ? d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '—';
+      const time = d ? d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '-';
       const user = e.userId === 'system' ? 'Система' : empName(e.userId) || e.userId;
       const details = typeof e.details === 'string' ? e.details.replace(/"/g, '""') : '';
       return [date, time, user, e.action, `"${details}"`].join(';');
@@ -220,7 +220,7 @@ export default function Journal({ db }) {
             value={filters.dateFrom}
             onChange={e => handleFilterChange('dateFrom', e.target.value)}
           />
-          <span className="flex-none">—</span>
+          <span className="flex-none">-</span>
           <input
             className="inp w-150 flex-none"
             type="date"
@@ -247,14 +247,12 @@ export default function Journal({ db }) {
             {ACTIONS.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
           </select>
 
-          <div className="search-box journal-search">
-            <Ic d={ICONS.search} size={15} />
-            <input
-              placeholder="Поиск по журналу"
-              value={filters.search}
-              onChange={e => handleFilterChange('search', e.target.value)}
-            />
-          </div>
+          <SearchBox
+            value={filters.search}
+            onChange={(v) => handleFilterChange('search', v)}
+            placeholder="Поиск по журналу"
+            className="journal-search"
+          />
         </div>
       </div>
 
@@ -315,7 +313,7 @@ export default function Journal({ db }) {
                       )}
                       <tr className={showDay ? 'bg-blue-50' : ''} onMouseEnter={(e) => e.currentTarget.style.background = showDay ? '#f0f7ff' : '#f8fafc'} onMouseLeave={(e) => e.currentTarget.style.background = showDay ? '#fafbff' : 'transparent'}>
                         <td className="whitespace-nowrap text-xs text-mut font-mono">
-                          {safeDate(entry.ts) ? fmtDT(entry.ts) : '—'}
+                          {safeDate(entry.ts) ? fmtDT(entry.ts) : '-'}
                         </td>
                         <td>
                           <div className="flex items-center gap-2 font-semibold text-sm">
