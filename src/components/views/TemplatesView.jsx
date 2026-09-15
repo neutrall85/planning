@@ -11,6 +11,7 @@ import { DIALOGS, TOASTS } from '../../utils/constants';
 import { TEMPLATE_KINDS } from '../../utils/templateSchemas';
 import { countNestedTasks } from '../../utils/templateNesting';
 import TemplateModal from '../Templates/TemplateModal';
+import FloatingMenu from '../FloatingMenu';
 
 const KIND_LABELS = {
   task: 'Задача',
@@ -23,8 +24,6 @@ const MODES = Object.freeze({
   view: 'view',
 });
 
-// Пункты меню «Создать шаблон». Единственная точка правды о том, какие
-// типы шаблонов доступны из раздела — состав совпадает с TEMPLATE_KINDS.
 const CREATE_OPTIONS = Object.freeze([
   { kind: 'task', label: 'Шаблон задачи' },
   { kind: 'project', label: 'Шаблон проекта' },
@@ -47,8 +46,6 @@ export default function TemplatesView() {
     return unsubscribe;
   }, [store]);
 
-  // Меню создания закрывается по клику вне контейнера и по Escape — тот же
-  // паттерн, что и у панели уведомлений в MainLayout.
   useEffect(() => {
     if (!createMenuOpen) return;
     const onDown = (event) => {
@@ -101,18 +98,6 @@ export default function TemplatesView() {
     }
   }, [store, showToast, confirm]);
 
-  /**
-   * Переключение «личный ↔ общий» прямо из таблицы.
-   *
-   * Клик не должен открывать модалку шаблона, поэтому гасим всплытие
-   * (event.stopPropagation) — иначе сработал бы onClick на <tr>. Право
-   * менять доступ проверяет TemplateService через _assertOwnership;
-   * здесь только не даём открыть переключатель не-владельцу — визуально
-   * (у него рендерится <span>, а не <button>) и защитно по id.
-   *
-   * Контракт DataStore.updateTemplate(id, patch) — двухаргументный:
-   * актор берётся из сессии внутри стора, снаружи его не передаём.
-   */
   const toggleShared = useCallback((template, event) => {
     event.stopPropagation();
     if (!currentUser || template.ownerId !== currentUser.id) return;
@@ -143,6 +128,25 @@ export default function TemplatesView() {
     );
   };
 
+  const buildTemplateMenu = (template, isMine) => {
+    return [
+      {
+        id: 'open',
+        label: isMine ? 'Редактировать' : 'Просмотр',
+        icon: isMine ? ICONS.edit : ICONS.eye,
+        onClick: () => openTemplate(template),
+      },
+      isMine && { type: 'divider' },
+      isMine && {
+        id: 'delete',
+        label: 'Удалить',
+        icon: ICONS.trash,
+        danger: true,
+        onClick: () => deleteTemplate(template),
+      },
+    ].filter(Boolean);
+  };
+
   const renderRow = (template) => {
     const owner = store.data.employees.find(e => e.id === template.ownerId);
     const isMine = template.ownerId === currentUserId;
@@ -159,56 +163,52 @@ export default function TemplatesView() {
       : null;
 
     return (
-      <tr
-        key={template.id}
-        className="clickable-row"
-        onClick={() => openTemplate(template)}
-      >
-        <td>
-          <b>{template.name}</b>
-          {projectTasksCount > 0 && (
-            <span className="mut sm"> · {projectTasksCount} задач</span>
-          )}
-          {taskSubtasksCount > 0 && (
-            <span className="mut sm"> · {taskSubtasksCount} подзадач</span>
-          )}
-          {templateProject && (
-            <span className="mut sm"> · {templateProject.code}</span>
-          )}
-        </td>
-        <td>
-          <span className="st-chip">
-            {KIND_LABELS[template.kind] || TEMPLATE_KINDS[template.kind]?.label || template.kind}
-          </span>
-        </td>
-        <td>
-          <div className="templates-owner">
-            <Avatar employee={owner} size="xs" />
-            <span>{owner ? `${owner.last} ${owner.first}` : '-'}</span>
-            {isMine && <span className="mut sm">· вы</span>}
-          </div>
-        </td>
-        <td className="mut sm">{fmtDT(template.updatedAt)}</td>
-        <td>{renderAccessCell(template, isMine)}</td>
-        <td className="templates-actions" onClick={(e) => e.stopPropagation()}>
-          <button
-            className="icon-btn"
-            title={isMine ? 'Редактировать' : 'Просмотр'}
+      <FloatingMenu key={template.id} items={buildTemplateMenu(template, isMine)}>
+        {({ anchorProps, buttonProps }) => (
+          <tr
+            {...anchorProps}
+            className="clickable-row"
             onClick={() => openTemplate(template)}
           >
-            <Ic d={isMine ? ICONS.edit : ICONS.eye} size={14} />
-          </button>
-          {isMine && (
-            <button
-              className="icon-btn danger"
-              title="Удалить"
-              onClick={() => deleteTemplate(template)}
-            >
-              <Ic d={ICONS.trash} size={14} />
-            </button>
-          )}
-        </td>
-      </tr>
+            <td>
+              <b>{template.name}</b>
+              {projectTasksCount > 0 && (
+                <span className="mut sm"> · {projectTasksCount} задач</span>
+              )}
+              {taskSubtasksCount > 0 && (
+                <span className="mut sm"> · {taskSubtasksCount} подзадач</span>
+              )}
+              {templateProject && (
+                <span className="mut sm"> · {templateProject.code}</span>
+              )}
+            </td>
+            <td>
+              <span className="st-chip">
+                {KIND_LABELS[template.kind] || TEMPLATE_KINDS[template.kind]?.label || template.kind}
+              </span>
+            </td>
+            <td>
+              <div className="templates-owner">
+                <Avatar employee={owner} size="xs" />
+                <span>{owner ? `${owner.last} ${owner.first}` : '-'}</span>
+                {isMine && <span className="mut sm">· вы</span>}
+              </div>
+            </td>
+            <td className="mut sm">{fmtDT(template.updatedAt)}</td>
+            <td>{renderAccessCell(template, isMine)}</td>
+            <td className="templates-actions" onClick={(e) => e.stopPropagation()}>
+              <button
+                {...buttonProps}
+                className="icon-btn"
+                title="Действия"
+                aria-label={`Действия с шаблоном ${template.name}`}
+              >
+                <Ic d={ICONS.more} size={15} />
+              </button>
+            </td>
+          </tr>
+        )}
+      </FloatingMenu>
     );
   };
 

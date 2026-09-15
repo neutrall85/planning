@@ -1,4 +1,4 @@
-// Staff.jsx
+// src/components/Staff.jsx
 import React, { useState, useMemo, useCallback } from "react";
 import { ROLES, VACATION_TYPES, DIALOGS, TOASTS } from "../utils/constants";
 import { TODAY, fmtDMY, uid } from "../utils/date";
@@ -15,6 +15,7 @@ import { useConfirm } from "../context/ConfirmContext";
 import { EditEmployeeModal } from "./Modals/EditEmployeeModal";
 import { CreateEmployeeModal } from "./Modals/CreateEmployeeModal";
 import Avatar from "./Avatar";
+import FloatingMenu from "./FloatingMenu";
 import { getPrimaryDeptName } from "../utils/helpers";
 
 const EmployeeRow = React.memo(({
@@ -46,6 +47,55 @@ const EmployeeRow = React.memo(({
   const mainDept = getPrimaryDeptName(employee, db);
   const displayPosition = employee.position || 'Сотрудник';
 
+  // Меню собирается из тех же прав, что и раньше управляли видимостью
+  // отдельных кнопок. Divider вставляется только между группами «действия
+  // над сотрудником» и «увольнение/восстановление» — и только если обе
+  // группы непустые.
+  const buildEmployeeMenu = () => {
+    const items = [];
+
+    if (canEditDepartments(ur)) {
+      items.push({
+        id: 'edit',
+        label: 'Редактировать',
+        icon: ICONS.edit,
+        onClick: () => openEditEmployee(employee.id),
+      });
+      if (!isFired) {
+        items.push({
+          id: 'depts',
+          label: 'Подразделения',
+          icon: ICONS.users,
+          onClick: () => openDepts(employee.id),
+        });
+      }
+    }
+
+    if (canEditRoles(ur) && !isFired) {
+      items.push({
+        id: 'roles',
+        label: 'Роли',
+        icon: ICONS.shield,
+        onClick: () => openRoles(employee.id),
+      });
+    }
+
+    if (canFire) {
+      if (items.length) items.push({ type: 'divider' });
+      items.push({
+        id: 'fire',
+        label: isFired ? 'Восстановить' : 'Уволить',
+        icon: isFired ? ICONS.restore : ICONS.x,
+        danger: !isFired,
+        onClick: handleFireToggle,
+      });
+    }
+
+    return items;
+  };
+
+  const menuItems = buildEmployeeMenu();
+
   return (
     <div className="st-row">
       <Avatar employee={employee} size="sm" />
@@ -71,17 +121,20 @@ const EmployeeRow = React.memo(({
         </div>
       )}
       <div className="st-nums"><b>{isFired ? '-' : l.cnt}</b><span>{isFired ? 'задач' : 'задач'}</span></div>
-      {canEditDepartments(ur) && !isFired && <button className="btn ghost sm" title="Подразделения" onClick={() => openDepts(employee.id)}><Ic d={ICONS.users} size={13} /> Отделы</button>}
-      {canEditRoles(ur) && !isFired && <button className="btn ghost sm" onClick={() => openRoles(employee.id)}><Ic d={ICONS.shield} size={13} /> Роли</button>}
-      {canFire && (
-        <button className={`btn ghost sm${isFired ? '' : ' danger'}`} onClick={handleFireToggle}>
-          <Ic d={isFired ? ICONS.restore : ICONS.x} size={13} /> {isFired ? 'Восстановить' : 'Уволить'}
-        </button>
-      )}
-      {canEditDepartments(ur) && (
-        <button className="icon-btn" title="Редактировать сотрудника" onClick={() => openEditEmployee(employee.id)}>
-          <Ic d={ICONS.edit} size={15} />
-        </button>
+
+      {menuItems.length > 0 && (
+        <FloatingMenu items={menuItems}>
+          {({ buttonProps }) => (
+            <button
+              {...buttonProps}
+              className="icon-btn"
+              title="Действия"
+              aria-label={`Действия с ${employee.last} ${employee.first}`}
+            >
+              <Ic d={ICONS.more} size={16} />
+            </button>
+          )}
+        </FloatingMenu>
       )}
     </div>
   );
@@ -128,7 +181,7 @@ export default function Staff({ store, db, setDb, ur, openRoles, openDepts, open
   }, [db.kbs, db.departments, activeEmployees]);
 
   const deptsWithoutKb = useMemo(() => db.departments.filter(d => d.kbId === null), [db.departments]);
-  const allVacs = useMemo(() => [...db.vacations].sort((a,b) => (a.start < b.start ? 1 : -1)), [db.vacations]);
+  const allVacs = useMemo(() => [...db.vacations].sort((a, b) => (a.start < b.start ? 1 : -1)), [db.vacations]);
   const canFire = canFireEmployee(ur);
 
   const openEditEmployee = useCallback((id) => setEditEmployeeId(id), []);

@@ -2,6 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import Kanban from '../Kanban';
 import Projects from '../Projects';
+import FloatingMenu from '../FloatingMenu';
 import { SearchBox } from '../SearchBox';
 import {
   PROJECT_STATUSES,
@@ -9,6 +10,8 @@ import {
   PROJECT_STATUS_CONFIG,
   PROJECT_STATUS_ORDER,
   PROJECT_PRIORITIES,
+  DIALOGS,
+  TOASTS,
 } from '../../utils/constants';
 import { TODAY } from '../../utils/date';
 import { computeScope, hasRole, canChangeProjectStatus } from '../../utils/permissions';
@@ -17,9 +20,11 @@ import Avatar from '../Avatar';
 import { getProjectColor } from '../../utils/projectHelpers';
 import ProjectProgress from '../ProjectProgress';
 import { useToast } from '../../context/ToastContext';
+import { useConfirm } from '../../context/ConfirmContext';
 
 export default function ProjectsView({ db, ur, openProject, openHoursReq, store }) {
   const { showToast } = useToast();
+  const { confirm } = useConfirm();
   const scope = useMemo(() => computeScope(ur, db), [ur, db]);
   const [viewMode, setViewMode] = useState('kanban');
   const [showOnlyMyProjects, setShowOnlyMyProjects] = useState(false);
@@ -72,17 +77,9 @@ export default function ProjectsView({ db, ur, openProject, openHoursReq, store 
       );
     }
 
-    if (filterStatus !== 'all') {
-      list = list.filter(p => p.status === filterStatus);
-    }
-
-    if (filterType !== 'all') {
-      list = list.filter(p => (p.ptype || 'prod') === filterType);
-    }
-
-    if (filterPriority !== 'all') {
-      list = list.filter(p => p.priority === filterPriority);
-    }
+    if (filterStatus !== 'all') list = list.filter(p => p.status === filterStatus);
+    if (filterType !== 'all') list = list.filter(p => (p.ptype || 'prod') === filterType);
+    if (filterPriority !== 'all') list = list.filter(p => p.priority === filterPriority);
 
     if (filterParticipant !== 'all') {
       const projectIdsWithParticipant = new Set();
@@ -110,51 +107,6 @@ export default function ProjectsView({ db, ur, openProject, openHoursReq, store 
     return list;
   }, [baseProjects, searchQuery, filterStatus, filterType, filterPriority, filterParticipant, filterDept, db]);
 
-  const renderProjectCard = (project) => {
-    const tasks = db.tasks.filter(t => t.projectId === project.id && !t.archived);
-    const plan = tasks.reduce((s, t) => s + (t.plannedHours || 0), 0);
-    const fact = tasks.reduce((s, t) => s + t.logs.reduce((lsum, l) => lsum + l.hours, 0), 0);
-    const uniqueAssignees = [...new Set(tasks.map(t => t.assigneeId).filter(Boolean))];
-    const projectColor = getProjectColor(project);
-    const canCloseOrCancel = canChangeProjectStatus(ur, project, 'closed');
-
-    return (
-      <div onClick={() => openProject(project.id)}>
-        <div className="kcard-title">{project.name}</div>
-        <div className="kcard-proj">
-          <span className="pdot" style={{ background: projectColor }} />
-          {project.code}
-        </div>
-        <div className="kcard-meta">
-          <span className="mut sm ml-8" style={{ color: PROJECT_PRIORITIES[project.priority]?.color || '#64748b' }}>
-            {project.priority || 'NORM'}
-          </span>
-          <ProjectProgress project={project} plan={plan} fact={fact} />
-        </div>
-        <div className="kcard-foot">
-          <div className="pj-avatars flex-1">
-            {uniqueAssignees.slice(0,4).map(id => {
-              const a = db.employees.find(e => e.id === id);
-              return a ? <Avatar key={id} employee={a} size="xs" /> : null;
-            })}
-            {uniqueAssignees.length > 4 && <span className="mut sm">+{uniqueAssignees.length-4}</span>}
-          </div>
-          <div className="pj-actions" onClick={(e) => e.stopPropagation()}>
-            {canCloseOrCancel && project.status !== 'closed' && project.status !== 'cancelled' && (
-              <button className="icon-btn danger" title="Закрыть/Отменить проект" onClick={() => {
-                const action = window.confirm(`Закрыть проект "${project.name}"?`) ? 'close' : window.confirm(`Отменить проект "${project.name}"?`) ? 'cancel' : null;
-                if (action === 'close') store.upsertProject({ ...project, status: 'closed', closedAt: TODAY });
-                else if (action === 'cancel') store.upsertProject({ ...project, status: 'cancelled' });
-              }}>
-                <Ic d={ICONS.x} size={15} />
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   const handleMoveProject = (id, newStatus) => {
     const project = db.projects.find(p => p.id === id);
     if (!project || project.status === newStatus) return;
@@ -165,9 +117,111 @@ export default function ProjectsView({ db, ur, openProject, openHoursReq, store 
     store.upsertProject({ ...project, status: newStatus });
   };
 
+  const handleCloseProject = async (project) => {
+    const ok = await confirm(DIALOGS.closeProject(project.name));
+    if (!ok) return;
+    store.upsertProject({ ...project, status: 'closed', closedAt: TODAY });
+    showToast(TOASTS.projectClosed, 'success');
+  };
+
+  const handleCancelProject = async (project) => {
+    const ok = await confirm(DIALOGS.cancelProject(project.name));
+    if (!ok) return;
+    store.upsertProject({ ...project, status: 'cancelled' });
+    showToast(TOASTS.projectCancelled, 'success');
+  };
+
+  /**
+   * Состав меню действий для проекта. Тот же набор правил, что и в
+   * списковой карточке Projects.jsx: закрывать/отменять может тот, кому
+   * canChangeProjectStatus разрешает переход. Разделитель ставится только
+   * когда под ним есть хотя бы один пункт — иначе «висячая» линия.
+   */
+  const buildProjectMenu = (project) => {
+    const isClosed = project.status === 'closed' || project.status === 'cancelled';
+    const canClose  = !isClosed && canChangeProjectStatus(ur, project, 'closed');
+    const canCancel = !isClosed && canChangeProjectStatus(ur, project, 'cancelled');
+
+    const canRequestHours = (
+      (hasRole(ur, 'project_lead') && project.managerId === ur.id) ||
+      hasRole(ur, 'admin', 'director', 'economist', 'kb_chief')
+    ) && project.status === 'active' && project.ptype !== 'admin';
+
+    const hasDestructive = canClose || canCancel;
+
+    return [
+      { id: 'open', label: 'Открыть проект', icon: ICONS.eye, onClick: () => openProject(project.id) },
+      canRequestHours && {
+        id: 'hours',
+        label: 'Запросить изменение часов',
+        icon: ICONS.clock,
+        onClick: () => openHoursReq('project', project.id),
+      },
+      hasDestructive && { type: 'divider' },
+      canClose && {
+        id: 'close',
+        label: 'Закрыть проект',
+        icon: ICONS.check,
+        onClick: () => handleCloseProject(project),
+      },
+      canCancel && {
+        id: 'cancel',
+        label: 'Отменить проект',
+        icon: ICONS.x,
+        danger: true,
+        onClick: () => handleCancelProject(project),
+      },
+    ].filter(Boolean);
+  };
+
+  const renderProjectCard = (project) => {
+    const tasks = db.tasks.filter(t => t.projectId === project.id && !t.archived);
+    const plan = tasks.reduce((s, t) => s + (t.plannedHours || 0), 0);
+    const fact = tasks.reduce((s, t) => s + t.logs.reduce((lsum, l) => lsum + l.hours, 0), 0);
+    const uniqueAssignees = [...new Set(tasks.map(t => t.assigneeId).filter(Boolean))];
+    const projectColor = getProjectColor(project);
+
+    return (
+      <FloatingMenu items={buildProjectMenu(project)}>
+        {({ anchorProps, buttonProps }) => (
+          <div {...anchorProps} onClick={() => openProject(project.id)}>
+            <button
+              {...buttonProps}
+              className="icon-btn kcard-menu-btn"
+              title="Действия"
+              aria-label="Действия с проектом"
+            >
+              <Ic d={ICONS.more} size={15} />
+            </button>
+
+            <div className="kcard-title">{project.name}</div>
+            <div className="kcard-proj">
+              <span className="pdot" style={{ background: projectColor }} />
+              {project.code}
+            </div>
+            <div className="kcard-meta">
+              <span className="mut sm ml-8" style={{ color: PROJECT_PRIORITIES[project.priority]?.color || '#64748b' }}>
+                {project.priority || 'NORM'}
+              </span>
+              <ProjectProgress project={project} plan={plan} fact={fact} />
+            </div>
+            <div className="kcard-foot">
+              <div className="pj-avatars flex-1">
+                {uniqueAssignees.slice(0, 4).map(id => {
+                  const a = db.employees.find(e => e.id === id);
+                  return a ? <Avatar key={id} employee={a} size="xs" /> : null;
+                })}
+                {uniqueAssignees.length > 4 && <span className="mut sm">+{uniqueAssignees.length - 4}</span>}
+              </div>
+            </div>
+          </div>
+        )}
+      </FloatingMenu>
+    );
+  };
+
   const closeProject = (p) => store.upsertProject({ ...p, status: 'closed', closedAt: TODAY });
   const cancelProject = (p) => store.upsertProject({ ...p, status: 'cancelled' });
-
   const canCreateProject = hasRole(ur, 'admin', 'director', 'kb_chief', 'project_manager');
 
   return (

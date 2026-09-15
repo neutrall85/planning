@@ -2,6 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import Kanban from '../Kanban';
 import TasksList from './TasksList';
+import FloatingMenu from '../FloatingMenu';
 import { SearchBox } from '../SearchBox';
 import { TASK_STATUSES, TASK_STATUS_ORDER, PRIORITIES } from '../../utils/constants';
 import { fmtDMY, daysDiff, TODAY, isTaskActive } from '../../utils/date';
@@ -60,41 +61,6 @@ export default function TasksView({ db, ur, openTask, store }) {
 
   const isOnlyExecutor = ur.roles.length === 1 && ur.roles[0] === 'executor';
 
-  const renderTaskCard = (task) => {
-    const p = db.projects.find(x => x.id === task.projectId);
-    const assignee = task.assigneeId ? db.employees.find(e => e.id === task.assigneeId) : null;
-    const sp = getTaskSpent(task);
-    const overdue = task.deadline && !['closed','cancelled'].includes(task.status) && task.deadline < TODAY;
-    const soon = task.deadline && !overdue && !['closed','cancelled'].includes(task.status) && daysDiff(TODAY, task.deadline) <= 3;
-    const priority = PRIORITIES[task.priority] || { label: task.priority || 'Нет', color: '#64748b' };
-    return (
-      <div onClick={() => openTask(task.id)}>
-        <div className="kcard-prio" style={{ background: priority.color }} />
-        <div className="kcard-title">{task.title}</div>
-        <div className="kcard-proj">
-          <span className="pdot" style={{ background: getProjectColor(p) }} />
-          {p?.code}
-        </div>
-        <div className="kcard-meta">
-          {assignee && (
-            <span className="kassignee">
-              <Avatar employee={assignee} size="xs" />
-            </span>
-          )}
-          <span className="khours"><Ic d={ICONS.clock} size={13} /> {sp}/{task.plannedHours ?? '-'} ч</span>
-          <span className="prio-chip" style={{ color: priority.color }}>
-            {priority.label}
-          </span>
-        </div>
-        <div className="kcard-foot">
-          <span className={'kdl' + (overdue ? ' late' : soon ? ' soon' : '')}>
-            {task.deadline ? (overdue ? `просрочено ${-daysDiff(TODAY, task.deadline)} дн` : `до ${fmtDMY(task.deadline)}`) : 'без дедлайна'}
-          </span>
-        </div>
-      </div>
-    );
-  };
-
   const handleMoveTask = (taskId, newStatus) => {
     const task = db.tasks.find(t => t.id === taskId);
     if (!task) return;
@@ -112,6 +78,99 @@ export default function TasksView({ db, ur, openTask, store }) {
       history: [...task.history, { ts: Date.now(), who: ur.id, text: `Статус → ${TASK_STATUSES[newStatus].label}` }]
     };
     store.upsertTask(updatedTask);
+  };
+
+  const handleDeleteTask = (task) => {
+    store.deleteTask(task.id);
+    store.addAudit('Удаление задачи', { title: task.title }, 'task', task.id);
+    showToast(`Задача «${task.title}» удалена`, 'success');
+  };
+
+  /**
+   * Пункты меню для конкретной задачи.
+   *
+   * Состав зависит от роли: «Открыть» доступно всем, «Перевести в статус» —
+   * только если canChangeTaskStatus разрешает хотя бы один переход,
+   * «Удалить» — только админу. Пустые слоты и разделители отсекаются
+   * filter(Boolean): меню никогда не покажет «висячий» разделитель или
+   * заголовок без пунктов под ним.
+   */
+  const buildTaskMenu = (task) => {
+    const statusChoices = TASK_STATUS_ORDER.filter(
+      s => s !== task.status && canChangeTaskStatus(ur, task, s, db)
+    );
+    const canDelete = hasRole(ur, 'admin');
+
+    return [
+      { id: 'open', label: 'Открыть', icon: ICONS.eye, onClick: () => openTask(task.id) },
+      statusChoices.length > 0 && { type: 'divider' },
+      statusChoices.length > 0 && { type: 'header', label: 'Перевести в статус' },
+      ...statusChoices.map(s => ({
+        id: s,
+        label: TASK_STATUSES[s].label,
+        onClick: () => handleMoveTask(task.id, s),
+      })),
+      canDelete && { type: 'divider' },
+      canDelete && {
+        id: 'del',
+        label: 'Удалить задачу',
+        icon: ICONS.trash,
+        danger: true,
+        onClick: () => handleDeleteTask(task),
+      },
+    ].filter(Boolean);
+  };
+
+  const renderTaskCard = (task) => {
+    const p = db.projects.find(x => x.id === task.projectId);
+    const assignee = task.assigneeId ? db.employees.find(e => e.id === task.assigneeId) : null;
+    const sp = getTaskSpent(task);
+    const overdue = task.deadline && !['closed','cancelled'].includes(task.status) && task.deadline < TODAY;
+    const soon = task.deadline && !overdue && !['closed','cancelled'].includes(task.status) && daysDiff(TODAY, task.deadline) <= 3;
+    const priority = PRIORITIES[task.priority] || { label: task.priority || 'Нет', color: '#64748b' };
+
+    return (
+      <FloatingMenu items={buildTaskMenu(task)}>
+        {({ anchorProps, buttonProps }) => (
+          <div
+            {...anchorProps}
+            onClick={() => openTask(task.id)}
+          >
+            <button
+              {...buttonProps}
+              className="icon-btn kcard-menu-btn"
+              title="Действия"
+              aria-label="Действия с задачей"
+            >
+              <Ic d={ICONS.more} size={15} />
+            </button>
+
+            <div className="kcard-prio" style={{ background: priority.color }} />
+            <div className="kcard-title">{task.title}</div>
+            <div className="kcard-proj">
+              <span className="pdot" style={{ background: getProjectColor(p) }} />
+              {p?.code}
+            </div>
+            <div className="kcard-meta">
+              {assignee && (
+                <span className="kassignee">
+                  <Avatar employee={assignee} size="xs" />
+                </span>
+              )}
+              <span className="khours"><Ic d={ICONS.clock} size={13} /> {sp}/{task.plannedHours ?? '-'} ч</span>
+              <span className="prio-chip" style={{ color: priority.color }}>
+                {priority.label}
+              </span>
+            </div>
+            <div className="kcard-foot">
+              <span className={'kdl' + (overdue ? ' late' : soon ? ' soon' : '')}>
+                {task.deadline ? (overdue ? `просрочено ${-daysDiff(TODAY, task.deadline)} дн` : `до ${fmtDMY(task.deadline)}`) : 'без дедлайна'}
+              </span>
+            </div>
+          </div>
+        )}
+      </FloatingMenu>
+    );
   };
 
   const canCreate = canCreateTask(ur);

@@ -14,6 +14,7 @@ import {
 import { DIALOGS, TOASTS, FILE_ROOT_LABEL } from '../utils/constants';
 import { useConfirm } from '../context/ConfirmContext';
 import { useToast } from '../context/ToastContext';
+import FloatingMenu from './FloatingMenu';
 
 const formatSize = (size) => {
   if (size < 1024) return size + ' Б';
@@ -40,15 +41,6 @@ const Breadcrumb = ({ items, onNavigate }) => (
   </div>
 );
 
-/**
- * Путь к файлу в режимах «Все файлы» и «Поиск» — одна кликабельная
- * строка, ведущая в папку, где расположен файл.
- *
- * Строится через getFolderPathString — единый источник правды о
- * строковом представлении пути в стиле "/a/b/". Клик передаёт id папки
- * файла наверх (или null для корня) — компонент не знает, что делать
- * дальше; вся логика перехода живёт в FileManager.navigateToFolder.
- */
 const FilePathButton = ({ folders, folderId, onNavigate }) => {
   const label = getFolderPathString(folders, folderId);
   return (
@@ -88,6 +80,23 @@ const DocumentRow = ({ doc, onDelete, canDelete, employeeName }) => {
   const { latest, versions } = doc;
   const hasHistory = versions.length > 1;
 
+  const menuItems = [
+    hasHistory && {
+      id: 'history',
+      label: expanded ? 'Скрыть историю' : `История версий (${versions.length})`,
+      icon: ICONS.archive,
+      onClick: () => setExpanded(v => !v),
+    },
+    canDelete && hasHistory && { type: 'divider' },
+    canDelete && {
+      id: 'del',
+      label: 'Удалить последнюю версию',
+      icon: ICONS.trash,
+      danger: true,
+      onClick: () => onDelete(latest.id),
+    },
+  ].filter(Boolean);
+
   return (
     <div className="file-document">
       <div className="file-item">
@@ -102,16 +111,6 @@ const DocumentRow = ({ doc, onDelete, canDelete, employeeName }) => {
             {latest.uploadedAt && ` ${fmtDMY(latest.uploadedAt)}`}
           </div>
         </div>
-        {hasHistory && (
-          <button
-            type="button"
-            className="btn ghost sm"
-            onClick={() => setExpanded(v => !v)}
-            title="История версий"
-          >
-            <Ic d={ICONS.archive} size={13} /> История ({versions.length})
-          </button>
-        )}
         <a
           href={latest.url}
           download={latest.name}
@@ -121,15 +120,19 @@ const DocumentRow = ({ doc, onDelete, canDelete, employeeName }) => {
         >
           Скачать
         </a>
-        {canDelete && (
-          <button
-            type="button"
-            className="icon-btn danger"
-            onClick={() => onDelete(latest.id)}
-            title="Удалить последнюю версию"
-          >
-            <Ic d={ICONS.trash} size={14} />
-          </button>
+        {menuItems.length > 0 && (
+          <FloatingMenu items={menuItems}>
+            {({ buttonProps }) => (
+              <button
+                {...buttonProps}
+                className="icon-btn"
+                title="Действия"
+                aria-label={`Действия с файлом ${latest.name}`}
+              >
+                <Ic d={ICONS.more} size={15} />
+              </button>
+            )}
+          </FloatingMenu>
         )}
       </div>
       {expanded && hasHistory && (
@@ -239,12 +242,6 @@ export const FileManager = ({
   const { prompt, confirm } = useConfirm();
   const { showToast } = useToast();
 
-  /**
-   * Единое состояние навигации: папка + режим «Все файлы» + поисковый
-   * запрос. Три «измерения» меняются согласованно, поэтому хранятся
-   * одним объектом — снимок такого состояния и есть единица истории
-   * для кнопки «Назад».
-   */
   const [view, setView] = useState({
     folderId: null,
     showAll: false,
@@ -253,8 +250,6 @@ export const FileManager = ({
 
   const [history, setHistory] = useState([]);
 
-  // Любое изменение «где я нахожусь» идёт через navigate: оно сохраняет
-  // текущее состояние в историю и применяет патч.
   const navigate = useCallback((patch) => {
     setHistory(prev => [...prev, view]);
     setView(prev => ({ ...prev, ...patch }));
@@ -266,7 +261,6 @@ export const FileManager = ({
     setHistory(prev => prev.slice(0, -1));
   }, [history]);
 
-  // Поиск — это НЕ навигация: печатание в поле не наполняет историю.
   const setSearchQuery = useCallback((q) => {
     setView(prev => ({ ...prev, searchQuery: q }));
   }, []);

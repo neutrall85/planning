@@ -44,4 +44,5 @@ export const ICONS = {
   bookmark: "M6 2h12v20l-6-4-6 4z",
   up: "M6 15l6-6 6 6",
   down: "M6 9l6 6 6-6",
+  more: "M5 12h.01M12 12h.01M19 12h.01",
 };
