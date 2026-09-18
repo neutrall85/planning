@@ -1,9 +1,9 @@
 // src/services/KbService.js
 export class KbService {
-  constructor(kbRepo, auditService, notifyCallback) {
+  constructor({ kbRepo, auditService, notify }) {
     this._kbRepo = kbRepo;
     this._audit = auditService;
-    this._notify = notifyCallback;
+    this._notify = notify;
   }
 
   upsertKb(kb, currentUserId) {

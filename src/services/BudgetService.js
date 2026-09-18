@@ -1,7 +1,7 @@
 // src/services/BudgetService.js
 
 export class BudgetService {
-  constructor(taskRepo, projectRepo, employeeRepo) {
+  constructor({ taskRepo, projectRepo, employeeRepo }) {
     this._taskRepo = taskRepo;
     this._projectRepo = projectRepo;
     this._employeeRepo = employeeRepo;

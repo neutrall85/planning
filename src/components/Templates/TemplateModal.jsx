@@ -17,6 +17,16 @@ import DraftListItem from './DraftListItem';
 
 const MAX_NAME_LENGTH = 80;
 
+/**
+ * Поля формы шаблона, участвующие в проверке isDirty. Обязательный
+ * параметр useForm - без него форма падает на первом рендере. Список
+ * явный: только два поля формы, поля payload редактируются отдельно
+ * (setPayloadField) и не должны открывать кнопку «Сохранить» сами по
+ * себе - иначе достаточно кликнуть в поле «Название», ничего не меняя,
+ * и Save станет активным.
+ */
+const FIELDS = Object.freeze(['name', 'isShared']);
+
 const MODES = Object.freeze({
   create: 'create',
   edit: 'edit',
@@ -130,7 +140,12 @@ export default function TemplateModal({
     onClose();
   }, [isEdit, isCreate, template, payload, includeNested, nestedKey, effectiveKind, store, onClose]);
 
-  const { values, handleChange, handleSubmit, errors, touched } = useForm(initialValues, validate);
+  const { values, handleChange, handleSubmit, errors, touched } = useForm(
+    initialValues,
+    validate,
+    { fields: FIELDS },
+  );
+
   const { submit, isSubmitting } = useAsyncSubmit(saveAsync, (error) => {
     toast(error.message || 'Не удалось сохранить шаблон', 'error');
   });
@@ -154,11 +169,6 @@ export default function TemplateModal({
 
   const nestedCount = countNestedTasks(nestedItems);
 
-  // При создании шаблона с нуля добавление первого вложенного узла
-  // подразумевает, что пользователь хочет его сохранить: чекбокс
-  // «Включить в шаблон» в этом сценарии имеет смысл только как «отменить»,
-  // а не как обязательный ручной шаг. Поэтому включаем его автоматически,
-  // когда добавляется узел.
   const addNestedNode = () => {
     setNested([...nestedItems, createEmptyNestedNode(nestedSingular)]);
     if (isCreate && !includeNested) setIncludeNested(true);
@@ -222,7 +232,8 @@ export default function TemplateModal({
       )}
 
       <FormField
-        label="Название шаблона *"
+        label="Название шаблона"
+        required
         value={values.name}
         onChange={(v) => handleChange('name', v)}
         error={touched.name && errors.name}

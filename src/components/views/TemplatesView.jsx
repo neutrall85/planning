@@ -1,9 +1,11 @@
 // src/components/views/TemplatesView.jsx
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useStore, useAuth } from '../../hooks';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useStore, useSelector } from '../../context/StoreContext';
+import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import { canCreateTemplate } from '../../utils/permissions';
+import { TemplateFilter } from '../../utils/templateFilter';
 import Avatar from '../Avatar';
 import { Ic, ICONS } from '../Icons';
 import { fmtDT } from '../../utils/date';
@@ -11,23 +13,35 @@ import { DIALOGS, TOASTS } from '../../utils/constants';
 import { TEMPLATE_KINDS } from '../../utils/templateSchemas';
 import { countNestedTasks } from '../../utils/templateNesting';
 import TemplateModal from '../Templates/TemplateModal';
+import { SearchBox } from '../SearchBox';
 import FloatingMenu from '../FloatingMenu';
 
-const KIND_LABELS = {
-  task: 'Задача',
-  project: 'Проект',
-};
+const KIND_LABELS = { task: 'Задача', project: 'Проект' };
 
-const MODES = Object.freeze({
-  create: 'create',
-  edit: 'edit',
-  view: 'view',
-});
+const MODES = Object.freeze({ create: 'create', edit: 'edit', view: 'view' });
 
 const CREATE_OPTIONS = Object.freeze([
   { kind: 'task', label: 'Шаблон задачи' },
   { kind: 'project', label: 'Шаблон проекта' },
 ]);
+
+const KIND_FILTERS = Object.freeze([
+  { id: 'all', label: 'Все' },
+  { id: 'task', label: 'Задачи' },
+  { id: 'project', label: 'Проекты' },
+]);
+
+const OWNERSHIP_FILTERS = Object.freeze([
+  { id: 'all', label: 'Все' },
+  { id: 'mine', label: 'Мои' },
+  { id: 'shared', label: 'Общие' },
+]);
+
+const INITIAL_FILTERS = Object.freeze({
+  kind: 'all',
+  ownership: 'all',
+  query: '',
+});
 
 export default function TemplatesView() {
   const { store } = useStore();
@@ -35,16 +49,14 @@ export default function TemplatesView() {
   const { showToast } = useToast();
   const { confirm } = useConfirm();
 
-  const [templates, setTemplates] = useState(() => store.getAllTemplates());
-  const [filterKind, setFilterKind] = useState('all');
+  const templatesFromStore = useSelector(s => s.templates);
+  const employees          = useSelector(s => s.employees);
+  const projects           = useSelector(s => s.projects);
+
+  const [filters, setFilters] = useState(INITIAL_FILTERS);
   const [modal, setModal] = useState(null);
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const createMenuRef = useRef(null);
-
-  useEffect(() => {
-    const unsubscribe = store.subscribe(() => setTemplates(store.getAllTemplates()));
-    return unsubscribe;
-  }, [store]);
 
   useEffect(() => {
     if (!createMenuOpen) return;
@@ -67,17 +79,29 @@ export default function TemplatesView() {
   const currentUserId = currentUser?.id || null;
   const canCreate = canCreateTemplate(currentUser);
 
-  const visible = useMemo(() => {
-    if (filterKind === 'all') return templates;
-    return templates.filter(t => t.kind === filterKind);
-  }, [templates, filterKind]);
+  const templates = useMemo(
+    () => store.getAllTemplates(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [store, templatesFromStore, currentUserId],
+  );
+
+  const filter = useMemo(
+    () => new TemplateFilter(currentUserId),
+    [currentUserId],
+  );
+
+  const visible = useMemo(
+    () => filter.apply(templates, filters),
+    [filter, templates, filters],
+  );
+
+  const handleFilterChange = useCallback((key, value) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  }, []);
 
   const openTemplate = useCallback((template) => {
     const isMine = template.ownerId === currentUserId;
-    setModal({
-      mode: isMine ? MODES.edit : MODES.view,
-      template,
-    });
+    setModal({ mode: isMine ? MODES.edit : MODES.view, template });
   }, [currentUserId]);
 
   const openCreate = useCallback((kind) => {
@@ -112,9 +136,7 @@ export default function TemplatesView() {
     const chipClass = `st-chip${template.isShared ? ' approved' : ''}`;
     const label = template.isShared ? 'общий' : 'личный';
 
-    if (!isMine) {
-      return <span className={chipClass}>{label}</span>;
-    }
+    if (!isMine) return <span className={chipClass}>{label}</span>;
 
     return (
       <button
@@ -148,7 +170,7 @@ export default function TemplatesView() {
   };
 
   const renderRow = (template) => {
-    const owner = store.data.employees.find(e => e.id === template.ownerId);
+    const owner = employees.find(e => e.id === template.ownerId);
     const isMine = template.ownerId === currentUserId;
 
     const projectTasksCount = template.kind === 'project' && Array.isArray(template.payload.tasks)
@@ -159,7 +181,7 @@ export default function TemplatesView() {
       : 0;
 
     const templateProject = template.kind === 'task' && template.payload.projectId
-      ? store.data.projects.find(p => p.id === template.payload.projectId)
+      ? projects.find(p => p.id === template.payload.projectId)
       : null;
 
     return (
@@ -217,53 +239,66 @@ export default function TemplatesView() {
       <div className="rep-panel p-4">
         <div className="rep-panel-title flex justify-between items-center">
           <span>Шаблоны</span>
-          <div className="flex items-center gap-3">
-            <div className="seg sm">
-              {[
-                { id: 'all', label: 'Все' },
-                { id: 'task', label: 'Задачи' },
-                { id: 'project', label: 'Проекты' },
-              ].map(opt => (
-                <button
-                  key={opt.id}
-                  type="button"
-                  className={`seg-btn${filterKind === opt.id ? ' on' : ''}`}
-                  onClick={() => setFilterKind(opt.id)}
-                >
-                  {opt.label}
-                </button>
-              ))}
+          {canCreate && (
+            <div className="templates-create" ref={createMenuRef}>
+              <button
+                type="button"
+                className="btn primary sm"
+                onClick={() => setCreateMenuOpen(v => !v)}
+                aria-haspopup="menu"
+                aria-expanded={createMenuOpen}
+              >
+                <Ic d={ICONS.plus} size={13} /> Создать шаблон
+              </button>
+              {createMenuOpen && (
+                <div className="templates-create-menu" role="menu">
+                  {CREATE_OPTIONS.map(opt => (
+                    <button
+                      key={opt.kind}
+                      type="button"
+                      role="menuitem"
+                      className="templates-create-item"
+                      onClick={() => openCreate(opt.kind)}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
+          )}
+        </div>
 
-            {canCreate && (
-              <div className="templates-create" ref={createMenuRef}>
-                <button
-                  type="button"
-                  className="btn primary sm"
-                  onClick={() => setCreateMenuOpen(v => !v)}
-                  aria-haspopup="menu"
-                  aria-expanded={createMenuOpen}
-                >
-                  <Ic d={ICONS.plus} size={13} /> Создать шаблон
-                </button>
-                {createMenuOpen && (
-                  <div className="templates-create-menu" role="menu">
-                    {CREATE_OPTIONS.map(opt => (
-                      <button
-                        key={opt.kind}
-                        type="button"
-                        role="menuitem"
-                        className="templates-create-item"
-                        onClick={() => openCreate(opt.kind)}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+        <div className="toolbar">
+          <div className="seg sm">
+            {KIND_FILTERS.map(opt => (
+              <button
+                key={opt.id}
+                type="button"
+                className={`seg-btn${filters.kind === opt.id ? ' on' : ''}`}
+                onClick={() => handleFilterChange('kind', opt.id)}
+              >
+                {opt.label}
+              </button>
+            ))}
           </div>
+
+          <SearchBox
+            value={filters.query}
+            onChange={(v) => handleFilterChange('query', v)}
+            placeholder="Поиск по названию…"
+            className="template-search"
+          />
+
+          <select
+            className="inp sel sm filter-select"
+            value={filters.ownership}
+            onChange={e => handleFilterChange('ownership', e.target.value)}
+          >
+            {OWNERSHIP_FILTERS.map(opt => (
+              <option key={opt.id} value={opt.id}>{opt.label}</option>
+            ))}
+          </select>
         </div>
 
         <p className="mut sm mb-3">
@@ -273,7 +308,7 @@ export default function TemplatesView() {
         </p>
 
         {visible.length === 0 ? (
-          <div className="empty-note p-4">Шаблонов пока нет</div>
+          <div className="empty-note p-4">Шаблонов по заданным условиям нет</div>
         ) : (
           <div className="w-full overflow-x-auto">
             <table className="tbl templates-table">

@@ -13,21 +13,24 @@ export const EmployeeFormFields = ({
   return (
     <div className="project-info-fields">
       <FormField
-        label="Фамилия *"
+        label="Фамилия"
+        required
         value={values.last}
         onChange={(v) => onChange('last', v)}
         error={touched.last && errors.last}
         disabled={disabled}
       />
       <FormField
-        label="Имя *"
+        label="Имя"
+        required
         value={values.first}
         onChange={(v) => onChange('first', v)}
         error={touched.first && errors.first}
         disabled={disabled}
       />
       <FormField
-        label="E-mail *"
+        label="E-mail"
+        required
         value={values.email}
         onChange={(v) => onChange('email', v)}
         error={touched.email && errors.email}
@@ -36,7 +39,8 @@ export const EmployeeFormFields = ({
 
       {passwordRequired && (
         <FormField
-          label="Пароль *"
+          label="Пароль"
+          required
           type="password"
           value={values.pass}
           onChange={(v) => onChange('pass', v)}

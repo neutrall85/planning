@@ -6,7 +6,7 @@ const TASK_META = TEMPLATE_FIELDS_META.task;
 /**
  * Поля одного узла дерева. Единственное место, где описаны поля задачи
  * в шаблоне: используется и TaskNodeEditor, и TaskDraftModal.
- * Никаких «+ подзадача» и «Удалить» — это ответственность контейнера.
+ * Никаких «+ подзадача» и «Удалить» - это ответственность контейнера.
  */
 export default function TaskNodeFields({ node, readOnly = false, onChange }) {
   const updateField = (field, value) => onChange({ ...node, [field]: value });

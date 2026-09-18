@@ -10,8 +10,18 @@ import { TODAY, iso, addDays, uid, fmtDMY } from '../../utils/date';
 import { canManageAllVacations } from '../../utils/permissions';
 import { getPrimaryDeptName } from '../../utils/helpers';
 
+const FIELDS = Object.freeze([
+  'empId',
+  'start',
+  'end',
+  'type',
+  'comment',
+  'status',
+  'delegation',
+]);
+
 export const VacationModal = ({ db, ur, vacationId, forEmpId, onClose, onSave, toast }) => {
-  const { empName, primaryDept } = useDataHelpers(db);
+  const { empName } = useDataHelpers(db);
   const existing = vacationId ? db.vacations.find(v => v.id === vacationId) : null;
   const isNew = !existing;
   const canPick = canManageAllVacations(ur);
@@ -37,7 +47,6 @@ export const VacationModal = ({ db, ur, vacationId, forEmpId, onClose, onSave, t
     if (values.delegation.enabled && !values.delegation.subId) {
       errors['delegation.subId'] = 'Выберите замещающего сотрудника';
     }
-    // Проверка пересечения с другими отпусками того же сотрудника
     if (values.empId) {
       const overlapping = db.vacations.some(v =>
         v.empId === values.empId &&
@@ -53,7 +62,11 @@ export const VacationModal = ({ db, ur, vacationId, forEmpId, onClose, onSave, t
     return errors;
   }, [db, existing]);
 
-  const { values, handleChange, handleSubmit, errors, touched } = useForm(initialValues, validate);
+  const { values, handleChange, handleSubmit, errors, touched } = useForm(
+    initialValues,
+    validate,
+    { fields: FIELDS },
+  );
 
   const saveAsync = useCallback(async (vals) => {
     await onSave(vals, isNew);
@@ -64,8 +77,14 @@ export const VacationModal = ({ db, ur, vacationId, forEmpId, onClose, onSave, t
     toast(error.message || 'Ошибка сохранения отпуска', 'error');
   });
 
-  const employeeOptions = db.employees.map(e => ({ value: e.id, label: `${empName(e.id)} - ${getPrimaryDeptName(e, db)}` }));
-  const substituteOptions = db.employees.filter(e => e.id !== values.empId).map(e => ({ value: e.id, label: `${empName(e.id)} - ${getPrimaryDeptName(e, db)}` }));
+  const employeeOptions = db.employees.map(e => ({
+    value: e.id,
+    label: `${empName(e.id)} - ${getPrimaryDeptName(e, db)}`,
+  }));
+  const substituteOptions = db.employees.filter(e => e.id !== values.empId).map(e => ({
+    value: e.id,
+    label: `${empName(e.id)} - ${getPrimaryDeptName(e, db)}`,
+  }));
   const statusOptions = [
     { value: 'pending', label: 'На утверждении' },
     { value: 'approved', label: 'Утверждён' },
@@ -86,48 +105,52 @@ export const VacationModal = ({ db, ur, vacationId, forEmpId, onClose, onSave, t
     >
       <div className="project-info-fields">
         {canPick && (
-          <FormField 
-            label="Сотрудник *" 
-            type="select" 
-            options={employeeOptions} 
-            value={values.empId} 
-            onChange={(v) => handleChange('empId', v)} 
-            disabled={!!existing} 
+          <FormField
+            label="Сотрудник"
+            required
+            type="select"
+            options={employeeOptions}
+            value={values.empId}
+            onChange={(v) => handleChange('empId', v)}
+            disabled={!!existing}
           />
         )}
-        <FormField 
-          label="Дата начала *" 
-          type="date" 
-          value={values.start} 
-          onChange={(v) => handleChange('start', v)} 
-          error={touched.start && errors.start} 
+        <FormField
+          label="Дата начала"
+          required
+          type="date"
+          value={values.start}
+          onChange={(v) => handleChange('start', v)}
+          error={touched.start && errors.start}
         />
-        <FormField 
-          label="Дата окончания *" 
-          type="date" 
-          value={values.end} 
-          onChange={(v) => handleChange('end', v)} 
-          error={touched.end && errors.end} 
+        <FormField
+          label="Дата окончания"
+          required
+          type="date"
+          value={values.end}
+          onChange={(v) => handleChange('end', v)}
+          error={touched.end && errors.end}
         />
-        <FormField 
-          label="Тип отпуска *" 
-          type="select" 
-          options={typeOptions} 
-          value={values.type} 
-          onChange={(v) => handleChange('type', v)} 
+        <FormField
+          label="Тип отпуска"
+          required
+          type="select"
+          options={typeOptions}
+          value={values.type}
+          onChange={(v) => handleChange('type', v)}
         />
-        <FormField 
-          label="Комментарий" 
-          value={values.comment} 
-          onChange={(v) => handleChange('comment', v)} 
+        <FormField
+          label="Комментарий"
+          value={values.comment}
+          onChange={(v) => handleChange('comment', v)}
         />
         {canPick && (
-          <FormField 
-            label="Статус" 
-            type="select" 
-            options={statusOptions} 
-            value={values.status} 
-            onChange={(v) => handleChange('status', v)} 
+          <FormField
+            label="Статус"
+            type="select"
+            options={statusOptions}
+            value={values.status}
+            onChange={(v) => handleChange('status', v)}
           />
         )}
       </div>
@@ -137,10 +160,10 @@ export const VacationModal = ({ db, ur, vacationId, forEmpId, onClose, onSave, t
           <label className="field-label">Делегирование</label>
           <div className="flex-1">
             <label className="roles-item" style={{ border: 'none', padding: 0 }}>
-              <input 
-                type="checkbox" 
-                checked={values.delegation.enabled} 
-                onChange={(e) => handleChange('delegation.enabled', e.target.checked)} 
+              <input
+                type="checkbox"
+                checked={values.delegation.enabled}
+                onChange={(e) => handleChange('delegation.enabled', e.target.checked)}
               />
               <b>Делегировать задачи на время отпуска</b>
             </label>
@@ -148,28 +171,29 @@ export const VacationModal = ({ db, ur, vacationId, forEmpId, onClose, onSave, t
         </div>
         {values.delegation.enabled && (
           <>
-            <FormField 
-              label="Замещающий сотрудник *" 
-              type="select" 
-              options={substituteOptions} 
-              value={values.delegation.subId} 
-              onChange={(v) => handleChange('delegation.subId', v)} 
-              error={touched['delegation.subId'] && errors['delegation.subId']} 
+            <FormField
+              label="Замещающий сотрудник"
+              required
+              type="select"
+              options={substituteOptions}
+              value={values.delegation.subId}
+              onChange={(v) => handleChange('delegation.subId', v)}
+              error={touched['delegation.subId'] && errors['delegation.subId']}
             />
             <div className="field-row">
               <label className="field-label">Какие задачи</label>
               <div className="sub-picks">
                 {statusList.map(s => (
                   <label key={s.value} className="dept-pick">
-                    <input 
-                      type="checkbox" 
-                      checked={values.delegation.statuses.includes(s.value)} 
+                    <input
+                      type="checkbox"
+                      checked={values.delegation.statuses.includes(s.value)}
                       onChange={(e) => {
                         const newStatuses = e.target.checked
                           ? [...values.delegation.statuses, s.value]
                           : values.delegation.statuses.filter(x => x !== s.value);
                         handleChange('delegation.statuses', newStatuses);
-                      }} 
+                      }}
                     />
                     {s.label}
                   </label>

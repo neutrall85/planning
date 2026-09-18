@@ -234,6 +234,7 @@ input, select, textarea {
   font-weight: 600;
   text-decoration: underline;
   padding: 0;
+  text-align: left;
 }
 .red-link {
   color: #dc2626;
@@ -280,6 +281,16 @@ input, select, textarea {
   background: #fef2f2;
   color: #dc2626;
   border-color: #fecaca;
+}
+.btn.request-hours {
+  background: #ecfdf5;
+  color: #047857;
+  border-color: #a7f3d0;
+}
+.btn.request-hours:hover {
+  background: #d1fae5;
+  border-color: #6ee7b7;
+  color: #065f46;
 }
 .btn.big {
   padding: 12px;
@@ -575,6 +586,20 @@ input, select, textarea {
   background: #ecfdf5;
   border-radius: 6px;
   padding: 2px 7px;
+}
+.pos-tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  color: #64748b;
+  background: #e2e8f0;
+  border-radius: 6px;
+  padding: 3px 7px;
+  margin-left: 6px;
+  vertical-align: middle;
+  letter-spacing: .2px;
 }
 .vac-badge.fired {
   background: #fef2f2;
@@ -1155,7 +1180,12 @@ input, select, textarea {
   border: 1px solid #223250;
   border-radius: 12px;
   padding: 9px;
-  margin-bottom: 16px;
+}
+.user-card-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 999px;
 }
 .user-card-clickable {
   cursor: pointer;
@@ -2325,6 +2355,10 @@ input, select, textarea {
   flex-wrap: wrap;
 }
 .st-pos {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  flex-wrap: wrap;
   font-size: 13px;
   color: var(--mut);
 }
@@ -2561,6 +2595,55 @@ input, select, textarea {
   gap: 8px;
 }
 
+/* Фото-колонка в профиле: фиксированная ширина, вертикальная раскладка. */
+.cab-photo-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 140px;
+}
+
+/* Аватар профиля: круг 120×120, фото вписано без искажений. */
+.cab-profile-photo {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--line);
+}
+
+/* Плейсхолдер вместо аватара, когда фото не загружено. */
+.cab-profile-photo-empty {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #e2e8f0;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+/* Таблица трудозатрат: узкая колонка задач, широкие колонки дней. */
+.cab-timesheet-table {
+  min-width: 700px;
+}
+
+.cab-timesheet-task-col {
+  min-width: 200px;
+}
+
+.cab-timesheet-day-col {
+  min-width: 60px;
+}
+
+/* Правая колонка профиля с полями: не должна сжиматься ниже 300px. */
+.cab-profile-fields {
+  flex: 1;
+  min-width: 300px;
+}
 
 /* ============================================================================
    23. Модальные окна и формы
@@ -2587,6 +2670,11 @@ input, select, textarea {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.modal.modal-task {
+  width: max-content;
+  max-width: calc(100vw - 40px);
 }
 .modal-head {
   display: flex;
@@ -2686,6 +2774,7 @@ input, select, textarea {
   margin-bottom: 11px;
 }
 .tm-progress-fill {
+  width: var(--tm-progress-fill, 0%);
   height: 100%;
   background: linear-gradient(90deg, #10b981, #0ea5e9);
   border-radius: 99px;
@@ -2996,6 +3085,66 @@ input, select, textarea {
   font-size: 15px;
   color: var(--txt);
   padding: 6px 0;
+}
+
+.tm-note-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.note-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.note-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+  font-family: inherit;
+  min-height: 110px;
+}
+
+.note-tile:hover {
+  border-color: var(--acc2);
+  background: #f0f9ff;
+}
+
+.note-tile-title {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--txt);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note-tile-preview {
+  font-size: 13px;
+  color: var(--mut);
+  line-height: 1.4;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  line-clamp: 3;
+}
+
+.note-tile-date {
+  font-size: 11px;
+  color: var(--mut);
+  margin-top: auto;
+  padding-top: 4px;
 }
 
 
@@ -3984,7 +4133,7 @@ input, select, textarea {
 }
 
 /* ============================================================================
-   30. Черновики в шаблоне — список и модалка-редактор
+   30. Черновики в шаблоне - список и модалка-редактор
    ============================================================================ */
 
 .template-draft-list {
@@ -4046,7 +4195,7 @@ input, select, textarea {
 }
 
 /* ============================================================================
-   31. Раздел «Шаблоны» — выпадающее меню создания
+   31. Раздел «Шаблоны» - выпадающее меню создания
    ============================================================================ */
 
 .templates-create {
@@ -4089,11 +4238,11 @@ input, select, textarea {
 }
 
 /* ============================================================================
-   32. Раздел «Шаблоны» — чип-переключатель доступа
+   32. Раздел «Шаблоны» - чип-переключатель доступа
    ============================================================================ */
 
 /*
- * Чип «личный ↔ общий» рендерится как <button> у владельца — значит,
+ * Чип «личный ↔ общий» рендерится как <button> у владельца - значит,
  * нужен сброс кнопочного хрома. Внешний вид (фон, паддинги, радиус)
  * берём из .st-chip как есть, добавляем только интерактив.
  */
@@ -4114,14 +4263,14 @@ input, select, textarea {
 }
 
 /* ============================================================================
-   33. Доступ к проекту — окно управления + одинаковые кнопки в подвале
+   33. Доступ к проекту - окно управления + одинаковые кнопки в подвале
    ============================================================================ */
 
 /*
  * Кнопки в подвале любой модалки: единая высота.
  * Раньше .btn (10px padding) и .btn.sm (7px padding) давали разную высоту
  * и подвал выглядел «ступенькой». min-height выравнивает без правки
- * паддингов — так кнопки остаются визуально центрированными.
+ * паддингов - так кнопки остаются визуально центрированными.
  */
 .modal-foot .btn {
   min-height: 38px;
@@ -4203,19 +4352,19 @@ input, select, textarea {
 }
 
 /* ============================================================================
-   34. Единый SearchBox — модификаторы
+   34. Единый SearchBox - модификаторы
    ============================================================================ */
 
 /*
- * Базовый .search-box задаёт input width: 170px — под одиночную строку
+ * Базовый .search-box задаёт input width: 170px - под одиночную строку
  * поиска. В узких тулбарах и модалках это переполняет контейнер; в
  * широких, наоборот, оставляет пустое место. Оба крайних случая решаются
  * растяжением input через flex: модификатор вешается на корень
  * .search-box и меняет только раскладку, не трогая базовый вид.
  *
- * .filter-search — узкая полоса фильтров (TasksView, ProjectsView).
+ * .filter-search - узкая полоса фильтров (TasksView, ProjectsView).
  *   Ширину контейнера задаёт .toolbar .filter-search (секция 15).
- * .access-search — модалка доступа к проекту, растягивается на ширину
+ * .access-search - модалка доступа к проекту, растягивается на ширину
  *   родителя.
  * .journal-search и .file-search-box уже настроены в своих секциях.
  */
@@ -4251,7 +4400,7 @@ input, select, textarea {
 /*
  * Визуально согласовано с .custom-select-popup и .mention-pop:
  * та же тень, тот же радиус, та же анимация popIn.
- * z-index выше модалок (у .overlay — 50), но ниже лайтбокса (10000):
+ * z-index выше модалок (у .overlay - 50), но ниже лайтбокса (10000):
  * меню не должно проваливаться под оверлеи, но и не должно оказаться
  * поверх полноэкранного просмотра фото.
  */
@@ -4331,12 +4480,6 @@ input, select, textarea {
   letter-spacing: .4px;
   color: var(--mut);
 }
-
-/* Кнопка «⋯» на карточке канбана.
-   Скрыта по умолчанию, появляется при наведении на карточку, при фокусе
-   с клавиатуры и пока меню открыто (иначе после клика мышью она бы
-   исчезла и меню осталось бы без «якоря»). На тач-устройствах
-   hover отсутствует — показываем всегда. */
 .kcard-menu-btn {
   position: absolute;
   top: 6px;
@@ -4345,6 +4488,9 @@ input, select, textarea {
   opacity: 0;
   transition: opacity .15s;
 }
+.pj-card .kcard-menu-btn {
+  opacity: 1;
+}
 .kcard:hover .kcard-menu-btn,
 .kcard-menu-btn:focus-visible,
 .kcard-menu-btn[aria-expanded="true"] {
@@ -4352,4 +4498,421 @@ input, select, textarea {
 }
 @media (hover: none) {
   .kcard-menu-btn { opacity: 1; }
+}
+
+/* ============================================================================
+   36. Дашборд загрузки сотрудников
+   ============================================================================ */
+
+.workload-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.workload-period {
+  min-width: 170px;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -.2px;
+}
+
+.workload-custom-range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.workload-search {
+  flex: 1 1 220px;
+  max-width: 340px;
+}
+
+.workload-search input {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+}
+.staff-search {
+  flex: 0 1 240px;
+  min-width: 180px;
+}
+
+.staff-search input {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+}
+
+.workload-period-meta {
+  font-size: 14px;
+  color: var(--mut);
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.workload-period-meta b {
+  color: var(--txt);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.workload-table {
+  min-width: 720px;
+}
+
+.workload-table th,
+.workload-table td {
+  vertical-align: middle;
+}
+
+.workload-col-bar {
+  width: 200px;
+}
+
+.workload-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.workload-bar {
+  flex: 1;
+  height: 12px;
+  background: #eef2f7;
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.workload-bar-fill {
+  width: var(--workload-fill, 0%);
+  height: 100%;
+  border-radius: 99px;
+  transition: width .2s ease;
+}
+
+.workload-bar-fill--plan {
+  background: linear-gradient(90deg, #93c5fd, #2563eb);
+}
+
+.workload-bar-fill--fact {
+  background: linear-gradient(90deg, #6ee7b7, #059669);
+}
+
+.workload-hours {
+  min-width: 52px;
+  text-align: right;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--mut);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.workload-util {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--acc);
+  font-variant-numeric: tabular-nums;
+}
+
+.workload-util.over {
+  color: #dc2626;
+}
+
+.workload-total-row td {
+  border-top: 2px solid var(--line);
+  background: #f8fafc;
+}
+
+.employee-tasks-table {
+  min-width: 720px;
+}
+
+.employee-tasks-table th {
+  white-space: nowrap;
+}
+
+/* ============================================================================
+   37. Производственный календарь
+   ============================================================================ */
+
+.pc-year-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pc-year-add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.pc-active-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.pc-sections {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 800px) {
+  .pc-sections {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pc-section {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px;
+  background: #fbfcfe;
+}
+
+.pc-section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.pc-section-title {
+  font-weight: 800;
+  font-size: 15px;
+}
+
+.pc-add-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.pc-date-input {
+  flex: 1;
+  min-width: 240px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .3px;
+}
+
+.pc-empty {
+  color: var(--mut);
+  font-size: 14px;
+  padding: 12px 0;
+  text-align: center;
+}
+
+.pc-date-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.pc-date-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.pc-date-label {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ============================================================================
+   38. Годовой просмотр производственного календаря
+   ============================================================================ */
+
+/*
+ * Модификатор к .modal: годовой календарь - контент широкий и
+ * распределён в 2 строки месяцев. Без минимальной высоты модалка
+ * растягивается по содержимому и выглядит плоской. Значение в vh,
+ * а не в px, чтобы работало и на большом мониторе, и на маленьком.
+ */
+.modal.modal-year-calendar {
+  min-height: 88vh;
+}
+
+.yc-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.yc-year {
+  min-width: 60px;
+  text-align: center;
+  font-size: 17px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.yc-today-hint {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--mut);
+}
+
+.yc-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.yc-month {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 10px;
+  background: #fff;
+}
+
+.yc-month-title {
+  font-size: 15px;
+  font-weight: 800;
+  text-align: center;
+  margin-bottom: 10px;
+  color: var(--txt);
+}
+
+.yc-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  font-size: 12px;
+  color: var(--mut);
+  text-align: center;
+  margin-bottom: 3px;
+}
+
+.yc-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.yc-day {
+  font-size: 14px;
+  text-align: center;
+  padding: 2px 0;
+  border-radius: 3px;
+  font-variant-numeric: tabular-nums;
+  color: var(--txt);
+}
+
+.yc-day--empty {
+  visibility: hidden;
+}
+
+.yc-day--workday {
+  color: var(--txt);
+}
+
+.yc-day--shortday {
+  color: #2563eb;
+  font-weight: 700;
+}
+
+.yc-day--weekend {
+  color: #dc2626;
+}
+
+.yc-day--holiday {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+/*
+ * Двойной класс - специфичность (0,2,0). Гарантированно перебивает
+ * .yc-day--workday / --weekend / --holiday (все (0,1,0)), независимо
+ * от порядка объявления в файле. Плюс - защищает от кэша браузера,
+ * где мог остаться старый .yc-day--today с синим фоном.
+ */
+.yc-day.yc-day--today {
+  background: #10b981;
+  color: #fff;
+  font-weight: 800;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  justify-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.yc-legend {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.yc-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--mut);
+}
+
+.yc-legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.yc-legend-dot--workday {
+  background: var(--txt);
+}
+
+.yc-legend-dot--shortday {
+  background: #2563eb;
+}
+
+.yc-legend-dot--weekend {
+  background: #dc2626;
+}
+
+.yc-legend-dot--today {
+  background: #10b981;
+  border-radius: 50%;
+}
+
+@media (max-width: 1000px) {
+  .yc-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .yc-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }

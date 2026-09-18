@@ -10,7 +10,11 @@ import { ProjectGallery } from '../ProjectGallery';
 import { Lightbox } from '../Lightbox';
 import { ProjectAccessModal } from './ProjectAccessModal';
 import { useForm } from '../../hooks/useForm';
-import { useDataHelpers, useStableModalHeight } from '../../hooks';
+import {
+  useDataHelpers,
+  useControlledTab,
+  useStableModalHeight,
+} from '../../hooks';
 import { useConfirm } from '../../context/ConfirmContext';
 import {
   PROJECT_STATUSES,
@@ -22,7 +26,7 @@ import {
   FILE_LIMITS,
   FILE_MESSAGES,
 } from '../../utils/constants';
-import { TODAY, iso, addDays, uid } from '../../utils/date';
+import { TODAY, iso, addDays, uid, fmtDMY } from '../../utils/date';
 import {
   canEditProjectFields,
   canChangeProjectStatus,
@@ -31,6 +35,7 @@ import {
   canManageProjectAccess,
   hasRole,
 } from '../../utils/permissions';
+import { isArchived } from '../../utils/entityState';
 import { getProjectColor } from '../../utils/projectHelpers';
 import { prepareAttachments } from '../../utils/fileUpload';
 import { createFolder } from '../../utils/fileTree';
@@ -45,10 +50,10 @@ const PROJECT_TYPE_OPTIONS = ['Ремонт', 'Модификация', 'КС', 
 /**
  * Копия проекта без поля access.
  *
- * access — не поле формы, а отдельная сущность со своим окном и
+ * access - не поле формы, а отдельная сущность со своим окном и
  * своим сервисным методом. Если он попадёт в initialValues, любой
  * внешний вызов setProjectAccess изменит initialValues в useForm,
- * JSON-сравнение покажет «dirty», и кнопка Сохранить активируется —
+ * JSON-сравнение покажет «dirty», и кнопка Сохранить активируется -
  * при том что форма проекта никаких правок не делает.
  */
 const stripAccess = (project) => {
@@ -56,6 +61,39 @@ const stripAccess = (project) => {
   const { access, ...rest } = project;
   return rest;
 };
+
+/**
+ * Список полей формы проекта, участвующих в проверке isDirty.
+ * Определён на уровне модуля - стабильная ссылка.
+ *
+ * Поля, сохраняемые отдельными методами (файлы, папки, фото), в список
+ * не входят: они не открывают кнопку «Сохранить» и не попадают в её
+ * проверку.
+ */
+const FORM_FIELDS = Object.freeze([
+  'name', 'code', 'desc', 'ptype', 'customer', 'aircraftType', 'projectType',
+  'priority', 'kbId', 'managerId', 'start', 'end', 'budget', 'status', 'longterm',
+]);
+
+/**
+ * Читает File как data URL и возвращает объект фото в форме, которую
+ * ожидает values.photos. isMain здесь не выставляется - этим
+ * управляет handlePhotoUpload, когда уже знает, первое ли это фото.
+ */
+const readFileAsPhoto = (file, uploaderId) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (ev) => resolve({
+      id: uid(),
+      name: file.name,
+      url: ev.target.result,
+      uploadedBy: uploaderId,
+      uploadedAt: new Date().toISOString(),
+      isMain: false,
+    });
+    reader.onerror = () => reject(new Error('Ошибка чтения файла'));
+    reader.readAsDataURL(file);
+  });
 
 export const ProjectModal = ({
   db,
@@ -71,6 +109,7 @@ export const ProjectModal = ({
   toast,
   openTask,
   store,
+  onTabChange,
 }) => {
   const { empName, getTaskSpent } = useDataHelpers(db);
   const { confirm } = useConfirm();
@@ -78,13 +117,12 @@ export const ProjectModal = ({
   const copySource = copyFromId ? db.projects.find(p => p.id === copyFromId) : null;
   const isCopy = !existing && !!copySource;
   const isNew = !existing;
-  const readOnly = !!(existing && existing.archived);
+  const readOnly = !!(existing && isArchived(existing));
   const canEditFields = !readOnly && (existing ? canEditProjectFields(ur, existing) : canCreateProject(ur));
   const canChangeStatus = !readOnly && existing && canChangeProjectStatus(ur, existing, null);
   const canChangeManager = !readOnly && (existing ? canManageManager(ur) : canCreateProject(ur));
 
-  const canCopy = canCreateProject(ur);
-  const canMakeTemplate = canCreateProject(ur);
+  const canCreateFromProject = canCreateProject(ur);
   const canManageAccess = !readOnly && existing && canManageProjectAccess(ur, existing);
 
   const [lightboxIndex, setLightboxIndex] = useState(null);
@@ -99,9 +137,9 @@ export const ProjectModal = ({
       : []
   );
 
-  const [activeTab, setActiveTab] = useState(initialTab);
+  const [activeTab, handleTabChange] = useControlledTab(initialTab, onTabChange);
 
-  const bodyRef = useStableModalHeight('info', activeTab);
+  const bodyRef = useStableModalHeight(activeTab);
 
   const initialValues = existing
     ? stripAccess(existing)
@@ -170,7 +208,8 @@ export const ProjectModal = ({
     return errors;
   }, []);
 
-  const { values, handleChange, handleSubmit, errors, touched, setFieldValue, isValid, isDirty } = useForm(initialValues, validate);
+  const { values, handleChange, handleSubmit, errors, touched, setFieldValue, isValid, isDirty } =
+    useForm(initialValues, validate, { fields: FORM_FIELDS });
 
   const draftTasks = useMemo(() => {
     if (!isNew || pendingTemplateTasks.length === 0) return [];
@@ -204,31 +243,48 @@ export const ProjectModal = ({
     setAppliedTemplateName(template.name);
   }, [setFieldValue]);
 
-  const handlePhotoUpload = useCallback((file, onDone) => {
-    if (file.size > FILE_LIMITS.image) {
-      toast(FILE_MESSAGES.imageTooLarge, 'error');
-      onDone?.();
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = (ev) => {
+  /**
+   * Побочные действия (фото, файлы, папки) сохраняются через
+   * store.patchProject - точечно, без всей формы. Локальное состояние
+   * обновляется через setFieldValue для мгновенного отклика UI.
+   */
+
+  const handlePhotoUpload = useCallback(async (files, onDone) => {
+    try {
       const currentPhotos = values.photos || [];
-      const newPhoto = {
-        id: uid(),
-        name: file.name,
-        url: ev.target.result,
-        uploadedBy: ur.id,
-        uploadedAt: new Date().toISOString(),
-        isMain: currentPhotos.length === 0,
-      };
-      const updatedPhotos = [...currentPhotos, newPhoto];
+
+      const valid = [];
+      for (const file of files) {
+        if (!file.type.startsWith('image/')) {
+          toast(FILE_MESSAGES.notImage, 'error');
+          continue;
+        }
+        if (file.size > FILE_LIMITS.image) {
+          toast(FILE_MESSAGES.imageTooLarge, 'error');
+          continue;
+        }
+        valid.push(file);
+      }
+      if (valid.length === 0) return;
+
+      const newPhotos = await Promise.all(
+        valid.map((file) => readFileAsPhoto(file, ur.id))
+      );
+
+      if (currentPhotos.length === 0 && newPhotos.length > 0) {
+        newPhotos[0].isMain = true;
+      }
+
+      const updatedPhotos = [...currentPhotos, ...newPhotos];
       setFieldValue('photos', updatedPhotos);
-      if (existing) store.upsertProject({ ...values, photos: updatedPhotos });
-      toast('Фото загружено', 'success');
+      if (existing) store.patchProject(existing.id, { photos: updatedPhotos });
+      toast(`Загружено фото: ${newPhotos.length}`, 'success');
+    } catch (err) {
+      toast(err.message || 'Ошибка загрузки фото', 'error');
+    } finally {
       onDone?.();
-    };
-    reader.readAsDataURL(file);
-  }, [values, existing, setFieldValue, store, toast, ur.id]);
+    }
+  }, [values.photos, existing, store, setFieldValue, toast, ur.id]);
 
   const handlePhotoDelete = useCallback(async (photoId) => {
     const ok = await confirm(DIALOGS.deleteProjectPhoto);
@@ -240,9 +296,9 @@ export const ProjectModal = ({
       updatedPhotos[0].isMain = true;
     }
     setFieldValue('photos', updatedPhotos);
-    if (existing) store.upsertProject({ ...values, photos: updatedPhotos });
+    if (existing) store.patchProject(existing.id, { photos: updatedPhotos });
     toast(TOASTS.photoDeleted, 'info');
-  }, [values.photos, existing, setFieldValue, store, toast, confirm]);
+  }, [values.photos, existing, store, setFieldValue, toast, confirm]);
 
   const handleSetMain = useCallback((photoId) => {
     const currentPhotos = values.photos || [];
@@ -251,9 +307,9 @@ export const ProjectModal = ({
       isMain: p.id === photoId,
     }));
     setFieldValue('photos', updatedPhotos);
-    if (existing) store.upsertProject({ ...values, photos: updatedPhotos });
+    if (existing) store.patchProject(existing.id, { photos: updatedPhotos });
     toast('Главное фото обновлено', 'success');
-  }, [values.photos, existing, setFieldValue, store, toast]);
+  }, [values.photos, existing, store, setFieldValue, toast]);
 
   const handleOpenLightbox = useCallback((index) => {
     setLightboxIndex(index);
@@ -293,9 +349,6 @@ export const ProjectModal = ({
     if (!vals.status) { toast('Выберите статус', 'error'); return; }
 
     const finalColor = getProjectColor(vals);
-    // access в форму не входит — берём актуальное значение из стора
-    // (или пустой объект для нового проекта/копии). Так сохранение формы
-    // не откатывает свежие изменения, сделанные через ProjectAccessModal.
     const storeProject = db.projects.find(p => p.id === vals.id);
     const projectToSave = {
       ...vals,
@@ -360,7 +413,7 @@ export const ProjectModal = ({
 
     if (result.accepted > 0) {
       setFieldValue('files', result.nextFiles);
-      if (existing) store.upsertProject({ ...values, files: result.nextFiles });
+      if (existing) store.patchProject(existing.id, { files: result.nextFiles });
       toast(
         result.accepted === 1 ? TOASTS.fileUploaded : TOASTS.filesUploaded(result.accepted),
         'success'
@@ -369,29 +422,29 @@ export const ProjectModal = ({
     if (result.rejected > 0) {
       toast(TOASTS.filesRejected(result.errors.join('; ')), 'warning');
     }
-  }, [values, existing, setFieldValue, store, toast, ur.id]);
+  }, [values.files, existing, store, setFieldValue, toast, ur.id]);
 
   const handleFileDelete = useCallback(async (fileId) => {
     const ok = await confirm(DIALOGS.deleteFile);
     if (!ok) return;
     const updatedFiles = (values.files || []).filter(f => f.id !== fileId);
     setFieldValue('files', updatedFiles);
-    if (existing) store.upsertProject({ ...values, files: updatedFiles });
+    if (existing) store.patchProject(existing.id, { files: updatedFiles });
     toast(TOASTS.fileDeleted, 'info');
-  }, [values, existing, setFieldValue, toast, store, confirm]);
+  }, [values.files, existing, store, setFieldValue, toast, confirm]);
 
   const handleCreateFolder = useCallback((name, parentId) => {
     const newFolder = createFolder(name, parentId, ur.id);
     const updatedFolders = [...(values.folders || []), newFolder];
     setFieldValue('folders', updatedFolders);
-    if (existing) store.upsertProject({ ...values, folders: updatedFolders });
-  }, [values, existing, setFieldValue, store, ur.id]);
+    if (existing) store.patchProject(existing.id, { folders: updatedFolders });
+  }, [values.folders, existing, store, setFieldValue, ur.id]);
 
   const handleDeleteFolder = useCallback((folderId) => {
     const updatedFolders = (values.folders || []).filter(f => f.id !== folderId);
     setFieldValue('folders', updatedFolders);
-    if (existing) store.upsertProject({ ...values, folders: updatedFolders });
-  }, [values, existing, setFieldValue, store]);
+    if (existing) store.patchProject(existing.id, { folders: updatedFolders });
+  }, [values.folders, existing, store, setFieldValue]);
 
   const saveDisabled = !(canEditFields || (existing && canChangeStatus) || canChangeManager)
     || (isNew ? !isValid : !isValid || !isDirty);
@@ -414,7 +467,7 @@ export const ProjectModal = ({
         </button>
       )}
 
-      {!readOnly && existing && onCopy && canCopy && (
+      {existing && onCopy && canCreateFromProject && (
         <button
           type="button"
           className="btn ghost sm"
@@ -425,7 +478,7 @@ export const ProjectModal = ({
         </button>
       )}
 
-      {!readOnly && canMakeTemplate && (
+      {canCreateFromProject && (
         <TemplateActions
           kind="project"
           source={values}
@@ -462,16 +515,21 @@ export const ProjectModal = ({
         title={modalTitle}
         onClose={onClose}
         width={900}
+        className="modal-project"
         showSave={false}
         footer={footer}
         bodyRef={bodyRef}
-        headerBefore={showBackButton ? (
-          <button className="btn ghost sm" onClick={onClose}>
-            <Ic d={ICONS.left} size={14} /> Назад
-          </button>
-        ) : undefined}
+        showBack={showBackButton}
       >
-        <Tabs tabs={tabs} active={activeTab} onChange={setActiveTab} />
+        {readOnly && (
+          <div className="info-box">
+            {existing.archivedAt
+              ? `Проект в архиве с ${fmtDMY(existing.archivedAt)}. Редактирование запрещено.`
+              : `Проект ${existing.status === 'cancelled' ? 'отменён' : 'закрыт'}. Редактирование запрещено.`}
+          </div>
+        )}
+
+        <Tabs tabs={tabs} active={activeTab} onChange={handleTabChange} />
 
         {activeTab === 'info' && (
           <div className="project-info-layout">
@@ -584,6 +642,7 @@ export const ProjectModal = ({
             candidates={candidates}
             openTask={openTask}
             tasks={db.tasks}
+            readOnly={readOnly}
           />
         )}
 

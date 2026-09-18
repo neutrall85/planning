@@ -1,12 +1,26 @@
-import React, { useState, useRef } from 'react';
+import React, { memo, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { initials } from '../utils/date';
 
-export default function Avatar({ employee, size = 'sm', className = '' }) {
-  if (!employee) return null;
-
+/**
+ * Аватар сотрудника с тултипом при наведении.
+ *
+ * memo-компонент: рендерится в списках и канбане десятками, при
+ * неизменном сотруднике не должен перерисовываться при изменении
+ * чужих данных. Пропсы - employee (ссылка на объект), size, className;
+ * memo сравнивает их стандартным shallow-equal.
+ *
+ * ВАЖНО: хуки вызываются до возможного return null. Раньше стоял
+ * `if (!employee) return null;` перед useState/useRef - это нарушение
+ * Rules of Hooks: если employee менялся с null на не-null (или наоборот)
+ * на смонтированном компоненте, порядок хуков в двух рендерах различался,
+ * и React падал с «Rendered fewer hooks than expected».
+ */
+const Avatar = memo(function Avatar({ employee, size = 'sm', className = '' }) {
   const [tooltip, setTooltip] = useState({ visible: false, text: '', x: 0, y: 0 });
   const ref = useRef(null);
+
+  if (!employee) return null;
 
   const tooltipText = `${employee.last} ${employee.first}` +
     (employee.extension ? `\nВн. телефон: ${employee.extension}` : '');
@@ -27,9 +41,7 @@ export default function Avatar({ employee, size = 'sm', className = '' }) {
     setTooltip(prev => ({ ...prev, visible: false }));
   };
 
-  const baseClass = 'avatar';
-  const sizeClass = size ? ` ${size}` : '';
-  const classes = `${baseClass}${sizeClass}${className ? ' ' + className : ''}`;
+  const classes = `avatar${size ? ' ' + size : ''}${className ? ' ' + className : ''}`;
 
   const avatarContent = employee.photo ? (
     <img
@@ -71,4 +83,6 @@ export default function Avatar({ employee, size = 'sm', className = '' }) {
       }
     </>
   );
-}
+});
+
+export default Avatar;

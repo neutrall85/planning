@@ -1,9 +1,9 @@
 // src/services/AuthService.js
 export class AuthService {
-  constructor(employeeService, auditService, notifyCallback) {
+  constructor({ employeeService, auditService, notify }) {
     this._employeeService = employeeService;
     this._audit = auditService;
-    this._notify = notifyCallback;
+    this._notify = notify;
     this._currentUser = null;
   }
 

@@ -1,4 +1,4 @@
-export { default as KanbanView } from './TasksView';
+export { default as TasksView } from './TasksView';
 export { default as ProjectsView } from './ProjectsView';
 export { default as CabinetView } from './CabinetView';
 export { default as StaffView } from './StaffView';
@@ -7,3 +7,5 @@ export { default as ArchiveView } from './ArchiveView';
 export { default as RequestsView } from './RequestsView';
 export { default as JournalView } from './JournalView';
 export { default as TemplatesView } from './TemplatesView';
+export { default as WorkloadView } from './WorkloadView';
+export { default as ProductionCalendarView } from './ProductionCalendarView';

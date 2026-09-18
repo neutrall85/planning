@@ -58,7 +58,7 @@ export default function CommentItem({ comment, depth, children }) {
       >
         <div className="cm-head">
           <Avatar employee={author} size="xs" />
-          <span className="cm-author">{author ? `${author.last} ${author.first}` : '—'}</span>
+          <span className="cm-author">{author ? `${author.last} ${author.first}` : '-'}</span>
           <span className="mut sm">{fmtDT(comment.createdAt)}</span>
           {comment.updatedAt > comment.createdAt && <span className="mut sm">(ред.)</span>}
           {comment.pinned && <span className="pinned-badge" title="Закреплено">📌</span>}

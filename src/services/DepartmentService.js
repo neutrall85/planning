@@ -1,9 +1,9 @@
 // src/services/DepartmentService.js
 export class DepartmentService {
-  constructor(deptRepo, auditService, notifyCallback) {
+  constructor({ deptRepo, auditService, notify }) {
     this._deptRepo = deptRepo;
     this._audit = auditService;
-    this._notify = notifyCallback;
+    this._notify = notify;
   }
 
   upsertDepartment(dept, currentUserId) {

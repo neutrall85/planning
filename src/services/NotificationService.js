@@ -6,12 +6,12 @@ import { extractMentions } from '../utils/mentionParser';
 export class NotificationService {
   /**
    * @param {NotificationRepository} notificationRepo
-   * @param {() => void} notifyCallback - триггер подписчиков store
+   * @param {() => void} notify - триггер подписчиков store
    * @param {() => Object} getData - доступ к текущим данным { tasks, projects, employees, comments }
    */
-  constructor(notificationRepo, notifyCallback, getData) {
+  constructor({ notificationRepo, notify, getData }) {
     this._notificationRepo = notificationRepo;
-    this._notify = notifyCallback;
+    this._notify = notify;
     this._getData = getData || (() => ({}));
   }
 
@@ -43,8 +43,7 @@ export class NotificationService {
   markRead(id) {
     const n = this._notificationRepo.findById(id);
     if (n) {
-      n.read = true;
-      this._notificationRepo.save(n);
+      this._notificationRepo.save({ ...n, read: true });
       this._notify();
     }
   }
@@ -53,8 +52,7 @@ export class NotificationService {
     const list = this._notificationRepo.findByUser(userId);
     list.forEach(n => {
       if (!n.read) {
-        n.read = true;
-        this._notificationRepo.save(n);
+        this._notificationRepo.save({ ...n, read: true });
       }
     });
     this._notify();

@@ -7,11 +7,11 @@ const DEFAULT_TASK_HOURS = 8;
 const DEFAULT_TASK_DEADLINE_DAYS = 14;
 
 export class TemplateService {
-  constructor(templateRepo, auditService, notifyCallback, deps = {}) {
+  constructor({ templateRepo, auditService, notify, taskService = null }) {
     this._repo = templateRepo;
     this._audit = auditService;
-    this._notify = notifyCallback;
-    this._taskService = deps.taskService || null;
+    this._notify = notify;
+    this._taskService = taskService;
   }
 
   // ---------- Чтение ----------

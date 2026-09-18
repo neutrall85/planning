@@ -1,20 +1,57 @@
 import { useState, useMemo } from 'react';
 
-export const useForm = (initialValues, validate) => {
+/**
+ * Форма с валидацией и отслеживанием «есть ли несохранённые изменения».
+ *
+ * options.fields - обязательный список полей, участвующих в проверке
+ * isDirty. Отсутствие списка - ошибка, а не «тихий откат» к сравнению
+ * всех полей: без явного перечня в проверку попадут служебные и побочные
+ * поля (файлы, логи, фотографии, actualHours), которые сохраняются
+ * отдельными методами и не должны открывать кнопку «Сохранить».
+ * Именно из-за такого сравнения всех полей раньше появлялись пустые
+ * записи «Изменение задачи - Название» после загрузки файла или внесения
+ * часа.
+ *
+ * Список, а не «excludeFromDirty»: при добавлении нового поля формы
+ * безопаснее явно указать его в перечне, чем надеяться, что кто-то
+ * вспомнит про исключение. Забыть добавить поле в fields - значит,
+ * форма не подсветит Save после его правки (баг заметен сразу).
+ * Забыть исключить служебное поле - значит, форма начнёт ложно
+ * активировать Save (баг заметен не сразу). Явный список защищает от
+ * второго сценария.
+ *
+ * Сравнение покомпонентное, а не JSON.stringify целого объекта:
+ * initialValues пересобирается на каждом рендере из стора, порядок
+ * ключей может отличаться.
+ */
+export const useForm = (initialValues, validate, options) => {
+  if (!options || !Array.isArray(options.fields)) {
+    throw new Error(
+      'useForm: опция fields обязательна - явный массив полей формы, ' +
+      'которые участвуют в проверке isDirty. ' +
+      'Это защищает от «тихого» сравнения служебных и побочных полей ' +
+      '(файлы, логи, фотографии, actualHours), которые сохраняются ' +
+      'отдельно и не должны открывать кнопку «Сохранить».'
+    );
+  }
+
+  const { fields } = options;
   const [values, setValues] = useState(initialValues);
   const [touched, setTouched] = useState({});
 
-  // Ошибки вычисляются при каждом изменении значений
   const errors = useMemo(() => {
     if (!validate) return {};
     return validate(values);
   }, [values, validate]);
 
-  // Валидность формы (нет ошибок)
   const isValid = useMemo(() => Object.keys(errors).length === 0, [errors]);
 
-  // Были ли изменены данные (сравниваем с initialValues)
-  const isDirty = useMemo(() => JSON.stringify(values) !== JSON.stringify(initialValues), [values, initialValues]);
+  const isDirty = useMemo(() => {
+    for (const key of fields) {
+      if (JSON.stringify(values[key]) !== JSON.stringify(initialValues[key])) return true;
+    }
+    return false;
+  }, [values, initialValues, fields]);
 
   const handleChange = (field, value) => {
     setValues(prev => ({ ...prev, [field]: value }));
@@ -23,7 +60,6 @@ export const useForm = (initialValues, validate) => {
 
   const handleSubmit = (callback) => (e) => {
     e?.preventDefault();
-    // Отмечаем все поля как touched для отображения ошибок
     const allTouched = Object.keys(values).reduce((acc, key) => ({ ...acc, [key]: true }), {});
     setTouched(allTouched);
     if (isValid) {

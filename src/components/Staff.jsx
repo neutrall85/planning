@@ -1,7 +1,7 @@
 // src/components/Staff.jsx
 import React, { useState, useMemo, useCallback } from "react";
 import { ROLES, VACATION_TYPES, DIALOGS, TOASTS } from "../utils/constants";
-import { TODAY, fmtDMY, uid } from "../utils/date";
+import { TODAY, fmtDMY } from "../utils/date";
 import {
   canEditDepartments,
   canEditRoles,
@@ -9,48 +9,96 @@ import {
   canFireEmployee,
 } from "../utils/permissions";
 import { Ic, ICONS } from "./Icons";
-import { useDataHelpers } from "../hooks";
+import { useDataHelpers, useFilters } from "../hooks";
 import { useToast } from "../context/ToastContext";
 import { useConfirm } from "../context/ConfirmContext";
 import { EditEmployeeModal } from "./Modals/EditEmployeeModal";
 import { CreateEmployeeModal } from "./Modals/CreateEmployeeModal";
 import Avatar from "./Avatar";
 import FloatingMenu from "./FloatingMenu";
-import { getPrimaryDeptName } from "../utils/helpers";
+import { SearchBox } from "./SearchBox";
+import { getPrimaryDeptName, getPositionInDept } from "../utils/helpers";
 
+const INITIAL_FILTERS = Object.freeze({
+  query: '',
+});
+
+const NORM_HOURS = 160;
+
+/**
+ * Совпадает ли сотрудник поисковой строке.
+ *
+ * Ищем по ФИО, личной должности и по должностям в отделах (они видны
+ * в карточках). Названия отделов тоже учитываются - пользователь может
+ * искать «аэродинамики».
+ */
+const matchesQuery = (emp, q, db) => {
+  if (!q) return true;
+  const needle = q.toLowerCase();
+  if (`${emp.last} ${emp.first}`.toLowerCase().includes(needle)) return true;
+  if ((emp.position || '').toLowerCase().includes(needle)) return true;
+
+  const deptText = (emp.departments || [])
+    .map(d => {
+      const name = db.departments.find(x => x.id === d.deptId)?.name || '';
+      const pos = d.position || '';
+      return `${name} ${pos}`;
+    })
+    .join(' ')
+    .toLowerCase();
+
+  return deptText.includes(needle);
+};
+
+/**
+ * Строка сотрудника.
+ *
+ * deptId - контекст: секция какого отдела сейчас рендерится.
+ *   - для renderDepartment(deptId) - конкретный отдел;
+ *   - для руководства, chiefs и уволенных - null.
+ *
+ * Под именем показывается ОДНА должность в этом отделе (см.
+ * getPositionInDept): название отдела не дублируется, потому что оно
+ * уже в заголовке секции. Плашка «совм» - только когда должность
+ * относится к совмещению.
+ *
+ * Все «числовые» и «строковые» данные приходят снаружи примитивами
+ * (plan, cnt, vacationEnd), а не через общий объект db. Это позволяет
+ * React.memo работать: правка чужой задачи/отпуска не пересоздаёт
+ * пропсы этой строки.
+ */
 const EmployeeRow = React.memo(({
   employee,
   isFired,
-  db,
   ur,
+  deptId,
+  plan,
+  cnt,
+  vacationEnd,
   openDepts,
   openRoles,
-  setDb,
+  store,
   canFire,
-  getEmployeeLoad,
   openEditEmployee,
 }) => {
-  const l = getEmployeeLoad(employee.id);
-  const norm = 160;
-  const pct = Math.min(100, Math.round((l.plan / norm) * 100));
-  const vacNow = db.vacations.find(v => v.empId === employee.id && v.status === 'approved' && v.start <= TODAY && TODAY <= v.end);
+  const norm = NORM_HOURS;
+  const pct = Math.min(100, Math.round((plan / norm) * 100));
+
+  // getPositionInDept не читает db - третий аргумент в теле не
+  // используется, поэтому в deps его нет.
+  const position = useMemo(
+    () => getPositionInDept(employee, deptId),
+    [employee, deptId],
+  );
 
   const handleFireToggle = useCallback(() => {
-    const updated = { ...employee, fired: !employee.fired };
-    setDb((s) => ({
-      ...s,
-      employees: s.employees.map(emp => emp.id === employee.id ? updated : emp),
-      audit: [{ id: uid(), ts: Date.now(), userId: ur.id, action: employee.fired ? 'Восстановление сотрудника' : 'Увольнение сотрудника', details: `${employee.last} ${employee.first}` }, ...s.audit]
-    }));
-  }, [employee, setDb, ur]);
+    try {
+      store.setEmployeeFired(employee.id, !employee.fired);
+    } catch (err) {
+      console.error(err);
+    }
+  }, [employee.id, employee.fired, store]);
 
-  const mainDept = getPrimaryDeptName(employee, db);
-  const displayPosition = employee.position || 'Сотрудник';
-
-  // Меню собирается из тех же прав, что и раньше управляли видимостью
-  // отдельных кнопок. Divider вставляется только между группами «действия
-  // над сотрудником» и «увольнение/восстановление» — и только если обе
-  // группы непустые.
   const buildEmployeeMenu = () => {
     const items = [];
 
@@ -103,10 +151,11 @@ const EmployeeRow = React.memo(({
         <div className="st-fio">
           {employee.last} {employee.first}
           {isFired && <span className="vac-badge fired">Уволен</span>}
-          {vacNow && <span className="vac-badge">в отпуске до {fmtDMY(vacNow.end)}</span>}
+          {vacationEnd && <span className="vac-badge">в отпуске до {fmtDMY(vacationEnd)}</span>}
         </div>
         <div className="st-pos">
-          {displayPosition}
+          <span>{position.position}</span>
+          {position.isExtra && <span className="pos-tag">совм</span>}
         </div>
       </div>
       <div className="st-roles">
@@ -116,11 +165,11 @@ const EmployeeRow = React.memo(({
       </div>
       {!isFired && (
         <div className="st-load">
-          <div className="st-load-bar"><div className={`st-load-fill${l.plan > norm ? ' over' : ''}`} style={{ width: pct + '%' }} /></div>
-          <span className={`st-load-txt${l.plan > norm ? ' over' : ''}`}>{l.plan} ч · {Math.round((l.plan / norm) * 100)}%</span>
+          <div className="st-load-bar"><div className={`st-load-fill${plan > norm ? ' over' : ''}`} style={{ width: pct + '%' }} /></div>
+          <span className={`st-load-txt${plan > norm ? ' over' : ''}`}>{plan} ч · {Math.round((plan / norm) * 100)}%</span>
         </div>
       )}
-      <div className="st-nums"><b>{isFired ? '-' : l.cnt}</b><span>{isFired ? 'задач' : 'задач'}</span></div>
+      <div className="st-nums"><b>{isFired ? '-' : cnt}</b><span>задач</span></div>
 
       {menuItems.length > 0 && (
         <FloatingMenu items={menuItems}>
@@ -141,47 +190,104 @@ const EmployeeRow = React.memo(({
 });
 
 export default function Staff({ store, db, setDb, ur, openRoles, openDepts, openVacation }) {
-  const { getEmployeeLoad, empName } = useDataHelpers(db);
+  const { empName } = useDataHelpers(db);
   const { showToast } = useToast();
   const { prompt } = useConfirm();
   const [showFired, setShowFired] = useState(false);
   const [editEmployeeId, setEditEmployeeId] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  const activeEmployees = useMemo(() => db.employees.filter(e => !e.fired), [db.employees]);
-  const firedEmployees = useMemo(() => db.employees.filter(e => e.fired), [db.employees]);
+  const { filters, setFilter } = useFilters(INITIAL_FILTERS);
+  const { query } = filters;
+
+  // Загрузка по плановым часам активных задач - считаем один проход
+  // по всем задачам. Результат передаём в строки примитивами (plan, cnt),
+  // поэтому React.memo в EmployeeRow пропускает строки, у которых числа
+  // не изменились. Раньше каждая строка звала getEmployeeLoad с фильтром
+  // по всему массиву задач - это было O(n_employees × n_tasks) и плюс
+  // сбивало мемо: колбэк пересоздавался при каждом изменении задач.
+  const loadByEmp = useMemo(() => {
+    const map = new Map();
+    for (const t of db.tasks) {
+      if (t.archived || !t.assigneeId) continue;
+      if (t.status === 'closed' || t.status === 'cancelled') continue;
+      let cur = map.get(t.assigneeId);
+      if (!cur) {
+        cur = { plan: 0, cnt: 0 };
+        map.set(t.assigneeId, cur);
+      }
+      cur.plan += t.plannedHours || 0;
+      cur.cnt += 1;
+    }
+    return map;
+  }, [db.tasks]);
+
+  // Текущий отпуск сотрудника (approved и сегодня внутри [start, end]).
+  // Первый подходящий - как в исходном .find(). Наружу отдаём только
+  // end-дату (string | null): этого достаточно для бейджа и это даёт
+  // стабильный примитивный проп.
+  const vacationEndByEmp = useMemo(() => {
+    const map = new Map();
+    for (const v of db.vacations) {
+      if (v.status !== 'approved') continue;
+      if (!(v.start <= TODAY && TODAY <= v.end)) continue;
+      if (!map.has(v.empId)) map.set(v.empId, v.end);
+    }
+    return map;
+  }, [db.vacations]);
+
+  const filteredActiveEmployees = useMemo(
+    () => db.employees.filter(e => !e.fired && matchesQuery(e, query, db)),
+    [db, query]
+  );
+
+  const filteredFiredEmployees = useMemo(
+    () => db.employees.filter(e => e.fired && matchesQuery(e, query, db)),
+    [db, query]
+  );
 
   const noDeptEmployees = useMemo(() => {
-    return activeEmployees
+    return filteredActiveEmployees
       .filter(e => e.departments.length === 0 && !e.roles.includes('kb_chief'))
       .sort((a, b) => {
         if (a.roles.includes('director') && !b.roles.includes('director')) return -1;
         if (!a.roles.includes('director') && b.roles.includes('director')) return 1;
         return a.last.localeCompare(b.last);
       });
-  }, [activeEmployees]);
+  }, [filteredActiveEmployees]);
 
   const deptMap = useMemo(() => {
     const map = new Map();
     db.departments.forEach(d => {
-      const members = activeEmployees.filter(e => e.departments.some(x => x.deptId === d.id));
+      const members = filteredActiveEmployees.filter(e => e.departments.some(x => x.deptId === d.id));
       if (members.length) map.set(d.id, members);
     });
     return map;
-  }, [db.departments, activeEmployees]);
+  }, [db.departments, filteredActiveEmployees]);
 
   const kbSections = useMemo(() => {
     return db.kbs.map(k => {
       const deptsInKb = db.departments.filter(d => d.kbId === k.id);
-      const members = activeEmployees.filter(e => e.departments.some(d => deptsInKb.some(x => x.id === d.deptId)));
-      const chiefs = activeEmployees.filter(e => e.roles.includes('kb_chief') && (e.kbIds || []).includes(k.id));
+      const members = filteredActiveEmployees.filter(e => e.departments.some(d => deptsInKb.some(x => x.id === d.deptId)));
+      const chiefs = filteredActiveEmployees.filter(e => e.roles.includes('kb_chief') && (e.kbIds || []).includes(k.id));
       if (members.length === 0 && deptsInKb.length === 0 && chiefs.length === 0) return null;
       return { kb: k, deptsInKb, members, chiefs };
     }).filter(Boolean);
-  }, [db.kbs, db.departments, activeEmployees]);
+  }, [db.kbs, db.departments, filteredActiveEmployees]);
 
   const deptsWithoutKb = useMemo(() => db.departments.filter(d => d.kbId === null), [db.departments]);
-  const allVacs = useMemo(() => [...db.vacations].sort((a, b) => (a.start < b.start ? 1 : -1)), [db.vacations]);
+
+  const allVacs = useMemo(() => {
+    const list = db.vacations
+      .filter(v => {
+        if (!query) return true;
+        const emp = db.employees.find(e => e.id === v.empId);
+        return emp && matchesQuery(emp, query, db);
+      })
+      .sort((a, b) => (a.start < b.start ? 1 : -1));
+    return list;
+  }, [db.vacations, db.employees, db, query]);
+
   const canFire = canFireEmployee(ur);
 
   const openEditEmployee = useCallback((id) => setEditEmployeeId(id), []);
@@ -207,12 +313,35 @@ export default function Staff({ store, db, setDb, ur, openRoles, openDepts, open
     showToast(TOASTS.deptCreated(name), 'success');
   }, [prompt, setDb, showToast]);
 
-  const renderDepartment = useCallback((deptId) => {
+  // Один хелпер для всех мест рендера строки - единая сигнатура пропсов,
+  // чтобы не было рассинхрона между 4 секциями.
+  const renderEmployeeRow = (e, deptId, isFired) => (
+    <EmployeeRow
+      key={e.id}
+      employee={e}
+      isFired={isFired}
+      ur={ur}
+      deptId={deptId}
+      plan={loadByEmp.get(e.id)?.plan || 0}
+      cnt={loadByEmp.get(e.id)?.cnt || 0}
+      vacationEnd={vacationEndByEmp.get(e.id) || null}
+      openDepts={openDepts}
+      openRoles={openRoles}
+      store={store}
+      canFire={canFire}
+      openEditEmployee={openEditEmployee}
+    />
+  );
+
+  const renderDepartment = (deptId) => {
     const members = deptMap.get(deptId) || [];
     if (!members.length) return null;
     const dept = db.departments.find(d => d.id === deptId);
     if (!dept) return null;
-    const headNames = db.employees.filter(e => (e.headDeptIds || []).includes(deptId) && !e.fired).map(e => `${e.last} ${e.first[0]}.`).join(', ');
+    const headNames = db.employees
+      .filter(e => (e.headDeptIds || []).includes(deptId) && !e.fired)
+      .map(e => `${e.last} ${e.first[0]}.`)
+      .join(', ');
     return (
       <div className="st-dept" key={deptId}>
         <div className="st-dept-head">
@@ -220,69 +349,61 @@ export default function Staff({ store, db, setDb, ur, openRoles, openDepts, open
           <span className="mut">руководитель: {headNames || '-'}</span>
           <span className="kcount">{members.length}</span>
         </div>
-        {members.map(e => (
-          <EmployeeRow
-            key={e.id}
-            employee={e}
-            isFired={false}
-            db={db}
-            ur={ur}
-            openDepts={openDepts}
-            openRoles={openRoles}
-            setDb={setDb}
-            canFire={canFire}
-            getEmployeeLoad={getEmployeeLoad}
-            openEditEmployee={openEditEmployee}
-          />
-        ))}
+        {members.map(e => renderEmployeeRow(e, deptId, false))}
       </div>
     );
-  }, [deptMap, db, ur, openDepts, openRoles, setDb, canFire, getEmployeeLoad, openEditEmployee]);
+  };
 
   return (
     <div className="staff">
       <div className="sec-head">
         <div className="sec-note">Привязку сотрудников к отделам меняют только HR-менеджер, суперадминистратор и генеральный директор. Загрузка - по плановым часам открытых задач, норма 160 ч/мес.</div>
-        {canEditRoles(ur) && (
-          <div className="sec-actions">
-            <button className="btn ghost sm" onClick={handleCreateKb}>
-              <Ic d={ICONS.plus} size={13} /> КБ
-            </button>
-            <button className="btn ghost sm" onClick={handleCreateDept}>
-              <Ic d={ICONS.plus} size={13} /> Отдел
-            </button>
-            {canEditDepartments(ur) && (
-              <button className="btn primary sm" onClick={() => setShowCreateModal(true)}>
-                <Ic d={ICONS.plus} size={13} /> Добавить сотрудника
+        <div className="sec-actions">
+          <SearchBox
+            value={query}
+            onChange={(v) => setFilter('query', v)}
+            placeholder="Поиск по ФИО, должности, отделу…"
+            className="staff-search"
+          />
+          {canEditRoles(ur) && (
+            <>
+              <button className="btn ghost sm" onClick={handleCreateKb}>
+                <Ic d={ICONS.plus} size={13} /> КБ
               </button>
-            )}
-          </div>
-        )}
+              <button className="btn ghost sm" onClick={handleCreateDept}>
+                <Ic d={ICONS.plus} size={13} /> Отдел
+              </button>
+              {canEditDepartments(ur) && (
+                <button className="btn primary sm" onClick={() => setShowCreateModal(true)}>
+                  <Ic d={ICONS.plus} size={13} /> Добавить сотрудника
+                </button>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       {showCreateModal && (
         <CreateEmployeeModal
           store={store}
-          db={db}
-          setDb={setDb}
           ur={ur}
           onClose={() => setShowCreateModal(false)}
           toast={(msg, type) => showToast(msg, type || 'error')}
-          audit={(action, details) => setDb(prev => ({ ...prev, audit: [{ id: uid(), ts: Date.now(), userId: ur.id, action, details }, ...prev.audit] }))}
         />
       )}
 
       {editEmployeeId && (
         <EditEmployeeModal
           store={store}
-          db={db}
-          setDb={setDb}
+          ur={ur}
           employeeId={editEmployeeId}
           onClose={closeEditEmployee}
           toast={(msg, type) => showToast(msg, type || 'error')}
-          audit={(action, details) => setDb(prev => ({ ...prev, audit: [{ id: uid(), ts: Date.now(), userId: ur.id, action, details }, ...prev.audit] }))}
-          ur={ur}
         />
+      )}
+
+      {query && filteredActiveEmployees.length === 0 && filteredFiredEmployees.length === 0 && (
+        <div className="empty-note p-4">Сотрудников по заданным условиям не найдено</div>
       )}
 
       {noDeptEmployees.length > 0 && (
@@ -290,46 +411,18 @@ export default function Staff({ store, db, setDb, ur, openRoles, openDepts, open
           <div className="st-sec-head">
             <div className="st-sec-title">Руководство</div>
           </div>
-          {noDeptEmployees.map(e => (
-            <EmployeeRow
-              key={e.id}
-              employee={e}
-              isFired={false}
-              db={db}
-              ur={ur}
-              openDepts={openDepts}
-              openRoles={openRoles}
-              setDb={setDb}
-              canFire={canFire}
-              getEmployeeLoad={getEmployeeLoad}
-              openEditEmployee={openEditEmployee}
-            />
-          ))}
+          {noDeptEmployees.map(e => renderEmployeeRow(e, null, false))}
         </div>
       )}
 
-      {kbSections.map(({ kb, deptsInKb, members, chiefs }) => (
+      {kbSections.map(({ kb, deptsInKb, chiefs }) => (
         <div className="st-section" key={kb.id}>
           <div className="st-sec-head">
             <div className="st-sec-title">{kb.name}</div>
           </div>
           {chiefs.length > 0 && (
             <div className="st-dept" style={{ borderTop: '1px solid var(--line)' }}>
-              {chiefs.map(e => (
-                <EmployeeRow
-                  key={e.id}
-                  employee={e}
-                  isFired={false}
-                  db={db}
-                  ur={ur}
-                  openDepts={openDepts}
-                  openRoles={openRoles}
-                  setDb={setDb}
-                  canFire={canFire}
-                  getEmployeeLoad={getEmployeeLoad}
-                  openEditEmployee={openEditEmployee}
-                />
-              ))}
+              {chiefs.map(e => renderEmployeeRow(e, null, false))}
             </div>
           )}
           {deptsInKb.map(d => renderDepartment(d.id))}
@@ -346,15 +439,27 @@ export default function Staff({ store, db, setDb, ur, openRoles, openDepts, open
         </div>
       )}
 
-      {canManageAllVacations(ur) && (
+      {canManageAllVacations(ur) && allVacs.length > 0 && (
         <div className="st-section">
           <div className="st-sec-head">
             <div className="st-sec-title">Все отпуска</div>
-            <button className="btn primary sm" onClick={() => openVacation(null, null)}><Ic d={ICONS.plus} size={13} /> Отпуск сотруднику</button>
+            <button className="btn primary sm" onClick={() => openVacation(null, null)}>
+              <Ic d={ICONS.plus} size={13} /> Отпуск сотруднику
+            </button>
           </div>
           <div className="p-3">
             <table className="tbl">
-              <thead><tr><th>Сотрудник</th><th>Отдел</th><th>Период</th><th>Тип</th><th>Делегирование</th><th>Статус</th><th></th></tr></thead>
+              <thead>
+                <tr>
+                  <th>Сотрудник</th>
+                  <th>Отдел</th>
+                  <th>Период</th>
+                  <th>Тип</th>
+                  <th>Делегирование</th>
+                  <th>Статус</th>
+                  <th></th>
+                </tr>
+              </thead>
               <tbody>
                 {allVacs.map(v => {
                   const e = db.employees.find(x => x.id === v.empId);
@@ -376,14 +481,13 @@ export default function Staff({ store, db, setDb, ur, openRoles, openDepts, open
                     </tr>
                   );
                 })}
-                {allVacs.length === 0 && <tr><td colSpan="7" className="mut">Отпусков нет</td></tr>}
               </tbody>
             </table>
           </div>
         </div>
       )}
 
-      {firedEmployees.length > 0 && canFire && (
+      {filteredFiredEmployees.length > 0 && canFire && (
         <div className="st-section">
           <div className="st-sec-head">
             <div className="st-sec-title">Архив сотрудников (уволенные)</div>
@@ -393,21 +497,7 @@ export default function Staff({ store, db, setDb, ur, openRoles, openDepts, open
           </div>
           {showFired && (
             <div className="st-empty-box">
-              {firedEmployees.map(e => (
-                <EmployeeRow
-                  key={e.id}
-                  employee={e}
-                  isFired={true}
-                  db={db}
-                  ur={ur}
-                  openDepts={openDepts}
-                  openRoles={openRoles}
-                  setDb={setDb}
-                  canFire={canFire}
-                  getEmployeeLoad={getEmployeeLoad}
-                  openEditEmployee={openEditEmployee}
-                />
-              ))}
+              {filteredFiredEmployees.map(e => renderEmployeeRow(e, null, true))}
             </div>
           )}
         </div>

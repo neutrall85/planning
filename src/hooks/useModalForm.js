@@ -10,9 +10,18 @@ import { useAsyncSubmit } from './useAsyncSubmit';
  * каждый из них имеет единственную ответственность (валидация формы / асинхронная
  * отправка) и тестируется отдельно. Комбинированный хук дал бы меньше гибкости
  * при тестировании поведения submitting/error в изоляции.
+ *
+ * options пробрасывается в оба хука как есть:
+ *   - useForm читает options.fields (обязателен, см. комментарий в useForm);
+ *   - useAsyncSubmit читает options.throwOnError.
+ * Ключи не пересекаются, поэтому один объект безопасно передавать дважды.
+ *
+ * Раньше options передавался только в useAsyncSubmit, а в useForm шёл без
+ * третьего аргумента. Это работало до тех пор, пока useForm не начал
+ * требовать fields.
  */
 export function useModalForm(initialValues, validate, onSubmitAsync, onError, options = {}) {
-  const form = useForm(initialValues, validate);
+  const form = useForm(initialValues, validate, options);
   const submission = useAsyncSubmit(onSubmitAsync, onError, options);
 
   const handleSubmit = useCallback(() => {

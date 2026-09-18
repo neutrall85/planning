@@ -1,6 +1,8 @@
+// src/components/Journal.jsx
 import React, { useState, useMemo } from 'react';
 import { fmtDT, fmtDMY } from '../utils/date';
-import { useDataHelpers } from '../hooks';
+import { useDataHelpers, useFilters } from '../hooks';
+import { downloadCsv } from '../utils/csvExport';
 import { SearchBox } from './SearchBox';
 
 const safeDate = (ts) => {
@@ -47,17 +49,29 @@ const ACTIONS = [
   { value: 'Отклонение регистрации', label: 'Отклонение регистрации' },
 ];
 
+const INITIAL_FILTERS = Object.freeze({
+  dateFrom: '',
+  dateTo: '',
+  userId: 'all',
+  action: 'all',
+  search: '',
+});
+
+const PAGE_SIZE = 20;
+
 export default function Journal({ db }) {
   const { empName } = useDataHelpers(db);
-  const [filters, setFilters] = useState({
-    dateFrom: '',
-    dateTo: '',
-    userId: 'all',
-    action: 'all',
-    search: '',
-  });
+  const { filters, setFilter } = useFilters(INITIAL_FILTERS);
+  const { dateFrom, dateTo, userId, action, search } = filters;
   const [page, setPage] = useState(1);
-  const pageSize = 20;
+
+  // Сброс пагинации - единственная побочная реакция на смену фильтра.
+  // Обёртка над setFilter честно возвращает наружу тот же интерфейс,
+  // а внутри делает «+ сбросить страницу».
+  const handleFilterChange = (key, value) => {
+    setFilter(key, value);
+    setPage(1);
+  };
 
   const allEntries = useMemo(() => {
     return [...(db.audit || [])].sort((a, b) => b.ts - a.ts);
@@ -74,19 +88,19 @@ export default function Journal({ db }) {
       if (!dateObj) return false;
 
       const entryDate = fmtDMY(entry.ts);
-      if (filters.dateFrom && entryDate < filters.dateFrom) return false;
-      if (filters.dateTo && entryDate > filters.dateTo) return false;
-      if (filters.userId !== 'all' && entry.userId !== filters.userId) return false;
-      if (filters.action !== 'all' && entry.action !== filters.action) return false;
-      if (filters.search.trim()) {
-        const q = filters.search.trim().toLowerCase();
+      if (dateFrom && entryDate < dateFrom) return false;
+      if (dateTo && entryDate > dateTo) return false;
+      if (userId !== 'all' && entry.userId !== userId) return false;
+      if (action !== 'all' && entry.action !== action) return false;
+      if (search.trim()) {
+        const q = search.trim().toLowerCase();
         const match = (entry.action || '').toLowerCase().includes(q) ||
                       (entry.details || '').toLowerCase().includes(q);
         if (!match) return false;
       }
       return true;
     });
-  }, [allEntries, filters]);
+  }, [allEntries, dateFrom, dateTo, userId, action, search]);
 
   const groupedEntries = useMemo(() => {
     const groups = {};
@@ -136,10 +150,7 @@ export default function Journal({ db }) {
         const isFirstInDay = idx === 0;
         const dayObj = safeDate(entry.ts);
         const dayLabel = isFirstInDay && dayObj
-          ? dayObj.toLocaleDateString('ru-RU', {
-              weekday: 'long',
-              day: 'numeric'
-            })
+          ? dayObj.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric' })
           : null;
 
         result.push({
@@ -158,16 +169,11 @@ export default function Journal({ db }) {
   }, [groupedEntries]);
 
   const paginatedFlat = useMemo(() => {
-    return flatEntries.slice((page - 1) * pageSize, page * pageSize);
+    return flatEntries.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   }, [flatEntries, page]);
 
   const totalEntries = filteredEntries.length;
-  const totalPages = Math.ceil(totalEntries / pageSize);
-
-  const handleFilterChange = (key, value) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
-    setPage(1);
-  };
+  const totalPages = Math.ceil(totalEntries / PAGE_SIZE);
 
   const renderDetails = (entry) => {
     if (!entry.details) return null;
@@ -189,23 +195,15 @@ export default function Journal({ db }) {
   };
 
   const exportToCSV = () => {
-    const headers = ['Дата', 'Время', 'Пользователь', 'Действие', 'Детали'];
-    const rows = filteredEntries.map(e => {
+    const rows = [['Дата', 'Время', 'Пользователь', 'Действие', 'Детали']];
+    filteredEntries.forEach(e => {
       const d = safeDate(e.ts);
       const date = d ? fmtDMY(e.ts) : 'неизвестно';
       const time = d ? d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '-';
-      const user = e.userId === 'system' ? 'Система' : empName(e.userId) || e.userId;
-      const details = typeof e.details === 'string' ? e.details.replace(/"/g, '""') : '';
-      return [date, time, user, e.action, `"${details}"`].join(';');
+      const user = e.userId === 'system' ? 'Система' : (empName(e.userId) || e.userId);
+      rows.push([date, time, user, e.action, e.details || '']);
     });
-    const csv = [headers.join(';'), ...rows].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `journal_${filters.dateFrom || 'start'}_${filters.dateTo || 'end'}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+    downloadCsv(`journal_${dateFrom || 'start'}_${dateTo || 'end'}`, rows);
   };
 
   return (
@@ -217,21 +215,21 @@ export default function Journal({ db }) {
           <input
             className="inp w-150 flex-none"
             type="date"
-            value={filters.dateFrom}
+            value={dateFrom}
             onChange={e => handleFilterChange('dateFrom', e.target.value)}
           />
           <span className="flex-none">-</span>
           <input
             className="inp w-150 flex-none"
             type="date"
-            value={filters.dateTo}
+            value={dateTo}
             onChange={e => handleFilterChange('dateTo', e.target.value)}
           />
 
           <label className="lbl m-0 flex-none">Пользователь:</label>
           <select
             className="inp sel w-180 flex-none"
-            value={filters.userId}
+            value={userId}
             onChange={e => handleFilterChange('userId', e.target.value)}
           >
             <option value="all">Все</option>
@@ -241,14 +239,14 @@ export default function Journal({ db }) {
           <label className="lbl m-0 flex-none">Действие:</label>
           <select
             className="inp sel w-200 flex-none"
-            value={filters.action}
+            value={action}
             onChange={e => handleFilterChange('action', e.target.value)}
           >
             {ACTIONS.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
           </select>
 
           <SearchBox
-            value={filters.search}
+            value={search}
             onChange={(v) => handleFilterChange('search', v)}
             placeholder="Поиск по журналу"
             className="journal-search"

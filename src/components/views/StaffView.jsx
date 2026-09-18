@@ -1,15 +1,24 @@
+// src/components/views/StaffView.jsx
+import { memo } from 'react';
 import Staff from '../Staff';
+import { useStaffDb } from '../../hooks/useDb';
 
-export default function StaffView({ store, db, ur, setDb, openRoles, openDepts, openVacation }) {
+function StaffView({
+  store, ur, openRoles, openDepts, openVacation,
+}) {
+  const db = useStaffDb();
+
   return (
     <Staff
-      store={store}                                      /* ← К1: пробрасываем store в Staff */
+      store={store}
       db={db}
       ur={ur}
-      setDb={setDb}
+      setDb={store.setDb}
       openRoles={openRoles}
       openDepts={openDepts}
       openVacation={openVacation}
     />
   );
 }
+
+export default memo(StaffView);

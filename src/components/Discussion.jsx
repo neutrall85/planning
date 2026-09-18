@@ -1,5 +1,5 @@
 // src/components/Discussion.jsx
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { extractMentions } from '../utils/mentionParser';
 import { TOASTS } from '../utils/constants';
 import { Lightbox } from './Lightbox';
@@ -14,8 +14,28 @@ import CommentComposer from './discussion/CommentComposer';
 
 export { extractMentions };
 
+/**
+ * Скролл к комментарию по id: подсветить и доскроллить до центра.
+ *
+ * Таймер снятия класса «comment-flash» держим в ref и снимаем в
+ * cleanup-эффекте при размонтировании Discussion - чтобы после ухода
+ * с вкладки он не пытался трогать DOM.
+ *
+ * Внутри useLayoutEffect свой cleanup не ставим специально:
+ * `setTargetId(null)` в конце перезапускает этот же эффект, и cleanup
+ * снял бы только что запланированный таймер (класс исчез бы мгновенно).
+ * `el.isConnected` - защита от работы с уже откреплённым узлом: если
+ * комментарий к моменту срабатывания таймера удалён из DOM, ничего не
+ * делаем.
+ *
+ * `comments` в deps - чтобы повторный вызов на тот же targetId после
+ * изменения списка сработал снова.
+ */
 function useScrollToComment(comments) {
   const [targetId, setTargetId] = useState(null);
+  const timerRef = useRef(null);
+
+  useEffect(() => () => clearTimeout(timerRef.current), []);
 
   useLayoutEffect(() => {
     if (!targetId) return;
@@ -23,16 +43,33 @@ function useScrollToComment(comments) {
     if (!el) return;
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     el.classList.add('comment-flash');
-    setTimeout(() => el.classList.remove('comment-flash'), 2000);
+    timerRef.current = setTimeout(() => {
+      timerRef.current = null;
+      if (el.isConnected) el.classList.remove('comment-flash');
+    }, 2000);
     setTargetId(null);
   }, [targetId, comments]);
 
   return setTargetId;
 }
 
+/**
+ * Обсуждение - чат задачи или проекта.
+ *
+ * Принимает projectId и taskId отдельными пропсами. Один из них может
+ * быть null:
+ *   - чат проекта (ProjectChat): только projectId;
+ *   - чат задачи (TaskModal): оба.
+ *
+ * Раньше снаружи приходил объект `filter`; в вызывающем коде он был
+ * инлайн-литералом и создавал лишние переподписки. Раздельные примитивы
+ * убирают эту проблему из API: нестабильную ссылку теперь физически
+ * некуда положить.
+ */
 export default function Discussion({
   store,
-  filter,
+  projectId = null,
+  taskId = null,
   currentUser,
   candidates = [],
   readOnly = false,
@@ -50,14 +87,14 @@ export default function Discussion({
   const [lightbox, setLightbox] = useState({ index: null, list: [] });
 
   const { comments, visibleComments, matchSteps } = useCommentList(
-    store, filter, searchQuery, sortOrder
+    projectId, taskId, searchQuery, sortOrder,
   );
 
   const scrollToComment = useScrollToComment(comments);
 
   /**
-   * Текущий шаг навигации. -1 — «ещё не переходили»: первое «вниз»
-   * ведёт на первое вхождение, первое «вверх» — на последнее.
+   * Текущий шаг навигации. -1 - «ещё не переходили»: первое «вниз»
+   * ведёт на первое вхождение, первое «вверх» - на последнее.
    */
   const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
 
@@ -80,9 +117,18 @@ export default function Discussion({
   const currentMatchNumber = currentMatchIndex === -1 ? 0 : currentMatchIndex + 1;
   const activeStep = currentMatchIndex >= 0 ? matchSteps[currentMatchIndex] : null;
 
+  // Резолв автора по Map<id, employee>. Раньше был линейный .find -
+  // он вызывался для каждого комментария (и его потомков) в дереве,
+  // и на больших ветках складывался в O(N²). Стабильная ссылка на
+  // Map и на useCallback - чтобы getAuthor не менялся при каждом
+  // ре-рендере Discussion и не срывал возможный memo в потомках.
+  const employeesById = useMemo(
+    () => new Map(employees.map(e => [e.id, e])),
+    [employees],
+  );
   const getAuthor = useCallback(
-    (id) => employees.find(e => e.id === id),
-    [employees]
+    (id) => employeesById.get(id),
+    [employeesById],
   );
 
   const policy = useMemo(
@@ -95,15 +141,15 @@ export default function Discussion({
     [comments]
   );
 
-  const saveEdit = (c) => {
+  const saveEdit = useCallback((c) => {
     if (!editText.trim()) return;
     store.updateComment(c.id, editText.trim());
     setEditingId(null);
     setEditText('');
     toast?.('Комментарий обновлён');
-  };
+  }, [editText, store, toast]);
 
-  const togglePin = (c) => {
+  const togglePin = useCallback((c) => {
     try {
       if (!c.pinned && pinnedComments.length >= 5) {
         toast?.('Нельзя закрепить более 5 сообщений', 'warning');
@@ -114,7 +160,7 @@ export default function Discussion({
     } catch (err) {
       toast?.(err.message, 'error');
     }
-  };
+  }, [pinnedComments.length, store, toast]);
 
   const setReaction = useCallback((commentId, emoji) => {
     try {
@@ -124,18 +170,23 @@ export default function Discussion({
     }
   }, [store, toast]);
 
-  const onDelete = (c) => {
+  const onDelete = useCallback((c) => {
     store.deleteComment(c.id);
     toast?.(TOASTS.commentDeleted, 'success');
-  };
+  }, [store, toast]);
 
-  const openLightbox = (list, index) => setLightbox({ list, index });
-  const closeLightbox = () => setLightbox({ list: [], index: null });
-  const prevLightbox = () =>
-    setLightbox(s => ({ ...s, index: s.index === 0 ? s.list.length - 1 : s.index - 1 }));
-  const nextLightbox = () =>
-    setLightbox(s => ({ ...s, index: s.index === s.list.length - 1 ? 0 : s.index + 1 }));
+  const openLightbox = useCallback((list, index) => setLightbox({ list, index }), []);
+  const closeLightbox = useCallback(() => setLightbox({ list: [], index: null }), []);
+  const prevLightbox = useCallback(() =>
+    setLightbox(s => ({ ...s, index: s.index === 0 ? s.list.length - 1 : s.index - 1 })), []);
+  const nextLightbox = useCallback(() =>
+    setLightbox(s => ({ ...s, index: s.index === s.list.length - 1 ? 0 : s.index + 1 })), []);
 
+  // Контекст пересобирается на каждый рендер - это неизбежно, потому
+  // что часть полей (editingId, editText, activeStep) меняется от
+  // действий внутри дерева. Мемоизация не даст выигрыша: её зависимости
+  // - почти все поля объекта. Если понадобится - разделим контекст на
+  // «данные» и «интерфейс».
   const ctx = {
     currentUser,
     employees,
@@ -183,13 +234,14 @@ export default function Discussion({
           <div className="mut sm">Ничего не найдено</div>
         )}
         {comments.length === 0 && !searchQuery && (
-          <div className="mut sm">Обсуждений пока нет — начните диалог.</div>
+          <div className="mut sm">Обсуждений пока нет - начните диалог.</div>
         )}
 
         {!readOnly ? (
           <CommentComposer
             store={store}
-            filter={filter}
+            projectId={projectId}
+            taskId={taskId}
             currentUser={currentUser}
             candidates={candidates}
             toast={toast}

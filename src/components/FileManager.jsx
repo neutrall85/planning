@@ -140,7 +140,7 @@ const DocumentRow = ({ doc, onDelete, canDelete, employeeName }) => {
           {versions.map((v, i) => (
             <div key={v.id} className={`file-version-row${i === 0 ? ' current' : ''}`}>
               <span className="file-version-tag">v{v.version}</span>
-              <span className="file-version-date">{v.uploadedAt ? fmtDT(v.uploadedAt) : '—'}</span>
+              <span className="file-version-date">{v.uploadedAt ? fmtDT(v.uploadedAt) : '-'}</span>
               <span className="file-version-author">{employeeName(v.uploadedBy)}</span>
               <span className="file-version-size">{formatSize(v.size)}</span>
               <a

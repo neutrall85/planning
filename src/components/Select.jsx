@@ -2,10 +2,18 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 
-const POPUP_MAX = 300;   // максимальная высота выпадающего меню
+const POPUP_MAX = 300;       // максимальная высота выпадающего меню
 const SEARCH_THRESHOLD = 10; // при каком количестве опций показывать поиск
 
-export const Select = ({ value, onChange, options, disabled, placeholder = '-', className = '' }) => {
+export const Select = ({
+  id,
+  value,
+  onChange,
+  options,
+  disabled,
+  placeholder = '-',
+  className = '',
+}) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [pos, setPos] = useState({ top: undefined, bottom: undefined, left: 0, width: 0 });
@@ -54,8 +62,14 @@ export const Select = ({ value, onChange, options, disabled, placeholder = '-', 
 
   return (
     <>
+      {/*
+        id пробрасывается в кнопку-триггер: снаружи FormField рендерит
+        <label htmlFor={id}>, и без этого атрибут for указывает в пустоту -
+        браузер ругается, autofill и скринридер не находят поле.
+      */}
       <button
         type="button"
+        id={id}
         ref={triggerRef}
         className={`inp sel custom-select-trigger ${className}`}
         onClick={toggle}

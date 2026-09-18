@@ -5,6 +5,25 @@ import { EmployeeFormFields } from '../EmployeeFormFields';
 import { useModalForm } from '../../hooks/useModalForm';
 import { hasRole } from '../../utils/permissions';
 
+/**
+ * Поля, участвующие в проверке isDirty. Явный список, а не Object.keys
+ * initialValues - так требует useForm: сменить состав формы без явного
+ * перечня слишком легко, и тогда служебное поле (фото, история паролей)
+ * молча включится в проверку «пользователь что-то менял».
+ *
+ * На уровне модуля - стабильная ссылка, не пересоздаётся на каждом рендере.
+ */
+const FIELDS = Object.freeze([
+  'last',
+  'first',
+  'email',
+  'position',
+  'phone',
+  'extension',
+  'tab',
+  'newPass',
+]);
+
 export const EditEmployeeModal = ({ store, ur, employeeId, onClose, toast }) => {
   const db = store.data;
   const emp = db.employees.find(e => e.id === employeeId);
@@ -65,7 +84,7 @@ export const EditEmployeeModal = ({ store, ur, employeeId, onClose, toast }) => 
     handleSubmit, isSubmitting,
   } = useModalForm(initialValues, validate, saveAsync, (error) => {
     toast(error.message || 'Ошибка редактирования сотрудника', 'error');
-  });
+  }, { fields: FIELDS });
 
   return (
     <ModalShell

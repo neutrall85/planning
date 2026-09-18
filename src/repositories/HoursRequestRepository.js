@@ -1,8 +1,4 @@
 // src/repositories/HoursRequestRepository.js
 import { Repository } from './Repository';
 
-export class HoursRequestRepository extends Repository {
-  constructor(requests) {
-    super(requests);
-  }
-}
+export class HoursRequestRepository extends Repository {}

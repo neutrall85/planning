@@ -12,12 +12,12 @@ import { useNestedModalEscape } from '../Templates/useNestedModalEscape';
  * Сотрудники, которые видят проект по своим ролям, задачам или КБ
  * (canSeeProjectByDefault), отмечены и защищены от снятия: это «доступ
  * по роли», он управляется ролями сотрудника, а не этим окном. Остальные
- * сотрудники — обычные чекбоксы, чьё состояние хранится в
+ * сотрудники - обычные чекбоксы, чьё состояние хранится в
  * project.access.userIds.
  *
  * Модалка не дублирует логику прав: всё, что нужно для разграничения
  * «locked / editable», берётся из canSeeProjectByDefault. Запись идёт
- * через store.setProjectAccess — сервис сам проверит право на запись
+ * через store.setProjectAccess - сервис сам проверит право на запись
  * тем же предикатом, что использовался для показа кнопки «Доступ».
  */
 export const ProjectAccessModal = ({ db, projectId, onClose, toast, store }) => {
@@ -36,8 +36,8 @@ export const ProjectAccessModal = ({ db, projectId, onClose, toast, store }) => 
     [db.employees]
   );
 
-  // Один проход по сотрудникам — определяем, у кого доступ уже есть
-  // по роли/КБ/задачам. Дальше в рендере — только проверка по Set.
+  // Один проход по сотрудникам - определяем, у кого доступ уже есть
+  // по роли/КБ/задачам. Дальше в рендере - только проверка по Set.
   const lockedIds = useMemo(() => {
     if (!project) return new Set();
     const set = new Set();
@@ -47,7 +47,7 @@ export const ProjectAccessModal = ({ db, projectId, onClose, toast, store }) => 
     return set;
   }, [activeEmployees, project, db]);
 
-  // Поиск по ФИО и должности. Фильтруем только для отображения —
+  // Поиск по ФИО и должности. Фильтруем только для отображения -
   // lockedIds и userIds остаются полными: снятие галочки с найденного
   // сотрудника невозможно, а состояние ненайденных не теряется.
   const visibleEmployees = useMemo(() => {

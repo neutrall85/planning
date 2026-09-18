@@ -6,12 +6,12 @@ import { REACTIONS } from '../../utils/reactions';
  * Панель выбора реакции. Рендерит ряд эмодзи-кнопок поверх комментария.
  *
  * Контракт:
- *   - containerRef — ref на корневой div попапа; хук useReactionPicker
+ *   - containerRef - ref на корневой div попапа; хук useReactionPicker
  *                    использует его для отслеживания «курсор внутри»;
- *   - activeEmoji  — текущая реакция пользователя (Unicode);
- *   - onPick(emoji) — выбор реакции.
+ *   - activeEmoji  - текущая реакция пользователя (Unicode);
+ *   - onPick(emoji) - выбор реакции.
  *
- * Вся логика «сколько попап живёт» — в useReactionPicker у вызывающего.
+ * Вся логика «сколько попап живёт» - в useReactionPicker у вызывающего.
  * Здесь только разметка и клики.
  */
 export default function ReactionPicker({ containerRef, activeEmoji, onPick }) {

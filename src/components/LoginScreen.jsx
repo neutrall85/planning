@@ -1,28 +1,49 @@
-import React, { useState } from 'react';
-import { DOMAIN } from '../utils/constants';
-import { usePasswordReveal } from '../hooks';
+// src/components/LoginScreen.jsx
+import { useEffect, useRef, useState } from 'react';
+import { useSelector } from '../context/StoreContext';
+import { ALLOWED_DOMAINS, DOMAIN } from '../utils/constants';
+import { usePasswordReveal } from '../hooks/usePasswordReveal';
 import { Ic, ICONS } from './Icons';
 
-// ===== Вспомогательные функции (DRY, KISS) =====
-const ALLOWED_DOMAINS = ["@hor.ru", "@zont.ru", "@horizont.ru"];
+const EMAIL_PLACEHOLDER = `ivanov@${DOMAIN}`;
 
 const validateEmailFormat = (email) => {
-  if (!email.trim()) return "E-mail обязателен";
+  if (!email.trim()) return 'E-mail обязателен';
   const lower = email.trim().toLowerCase();
-  if (!lower.includes("@") || lower.startsWith("@") || lower.endsWith(".") || lower.includes("..")) {
-    return "Некорректный формат e-mail";
-  }
+  if (
+    !lower.includes('@') ||
+    lower.startsWith('@') ||
+    lower.endsWith('.') ||
+    lower.includes('..')
+  ) return 'Некорректный формат e-mail';
   if (!ALLOWED_DOMAINS.some(domain => lower.endsWith(domain))) {
-    return "Допускаются домены " + ALLOWED_DOMAINS.join(', ');
+    return 'Допускаются домены ' + ALLOWED_DOMAINS.join(', ');
   }
   return null;
 };
 
+const emailLocalPart = (email) => {
+  const e = String(email || '').toLowerCase().trim();
+  return e.includes('@') ? e.split('@')[0] : e;
+};
+
+const validateEmailNotTaken = (email, employees, regRequests) => {
+  const formatError = validateEmailFormat(email);
+  if (formatError) return formatError;
+  const local = emailLocalPart(email);
+  if (
+    employees.some(e => e.email && emailLocalPart(e.email) === local) ||
+    (regRequests || []).some(r => r.email && emailLocalPart(r.email) === local)
+  ) return 'Такой e-mail уже зарегистрирован';
+  return null;
+};
+
 const validateEmailExists = (email, employees) => {
-  if (!email.trim()) return "E-mail обязателен";
-  const lower = email.trim().toLowerCase();
-  const exists = employees.some(e => e.email && e.email.toLowerCase() === lower);
-  if (!exists) return "E-mail не найден в системе";
+  if (!email.trim()) return 'E-mail обязателен';
+  const local = emailLocalPart(email);
+  if (!employees.some(e => e.email && emailLocalPart(e.email) === local)) {
+    return 'E-mail не найден в системе';
+  }
   return null;
 };
 
@@ -34,41 +55,72 @@ const validateForgotEmail = (email, employees) => {
 
 function passIssues(p) {
   return [
-    { ok: p.length >= 8, t: "Минимум 8 символов" },
-    { ok: /[A-ZА-ЯЁ]/.test(p), t: "Заглавная буква" },
-    { ok: /[a-zа-яё]/.test(p), t: "Строчная буква" },
-    { ok: /\d/.test(p), t: "Цифра" },
-    { ok: /[^A-Za-zА-Яа-яЁё0-9]/.test(p), t: "Специальный символ" },
+    { ok: p.length >= 8,                     t: 'Минимум 8 символов' },
+    { ok: /[A-ZА-ЯЁ]/.test(p),               t: 'Заглавная буква' },
+    { ok: /[a-zа-яё]/.test(p),               t: 'Строчная буква' },
+    { ok: /\d/.test(p),                      t: 'Цифра' },
+    { ok: /[^A-Za-zА-Яа-яЁё0-9]/.test(p),    t: 'Специальный символ' },
   ];
 }
 
-export default function LoginScreen({ db, registerEmployee, onLogin, toast }) {
-  const [mode, setMode] = useState("login");
-  const [lg, setLg] = useState("");
-  const [pw, setPw] = useState("");
+export default function LoginScreen({ registerEmployee, onLogin, toast }) {
+  const employees   = useSelector(s => s.employees);
+  const regRequests = useSelector(s => s.regRequests);
+
+  // Таймеры: 450 мс - снять анимацию «тряски»; 30 мс - короткая задержка
+  // перед onLogin, чтобы кнопка успела перейти в disabled до синхронного
+  // setState выше. Оба снимаются при размонтировании: экран исчезает
+  // при успешном входе, а оживший таймер трогал бы state снятого
+  // компонента.
+  const flashTimerRef = useRef(null);
+  const loginTimerRef = useRef(null);
+
+  useEffect(() => () => {
+    clearTimeout(flashTimerRef.current);
+    clearTimeout(loginTimerRef.current);
+  }, []);
+
+  const [mode, setMode] = useState('login');
+  const [lg, setLg] = useState('');
+  const [pw, setPw] = useState('');
   const { shown: showPassword, toggle: togglePasswordVisibility } = usePasswordReveal();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const [shake, setShake] = useState(false);
-  const [reg, setReg] = useState({ first: "", last: "", email: "", pass: "", pass2: "" });
-
+  const [reg, setReg] = useState({ first: '', last: '', email: '', pass: '', pass2: '' });
   const [emailError, setEmailError] = useState(null);
   const [emailTouched, setEmailTouched] = useState(false);
-
   const [forgotError, setForgotError] = useState(null);
   const [forgotTouched, setForgotTouched] = useState(false);
-
-  const [forgot, setForgot] = useState("");
+  const [forgot, setForgot] = useState('');
   const { shown: showRegPass, toggle: toggleRegPassVisibility } = usePasswordReveal();
+  const [loginEmailError, setLoginEmailError] = useState(null);
 
-  const fail = (m) => { setErr(m); setShake(true); setTimeout(() => setShake(false), 450); };
+  const flash = () => {
+    setShake(true);
+    clearTimeout(flashTimerRef.current);
+    flashTimerRef.current = setTimeout(() => {
+      flashTimerRef.current = null;
+      setShake(false);
+    }, 450);
+  };
+  const rejectField = () => { flash(); };
+  const reject = (message) => { setErr(message); flash(); };
 
-  const doLogin = (loginVal, passVal) => {
+  const doLogin = (email, pass) => {
+    const emailErr = validateEmailFormat(email);
+    if (emailErr) {
+      setLoginEmailError(emailErr);
+      rejectField();
+      return;
+    }
     setBusy(true);
     setErr(null);
-    setTimeout(() => {
-      const r = onLogin(loginVal, passVal);
-      if (r) fail(r);
+    clearTimeout(loginTimerRef.current);
+    loginTimerRef.current = setTimeout(() => {
+      loginTimerRef.current = null;
+      const r = onLogin(email, pass);
+      if (r) reject(r);
       setBusy(false);
     }, 30);
   };
@@ -80,153 +132,188 @@ export default function LoginScreen({ db, registerEmployee, onLogin, toast }) {
     setEmailTouched(false);
     setForgotError(null);
     setForgotTouched(false);
+    setLoginEmailError(null);
+    if (newMode === 'forgot') setForgot('');
+  };
+
+  const handleLoginEmailChange = (value) => {
+    setLg(value);
+    setErr(null);
+    if (loginEmailError) setLoginEmailError(null);
+  };
+
+  const handleLoginEmailBlur = () => {
+    if (!lg.trim()) { setLoginEmailError(null); return; }
+    setLoginEmailError(validateEmailFormat(lg));
   };
 
   const handleEmailChange = (value, setter) => {
     setter(value);
-    if (emailTouched) {
-      setEmailError(validateEmailFormat(value));
-    }
+    if (emailTouched) setEmailError(validateEmailNotTaken(value, employees, regRequests));
   };
 
   const handleEmailBlur = (value) => {
     setEmailTouched(true);
-    setEmailError(validateEmailFormat(value));
+    if (!value.trim()) { setEmailError(null); return; }
+    setEmailError(validateEmailNotTaken(value, employees, regRequests));
   };
 
   const handleForgotEmailChange = (value) => {
     setForgot(value);
-    if (forgotTouched) {
-      setForgotError(validateForgotEmail(value, db.employees));
-    }
+    if (forgotTouched) setForgotError(validateForgotEmail(value, employees));
   };
 
   const handleForgotEmailBlur = () => {
     setForgotTouched(true);
-    setForgotError(validateForgotEmail(forgot, db.employees));
-  };
-
-  const isRegFormValid = () => {
-    if (!reg.first.trim() || !reg.last.trim()) return false;
-    if (validateEmailFormat(reg.email)) return false;
-    if (db.employees.some(e => e.email && e.email.toLowerCase() === reg.email.trim().toLowerCase())) return false;
-    if (!passIssues(reg.pass).every(i => i.ok)) return false;
-    if (reg.pass !== reg.pass2) return false;
-    return true;
-  };
-
-  const isForgotFormValid = () => {
-    return !validateForgotEmail(forgot, db.employees);
+    if (!forgot.trim()) { setForgotError(null); return; }
+    setForgotError(validateForgotEmail(forgot, employees));
   };
 
   const submit = (e) => {
     if (e && e.preventDefault) e.preventDefault();
     try {
-      if (mode === "login") { doLogin(lg, pw); return; }
+      if (mode === 'login') {
+        doLogin(lg, pw);
+        return;
+      }
 
-      if (mode === "register") {
-        if (!reg.first.trim() || !reg.last.trim() || !reg.email.trim()) return fail("Заполните все обязательные поля");
-
-        const email = reg.email.trim().toLowerCase();
-        if (!ALLOWED_DOMAINS.some(domain => email.endsWith(domain))) {
-          return fail("Недопустимый домен e-mail");
+      if (mode === 'register') {
+        if (!reg.first.trim() || !reg.last.trim() || !reg.email.trim()) {
+          return reject('Заполните все обязательные поля');
         }
-        if (db.employees.some(x => x.email && x.email.toLowerCase() === email)
-            || db.regRequests.some(x => x.email && x.email.toLowerCase() === email)) {
-          return fail("Такой e-mail уже зарегистрирован");
+        const emailErr = validateEmailNotTaken(reg.email, employees, regRequests);
+        if (emailErr) {
+          setEmailTouched(true);
+          setEmailError(emailErr);
+          return rejectField();
         }
-        if (passIssues(reg.pass).some(i => !i.ok)) return fail("Пароль не соответствует требованиям безопасности");
-        if (reg.pass !== reg.pass2) return fail("Пароли не совпадают");
-
+        if (passIssues(reg.pass).some(i => !i.ok)) {
+          return reject('Пароль не соответствует требованиям безопасности');
+        }
+        if (reg.pass !== reg.pass2) return reject('Пароли не совпадают');
         try {
-          const newEmp = registerEmployee({
-            first: reg.first,
-            last: reg.last,
-            email,
-            pass: reg.pass,
-          });
-          toast('Регистрация успешна! Выполняется вход…');
-          const loginOk = onLogin(newEmp.email, reg.pass);
-          if (!loginOk) fail("Ошибка автоматического входа после регистрации.");
-          setReg({ first: "", last: "", email: "", pass: "", pass2: "" });
+          const email = reg.email.trim().toLowerCase();
+          registerEmployee({ first: reg.first, last: reg.last, email, pass: reg.pass });
+          if (toast) toast('Регистрация успешна! Выполняется вход…', 'success');
+          if (!onLogin(email, reg.pass)) {
+            reject('Ошибка автоматического входа после регистрации.');
+          }
+          setReg({ first: '', last: '', email: '', pass: '', pass2: '' });
           setEmailError(null);
           setEmailTouched(false);
-          setMode("login");
+          setMode('login');
         } catch (ex) {
-          fail(ex.message || "Не удалось зарегистрироваться");
+          reject(ex.message || 'Не удалось зарегистрироваться');
         }
         return;
       }
 
-      if (mode === "forgot") {
-        if (!forgot.trim()) return fail("Укажите e-mail");
-        if (validateForgotEmail(forgot, db.employees)) return fail(validateForgotEmail(forgot, db.employees));
-        toast("Ссылка для восстановления пароля отправлена на " + forgot.trim() + " (действует 1 час). Заглушка.");
-        switchMode("login");
+      if (mode === 'forgot') {
+        if (!forgot.trim()) {
+          setForgotTouched(true);
+          setForgotError('E-mail обязателен');
+          return rejectField();
+        }
+        const forgotErr = validateForgotEmail(forgot, employees);
+        if (forgotErr) {
+          setForgotTouched(true);
+          setForgotError(forgotErr);
+          return rejectField();
+        }
+        if (toast) {
+          toast(
+            'Ссылка для восстановления пароля отправлена на ' + forgot.trim() +
+            ' (действует 1 час). Заглушка.',
+            'success',
+          );
+        }
+        switchMode('login');
       }
     } catch (ex) {
-      fail("Внутренняя ошибка: " + (ex && ex.message ? ex.message : ex));
+      reject('Внутренняя ошибка: ' + (ex && ex.message ? ex.message : ex));
     }
   };
-  const issues = passIssues(reg.pass);
 
-  const demos = [
-    { l: "sergey.adminov", p: "Admin2026!", t: "Суперадминистратор" },
-    { l: "aleksey.gendirov", p: "Director2026!", t: "Генеральный директор" },
-    { l: "erik.ekonomistov", p: "Econ2026!", t: "Главный экономист" },
-    { l: "ivan.konstruktorov", p: "KbLa2026!", t: "Гл. конструктор КБ «ЛА»" },
-    { l: "olga.personalova", p: "Hr2026!", t: "HR-менеджер" },
-    { l: "mikhail.otdelov", p: "Head2026!", t: "Руководитель отделов" },
-    { l: "nikolay.managerov", p: "Pm2026!", t: "Менеджер проектов" },
-    { l: "kirill.proektov", p: "Pm2026!", t: "Ответственный по проекту" },
-    { l: "isaev", p: "Exec2026!", t: "Исполнитель" }
-  ];
+  const issues = passIssues(reg.pass);
 
   return (
     <div className="login-wrap">
       <div className="login-hero">
-        <div className="logo lg"><div className="logo-mark">АП</div><div><div className="logo-name">АвиаГоризонт</div><div className="logo-sub">планирование и учёт времени</div></div></div>
+        <div className="logo lg">
+          <div className="logo-mark">АП</div>
+          <div>
+            <div className="logo-name">АвиаГоризонт</div>
+            <div className="logo-sub">планирование и учёт времени</div>
+          </div>
+        </div>
         <h2>Единая среда планирования ИЦ</h2>
-        <p>Канбан, список, диаграмма Ганта и календарь. Производственные проекты двух типов, административные проекты, задачи с подзадачами бесконечной вложенности, отпуска с делегированием, HR-администрирование и журнал аудита.</p>
+        <p>
+          Канбан, список, диаграмма Ганта и календарь. Производственные проекты
+          двух типов, административные проекты, задачи с подзадачами бесконечной
+          вложенности, отпуска с делегированием, HR-администрирование и журнал
+          аудита.
+        </p>
         <ul className="hero-list">
           <li>9 ролей, включая HR-менеджера; временное делегирование полномочий</li>
           <li>Архив закрытых задач и проектов при попадании в завершенные или отмененные</li>
           <li>Комментарии с ветками ответов и @упоминаниями участников в задачах и проектах</li>
         </ul>
-        <div className="hero-stack">React · Vite · Node.js · PostgreSQL · Ubuntu LTS · ООП/KISS/DRY</div>
+        <div className="hero-stack">
+          React · Vite · Node.js · PostgreSQL · Ubuntu LTS · ООП/KISS/DRY
+        </div>
       </div>
+
       <div className="login-panel">
-        <form className={"login-card" + (shake ? " shake" : "")} onSubmit={submit}>
-          {mode !== "register" && (
+        <form className={'login-card' + (shake ? ' shake' : '')} onSubmit={submit}>
+          {mode !== 'register' && (
             <>
-              <h3>{mode === "forgot" ? "Восстановление пароля" : "Вход в систему"}</h3>
-              <div className="login-sub">{mode === "forgot" ? "Ссылка будет отправлена на зарегистрированный e-mail" : "Логин - e-mail без домена " + "@" + DOMAIN}</div>
-              {mode === "forgot" ? (
+              <h3>{mode === 'forgot' ? 'Восстановление пароля' : 'Вход в систему'}</h3>
+              <div className="login-sub">
+                {mode === 'forgot'
+                  ? 'Ссылка будет отправлена на зарегистрированный e-mail'
+                  : `Введите рабочий e-mail целиком, например ${EMAIL_PLACEHOLDER}`}
+              </div>
+
+              {mode === 'forgot' ? (
                 <>
                   <label className="lbl">E-mail</label>
-                  <div className="email-inp">
-                    <input
-                      className="inp"
-                      value={forgot}
-                      onChange={(e) => handleForgotEmailChange(e.target.value)}
-                      onBlur={handleForgotEmailBlur}
-                      placeholder="ivanov@hor.ru"
-                      autoFocus
-                    />
-                  </div>
-                  {forgotTouched && forgotError && <div className="login-err">{forgotError}</div>}
+                  <input
+                    className="inp"
+                    type="email"
+                    autoComplete="username"
+                    value={forgot}
+                    onChange={e => handleForgotEmailChange(e.target.value)}
+                    onBlur={handleForgotEmailBlur}
+                    placeholder={EMAIL_PLACEHOLDER}
+                    autoFocus
+                  />
+                  {forgotTouched && forgotError && (
+                    <div className="login-err">{forgotError}</div>
+                  )}
                 </>
               ) : (
                 <>
-                  <label className="lbl">Логин (e-mail)</label>
-                  <div className="email-inp"><input className="inp" value={lg} onChange={(e) => { setLg(e.target.value); setErr(null); }} placeholder="ivanov" autoFocus /><span className="email-dom">{"@" + DOMAIN}</span></div>
+                  <label className="lbl">E-mail</label>
+                  <input
+                    className="inp"
+                    type="email"
+                    autoComplete="username"
+                    value={lg}
+                    onChange={e => handleLoginEmailChange(e.target.value)}
+                    onBlur={handleLoginEmailBlur}
+                    placeholder={EMAIL_PLACEHOLDER}
+                    autoFocus
+                  />
+                  {loginEmailError && <div className="login-err">{loginEmailError}</div>}
+
                   <label className="lbl">Пароль</label>
                   <div className="relative">
                     <input
                       className="inp"
-                      type={showPassword ? "text" : "password"}
+                      type={showPassword ? 'text' : 'password'}
+                      autoComplete="current-password"
                       value={pw}
-                      onChange={(e) => { setPw(e.target.value); setErr(null); }}
+                      onChange={e => { setPw(e.target.value); setErr(null); }}
                       placeholder="с учётом регистра"
                     />
                     <button
@@ -242,33 +329,55 @@ export default function LoginScreen({ db, registerEmployee, onLogin, toast }) {
             </>
           )}
 
-          {mode === "register" && (
+          {mode === 'register' && (
             <>
               <h3>Регистрация сотрудника</h3>
-              <div className="login-sub">После регистрации вы автоматически войдёте с ролью «Исполнитель». Суперадминистратор получит уведомление.</div>
+              <div className="login-sub">
+                После регистрации вы автоматически войдёте с ролью «Исполнитель».
+                Суперадминистратор получит уведомление.
+              </div>
+
               <div className="reg-row">
-                <div><label className="lbl">Имя *</label><input className="inp" value={reg.first} onChange={(e) => setReg({ ...reg, first: e.target.value })} /></div>
-                <div><label className="lbl">Фамилия *</label><input className="inp" value={reg.last} onChange={(e) => setReg({ ...reg, last: e.target.value })} /></div>
+                <div>
+                  <label className="lbl">Имя<span className="required-star">*</span></label>
+                  <input
+                    className="inp"
+                    value={reg.first}
+                    onChange={e => setReg({ ...reg, first: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="lbl">Фамилия<span className="required-star">*</span></label>
+                  <input
+                    className="inp"
+                    value={reg.last}
+                    onChange={e => setReg({ ...reg, last: e.target.value })}
+                  />
+                </div>
               </div>
-              <label className="lbl">E-mail *</label>
-              <div className="email-inp">
-                <input
-                  className="inp"
-                  value={reg.email}
-                  onChange={(e) => handleEmailChange(e.target.value, (v) => setReg(prev => ({ ...prev, email: v })))}
-                  onBlur={() => handleEmailBlur(reg.email)}
-                  placeholder="ivanov@hor.ru"
-                />
-              </div>
+
+              <label className="lbl">E-mail<span className="required-star">*</span></label>
+              <input
+                className="inp"
+                type="email"
+                autoComplete="email"
+                value={reg.email}
+                onChange={e =>
+                  handleEmailChange(e.target.value, (v) =>
+                    setReg(prev => ({ ...prev, email: v })))}
+                onBlur={() => handleEmailBlur(reg.email)}
+                placeholder={EMAIL_PLACEHOLDER}
+              />
               {emailTouched && emailError && <div className="login-err">{emailError}</div>}
 
-              <label className="lbl">Пароль *</label>
+              <label className="lbl">Пароль<span className="required-star">*</span></label>
               <div className="relative">
                 <input
                   className="inp"
-                  type={showRegPass ? "text" : "password"}
+                  type={showRegPass ? 'text' : 'password'}
+                  autoComplete="new-password"
                   value={reg.pass}
-                  onChange={(e) => setReg({ ...reg, pass: e.target.value })}
+                  onChange={e => setReg({ ...reg, pass: e.target.value })}
                 />
                 <button
                   type="button"
@@ -278,37 +387,87 @@ export default function LoginScreen({ db, registerEmployee, onLogin, toast }) {
                   <Ic d={ICONS.eye} size={18} />
                 </button>
               </div>
-              <div className="pass-checks">{issues.map((i) => <span key={i.t} className={i.ok ? "ok" : ""}>✓ {i.t}</span>)}</div>
-              <label className="lbl">Подтверждение пароля *</label>
-              <input className="inp" type="password" value={reg.pass2} onChange={(e) => setReg({ ...reg, pass2: e.target.value })} />
+              <div className="pass-checks">
+                {issues.map(i => (
+                  <span key={i.t} className={i.ok ? 'ok' : ''}>✓ {i.t}</span>
+                ))}
+              </div>
+
+              <label className="lbl">Подтверждение пароля<span className="required-star">*</span></label>
+              <input
+                className="inp"
+                type="password"
+                autoComplete="new-password"
+                value={reg.pass2}
+                onChange={e => setReg({ ...reg, pass2: e.target.value })}
+              />
             </>
           )}
 
           {err && <div className="login-err">{err}</div>}
-          <button className="btn primary big" type="submit" disabled={busy || (mode === "register" && !isRegFormValid()) || (mode === "forgot" && !isForgotFormValid())}>
-            {busy ? "Выполняется вход…" : mode === "login" ? "Войти" : mode === "register" ? "Зарегистрироваться" : "Отправить ссылку"}
+
+          <button className="btn primary big" type="submit" disabled={busy}>
+            {busy ? 'Выполняется вход…'
+              : mode === 'login' ? 'Войти'
+              : mode === 'register' ? 'Зарегистрироваться'
+              : 'Отправить ссылку'}
           </button>
 
-          {mode === "login" && (
+          {mode === 'login' && (
             <>
               <div className="login-links">
-                <button type="button" className="link" onClick={() => switchMode("forgot")}>Забыли пароль?</button>
+                <button type="button" className="link" onClick={() => switchMode('forgot')}>
+                  Забыли пароль?
+                </button>
                 <span className="link-sep">|</span>
-                <button type="button" className="link" onClick={() => switchMode("register")}>Регистрация</button>
+                <button type="button" className="link" onClick={() => switchMode('register')}>
+                  Регистрация
+                </button>
               </div>
-              <div className="cookie-note">Сессия хранится в cookie 30 дней (HttpOnly, Secure, SameSite=Lax - на стороне сервера).</div>
+              <div className="cookie-note">
+                Сессия хранится в cookie 30 дней (HttpOnly, Secure, SameSite=Lax - на стороне сервера).
+              </div>
               <div className="demo-title">Демо-доступы - клик сразу выполняет вход</div>
               <div className="demo-grid">
-                {demos.map((d) => (
-                  <button type="button" key={d.l} className="demo-chip" onClick={() => { setLg(d.l); setPw(d.p); setErr(null); doLogin(d.l, d.p); }}>
-                    <span className="demo-login">{d.l}</span><span className="demo-role">{d.t}</span>
+                {[
+                  { l: 'sergey.adminov@hor.ru',    p: 'Admin2026!',    t: 'Суперадминистратор' },
+                  { l: 'aleksey.gendirov@hor.ru',  p: 'Director2026!', t: 'Генеральный директор' },
+                  { l: 'erik.ekonomistov@hor.ru',  p: 'Econ2026!',     t: 'Главный экономист' },
+                  { l: 'ivan.konstruktorov@hor.ru',p: 'KbLa2026!',     t: 'Гл. конструктор КБ «ЛА»' },
+                  { l: 'olga.personalova@hor.ru',  p: 'Hr2026!',       t: 'HR-менеджер' },
+                  { l: 'mikhail.otdelov@hor.ru',   p: 'Head2026!',     t: 'Руководитель отделов' },
+                  { l: 'nikolay.managerov@hor.ru', p: 'Pm2026!',       t: 'Менеджер проектов' },
+                  { l: 'kirill.proektov@hor.ru',   p: 'Pm2026!',       t: 'Ответственный по проекту' },
+                  { l: 'isaev@hor.ru',             p: 'Exec2026!',     t: 'Исполнитель' },
+                ].map(d => (
+                  <button
+                    key={d.l}
+                    type="button"
+                    className="demo-chip"
+                    disabled={busy}
+                    onClick={() => {
+                      setLg(d.l);
+                      setPw(d.p);
+                      setErr(null);
+                      setLoginEmailError(null);
+                      doLogin(d.l, d.p);
+                    }}
+                  >
+                    <span className="demo-login">{d.l}</span>
+                    <span className="demo-role">{d.t}</span>
                   </button>
                 ))}
               </div>
             </>
           )}
 
-          {mode !== "login" && <div className="login-links"><button type="button" className="link" onClick={() => switchMode("login")}>← Назад ко входу</button></div>}
+          {mode !== 'login' && (
+            <div className="login-links">
+              <button type="button" className="link" onClick={() => switchMode('login')}>
+                ← Назад ко входу
+              </button>
+            </div>
+          )}
         </form>
       </div>
     </div>

@@ -3,7 +3,7 @@ import { uid } from './date';
 
 const MAX_FOLDER_NAME_LENGTH = 64;
 // Allowlist Unicode-букв, цифр, пробела, точки, подчёркивания, дефиса.
-// Всё остальное (включая <, >, /, \, кавычки, юникод-разделители) — отклоняется.
+// Всё остальное (включая <, >, /, \, кавычки, юникод-разделители) - отклоняется.
 const FOLDER_NAME_RE = /^[\p{L}\p{N}\s._-]+$/u;
 
 /** Содержимое одной папки: подпапки и файлы внутри неё. */
@@ -18,7 +18,7 @@ export function getChildren(folders, files, parentId) {
 /**
  * Путь от корня до текущей папки.
  * Защита от циклов в parentId: если данные повреждены, visited не даст
- * бесконечному while зациклиться — вернётся частичный путь.
+ * бесконечному while зациклиться - вернётся частичный путь.
  */
 export function buildBreadcrumb(folders, folderId) {
   const path = [];
@@ -71,7 +71,7 @@ export function validateFolderName(name, siblingFolders, siblingFiles) {
   return null;
 }
 
-/** Создаёт папку с id и метаданными — единственная точка формирования. */
+/** Создаёт папку с id и метаданными - единственная точка формирования. */
 export function createFolder(name, parentId, createdBy) {
   return {
     id: 'fld_' + uid(),
@@ -84,9 +84,9 @@ export function createFolder(name, parentId, createdBy) {
 
 /**
  * Плоский список последних версий документов по всем папкам.
- * Группировка — по паре (folderId, name): одноимённые файлы в разных
+ * Группировка - по паре (folderId, name): одноимённые файлы в разных
  * папках считаются разными документами, а не версиями одного.
- * Сортировка — по пути, затем по имени.
+ * Сортировка - по пути, затем по имени.
  */
 export function flattenLatestDocuments(folders, files) {
   const latest = new Map();

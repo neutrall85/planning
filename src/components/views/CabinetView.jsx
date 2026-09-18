@@ -1,6 +1,13 @@
+// src/components/views/CabinetView.jsx
+import { memo } from 'react';
 import Cabinet from '../Cabinet';
+import { useCabinetDb } from '../../hooks/useDb';
 
-export default function CabinetView({ store, data, user, openTask, openVacation, openDelegation }) {
+function CabinetView({
+  store, user, openTask, openVacation, openDelegation, openEmployeeTasks,
+}) {
+  const data = useCabinetDb();
+
   return (
     <Cabinet
       store={store}
@@ -9,6 +16,9 @@ export default function CabinetView({ store, data, user, openTask, openVacation,
       openTask={openTask}
       openVacation={openVacation}
       openDelegation={openDelegation}
+      openEmployeeTasks={openEmployeeTasks}
     />
   );
 }
+
+export default memo(CabinetView);

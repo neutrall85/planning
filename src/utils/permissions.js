@@ -1,11 +1,12 @@
 // src/utils/permissions.js
+import { isArchived } from './entityState';
 
 export const hasRole = (user, ...roles) => !!user && roles.some(r => user.roles.includes(r));
 export const has = hasRole;
 
 export const canEditDepartments = (user) => hasRole(user, "admin", "director", "hr");
 export const canManageAllVacations = (user) => hasRole(user, "admin", "director", "hr");
-export const canRestore = (user) => hasRole(user, "admin", "director");
+export const canRestore = (user) => hasRole(user, "admin", "director", "project_manager");
 export const canCreateTask = (user) => hasRole(user, "admin", "director", "economist", "kb_chief", "head", "project_lead", "project_manager");
 export const canCreateProject = (user) => hasRole(user, "admin", "director", "kb_chief", "project_manager");
 export const canManageManager = (user) => hasRole(user, "admin", "director", "kb_chief", "project_manager");
@@ -16,25 +17,62 @@ export const canFireEmployee = (user) => hasRole(user, "admin", "director", "hr"
 /**
  * Право сохранять шаблоны.
  *
- * Шаблон — «заготовка» задачи или проекта, поэтому право на шаблон
+ * Шаблон - «заготовка» задачи или проекта, поэтому право на шаблон
  * производно от права создать соответствующую сущность. Формула
  * выражена через canCreateTask / canCreateProject: при изменении состава
  * ролей там право на шаблон пересчитается автоматически. В
- * TemplatesView используется композитный предикат; в карточках — тот
+ * TemplatesView используется композитный предикат; в карточках - тот
  * одиночный, что соответствует типу карточки.
  */
 export const canCreateTemplate = (user) =>
   canCreateTask(user) || canCreateProject(user);
+
+/**
+ * Право управлять производственным календарём.
+ *
+ * Только суперадминистратор: календарь - общая справочная конфигурация,
+ * от которой зависит норма рабочего времени во всех отчётах и загрузке.
+ * Правка не делегируется HR или ГД сознательно - это отдельная
+ * административная операция уровня конфигурации системы.
+ */
+export const canManageProductionCalendar = (user) => hasRole(user, 'admin');
+
+/**
+ * Единственная точка правила «задачу с архивным проектом восстанавливать
+ * нельзя».
+ *
+ * Предикат отвечает на два вопроса одновременно:
+ *   - есть ли у пользователя право восстанавливать задачи из архива
+ *     (это же право нужно и для проектов, роль-формула одна - canRestore);
+ *   - не находится ли проект задачи в архиве.
+ *
+ * «Задача сейчас в архиве» - НЕ часть этого правила. Это контекст
+ * вызова: восстановление определяется в TaskService через пару
+ * isArchived(existing) && !isArchived(task), а в UI - через отдельную
+ * проверку isArchived перед рендером кнопки. Предикат намеренно не
+ * смешивает «что значит восстановление» с «какие для него условия».
+ *
+ * Задачи без проекта (теоретически возможны) - ограничение по проекту
+ * не применяется, потому что восстанавливать нечего согласовывать.
+ */
+export const canRestoreTask = (user, task, db) => {
+  if (!canRestore(user)) return false;
+  if (!task) return false;
+  if (!task.projectId) return true;
+  if (!db || !Array.isArray(db.projects)) return false;
+  const project = db.projects.find(p => p.id === task.projectId);
+  return !project || !isArchived(project);
+};
 
 // ---------------------------------------------------------------------------
 // Доступ к проекту
 // ---------------------------------------------------------------------------
 
 /**
- * Явный доступ к проекту — через поле project.access.userIds.
+ * Явный доступ к проекту - через поле project.access.userIds.
  * Роль-доступ не входит сюда: он часть базовой видимости
  * (см. computeBaseScope) и отдельно учитывается в модалке как
- * «доступ по роли» — его нельзя снять.
+ * «доступ по роли» - его нельзя снять.
  *
  * Пустое/отсутствующее поле access трактуется как «явного доступа ни у
  * кого нет». Безопасное поведение по умолчанию.
@@ -50,7 +88,7 @@ export const hasProjectAccess = (user, project) => {
 /**
  * Право управлять доступом к проекту. Круг ролей: админ, ГД, главный
  * конструктор (в своём КБ), менеджер проектов. Симметрично
- * canChangeProjectStatus — тот же паттерн проверки КБ.
+ * canChangeProjectStatus - тот же паттерн проверки КБ.
  */
 export const canManageProjectAccess = (user, project) => {
   if (!user || !project) return false;
@@ -63,7 +101,7 @@ export const canManageProjectAccess = (user, project) => {
  * Видит ли сотрудник проект по «встроенным» правилам: без учёта
  * явного персонального доступа.
  *
- * Реализация — через computeBaseScope: одно место описывает, что
+ * Реализация - через computeBaseScope: одно место описывает, что
  * вообще доступно пользователю, и все места, которым нужно «увидеть
  * проект по роли», спрашивают здесь.
  */
@@ -101,7 +139,7 @@ const PROD_ASSIGNEE_TRANSITIONS = {
 
 export const canEditTaskFields = (user, task, data) => {
   if (!user || !task || !data) return false;
-  if (task.archived) return false;
+  if (isArchived(task)) return false;
   if (hasRole(user, "admin", "economist")) return true;
   if (hasRole(user, "project_manager")) return false;
   return false;
@@ -109,7 +147,7 @@ export const canEditTaskFields = (user, task, data) => {
 
 export const canChangeTaskStatus = (user, task, newStatus, data) => {
   if (!user || !task || !data) return false;
-  if (task.archived) return false;
+  if (isArchived(task)) return false;
 
   if (task.status === 'closed' || task.status === 'cancelled') {
     return hasRole(user, 'admin');
@@ -135,7 +173,7 @@ export const canChangeTaskStatus = (user, task, newStatus, data) => {
 
 export const canEditProjectFields = (user, project) => {
   if (!user || !project) return false;
-  if (project.archived) return false;
+  if (isArchived(project)) return false;
   if (hasRole(user, "admin", "director")) return true;
   if (hasRole(user, "project_manager")) return false;
   return false;
@@ -143,7 +181,7 @@ export const canEditProjectFields = (user, project) => {
 
 export const canChangeProjectStatus = (user, project, newStatus) => {
   if (!user || !project) return false;
-  if (project.archived) return false;
+  if (isArchived(project)) return false;
 
   if (hasRole(user, 'admin')) return true;
   if (hasRole(user, 'director')) return true;
@@ -194,17 +232,17 @@ export const canApproveVacation = (user, vacation, data) => {
 };
 
 /**
- * Базовая видимость пользователя — без явного доступа к проектам.
+ * Базовая видимость пользователя - без явного доступа к проектам.
  *
  * Сюда попадает всё, что «даётся ролью или участием»: scope.all для
  * admin/director/economist/project_manager; проекты КБ для kb_chief;
  * проекты в руководстве для project_lead; проекты, где есть задачи
  * пользователя или его подчинённых (head/kb_chief).
  *
- * Отдельная функция — потому что на неё опирается canSeeProjectByDefault:
+ * Отдельная функция - потому что на неё опирается canSeeProjectByDefault:
  * если бы она звала computeScope, тот бы через hasProjectAccess вернулся
  * к явному доступу и получилась бы рекурсия. Разделение базовой
- * видимости и явного оверрайда — это граница между «по роли» и
+ * видимости и явного оверрайда - это граница между «по роли» и
  * «персонально».
  */
 export function computeBaseScope(u, db) {
@@ -257,6 +295,21 @@ export function taskVisible(u, scope, t, db) {
   if (hasRole(u, "kb_chief") && proj.kbId && (u.kbIds || []).includes(proj.kbId)) return true;
   if (hasRole(u, "head")) return true;
   return false;
+}
+
+/**
+ * Симметрично taskVisible: виден ли проект пользователю.
+ *
+ * Проект виден, если пользователь видит все проекты (scope.all) или
+ * если id проекта попал в его scope по роли, участию в задачах или
+ * персональному доступу (scope.projIds).
+ *
+ * Не путать с hasProjectAccess: там - про управление персональным
+ * доступом к проекту; здесь - «попадает ли проект в область видимости».
+ */
+export function projectVisible(scope, project) {
+  if (!scope || !project) return false;
+  return scope.all || scope.projIds.has(project.id);
 }
 
 export function empName(db, id) {

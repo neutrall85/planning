@@ -7,6 +7,18 @@ import { uid } from '../../utils/date';
 import { ROLES } from '../../utils/constants';
 import { FormField } from '../FormField';
 
+const FIELDS = Object.freeze([
+  'last',
+  'first',
+  'email',
+  'pass',
+  'position',
+  'phone',
+  'extension',
+  'tab',
+  'roles',
+]);
+
 export const CreateEmployeeModal = ({ store, ur, onClose, toast }) => {
   const initialValues = {
     last: '',
@@ -67,7 +79,7 @@ export const CreateEmployeeModal = ({ store, ur, onClose, toast }) => {
     handleSubmit, isSubmitting,
   } = useModalForm(initialValues, validate, saveAsync, (error) => {
     toast(error.message || 'Ошибка создания сотрудника', 'error');
-  });
+  }, { fields: FIELDS });
 
   const roleOptions = Object.entries(ROLES).map(([k, v]) => ({ value: k, label: v.label }));
 

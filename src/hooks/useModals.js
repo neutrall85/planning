@@ -1,21 +1,16 @@
-import { useRef, useState } from 'react';
+// src/hooks/useModals.js
+import { useCallback, useRef, useState } from 'react';
 
-export function useModals({ store, data, user }) {
+export function useModals({ store, user }) {
   const [modal, setModal] = useState(null);
-
-  // Счётчик монтирований модалок. MainLayout использует его как key у
-  // ModalRenderer: при каждом открытии модалка монтируется с нуля, поэтому
-  // внутреннее состояние useForm инициализируется новыми initialValues.
-  // Без этого React переиспользовал бы инстанс (тот же тип на той же
-  // позиции в дереве), и форма показала бы значения предыдущей сущности.
   const seqRef = useRef(0);
 
-  const open = (state) => {
+  const open = useCallback((state) => {
     seqRef.current += 1;
     setModal({ ...state, _seq: seqRef.current });
-  };
+  }, []);
 
-  const openTask = (
+  const openTask = useCallback((
     taskId = null,
     initialTab = 'form',
     parentTaskId = null,
@@ -23,47 +18,62 @@ export function useModals({ store, data, user }) {
     returnToProjectId = null,
     returnToProjectTab = 'info',
     returnToTaskId = null,
-    returnToTaskTab = 'subtasks'
-  ) =>
-    open({
-      type: 'task',
-      taskId,
-      initialTab,
-      parentTaskId,
-      initialProjectId,
-      returnToProjectId,
-      returnToProjectTab,
-      returnToTaskId,
-      returnToTaskTab,
-    });
+    returnToTaskTab = 'subtasks',
+    returnToEmployeeTasksId = null,
+  ) => open({
+    type: 'task',
+    taskId, initialTab, parentTaskId, initialProjectId,
+    returnToProjectId, returnToProjectTab,
+    returnToTaskId, returnToTaskTab,
+    returnToEmployeeTasksId,
+  }), [open]);
 
-  const openProject = (
+  const openProject = useCallback((
     projectId = null,
     initialTab = 'info',
     returnToProjectId = null,
-    returnToProjectTab = 'info'
-  ) =>
-    open({
-      type: 'project',
-      projectId,
-      initialTab,
-      returnToProjectId,
-      returnToProjectTab,
-    });
+    returnToProjectTab = 'info',
+  ) => open({
+    type: 'project', projectId, initialTab, returnToProjectId, returnToProjectTab,
+  }), [open]);
 
-  const openHoursReq = (kind, targetId) => open({ type: 'hours', kind, targetId });
-  const openRoles = (empId) => open({ type: 'roles', empId });
-  const openDepts = (empId) => open({ type: 'depts', empId });
-  const openVacation = (vacationId = null, forEmpId = null) =>
-    open({ type: 'vacation', vacationId, forEmpId });
-  const openDelegation = () => open({ type: 'delegation' });
-  const openVacNow = () => open({ type: 'vacnow' });
+  const openHoursReq = useCallback((kind, targetId) =>
+    open({ type: 'hours', kind, targetId }), [open]);
 
-  // Копирование = «шаблон из живой сущности»: тот же конвейер черновиков
-  // (collectTaskPayloads → pendingTemplate* → instantiateTemplate*), что и
-  // при сохранении в шаблон. Никаких новых путей создания задач/подзадач.
-  const openCopyTask = (sourceTaskId) =>
-    open({
+  const openRoles = useCallback((empId) =>
+    open({ type: 'roles', empId }), [open]);
+
+  const openDepts = useCallback((empId) =>
+    open({ type: 'depts', empId }), [open]);
+
+  const openVacation = useCallback((vacationId = null, forEmpId = null) =>
+    open({ type: 'vacation', vacationId, forEmpId }), [open]);
+
+  const openDelegation = useCallback(() =>
+    open({ type: 'delegation' }), [open]);
+
+  const openVacNow = useCallback(() =>
+    open({ type: 'vacnow' }), [open]);
+
+  const openYearCalendar = useCallback(() =>
+    open({ type: 'yearCalendar' }), [open]);
+
+  const openEmployeeTasks = useCallback((empId) =>
+    open({ type: 'employeeTasks', empId }), [open]);
+
+  // Копирование задачи и проекта - две ветки одного правила:
+  //   options.returnToModal === true - открыто изнутри модалки-источника
+  //     (кнопка "Копировать" в футере). Кнопка "Назад" и закрытие по X
+  //     вернут в исходную сущность.
+  //   без опции - открыто из канбана/списка/календаря (контекстное меню
+  //     карточки). Возврат не задан: закрытие просто закрывает модалку,
+  //     пользователь остаётся на исходном экране.
+  // Различие выражается одним булевым флагом в дескрипторе модалки;
+  // closeTaskWithReturn / closeProjectWithReturn уже читают его через
+  // modal.returnToTaskId / modal.returnToProjectId.
+  const openCopyTask = useCallback((sourceTaskId, options) => {
+    const returnToModal = options?.returnToModal === true;
+    return open({
       type: 'task',
       taskId: null,
       copyFromId: sourceTaskId,
@@ -72,34 +82,42 @@ export function useModals({ store, data, user }) {
       initialProjectId: null,
       returnToProjectId: null,
       returnToProjectTab: 'info',
-      returnToTaskId: sourceTaskId,
+      returnToTaskId: returnToModal ? sourceTaskId : null,
       returnToTaskTab: 'form',
+      returnToEmployeeTasksId: null,
     });
+  }, [open]);
 
-  const openCopyProject = (sourceProjectId) =>
-    open({
+  const openCopyProject = useCallback((sourceProjectId, options) => {
+    const returnToModal = options?.returnToModal === true;
+    return open({
       type: 'project',
       projectId: null,
       copyFromId: sourceProjectId,
       initialTab: 'info',
-      returnToProjectId: sourceProjectId,
+      returnToProjectId: returnToModal ? sourceProjectId : null,
       returnToProjectTab: 'info',
     });
+  }, [open]);
 
-  const closeModal = () => setModal(null);
+  const openTemplateFromTask = useCallback((taskId) =>
+    open({ type: 'templateFromTask', taskId }), [open]);
+
+  const openTemplateFromProject = useCallback((projectId) =>
+    open({ type: 'templateFromProject', projectId }), [open]);
+
+  const setModalTab = useCallback((tab) => {
+    setModal(prev => prev ? { ...prev, initialTab: tab } : prev);
+  }, []);
+
+  const closeModal = useCallback(() => setModal(null), []);
 
   return {
     modal,
-    openTask,
-    openProject,
-    openHoursReq,
-    openRoles,
-    openDepts,
-    openVacation,
-    openDelegation,
-    openVacNow,
-    openCopyTask,
-    openCopyProject,
-    closeModal,
+    openTask, openProject, openHoursReq, openRoles, openDepts,
+    openVacation, openDelegation, openVacNow, openYearCalendar,
+    openEmployeeTasks, openCopyTask, openCopyProject,
+    openTemplateFromTask, openTemplateFromProject,
+    closeModal, setModalTab,
   };
 }

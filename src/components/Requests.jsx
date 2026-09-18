@@ -1,20 +1,30 @@
 import React, { useState } from "react";
-import { TASK_STATUSES, VACATION_TYPES, ROLES } from "../utils/constants";
-import { fmtDMY, fmtDT } from "../utils/date";
+import { DOMAIN, VACATION_TYPES, ROLES } from "../utils/constants";
+import { fmtDMY } from "../utils/date";
 import { hasRole, canApproveVacation } from "../utils/permissions";
-import { Ic, ICONS } from "./Icons";
 import { useDataHelpers } from "../hooks";
+import { useStore } from "../context/StoreContext";
 
-export default function Requests({
-  db,
-  setDb,
-  ur,
-  initialTab = 'hours',
-  addAudit,
-  notifyVacationDecision,
-  notifyRoleDelegationDecision,
-  notifyHoursRequestDecision,
-}) {
+/**
+ * Очередь решений по заявкам и запросам.
+ *
+ * Все действия идут через store.decideX(...): сервисы сами пишут аудит,
+ * уведомляют заявителя и, где нужно, меняют целевую сущность (plannedHours
+ * задачи при одобрении запроса часов, роль executor при одобрении
+ * регистрации). Вьюха не пишет в setDb, не собирает diff и не вызывает
+ * notify* вручную.
+ *
+ * Причина: те же самые решения, сделанные из другого места (например,
+ * из будущего мобильного приложения), должны давать идентичный аудит и
+ * уведомления. Вьюха - не место для доменной логики.
+ *
+ * Ошибки сервиса (идемпотентность, «уже решено») летят как исключения.
+ * Тост-контекст сюда не пробрасывается - консоль и ErrorBoundary дадут
+ * достаточно информации. Для пользователя этот случай аномальный:
+ * интерфейс не даёт дважды нажать на одну кнопку.
+ */
+export default function Requests({ db, ur, initialTab = 'hours' }) {
+  const { store } = useStore();
   const { empName } = useDataHelpers(db);
   const [tab, setTab] = useState(initialTab);
 
@@ -24,128 +34,14 @@ export default function Requests({
   tabs.push(['rd', 'Передача ролей']);
   if (hasRole(ur, 'admin')) tabs.push(['reg', 'Заявки на регистрацию']);
 
-  const decideHours = (r, ok) => {
-    const targetTitle = ok
-      ? (r.kind === "task"
-          ? db.tasks.find(t => t.id === r.targetId)?.title
-          : db.projects.find(p => p.id === r.targetId)?.name)
-      : (r.kind === "task"
-          ? db.tasks.find(t => t.id === r.targetId)?.title
-          : db.projects.find(p => p.id === r.targetId)?.name);
+  const targetTitleOf = (r) => r.kind === "task"
+    ? db.tasks.find(t => t.id === r.targetId)?.title
+    : db.projects.find(p => p.id === r.targetId)?.name;
 
-    setDb((s) => {
-      const st = { ...s, hoursRequests: s.hoursRequests.map((x) => (x.id === r.id ? { ...x, status: ok ? "approved" : "rejected" } : x)) };
-      if (ok) {
-        if (r.kind === "task") st.tasks = st.tasks.map((t) => (t.id === r.targetId ? { ...t, plannedHours: r.newH } : t));
-        else st.projects = st.projects.map((p) => (p.id === r.targetId ? { ...p, budget: r.newH } : p));
-      }
-      return st;
-    });
-
-    if (notifyHoursRequestDecision) notifyHoursRequestDecision(r, ok, targetTitle);
-
-    setTimeout(() => {
-      if (ok) {
-        addAudit('Утверждение запроса часов', { task: targetTitle, previousHours: r.oldH, newHours: r.newH, reason: r.reason }, 'hoursRequest', r.id);
-      } else {
-        addAudit('Отклонение запроса часов', { task: targetTitle, requestedHours: r.newH, reason: r.reason }, 'hoursRequest', r.id);
-      }
-    }, 0);
-  };
-
-  const decideVac = (v, ok) => {
-    const employeeName = empName(v.empId);
-    const period = `${fmtDMY(v.start)}-${fmtDMY(v.end)}`;
-
-    setDb((s) => {
-      const updated = { ...s, vacations: s.vacations.map((x) => (x.id === v.id ? { ...x, status: ok ? "approved" : "rejected" } : x)) };
-      return updated;
-    });
-
-    if (notifyVacationDecision) notifyVacationDecision(v, ok);
-
-    setTimeout(() => {
-      if (ok) {
-        addAudit('Утверждение отпуска', { employee: employeeName, period, type: VACATION_TYPES[v.type]?.label || v.type }, 'vacation', v.id);
-      } else {
-        addAudit('Отклонение отпуска', { employee: employeeName, period, type: VACATION_TYPES[v.type]?.label || v.type }, 'vacation', v.id);
-      }
-    }, 0);
-  };
-
-  const decideRD = (r, ok) => {
-    const fromName = empName(r.fromId);
-    const toName = empName(r.toId);
-    const rolesStr = r.roles.join(', ');
-
-    setDb((s) => {
-      const updated = { ...s, roleDelegations: s.roleDelegations.map((x) => (x.id === r.id ? { ...x, status: ok ? "active" : "rejected" } : x)) };
-      return updated;
-    });
-
-    if (notifyRoleDelegationDecision) notifyRoleDelegationDecision(r, ok);
-
-    setTimeout(() => {
-      if (ok) {
-        addAudit('Принятие делегирования', { from: fromName, to: toName, roles: rolesStr, start: fmtDMY(r.start), end: fmtDMY(r.end) }, 'delegation', r.id);
-      } else {
-        addAudit('Отклонение делегирования', { from: fromName, to: toName, roles: rolesStr }, 'delegation', r.id);
-      }
-    }, 0);
-  };
-
-  const decideReg = (r, ok) => {
-    const empNameStr = `${r.last} ${r.first}`;
-
-    if (ok) {
-      setDb((s) => {
-        const existing = s.employees.find(e => e.email === r.email);
-        if (existing) {
-          const updated = { ...existing, roles: ['executor'] };
-          return {
-            ...s,
-            employees: s.employees.map(e => e.id === updated.id ? updated : e),
-            regRequests: s.regRequests.map(x => x.id === r.id ? { ...x, status: "approved" } : x)
-          };
-        } else {
-          const newEmp = {
-            id: "e_" + Math.random().toString(36).slice(2,6),
-            last: r.last,
-            first: r.first,
-            email: r.email,
-            pass: r.pass,
-            position: "Сотрудник",
-            departments: [],
-            roles: ["executor"],
-            kbIds: [],
-            headDeptIds: [],
-            phone: "",
-            tab: String(1000 + Math.floor(Math.random() * 8999)),
-            notif: { deadlineEmail: true, overdueDigest: false, commentSub: true },
-            failed: 0,
-            lockUntil: 0
-          };
-          return {
-            ...s,
-            employees: [...s.employees, newEmp],
-            regRequests: s.regRequests.map(x => x.id === r.id ? { ...x, status: "approved" } : x)
-          };
-        }
-      });
-
-      setTimeout(() => {
-        addAudit('Одобрение регистрации', { email: r.email, employee: empNameStr, position: r.position || 'Сотрудник' }, 'registration', r.id);
-      }, 0);
-    } else {
-      setDb((s) => {
-        return { ...s, regRequests: s.regRequests.map((x) => (x.id === r.id ? { ...x, status: "rejected" } : x)) };
-      });
-
-      setTimeout(() => {
-        addAudit('Отклонение регистрации', { email: r.email, employee: empNameStr, reason: r.rejectionReason || 'Не указана' }, 'registration', r.id);
-      }, 0);
-    }
-  };
+  const decideHours = (r, ok) => store.decideHoursRequest(r.id, ok);
+  const decideVac = (v, ok) => store.decideVacation(v.id, ok);
+  const decideRD = (r, ok) => store.decideRoleDelegation(r.id, ok);
+  const decideReg = (r, ok) => store.decideRegistration(r.id, ok);
 
   return (
     <div>
@@ -174,7 +70,7 @@ export default function Requests({
             <tbody>
               {db.hoursRequests.map(r => (
                 <tr key={r.id}>
-                  <td><b>{r.kind === "task" ? db.tasks.find(t => t.id === r.targetId)?.title : db.projects.find(p => p.id === r.targetId)?.name}</b></td>
+                  <td><b>{targetTitleOf(r)}</b></td>
                   <td>{r.oldH} ч</td>
                   <td><b>{r.newH} ч</b></td>
                   <td className="mut sm">{r.reason}</td>
@@ -254,7 +150,7 @@ export default function Requests({
               {db.regRequests.map(r => (
                 <tr key={r.id}>
                   <td><b>{r.last} {r.first}</b></td>
-                  <td>{r.email}@aviahorizont.ru</td>
+                  <td>{r.email}@{DOMAIN}</td>
                   <td>
                     {r.status === "pending" ? (
                       <>

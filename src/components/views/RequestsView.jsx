@@ -1,24 +1,11 @@
+// src/components/views/RequestsView.jsx
+import { memo } from 'react';
 import Requests from '../Requests';
+import { useRequestsDb } from '../../hooks/useDb';
 
-export default function RequestsView({
-  db,
-  setDb,
-  ur,
-  addAudit,
-  notifyVacationDecision,
-  notifyRoleDelegationDecision,
-  notifyHoursRequestDecision,
-}) {
-  return (
-    <Requests
-      db={db}
-      setDb={setDb}
-      ur={ur}
-      initialTab="hours"
-      addAudit={addAudit}
-      notifyVacationDecision={notifyVacationDecision}
-      notifyRoleDelegationDecision={notifyRoleDelegationDecision}
-      notifyHoursRequestDecision={notifyHoursRequestDecision}
-    />
-  );
+function RequestsView({ ur }) {
+  const db = useRequestsDb();
+  return <Requests db={db} ur={ur} initialTab="hours" />;
 }
+
+export default memo(RequestsView);

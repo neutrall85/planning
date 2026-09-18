@@ -16,7 +16,7 @@ export const Modal = ({
 
   // Ширина передаётся через CSS-переменную, а не inline-стилем: значение
   // по умолчанию живёт в styles.css рядом с остальным описанием .modal.
-  // Это устраняет style={{ maxWidth }} в JSX — разметка остаётся чистой.
+  // Это устраняет style={{ maxWidth }} в JSX - разметка остаётся чистой.
   useLayoutEffect(() => {
     rootRef.current?.style.setProperty('--modal-max-w', `${width}px`);
   }, [width]);

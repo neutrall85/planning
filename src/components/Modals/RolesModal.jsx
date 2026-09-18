@@ -4,6 +4,15 @@ import { ModalShell } from '../ModalShell';
 import { ROLES } from '../../utils/constants';
 import { useAsyncSubmit } from '../../hooks/useAsyncSubmit';
 
+/**
+ * Редактор ролей сотрудника.
+ *
+ * Роль `executor` в списке показывается, но её чекбокс выключен: она
+ * производна от факта «есть задачи» и управляется автоматически
+ * (см. utils/roleSync). Разрешать её ручное снятие - значит создавать
+ * пользователю иллюзию контроля: после сохранения роль вернётся, если
+ * задачи есть, или снимется, если их нет.
+ */
 export const RolesModal = ({ store, empId, onClose, toast }) => {
   const db = store.data;
   const emp = db.employees.find(e => e.id === empId);
@@ -38,6 +47,9 @@ export const RolesModal = ({ store, empId, onClose, toast }) => {
       updatedDepartments = [];
     }
 
+    // Роль executor не отправляем руками: её финализирует
+    // EmployeeService.upsertEmployee через withSyncedExecutorRole.
+    // Отправляем как есть - синхронизация сделает своё.
     const updatedEmp = {
       ...emp,
       roles,
@@ -46,7 +58,6 @@ export const RolesModal = ({ store, empId, onClose, toast }) => {
       departments: updatedDepartments,
     };
     await store.upsertEmployee(updatedEmp);
-    store.addAudit('Назначение ролей', `${emp.last} ${emp.first}: ${roles.map(r => ROLES[r]?.short || r).join(', ')}`);
     onClose();
   }, [emp, roles, kbIds, headDeptIds, store, onClose]);
 
@@ -63,37 +74,57 @@ export const RolesModal = ({ store, empId, onClose, toast }) => {
       className="modal-roles"
       saveDisabled={isSubmitting}
     >
-      <p className="mut sm">Сотрудник может иметь несколько ролей. Для «Главного конструктора» укажите КБ, для «Руководителя отдела» - перечень отделов.</p>
+      <p className="mut sm">
+        Сотрудник может иметь несколько ролей. Для «Главного конструктора» укажите КБ,
+        для «Руководителя отдела» - перечень отделов. Роль «Исполнитель» управляется
+        автоматически: появляется при назначении задач, снимается - когда их не остаётся
+        (если есть другие роли).
+      </p>
       <div className="roles-list">
-        {Object.entries(ROLES).map(([k, v]) => (
-          <div key={k}>
-            <label className="roles-item">
-              <input type="checkbox" checked={roles.includes(k)} onChange={() => toggleRole(k)} />
-              <span className="role-chip" style={{ background: v.color + '1e', color: v.color }}>{v.short}</span>
-              {v.label}
-            </label>
-            {k === 'kb_chief' && roles.includes('kb_chief') && (
-              <div className="sub-picks">
-                {db.kbs.map(kb => (
-                  <label key={kb.id} className="dept-pick">
-                    <input type="checkbox" checked={kbIds.includes(kb.id)} onChange={() => toggleKb(kb.id)} />
-                    {kb.name}
-                  </label>
-                ))}
-              </div>
-            )}
-            {k === 'head' && roles.includes('head') && (
-              <div className="sub-picks">
-                {db.departments.map(d => (
-                  <label key={d.id} className="dept-pick">
-                    <input type="checkbox" checked={headDeptIds.includes(d.id)} onChange={() => toggleDept(d.id)} />
-                    {d.name} {d.kbId ? `(${db.kbs.find(x => x.id === d.kbId)?.name})` : ''}
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
+        {Object.entries(ROLES).map(([k, v]) => {
+          const isDerived = k === 'executor';
+          return (
+            <div key={k}>
+              <label className="roles-item">
+                <input
+                  type="checkbox"
+                  checked={roles.includes(k)}
+                  onChange={() => toggleRole(k)}
+                  disabled={isDerived}
+                />
+                <span className="role-chip" style={{ background: v.color + '1e', color: v.color }}>
+                  {v.short}
+                </span>
+                {v.label}
+                {isDerived && (
+                  <span className="mut sm" style={{ marginLeft: 'auto' }}>
+                    назначается автоматически
+                  </span>
+                )}
+              </label>
+              {k === 'kb_chief' && roles.includes('kb_chief') && (
+                <div className="sub-picks">
+                  {db.kbs.map(kb => (
+                    <label key={kb.id} className="dept-pick">
+                      <input type="checkbox" checked={kbIds.includes(kb.id)} onChange={() => toggleKb(kb.id)} />
+                      {kb.name}
+                    </label>
+                  ))}
+                </div>
+              )}
+              {k === 'head' && roles.includes('head') && (
+                <div className="sub-picks">
+                  {db.departments.map(d => (
+                    <label key={d.id} className="dept-pick">
+                      <input type="checkbox" checked={headDeptIds.includes(d.id)} onChange={() => toggleDept(d.id)} />
+                      {d.name} {d.kbId ? `(${db.kbs.find(x => x.id === d.kbId)?.name})` : ''}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </ModalShell>
   );

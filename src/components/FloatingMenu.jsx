@@ -1,5 +1,5 @@
 // src/components/FloatingMenu.jsx
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Ic } from './Icons';
 import { useNestedModalEscape } from './Templates/useNestedModalEscape';
@@ -10,29 +10,37 @@ const OFFSET = 4;  // зазор между триггером и меню
 /**
  * Плавающее меню действий.
  *
- * API — render-prop. Потребитель получает два набора пропсов и раскладывает
+ * API - render-prop. Потребитель получает два набора пропсов и раскладывает
  * их по своим узлам:
  *
- *   anchorProps — на контейнер, по которому правый клик открывает меню
+ *   anchorProps - на контейнер, по которому правый клик открывает меню
  *                 (обычно это вся карточка). Содержит onContextMenu.
- *   buttonProps — на кнопку «⋯» в углу. Содержит ref (для позиционирования
+ *   buttonProps - на кнопку «⋯» в углу. Содержит ref (для позиционирования
  *                 под кнопкой), onClick с stopPropagation (чтобы клик по
  *                 кнопке не открывал карточку), onMouseDown с
  *                 stopPropagation (чтобы draggable-родитель в канбане не
  *                 начал перетаскивание), onContextMenu для правого клика
  *                 именно по кнопке, aria-haspopup / aria-expanded.
  *
- * Пункты меню — массив узлов одного из трёх видов:
+ * Пункты меню - массив узлов одного из трёх видов:
  *   { id, label, icon?, hint?, danger?, disabled?, onClick? }
  *   { type: 'divider' }
  *   { type: 'header', label }
  *
- * Каждый экземпляр FloatingMenu — самодостаточный: держит своё состояние,
+ * Каждый экземпляр FloatingMenu - самодостаточный: держит своё состояние,
  * свой портал, свою позицию. Поэтому 50 карточек в канбане = 50 маленьких
  * изолированных состояний, а не одно общее на весь список.
  *
  * Закрытие: клик вне, Escape (через общий стек useNestedModalEscape),
  * scroll любой вложенности, resize.
+ *
+ * Стабильность колбэков: close / openFromAnchor / openAt / toggle
+ * мемоизированы. Это не косметика - close попадает в useNestedModalEscape
+ * и в useEffect-слушатели портала. Без мемоизации каждый ре-рендер
+ * родителя (например, канбана при обновлении задач) пересоздавал бы
+ * обработчики: токен Escape снимался/ставился бы в стек, слушатель
+ * mousedown - снимался/ставился на document. В окне между cleanup и
+ * setup событие может «проскочить». memo убирает это окно.
  */
 export default function FloatingMenu({ items, placement = 'bottom-end', children }) {
   const anchorRef = useRef(null);
@@ -40,28 +48,28 @@ export default function FloatingMenu({ items, placement = 'bottom-end', children
   const [open, setOpen] = useState(false);
   const [origin, setOrigin] = useState(null);
   // Меню монтируется скрытым, useLayoutEffect измеряет его и ставит в
-  // правильную точку — до первого пейнта. Мигания в (0,0) не видно.
+  // правильную точку - до первого пейнта. Мигания в (0,0) не видно.
   const [style, setStyle] = useState({ left: 0, top: 0, visibility: 'hidden' });
 
-  const close = () => {
+  const close = useCallback(() => {
     setOpen(false);
     setOrigin(null);
-  };
+  }, []);
 
-  const openFromAnchor = () => {
+  const openFromAnchor = useCallback(() => {
     setOrigin({ type: 'anchor' });
     setOpen(true);
-  };
+  }, []);
 
-  const openAt = (x, y) => {
+  const openAt = useCallback((x, y) => {
     setOrigin({ type: 'cursor', x, y });
     setOpen(true);
-  };
+  }, []);
 
-  const toggle = () => {
+  const toggle = useCallback(() => {
     if (open) close();
     else openFromAnchor();
-  };
+  }, [open, close, openFromAnchor]);
 
   useLayoutEffect(() => {
     if (!open || !origin) return;
@@ -83,7 +91,7 @@ export default function FloatingMenu({ items, placement = 'bottom-end', children
       const r = anchorRef.current?.getBoundingClientRect();
       if (!r) {
         // Теоретически недостижимо: anchorRef проставляется через
-        // buttonProps.ref, и если кнопка отрендерена — rect есть.
+        // buttonProps.ref, и если кнопка отрендерена - rect есть.
         // Но безопаснее показать меню в углу, чем оставить его невидимым.
         setStyle({ left: EDGE, top: EDGE, visibility: 'visible' });
         return;
@@ -100,14 +108,16 @@ export default function FloatingMenu({ items, placement = 'bottom-end', children
     setStyle({ left, top, visibility: 'visible' });
   }, [open, origin, placement]);
 
-  const anchorProps = {
+  // anchorProps не зависит от open - стабилен. buttonProps зависит от open
+  // через aria-expanded и toggle, поэтому пересобирается при смене open.
+  const anchorProps = useMemo(() => ({
     onContextMenu: (e) => {
       e.preventDefault();
       openAt(e.clientX, e.clientY);
     },
-  };
+  }), [openAt]);
 
-  const buttonProps = {
+  const buttonProps = useMemo(() => ({
     ref: anchorRef,
     onClick: (e) => {
       e.stopPropagation();
@@ -121,7 +131,7 @@ export default function FloatingMenu({ items, placement = 'bottom-end', children
     },
     'aria-haspopup': 'menu',
     'aria-expanded': open,
-  };
+  }), [toggle, open, openAt]);
 
   return (
     <>
@@ -139,10 +149,10 @@ export default function FloatingMenu({ items, placement = 'bottom-end', children
 }
 
 /**
- * Портал меню — отдельный компонент, чтобы useNestedModalEscape
+ * Портал меню - отдельный компонент, чтобы useNestedModalEscape
  * регистрировался ровно на время, пока меню открыто. Хук кладёт токен
  * в общий стек Escape при монтировании; если бы он жил в FloatingMenu,
- * он занимал бы стек постоянно — и Escape при закрытом меню «съедался»
+ * он занимал бы стек постоянно - и Escape при закрытом меню «съедался»
  * бы впустую.
  */
 function FloatingMenuPortal({ menuRef, style, items, onClose }) {
@@ -169,7 +179,7 @@ function FloatingMenuPortal({ menuRef, style, items, onClose }) {
     };
   }, [onClose, menuRef]);
 
-  // Фокус в первое активное действие — клавиатурная навигация Tab
+  // Фокус в первое активное действие - клавиатурная навигация Tab
   // начинает работать сразу, а не после «пустого» Tab.
   useEffect(() => {
     const first = menuRef.current?.querySelector('.fm-item:not(:disabled)');

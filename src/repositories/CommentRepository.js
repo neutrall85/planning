@@ -5,13 +5,9 @@ const textMatches = (text, query) =>
   String(text || '').toLowerCase().includes(query);
 
 export class CommentRepository extends Repository {
-  constructor(comments) {
-    super(comments);
-  }
-
   /**
    * Все комментарии в рамках фильтра. Фильтр задаёт видимую область:
-   * { projectId } — чат проекта, { projectId, taskId } — чат задачи.
+   * { projectId } - чат проекта, { projectId, taskId } - чат задачи.
    */
   findByFilter(filter = {}) {
     return this.find(c => {
@@ -30,9 +26,9 @@ export class CommentRepository extends Repository {
   }
 
   /**
-   * Полнотекстовый поиск. Возвращает совпадения И их родителей — чтобы
+   * Полнотекстовый поиск. Возвращает совпадения И их родителей - чтобы
    * найденный ответ не выглядел сиротой в дереве. Длину этого массива
-   * нельзя использовать как счётчик совпадений — для этого findMatches.
+   * нельзя использовать как счётчик совпадений - для этого findMatches.
    */
   search(filter, query) {
     const q = (query || '').trim().toLowerCase();
@@ -57,7 +53,7 @@ export class CommentRepository extends Repository {
 
   /**
    * Только фактические совпадения, без родителей. Единая точка правды
-   * для «кто совпал» — счётчик в UI и навигация по найденным берут
+   * для «кто совпал» - счётчик в UI и навигация по найденным берут
    * данные отсюда.
    */
   findMatches(filter, query) {

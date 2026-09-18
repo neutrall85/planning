@@ -1,45 +1,63 @@
 // src/services/ProjectService.js
 import { TODAY } from '../utils/date';
+import { PROJECT_STATUSES, PROJECT_TYPES } from '../utils/constants';
+import { isArchived } from '../utils/entityState';
+import { syncExecutorRolesFor } from './roleSync';
+import {
+  auditLabel,
+  auditName,
+  auditDetails,
+  auditDelta,
+  auditToggle,
+  auditListDelta,
+  auditMark,
+} from '../utils/auditHelpers';
 
 export class ProjectService {
-  constructor(
+  constructor({
     projectRepo,
     taskRepo,
     employeeRepo,
     notificationService,
     auditService,
-    notifyCallback,
+    notify,
     canChangeStatus,
     canManageAccess,
-  ) {
+    canRestore,
+  }) {
     this._projectRepo = projectRepo;
     this._taskRepo = taskRepo;
     this._employeeRepo = employeeRepo;
     this._notifications = notificationService;
     this._audit = auditService;
-    this._notify = notifyCallback;
+    this._notify = notify;
     this._canChangeStatus = canChangeStatus;
     this._canManageAccess = canManageAccess;
+    this._canRestore = canRestore;
+
+    // Синхронизация производной роли executor - правило в roleSync.js.
+    this._syncExecutorRoles = (empIds) =>
+      syncExecutorRolesFor(empIds, { employeeRepo, taskRepo });
   }
 
   getAll() { return this._projectRepo.findAll(); }
 
-  /**
-   * Сохранение проекта.
-   *
-   * Аргумент `currentUser` — полный объект пользователя (не id), потому
-   * что право на смену статуса проверяется через canChangeProjectStatus,
-   * а она смотрит роли и kbIds.
-   *
-   * Системные вызовы (user === null) пропускаются: они идут из
-   * автоматических сценариев (архивация, восстановление).
-   */
   upsertProject(project, currentUser) {
     const existing = this._projectRepo.findById(project.id);
     const isNew = !existing;
     const currentUserId = currentUser?.id || 'system';
 
-    if (!isNew && existing.status !== project.status && currentUserId !== 'system') {
+    if (!isNew && isArchived(existing) && isArchived(project)) {
+      throw new Error('Проект в архиве - редактирование запрещено');
+    }
+
+    const isRestore = !isNew && isArchived(existing) && !isArchived(project);
+
+    if (isRestore) {
+      if (!currentUser || !this._canRestore(currentUser)) {
+        throw new Error('Недостаточно прав для восстановления проекта из архива');
+      }
+    } else if (!isNew && existing.status !== project.status && currentUserId !== 'system') {
       const allowed = this._canChangeStatus
         && this._canChangeStatus(currentUser, existing, project.status);
       if (!allowed) {
@@ -47,13 +65,25 @@ export class ProjectService {
       }
     }
 
-    if (!isNew) {
-      this._audit.addAudit('Изменение проекта', `Обновлён проект "${project.name}"`, 'project', project.id, currentUserId);
+    if (!isNew && isRestore) {
+      this._audit.addAudit('Восстановление проекта', project.name, 'project', project.id, currentUserId);
+    } else if (!isNew) {
+      const changes = this._describeChanges(existing, project);
+      if (Object.keys(changes).length > 0) {
+        this._audit.addAudit(
+          'Изменение проекта',
+          auditDetails('Проект', project.name, changes),
+          'project',
+          project.id,
+          currentUserId,
+        );
+      }
     } else {
       this._audit.addAudit('Создание проекта', project.name, 'project', project.id, currentUserId);
     }
 
-    // Архивация при закрытии/отмене
+    const affectedEmpIds = new Set();
+
     if (!isNew && (project.status === 'closed' || project.status === 'cancelled') && existing.status !== project.status) {
       project.archived = true;
       project.archivedAt = TODAY;
@@ -64,17 +94,19 @@ export class ProjectService {
           task.archived = true;
           task.archivedAt = TODAY;
           this._taskRepo.save(task);
-          if (task.assigneeId) assigneeIds.add(task.assigneeId);
+          if (task.assigneeId) {
+            assigneeIds.add(task.assigneeId);
+            affectedEmpIds.add(task.assigneeId);
+          }
           this._notifications.notifyTaskArchived(task, project, currentUserId);
         }
       }
       this._notifications.notifyProjectArchived(project, assigneeIds, currentUserId);
     }
 
-    // Уведомления по проекту
     if (isNew) {
       this._notifications.notifyProjectCreated(project, currentUserId);
-    } else if (existing) {
+    } else if (existing && !isRestore) {
       if (existing.managerId !== project.managerId && project.managerId) {
         this._notifications.notifyProjectManagerChanged(project, currentUserId);
       }
@@ -84,39 +116,89 @@ export class ProjectService {
     }
 
     this._projectRepo.save(project);
+
+    if (affectedEmpIds.size) this._syncExecutorRoles(affectedEmpIds);
+
     this._notify();
+  }
+
+  patchProject(projectId, patch, currentUser) {
+    const existing = this._projectRepo.findById(projectId);
+    if (!existing) throw new Error('Проект не найден');
+    if (isArchived(existing)) throw new Error('Проект в архиве - редактирование запрещено');
+
+    const updated = { ...existing, ...patch };
+    this._projectRepo.save(updated);
+
+    const changes = this._describeChanges(existing, updated);
+    if (Object.keys(changes).length > 0) {
+      this._audit.addAudit(
+        'Изменение проекта',
+        auditDetails('Проект', updated.name, changes),
+        'project',
+        projectId,
+        currentUser?.id || 'system',
+      );
+    }
+
+    this._notify();
+    return updated;
+  }
+
+  _describeChanges(existing, next) {
+    const changes = {};
+
+    auditDelta(changes, 'Название', existing.name, next.name, (v) => (v ? `«${v}»` : '-'));
+    auditDelta(changes, 'Код', existing.code, next.code);
+    auditDelta(changes, 'Статус', existing.status, next.status, (v) => auditLabel(PROJECT_STATUSES, v));
+    auditDelta(changes, 'Тип', existing.ptype, next.ptype, (v) => auditLabel(PROJECT_TYPES, v));
+    auditDelta(changes, 'Приоритет', existing.priority, next.priority);
+    auditDelta(changes, 'Ответственный', existing.managerId, next.managerId, (v) => auditName(this._employeeRepo, v));
+    auditDelta(changes, 'Бюджет', existing.budget, next.budget);
+    auditDelta(changes, 'Дата начала', existing.start, next.start);
+    auditDelta(changes, 'Дата окончания', existing.end, next.end);
+    auditDelta(changes, 'Заказчик', existing.customer, next.customer);
+    auditDelta(changes, 'Тип ВС', existing.aircraftType, next.aircraftType);
+    auditDelta(changes, 'Категория', existing.projectType, next.projectType);
+
+    auditToggle(changes, 'Долгосрочный', existing.longterm, next.longterm, 'включён', 'выключен');
+
+    auditMark(changes, 'Описание', existing.desc, next.desc, 'изменено');
+    auditMark(changes, 'Подразделение', existing.kbId, next.kbId, 'изменено');
+
+    auditListDelta(changes, 'Вложения', existing.files, next.files, (f) => f.id, (f) => f.name);
+    auditListDelta(changes, 'Фото', existing.photos, next.photos, (p) => p.id, (p) => p.name);
+    auditListDelta(changes, 'Папки', existing.folders, next.folders, (f) => f.id, (f) => f.name);
+
+    return changes;
   }
 
   deleteProject(id, currentUserId) {
     const project = this._projectRepo.findById(id);
+    if (project && isArchived(project)) {
+      throw new Error('Проект в архиве - удаление запрещено');
+    }
     if (project) {
       this._audit.addAudit('Удаление проекта', project.name, 'project', id, currentUserId);
     }
     this._projectRepo.delete(id);
+
     const tasks = this._taskRepo.findByProject(id);
-    for (const task of tasks) this._taskRepo.delete(task.id);
+    const affectedEmpIds = new Set();
+    for (const task of tasks) {
+      if (task.assigneeId) affectedEmpIds.add(task.assigneeId);
+      this._taskRepo.delete(task.id);
+    }
+
+    if (affectedEmpIds.size) this._syncExecutorRoles(affectedEmpIds);
+
     this._notify();
   }
 
-  /**
-   * Обновление списка явного доступа к проекту.
-   *
-   * Единственная точка входа: форма проекта это поле не трогает.
-   * Роль-доступ сюда не попадает — он часть computeBaseScope и
-   * настраивается ролями сотрудника, а не этим методом.
-   *
-   * Право проверяется тем же предикатом, что и в UI —
-   * canManageProjectAccess. Массив копируется, чтобы состояние формы
-   * не становилось частью store.
-   *
-   * Аудит фиксирует имена, а не только количество: журнал должен
-   * отвечать на вопрос «кому именно», а не «сколько». Разрешение
-   * id → ФИО живёт здесь, потому что это часть формирования записи
-   * аудита; никакой UI-логики сюда не протекает.
-   */
   setAccess(projectId, access, currentUser) {
     const project = this._projectRepo.findById(projectId);
     if (!project) throw new Error('Проект не найден');
+    if (isArchived(project)) throw new Error('Проект в архиве - редактирование запрещено');
 
     const allowed = currentUser && this._canManageAccess
       && this._canManageAccess(currentUser, project);
@@ -125,9 +207,6 @@ export class ProjectService {
     }
 
     const userIds = Array.isArray(access?.userIds) ? [...access.userIds] : [];
-
-    // Имена для журнала. Отсутствующие id молча пропускаем — данные
-    // могут быть устаревшими, но это не должно валить сохранение.
     const names = userIds
       .map(id => this._employeeRepo.findById(id))
       .filter(Boolean)
@@ -140,7 +219,7 @@ export class ProjectService {
       'Изменение доступа к проекту',
       {
         project: project.name,
-        grantedTo: names.length ? names.join(', ') : '—',
+        grantedTo: names.length ? names.join(', ') : '-',
       },
       'project',
       project.id,

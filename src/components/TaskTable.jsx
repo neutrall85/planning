@@ -2,6 +2,15 @@ import { useState, useMemo } from 'react';
 import { TASK_STATUSES } from '../utils/constants';
 import { fmtDMY } from '../utils/date';
 
+/**
+ * Таблица задач с сортировкой по столбцам.
+ *
+ * Раньше `.find` по проектам стоял прямо в компараторе sort:
+ * `db.projects.find(p => p.id === a.projectId)` для каждой пары
+ * сравниваемых элементов. Это O(N log N · M). Сейчас ключи сортировки
+ * для всех задач вычисляются один раз перед сортировкой - O(N), а
+ * компаратор только сравнивает готовые значения.
+ */
 export const TaskTable = ({
   tasks,
   onRowClick,
@@ -14,55 +23,38 @@ export const TaskTable = ({
   const [sortField, setSortField] = useState('title');
   const [sortDir, setSortDir] = useState('asc');
 
-  const sortedTasks = useMemo(() => {
-    const sorted = [...tasks];
-    sorted.sort((a, b) => {
-      // Черновые всегда выше реальных, независимо от сортировки.
-      if (a._draft !== b._draft) return a._draft ? -1 : 1;
+  // Стабильная по ссылке карта проектов; сравнение в deps useMemo по
+  // ссылке на массив db.projects.
+  const projectsById = useMemo(
+    () => new Map((db?.projects || []).map(p => [p.id, p])),
+    [db?.projects],
+  );
 
-      let valA, valB;
+  const sortedTasks = useMemo(() => {
+    const keyed = tasks.map(t => {
+      let key;
       switch (sortField) {
-        case 'title':
-          valA = (a.title || '').toLowerCase();
-          valB = (b.title || '').toLowerCase();
-          break;
-        case 'assignee':
-          const nameA = a.assigneeId ? empName(a.assigneeId) : '';
-          const nameB = b.assigneeId ? empName(b.assigneeId) : '';
-          valA = nameA.toLowerCase();
-          valB = nameB.toLowerCase();
-          break;
-        case 'status':
-          valA = TASK_STATUSES[a.status]?.label || a.status;
-          valB = TASK_STATUSES[b.status]?.label || b.status;
-          break;
-        case 'planned':
-          valA = a.plannedHours ?? -1;
-          valB = b.plannedHours ?? -1;
-          break;
-        case 'fact':
-          valA = getTaskSpent(a);
-          valB = getTaskSpent(b);
-          break;
-        case 'deadline':
-          valA = a.deadline || '';
-          valB = b.deadline || '';
-          break;
-        case 'project':
-          const pA = db.projects.find(p => p.id === a.projectId);
-          const pB = db.projects.find(p => p.id === b.projectId);
-          valA = pA?.code || '';
-          valB = pB?.code || '';
-          break;
-        default:
-          return 0;
+        case 'title':    key = (t.title || '').toLowerCase(); break;
+        case 'assignee': key = (t.assigneeId ? empName(t.assigneeId) : '').toLowerCase(); break;
+        case 'status':   key = TASK_STATUSES[t.status]?.label || t.status || ''; break;
+        case 'planned':  key = t.plannedHours ?? -1; break;
+        case 'fact':     key = getTaskSpent(t); break;
+        case 'deadline': key = t.deadline || ''; break;
+        case 'project':  key = projectsById.get(t.projectId)?.code || ''; break;
+        default:         key = '';
       }
-      if (valA < valB) return sortDir === 'asc' ? -1 : 1;
-      if (valA > valB) return sortDir === 'asc' ? 1 : -1;
+      return { task: t, key };
+    });
+
+    keyed.sort((a, b) => {
+      if (a.task._draft !== b.task._draft) return a.task._draft ? -1 : 1;
+      if (a.key < b.key) return sortDir === 'asc' ? -1 : 1;
+      if (a.key > b.key) return sortDir === 'asc' ? 1 : -1;
       return 0;
     });
-    return sorted;
-  }, [tasks, sortField, sortDir, db, empName, getTaskSpent]);
+
+    return keyed.map(k => k.task);
+  }, [tasks, sortField, sortDir, projectsById, empName, getTaskSpent]);
 
   const handleSort = (field) => {
     if (sortField === field) setSortDir(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -129,7 +121,7 @@ export const TaskTable = ({
                     <td>{task.deadline ? fmtDMY(task.deadline) : '-'}</td>
                   )}
                   {showProject && columns.includes('project') && (
-                    <td>{db.projects.find(p => p.id === task.projectId)?.code || '-'}</td>
+                    <td>{projectsById.get(task.projectId)?.code || '-'}</td>
                   )}
                 </tr>
               );

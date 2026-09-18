@@ -2,10 +2,6 @@
 import { Repository } from './Repository';
 
 export class TaskRepository extends Repository {
-  constructor(tasks) {
-    super(tasks);
-  }
-
   findByProject(projectId) {
     return this.find(t => t.projectId === projectId);
   }
@@ -25,6 +21,8 @@ export class TaskRepository extends Repository {
   }
 
   findRootTasks(projectId) {
-    return this.find(t => t.projectId === projectId && !t.parentTaskId && !t.archived);
+    return this.find(t =>
+      t.projectId === projectId && !t.parentTaskId && !t.archived
+    );
   }
 }

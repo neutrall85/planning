@@ -1,10 +1,7 @@
+// src/repositories/TemplateRepository.js
 import { Repository } from './Repository';
 
 export class TemplateRepository extends Repository {
-  constructor(templates) {
-    super(templates);
-  }
-
   findByKind(kind) {
     return this.find(t => t.kind === kind);
   }

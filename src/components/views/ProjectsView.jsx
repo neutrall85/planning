@@ -1,5 +1,5 @@
 // src/components/views/ProjectsView.jsx
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback, memo } from 'react';
 import Kanban from '../Kanban';
 import Projects from '../Projects';
 import FloatingMenu from '../FloatingMenu';
@@ -21,82 +21,174 @@ import { getProjectColor } from '../../utils/projectHelpers';
 import ProjectProgress from '../ProjectProgress';
 import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmContext';
+import { useFilters } from '../../hooks/useFilters';
+import { useTasksDb } from '../../hooks/useDb';
+import { buildProjectMenu } from '../menus';
 
-export default function ProjectsView({ db, ur, openProject, openHoursReq, store }) {
+const INITIAL_FILTERS = Object.freeze({
+  query: '',
+  status: 'all',
+  type: 'all',
+  priority: 'all',
+  participant: 'all',
+  deptId: 'all',
+  showOnlyMy: false,
+});
+
+/**
+ * Карточка проекта на канбан-доске.
+ *
+ * memo-компонент: агрегаты (plan, fact, assigneeIds) приходят готовыми
+ * из projectStatsById; раскладка карточки не пересчитывает ничего сама.
+ * memo сравнивает plan/fact по значению (числа), assigneeIds - по
+ * ссылке из стабильной карты, поэтому на hover колонки карточки не
+ * перерисовываются.
+ */
+const ProjectCard = memo(function ProjectCard({
+  project,
+  plan,
+  fact,
+  assigneeIds,
+  employeesById,
+  db,
+  user,
+  openProject,
+  onClose,
+  onCancel,
+  onCopy,
+  onMakeTemplate,
+}) {
+  const projectColor = getProjectColor(project);
+
+  const menuItems = buildProjectMenu({
+    project, user, openProject,
+    onClose, onCancel, onCopy, onMakeTemplate,
+  });
+
+  const handleOpen = () => openProject(project.id);
+
+  return (
+    <FloatingMenu items={menuItems}>
+      {({ anchorProps }) => (
+        <div {...anchorProps} onClick={handleOpen}>
+          <div className="kcard-title">{project.name}</div>
+          <div className="kcard-proj">
+            <span className="pdot" style={{ background: projectColor }} />
+            {project.code}
+          </div>
+          <div className="kcard-meta">
+            <span
+              className="mut sm ml-8"
+              style={{ color: PROJECT_PRIORITIES[project.priority]?.color || '#64748b' }}
+            >
+              {project.priority || 'NORM'}
+            </span>
+            <ProjectProgress project={project} plan={plan} fact={fact} />
+          </div>
+          <div className="kcard-foot">
+            <div className="pj-avatars flex-1">
+              {assigneeIds.slice(0, 4).map(id => {
+                const a = employeesById.get(id);
+                return a ? <Avatar key={id} employee={a} size="xs" /> : null;
+              })}
+              {assigneeIds.length > 4 && (
+                <span className="mut sm">+{assigneeIds.length - 4}</span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </FloatingMenu>
+  );
+});
+
+function ProjectsView({
+  ur, openProject, store,
+  openCopyProject, openTemplateFromProject,
+}) {
+  const db = useTasksDb();
+  const { projects, tasks, employees, departments } = db;
+
   const { showToast } = useToast();
   const { confirm } = useConfirm();
   const scope = useMemo(() => computeScope(ur, db), [ur, db]);
   const [viewMode, setViewMode] = useState('kanban');
-  const [showOnlyMyProjects, setShowOnlyMyProjects] = useState(false);
   const canSeeAll = hasRole(ur, 'admin', 'director', 'economist', 'kb_chief', 'head', 'project_lead', 'project_manager');
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [filterType, setFilterType] = useState('all');
-  const [filterPriority, setFilterPriority] = useState('all');
-  const [filterParticipant, setFilterParticipant] = useState('all');
-  const [filterDept, setFilterDept] = useState('all');
+  const { filters, setFilter } = useFilters(INITIAL_FILTERS);
+  const { query, status, type, priority, participant, deptId, showOnlyMy } = filters;
+
+  const employeesById = useMemo(
+    () => new Map(employees.map(e => [e.id, e])),
+    [employees],
+  );
 
   const baseProjects = useMemo(() => {
     let list = scope.all
-      ? db.projects.filter(p => !p.archived || p.status === 'closed' || p.status === 'cancelled')
-      : db.projects.filter(p => (!p.archived || p.status === 'closed' || p.status === 'cancelled') && scope.projIds.has(p.id));
-    if (showOnlyMyProjects) {
-      const myTasks = db.tasks.filter(t => t.assigneeId === ur.id && !t.archived);
+      ? projects.filter(p => !p.archived || p.status === 'closed' || p.status === 'cancelled')
+      : projects.filter(p =>
+          (!p.archived || p.status === 'closed' || p.status === 'cancelled') &&
+          scope.projIds.has(p.id));
+    if (showOnlyMy) {
+      const myTasks = tasks.filter(t => t.assigneeId === ur.id && !t.archived);
       const myProjectIds = new Set(myTasks.map(t => t.projectId));
       list = list.filter(p => myProjectIds.has(p.id));
     }
     return list;
-  }, [db, scope, showOnlyMyProjects, ur.id]);
+  }, [projects, tasks, scope, showOnlyMy, ur.id]);
 
   const participantOptions = useMemo(() => {
-    const activeProjectIds = new Set(db.projects.filter(p => !p.archived || p.status === 'closed' || p.status === 'cancelled').map(p => p.id));
+    const activeProjectIds = new Set(
+      projects
+        .filter(p => !p.archived || p.status === 'closed' || p.status === 'cancelled')
+        .map(p => p.id)
+    );
     const involvedIds = new Set();
-    db.tasks.forEach(t => {
+    tasks.forEach(t => {
       if (activeProjectIds.has(t.projectId) && !t.archived && t.assigneeId) {
         involvedIds.add(t.assigneeId);
       }
     });
-    return db.employees.filter(e => involvedIds.has(e.id));
-  }, [db]);
+    return employees.filter(e => involvedIds.has(e.id));
+  }, [projects, tasks, employees]);
 
   const deptOptions = useMemo(() => {
     const deptIds = new Set();
     participantOptions.forEach(e => e.departments.forEach(d => deptIds.add(d.deptId)));
-    return db.departments.filter(d => deptIds.has(d.id));
-  }, [participantOptions, db.departments]);
+    return departments.filter(d => deptIds.has(d.id));
+  }, [participantOptions, departments]);
 
   const filteredProjects = useMemo(() => {
     let list = baseProjects;
 
-    if (searchQuery.trim()) {
-      const q = searchQuery.trim().toLowerCase();
+    if (query.trim()) {
+      const q = query.trim().toLowerCase();
       list = list.filter(p =>
         p.name.toLowerCase().includes(q) ||
         (p.code && p.code.toLowerCase().includes(q))
       );
     }
 
-    if (filterStatus !== 'all') list = list.filter(p => p.status === filterStatus);
-    if (filterType !== 'all') list = list.filter(p => (p.ptype || 'prod') === filterType);
-    if (filterPriority !== 'all') list = list.filter(p => p.priority === filterPriority);
+    if (status !== 'all') list = list.filter(p => p.status === status);
+    if (type !== 'all') list = list.filter(p => (p.ptype || 'prod') === type);
+    if (priority !== 'all') list = list.filter(p => p.priority === priority);
 
-    if (filterParticipant !== 'all') {
+    if (participant !== 'all') {
       const projectIdsWithParticipant = new Set();
-      db.tasks.forEach(t => {
-        if (!t.archived && t.assigneeId === filterParticipant) {
+      tasks.forEach(t => {
+        if (!t.archived && t.assigneeId === participant) {
           projectIdsWithParticipant.add(t.projectId);
         }
       });
       list = list.filter(p => projectIdsWithParticipant.has(p.id));
     }
 
-    if (filterDept !== 'all') {
+    if (deptId !== 'all') {
       const projectIdsWithDept = new Set();
-      db.tasks.forEach(t => {
+      tasks.forEach(t => {
         if (!t.archived && t.assigneeId) {
-          const assignee = db.employees.find(e => e.id === t.assigneeId);
-          if (assignee && assignee.departments.some(d => d.deptId === filterDept)) {
+          const assignee = employeesById.get(t.assigneeId);
+          if (assignee && assignee.departments.some(d => d.deptId === deptId)) {
             projectIdsWithDept.add(t.projectId);
           }
         }
@@ -105,172 +197,151 @@ export default function ProjectsView({ db, ur, openProject, openHoursReq, store 
     }
 
     return list;
-  }, [baseProjects, searchQuery, filterStatus, filterType, filterPriority, filterParticipant, filterDept, db]);
+  }, [baseProjects, query, status, type, priority, participant, deptId, tasks, employeesById]);
 
-  const handleMoveProject = (id, newStatus) => {
-    const project = db.projects.find(p => p.id === id);
+  // Агрегаты по проектам считаются один раз на срез tasks. Раньше это
+  // делалось в renderProjectCard, то есть N раз за рендер, и каждый раз
+  // пробегало по всем задачам. Сейчас один проход по задачам, результат
+  // в Map; карточка получает уже готовые числа и стабильную по ссылке
+  // копию assigneeIds.
+  const projectStatsById = useMemo(() => {
+    const map = new Map();
+    const byProject = new Map();
+    tasks.forEach(t => {
+      if (t.archived) return;
+      let list = byProject.get(t.projectId);
+      if (!list) { list = []; byProject.set(t.projectId, list); }
+      list.push(t);
+    });
+    byProject.forEach((list, projectId) => {
+      let plan = 0;
+      let fact = 0;
+      const assigneeIds = [];
+      const seen = new Set();
+      list.forEach(t => {
+        plan += t.plannedHours || 0;
+        if (Array.isArray(t.logs)) {
+          for (const l of t.logs) fact += l.hours || 0;
+        }
+        if (t.assigneeId && !seen.has(t.assigneeId)) {
+          seen.add(t.assigneeId);
+          assigneeIds.push(t.assigneeId);
+        }
+      });
+      map.set(projectId, { plan, fact, assigneeIds });
+    });
+    return map;
+  }, [tasks]);
+
+  const handleMoveProject = useCallback((id, newStatus) => {
+    const project = projects.find(p => p.id === id);
     if (!project || project.status === newStatus) return;
     if (!canChangeProjectStatus(ur, project, newStatus)) {
       showToast('У вас нет прав на изменение статуса этого проекта.', 'error');
       return;
     }
     store.upsertProject({ ...project, status: newStatus });
-  };
+  }, [projects, ur, store, showToast]);
 
-  const handleCloseProject = async (project) => {
+  const handleCloseProject = useCallback(async (project) => {
     const ok = await confirm(DIALOGS.closeProject(project.name));
     if (!ok) return;
     store.upsertProject({ ...project, status: 'closed', closedAt: TODAY });
     showToast(TOASTS.projectClosed, 'success');
-  };
+  }, [confirm, store, showToast]);
 
-  const handleCancelProject = async (project) => {
+  const handleCancelProject = useCallback(async (project) => {
     const ok = await confirm(DIALOGS.cancelProject(project.name));
     if (!ok) return;
     store.upsertProject({ ...project, status: 'cancelled' });
     showToast(TOASTS.projectCancelled, 'success');
-  };
+  }, [confirm, store, showToast]);
 
-  /**
-   * Состав меню действий для проекта. Тот же набор правил, что и в
-   * списковой карточке Projects.jsx: закрывать/отменять может тот, кому
-   * canChangeProjectStatus разрешает переход. Разделитель ставится только
-   * когда под ним есть хотя бы один пункт — иначе «висячая» линия.
-   */
-  const buildProjectMenu = (project) => {
-    const isClosed = project.status === 'closed' || project.status === 'cancelled';
-    const canClose  = !isClosed && canChangeProjectStatus(ur, project, 'closed');
-    const canCancel = !isClosed && canChangeProjectStatus(ur, project, 'cancelled');
-
-    const canRequestHours = (
-      (hasRole(ur, 'project_lead') && project.managerId === ur.id) ||
-      hasRole(ur, 'admin', 'director', 'economist', 'kb_chief')
-    ) && project.status === 'active' && project.ptype !== 'admin';
-
-    const hasDestructive = canClose || canCancel;
-
-    return [
-      { id: 'open', label: 'Открыть проект', icon: ICONS.eye, onClick: () => openProject(project.id) },
-      canRequestHours && {
-        id: 'hours',
-        label: 'Запросить изменение часов',
-        icon: ICONS.clock,
-        onClick: () => openHoursReq('project', project.id),
-      },
-      hasDestructive && { type: 'divider' },
-      canClose && {
-        id: 'close',
-        label: 'Закрыть проект',
-        icon: ICONS.check,
-        onClick: () => handleCloseProject(project),
-      },
-      canCancel && {
-        id: 'cancel',
-        label: 'Отменить проект',
-        icon: ICONS.x,
-        danger: true,
-        onClick: () => handleCancelProject(project),
-      },
-    ].filter(Boolean);
-  };
-
-  const renderProjectCard = (project) => {
-    const tasks = db.tasks.filter(t => t.projectId === project.id && !t.archived);
-    const plan = tasks.reduce((s, t) => s + (t.plannedHours || 0), 0);
-    const fact = tasks.reduce((s, t) => s + t.logs.reduce((lsum, l) => lsum + l.hours, 0), 0);
-    const uniqueAssignees = [...new Set(tasks.map(t => t.assigneeId).filter(Boolean))];
-    const projectColor = getProjectColor(project);
-
+  const renderProjectCard = useCallback((project) => {
+    const stats = projectStatsById.get(project.id) || { plan: 0, fact: 0, assigneeIds: [] };
     return (
-      <FloatingMenu items={buildProjectMenu(project)}>
-        {({ anchorProps, buttonProps }) => (
-          <div {...anchorProps} onClick={() => openProject(project.id)}>
-            <button
-              {...buttonProps}
-              className="icon-btn kcard-menu-btn"
-              title="Действия"
-              aria-label="Действия с проектом"
-            >
-              <Ic d={ICONS.more} size={15} />
-            </button>
-
-            <div className="kcard-title">{project.name}</div>
-            <div className="kcard-proj">
-              <span className="pdot" style={{ background: projectColor }} />
-              {project.code}
-            </div>
-            <div className="kcard-meta">
-              <span className="mut sm ml-8" style={{ color: PROJECT_PRIORITIES[project.priority]?.color || '#64748b' }}>
-                {project.priority || 'NORM'}
-              </span>
-              <ProjectProgress project={project} plan={plan} fact={fact} />
-            </div>
-            <div className="kcard-foot">
-              <div className="pj-avatars flex-1">
-                {uniqueAssignees.slice(0, 4).map(id => {
-                  const a = db.employees.find(e => e.id === id);
-                  return a ? <Avatar key={id} employee={a} size="xs" /> : null;
-                })}
-                {uniqueAssignees.length > 4 && <span className="mut sm">+{uniqueAssignees.length - 4}</span>}
-              </div>
-            </div>
-          </div>
-        )}
-      </FloatingMenu>
+      <ProjectCard
+        project={project}
+        plan={stats.plan}
+        fact={stats.fact}
+        assigneeIds={stats.assigneeIds}
+        employeesById={employeesById}
+        db={db}
+        user={ur}
+        openProject={openProject}
+        onClose={handleCloseProject}
+        onCancel={handleCancelProject}
+        onCopy={openCopyProject}
+        onMakeTemplate={openTemplateFromProject}
+      />
     );
-  };
+  }, [
+    projectStatsById, employeesById, db, ur,
+    openProject, handleCloseProject, handleCancelProject,
+    openCopyProject, openTemplateFromProject,
+  ]);
 
-  const closeProject = (p) => store.upsertProject({ ...p, status: 'closed', closedAt: TODAY });
-  const cancelProject = (p) => store.upsertProject({ ...p, status: 'cancelled' });
   const canCreateProject = hasRole(ur, 'admin', 'director', 'kb_chief', 'project_manager');
 
   return (
     <>
       <div className="toolbar">
         <div className="btn-group">
-          <button className={`btn ghost sm ${viewMode === 'list' ? 'active' : ''}`} onClick={() => setViewMode('list')}>
+          <button
+            className={`btn ghost sm ${viewMode === 'list' ? 'active' : ''}`}
+            onClick={() => setViewMode('list')}
+          >
             <Ic d={ICONS.list} size={15} /> Список
           </button>
-          <button className={`btn ghost sm ${viewMode === 'kanban' ? 'active' : ''}`} onClick={() => setViewMode('kanban')}>
+          <button
+            className={`btn ghost sm ${viewMode === 'kanban' ? 'active' : ''}`}
+            onClick={() => setViewMode('kanban')}
+          >
             <Ic d={ICONS.kanban} size={15} /> Канбан
           </button>
         </div>
 
         <SearchBox
-          value={searchQuery}
-          onChange={setSearchQuery}
+          value={query}
+          onChange={v => setFilter('query', v)}
           placeholder="Поиск..."
           className="filter-search"
         />
 
-        <select className="inp sel sm filter-select" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+        <select className="inp sel sm filter-select" value={status} onChange={e => setFilter('status', e.target.value)}>
           <option value="all">Статус</option>
           {Object.entries(PROJECT_STATUSES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
 
-        <select className="inp sel sm filter-select" value={filterType} onChange={e => setFilterType(e.target.value)}>
+        <select className="inp sel sm filter-select" value={type} onChange={e => setFilter('type', e.target.value)}>
           <option value="all">Тип</option>
           {Object.entries(PROJECT_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
 
-        <select className="inp sel sm filter-select" value={filterPriority} onChange={e => setFilterPriority(e.target.value)}>
+        <select className="inp sel sm filter-select" value={priority} onChange={e => setFilter('priority', e.target.value)}>
           <option value="all">Приоритет</option>
           {Object.entries(PROJECT_PRIORITIES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
         </select>
 
-        <select className="inp sel sm filter-select" value={filterParticipant} onChange={e => setFilterParticipant(e.target.value)}>
+        <select className="inp sel sm filter-select" value={participant} onChange={e => setFilter('participant', e.target.value)}>
           <option value="all">Участник</option>
-          {participantOptions.map(emp => <option key={emp.id} value={emp.id}>{emp.last} {emp.first}</option>)}
+          {participantOptions.map(emp => (
+            <option key={emp.id} value={emp.id}>{emp.last} {emp.first}</option>
+          ))}
         </select>
 
-        <select className="inp sel sm filter-select filter-select-dept" value={filterDept} onChange={e => setFilterDept(e.target.value)}>
+        <select className="inp sel sm filter-select filter-select-dept" value={deptId} onChange={e => setFilter('deptId', e.target.value)}>
           <option value="all">Отдел</option>
           {deptOptions.map(dept => <option key={dept.id} value={dept.id}>{dept.name}</option>)}
         </select>
 
         {canSeeAll && (
           <label className="dept-pick ml-auto">
-            <input type="checkbox" checked={showOnlyMyProjects} onChange={e => setShowOnlyMyProjects(e.target.checked)} />
+            <input
+              type="checkbox"
+              checked={showOnlyMy}
+              onChange={e => setFilter('showOnlyMy', e.target.checked)}
+            />
             <span>Проекты с моими задачами</span>
           </label>
         )}
@@ -296,12 +367,15 @@ export default function ProjectsView({ db, ur, openProject, openHoursReq, store 
           db={db}
           ur={ur}
           openProject={openProject}
-          openHoursReq={openHoursReq}
-          closeProject={closeProject}
-          cancelProject={cancelProject}
           projects={filteredProjects}
+          onCloseProject={handleCloseProject}
+          onCancelProject={handleCancelProject}
+          openCopyProject={openCopyProject}
+          openTemplateFromProject={openTemplateFromProject}
         />
       )}
     </>
   );
 }
+
+export default memo(ProjectsView);

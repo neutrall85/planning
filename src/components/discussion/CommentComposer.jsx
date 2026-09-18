@@ -1,43 +1,58 @@
-import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
-import { Ic, ICONS } from '../Icons';
+// src/components/discussion/CommentComposer.jsx
+import { useState, useRef, useLayoutEffect, useCallback } from 'react';
 import { FILE_LIMITS, FILE_MESSAGES } from '../../utils/constants';
-import MentionPopup from './MentionPopup';
 import { useMentions } from '../../hooks';
+import { ICONS, Ic } from '../Icons';
+import MentionPopup from './MentionPopup';
 
-// Префикс «@Фамилия Имя, » в начале текста — маркер адресата ответа.
-// Совпадает с форматом @-упоминаний (mentionParser), поэтому адресат
-// получит отдельное уведомление об упоминании. Используется и при вставке
-// нового адресата, и при отмене ответа.
 const REPLY_PREFIX_RE = /^@?[^\s,]+\s+[^\s,]+,\s*/;
 
+/**
+ * Композер комментария: текст, вложения-изображения, @-упоминания.
+ *
+ * Принимает projectId и taskId отдельными пропсами - в них уходит
+ * созданный комментарий. Один из них может быть null (чат проекта:
+ * только projectId; чат задачи: оба).
+ */
 export default function CommentComposer({
-  store, filter, currentUser, candidates, toast,
-  replyTo, setReplyTo, comments, getAuthor,
-  readOnly, onCommentCreated,
+  store,
+  projectId = null,
+  taskId = null,
+  currentUser,
+  candidates,
+  toast,
+  replyTo,
+  setReplyTo,
+  comments,
+  getAuthor,
+  readOnly,
+  onCommentCreated,
 }) {
   const [text, setText] = useState('');
   const [attachments, setAttachments] = useState([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const textareaRef = useRef(null);
 
-  const mentions = useMentions({ text, setText, candidates, textareaRef });
+  const mentions = useMentions({
+    text,
+    setText,
+    candidates,
+    textareaRef,
+  });
 
   useLayoutEffect(() => {
     if (!replyTo) return;
     const parent = comments.find(c => c.id === replyTo);
     const author = parent ? getAuthor(parent.authorId) : null;
     if (!author) return;
-
     const prefix = `@${author.last} ${author.first}, `;
     setText(prev => prefix + prev.replace(REPLY_PREFIX_RE, ''));
-
     requestAnimationFrame(() => {
       const ta = textareaRef.current;
       if (!ta) return;
       ta.focus();
       ta.setSelectionRange(ta.value.length, ta.value.length);
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [replyTo]);
 
   const cancelReply = useCallback(() => {
@@ -64,17 +79,14 @@ export default function CommentComposer({
     }
     const files = Array.from(e.dataTransfer.files);
     const valid = files.filter(f => f.type.startsWith('image/') && f.size <= FILE_LIMITS.image);
-    if (valid.length !== files.length) {
-      toast?.(FILE_MESSAGES.someImagesSkipped, 'warning');
-    }
+    if (valid.length !== files.length) toast?.(FILE_MESSAGES.someImagesSkipped, 'warning');
     if (valid.length) {
       setAttachments(prev => [...prev, ...valid]);
       toast?.(`Добавлено ${valid.length} файлов`, 'success');
     }
   }, [readOnly, toast]);
 
-  const removeAttachment = (idx) =>
-    setAttachments(prev => prev.filter((_, i) => i !== idx));
+  const removeAttachment = (idx) => setAttachments(prev => prev.filter((_, i) => i !== idx));
 
   const send = async () => {
     if (readOnly) return;
@@ -84,8 +96,8 @@ export default function CommentComposer({
     }
 
     const created = store.addComment({
-      projectId: filter.projectId || null,
-      taskId: filter.taskId || null,
+      projectId: projectId || null,
+      taskId: taskId || null,
       parentId: replyTo || null,
       authorId: currentUser.id,
       text: text.trim(),
@@ -175,7 +187,7 @@ export default function CommentComposer({
 
       <div className="cm-foot">
         <span className="mut sm">
-          Участники получат уведомление; упомянутые — отдельно.
+          Участники получат уведомление; упомянутые - отдельно.
         </span>
         <div className="flex gap-2">
           <button className="btn primary sm" onClick={send}>

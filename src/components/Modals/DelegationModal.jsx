@@ -7,6 +7,23 @@ import { useAsyncSubmit } from '../../hooks/useAsyncSubmit';
 import { ROLES } from '../../utils/constants';
 import { TODAY, iso, addDays, uid } from '../../utils/date';
 
+/**
+ * Поля формы, участвующие в проверке isDirty. Обязательный параметр
+ * useForm - без него форма падает на первом рендере.
+ *
+ * `roles` - массив строк; useForm сравнивает через JSON.stringify,
+ * порядок элементов может отличаться. Если это станет проблемой, роли
+ * можно сортировать перед сравнением - но пока не нужно.
+ */
+const FIELDS = Object.freeze([
+  'toId',
+  'roles',
+  'start',
+  'end',
+  'openEnd',
+  'reason',
+]);
+
 export const DelegationModal = ({ db, ur, onClose, onSubmit, toast }) => {
   const initialValues = {
     toId: '',
@@ -22,7 +39,6 @@ export const DelegationModal = ({ db, ur, onClose, onSubmit, toast }) => {
     if (!values.toId) errors.toId = 'Выберите получателя';
     if (!values.roles.length) errors.roles = 'Выберите хотя бы одну роль';
     if (!values.reason.trim()) errors.reason = 'Укажите обоснование';
-    // Проверка дат
     if (values.start && values.end && !values.openEnd) {
       if (values.end < values.start) errors.end = 'Дата окончания не может быть раньше даты начала';
     }
@@ -32,7 +48,11 @@ export const DelegationModal = ({ db, ur, onClose, onSubmit, toast }) => {
     return errors;
   }, []);
 
-  const { values, handleChange, handleSubmit, errors, touched } = useForm(initialValues, validate);
+  const { values, handleChange, handleSubmit, errors, touched } = useForm(
+    initialValues,
+    validate,
+    { fields: FIELDS },
+  );
 
   const saveAsync = useCallback(async (vals) => {
     const delegation = {
@@ -71,62 +91,66 @@ export const DelegationModal = ({ db, ur, onClose, onSubmit, toast }) => {
       saveDisabled={isSubmitting}
     >
       <p className="mut sm">
-        Роли «Суперадминистратор» и «Генеральный директор» делегируются только через суперадминистратора. 
+        Роли «Суперадминистратор» и «Генеральный директор» делегируются только через суперадминистратора.
         Получатель должен подтвердить принятие.
       </p>
-      
+
       <div className="project-info-fields">
-        <FormField 
-          label="Сотрудник-получатель *" 
-          type="select" 
-          options={employeeOptions} 
-          value={values.toId} 
-          onChange={(v) => handleChange('toId', v)} 
-          error={touched.toId && errors.toId} 
+        <FormField
+          label="Сотрудник-получатель"
+          required
+          type="select"
+          options={employeeOptions}
+          value={values.toId}
+          onChange={(v) => handleChange('toId', v)}
+          error={touched.toId && errors.toId}
         />
-        <FormField 
-          label="Передаваемые роли *" 
-          type="select" 
-          options={roleOptions} 
-          value={values.roles} 
-          onChange={(v) => handleChange('roles', v)} 
-          error={touched.roles && errors.roles} 
-          multiple 
+        <FormField
+          label="Передаваемые роли"
+          required
+          type="select"
+          options={roleOptions}
+          value={values.roles}
+          onChange={(v) => handleChange('roles', v)}
+          error={touched.roles && errors.roles}
+          multiple
         />
-        <FormField 
-          label="Дата начала *" 
-          type="date" 
-          value={values.start} 
-          onChange={(v) => handleChange('start', v)} 
-          error={touched.start && errors.start} 
+        <FormField
+          label="Дата начала"
+          required
+          type="date"
+          value={values.start}
+          onChange={(v) => handleChange('start', v)}
+          error={touched.start && errors.start}
         />
         <div className="field-row">
           <label className="field-label">Дата окончания</label>
           <div className="duo flex-1">
-            <input 
-              className="inp" 
-              type="date" 
-              disabled={values.openEnd} 
-              value={values.end} 
-              onChange={(e) => handleChange('end', e.target.value)} 
+            <input
+              className="inp"
+              type="date"
+              disabled={values.openEnd}
+              value={values.end}
+              onChange={(e) => handleChange('end', e.target.value)}
             />
             <label className="dept-pick">
-              <input 
-                type="checkbox" 
-                checked={values.openEnd} 
-                onChange={(e) => handleChange('openEnd', e.target.checked)} 
-              /> 
+              <input
+                type="checkbox"
+                checked={values.openEnd}
+                onChange={(e) => handleChange('openEnd', e.target.checked)}
+              />
               до отмены
             </label>
           </div>
         </div>
-        <FormField 
-          label="Обоснование *" 
-          type="textarea" 
-          rows={2} 
-          value={values.reason} 
-          onChange={(v) => handleChange('reason', v)} 
-          error={touched.reason && errors.reason} 
+        <FormField
+          label="Обоснование"
+          required
+          type="textarea"
+          rows={2}
+          value={values.reason}
+          onChange={(v) => handleChange('reason', v)}
+          error={touched.reason && errors.reason}
         />
       </div>
     </ModalShell>

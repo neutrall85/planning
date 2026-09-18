@@ -1,10 +1,11 @@
-import React, { useState, useMemo, useEffect } from 'react';
+// src/components/Reports.jsx
+import { useState, useMemo } from 'react';
 import { TASK_STATUSES, PRIORITIES, PROJECT_STATUSES } from '../utils/constants';
-import { TODAY, fmtDMY, fmtDT } from '../utils/date';
-import { hasRole, computeScope, taskVisible } from '../utils/permissions';
+import { fmtDMY } from '../utils/date';
+import { computeScope, taskVisible } from '../utils/permissions';
 import { useToast } from '../context/ToastContext';
 import { Ic, ICONS } from './Icons';
-import { useDataHelpers } from '../hooks';
+import { useDataHelpers, useFilters } from '../hooks';
 import { getPrimaryDeptName } from '../utils/helpers';
 
 const REPORT_TYPES = [
@@ -14,9 +15,26 @@ const REPORT_TYPES = [
   { value: 'worklog', label: 'Трудозатраты' },
 ];
 
+const INITIAL_FILTERS = Object.freeze({
+  type: 'tasks',
+  dateFrom: '',
+  dateTo: '',
+  deadlineFrom: '',
+  deadlineTo: '',
+  projectId: 'all',
+  assigneeId: 'all',
+  status: 'all',
+  priority: 'all',
+  customer: '',
+});
+
+const SAVED_FILTERS_KEY = 'savedReportFilters';
+
+const EMPTY_STATS = { plan: 0, fact: 0, count: 0 };
+
 export default function Reports({ db, ur }) {
   const { showToast } = useToast();
-  const { empName, getTaskSpent, getProjectStats } = useDataHelpers(db);
+  const { empName, getTaskSpent } = useDataHelpers(db);
   const scope = useMemo(() => computeScope(ur, db), [ur, db]);
 
   const safeDb = useMemo(() => {
@@ -24,22 +42,15 @@ export default function Reports({ db, ur }) {
     return db;
   }, [db]);
 
-  const [filters, setFilters] = useState({
-    type: 'tasks',
-    dateFrom: '',
-    dateTo: '',
-    deadlineFrom: '',
-    deadlineTo: '',
-    projectId: 'all',
-    assigneeId: 'all',
-    status: 'all',
-    priority: 'all',
-    customer: '',
-  });
+  const { filters, setFilter, resetFilters } = useFilters(INITIAL_FILTERS);
+  const {
+    type: filterType, dateFrom, dateTo, deadlineFrom, deadlineTo,
+    projectId, assigneeId, status, priority, customer,
+  } = filters;
 
   const [savedFilters, setSavedFilters] = useState(() => {
     try {
-      const data = localStorage.getItem('savedReportFilters');
+      const data = localStorage.getItem(SAVED_FILTERS_KEY);
       return data ? JSON.parse(data) : [];
     } catch {
       return [];
@@ -47,87 +58,147 @@ export default function Reports({ db, ur }) {
   });
 
   const [filterName, setFilterName] = useState('');
-  const [results, setResults] = useState([]);
 
-  const allProjects = (safeDb.projects || []);
+  const allProjects = safeDb.projects || [];
+  const allEmployees = safeDb.employees || [];
+
+  // Карты идентификаторов - один раз на срез. Раньше каждая строка
+  // таблиц отчёта делала линейный .find по проектам и сотрудникам,
+  // то есть O(rows · total). На больших отчётах это заметно.
+  const projectsById = useMemo(
+    () => new Map(allProjects.map(p => [p.id, p])),
+    [allProjects],
+  );
+  const employeesById = useMemo(
+    () => new Map(allEmployees.map(e => [e.id, e])),
+    [allEmployees],
+  );
+
+  // Агрегаты «план/факт/кол-во задач» по проектам и сотрудникам -
+  // один линейный проход по задачам вместо getProjectStats(p.id) на
+  // каждую строку. getProjectStats фильтровал весь tasks массив внутри
+  // каждого вызова.
+  const projectStatsById = useMemo(() => {
+    const map = new Map();
+    const tasksList = safeDb.tasks || [];
+    tasksList.forEach(t => {
+      if (t.archived) return;
+      let s = map.get(t.projectId);
+      if (!s) { s = { plan: 0, fact: 0, count: 0 }; map.set(t.projectId, s); }
+      s.plan += t.plannedHours || 0;
+      if (Array.isArray(t.logs)) {
+        for (const l of t.logs) s.fact += l.hours || 0;
+      }
+      s.count += 1;
+    });
+    return map;
+  }, [safeDb.tasks]);
+
+  const employeeStatsById = useMemo(() => {
+    const map = new Map();
+    const tasksList = safeDb.tasks || [];
+    tasksList.forEach(t => {
+      if (!t.assigneeId) return;
+      let s = map.get(t.assigneeId);
+      if (!s) { s = { plan: 0, fact: 0, count: 0 }; map.set(t.assigneeId, s); }
+      s.plan += t.plannedHours || 0;
+      if (Array.isArray(t.logs)) {
+        for (const l of t.logs) s.fact += l.hours || 0;
+      }
+      s.count += 1;
+    });
+    return map;
+  }, [safeDb.tasks]);
+
   const visibleProjects = useMemo(() => {
     if (scope.all) return allProjects;
     return allProjects.filter(p => scope.projIds.has(p.id));
   }, [allProjects, scope]);
 
-  const allEmployees = (safeDb.employees || []);
   const visibleEmployees = useMemo(() => {
     if (scope.all) return allEmployees;
     return allEmployees.filter(e => scope.empIds.has(e.id));
   }, [allEmployees, scope]);
 
-  const applyFilters = () => {
-    const type = filters.type;
+  const handleFilterChange = setFilter;
+
+  const results = useMemo(() => {
     const tasksList = safeDb.tasks || [];
     const projectsList = safeDb.projects || [];
     const employeesList = safeDb.employees || [];
 
-    if (type === 'tasks') {
+    if (filterType === 'tasks') {
       let tasks = tasksList;
-      if (filters.dateFrom || filters.dateTo) {
+      if (dateFrom || dateTo) {
         tasks = tasks.filter(t => {
           if (!t.createdAt) return false;
-          if (filters.dateFrom && t.createdAt < filters.dateFrom) return false;
-          if (filters.dateTo && t.createdAt > filters.dateTo) return false;
+          if (dateFrom && t.createdAt < dateFrom) return false;
+          if (dateTo && t.createdAt > dateTo) return false;
           return true;
         });
       }
-      if (filters.deadlineFrom || filters.deadlineTo) {
+      if (deadlineFrom || deadlineTo) {
         tasks = tasks.filter(t => {
           if (!t.deadline) return false;
-          if (filters.deadlineFrom && t.deadline < filters.deadlineFrom) return false;
-          if (filters.deadlineTo && t.deadline > filters.deadlineTo) return false;
+          if (deadlineFrom && t.deadline < deadlineFrom) return false;
+          if (deadlineTo && t.deadline > deadlineTo) return false;
           return true;
         });
       }
-      if (filters.projectId !== 'all') tasks = tasks.filter(t => t.projectId === filters.projectId);
-      if (filters.assigneeId !== 'all') tasks = tasks.filter(t => t.assigneeId === filters.assigneeId);
-      if (filters.status !== 'all') tasks = tasks.filter(t => t.status === filters.status);
-      if (filters.priority !== 'all') tasks = tasks.filter(t => t.priority === filters.priority);
-      if (filters.customer) {
+      if (projectId !== 'all') tasks = tasks.filter(t => t.projectId === projectId);
+      if (assigneeId !== 'all') tasks = tasks.filter(t => t.assigneeId === assigneeId);
+      if (status !== 'all') tasks = tasks.filter(t => t.status === status);
+      if (priority !== 'all') tasks = tasks.filter(t => t.priority === priority);
+      if (customer) {
+        const q = customer.toLowerCase();
         tasks = tasks.filter(t => {
-          const project = projectsList.find(p => p.id === t.projectId);
-          return project && project.customer?.toLowerCase().includes(filters.customer.toLowerCase());
+          const project = projectsById.get(t.projectId);
+          return project && project.customer?.toLowerCase().includes(q);
         });
       }
       tasks = tasks.filter(t => taskVisible(ur, scope, t, safeDb));
-      setResults(tasks);
-    } else if (type === 'projects') {
+      return tasks;
+    }
+
+    if (filterType === 'projects') {
       let projects = projectsList;
-      if (filters.dateFrom) projects = projects.filter(p => p.start >= filters.dateFrom);
-      if (filters.dateTo) projects = projects.filter(p => p.start <= filters.dateTo);
-      if (filters.deadlineFrom) projects = projects.filter(p => p.end && p.end >= filters.deadlineFrom);
-      if (filters.deadlineTo) projects = projects.filter(p => p.end && p.end <= filters.deadlineTo);
-      if (filters.projectId !== 'all') projects = projects.filter(p => p.id === filters.projectId);
-      if (filters.customer) projects = projects.filter(p => p.customer?.toLowerCase().includes(filters.customer.toLowerCase()));
+      if (dateFrom) projects = projects.filter(p => p.start >= dateFrom);
+      if (dateTo) projects = projects.filter(p => p.start <= dateTo);
+      if (deadlineFrom) projects = projects.filter(p => p.end && p.end >= deadlineFrom);
+      if (deadlineTo) projects = projects.filter(p => p.end && p.end <= deadlineTo);
+      if (projectId !== 'all') projects = projects.filter(p => p.id === projectId);
+      if (customer) {
+        const q = customer.toLowerCase();
+        projects = projects.filter(p => p.customer?.toLowerCase().includes(q));
+      }
       if (!scope.all) projects = projects.filter(p => scope.projIds.has(p.id));
-      setResults(projects);
-    } else if (type === 'employees') {
+      return projects;
+    }
+
+    if (filterType === 'employees') {
       let employees = employeesList;
-      if (filters.projectId !== 'all') {
-        const taskIds = tasksList.filter(t => t.projectId === filters.projectId).map(t => t.id);
+      if (projectId !== 'all') {
+        const taskIds = tasksList.filter(t => t.projectId === projectId).map(t => t.id);
         employees = employees.filter(e =>
           tasksList.some(t => t.assigneeId === e.id && taskIds.includes(t.id))
         );
       }
-      if (filters.assigneeId !== 'all') employees = employees.filter(e => e.id === filters.assigneeId);
-      if (filters.customer) {
+      if (assigneeId !== 'all') employees = employees.filter(e => e.id === assigneeId);
+      if (customer) {
+        const q = customer.toLowerCase();
         employees = employees.filter(e => {
           const userTasks = tasksList.filter(t => t.assigneeId === e.id);
           if (userTasks.length === 0) return false;
           return userTasks.some(t => {
-            const project = projectsList.find(p => p.id === t.projectId);
-            return project && project.customer?.toLowerCase().includes(filters.customer.toLowerCase());
+            const project = projectsById.get(t.projectId);
+            return project && project.customer?.toLowerCase().includes(q);
           });
         });
       }
-      setResults(employees);
-    } else if (type === 'worklog') {
+      return employees;
+    }
+
+    if (filterType === 'worklog') {
       let logs = [];
       tasksList.forEach(t => {
         (t.logs || []).forEach(l => {
@@ -139,51 +210,33 @@ export default function Reports({ db, ur }) {
           });
         });
       });
-      if (filters.dateFrom) logs = logs.filter(l => l.date >= filters.dateFrom);
-      if (filters.dateTo) logs = logs.filter(l => l.date <= filters.dateTo);
-      if (filters.projectId !== 'all') logs = logs.filter(l => l.projectId === filters.projectId);
-      if (filters.assigneeId !== 'all') logs = logs.filter(l => l.userId === filters.assigneeId);
-      if (filters.customer) {
+      if (dateFrom) logs = logs.filter(l => l.date >= dateFrom);
+      if (dateTo) logs = logs.filter(l => l.date <= dateTo);
+      if (projectId !== 'all') logs = logs.filter(l => l.projectId === projectId);
+      if (assigneeId !== 'all') logs = logs.filter(l => l.userId === assigneeId);
+      if (customer) {
+        const q = customer.toLowerCase();
         logs = logs.filter(l => {
-          const project = projectsList.find(p => p.id === l.projectId);
-          return project && project.customer?.toLowerCase().includes(filters.customer.toLowerCase());
+          const project = projectsById.get(l.projectId);
+          return project && project.customer?.toLowerCase().includes(q);
         });
       }
       if (!scope.all) {
         const visibleTaskIds = tasksList
           .filter(t => taskVisible(ur, scope, t, safeDb))
           .map(t => t.id);
-        logs = logs.filter(l => {
-          const task = tasksList.find(t => t.id === l.taskId);
-          return task && visibleTaskIds.includes(task.id);
-        });
+        const visibleSet = new Set(visibleTaskIds);
+        logs = logs.filter(l => visibleSet.has(l.taskId));
       }
-      setResults(logs);
+      return logs;
     }
-  };
 
-  useEffect(() => {
-    applyFilters();
-  }, [filters, safeDb, ur, scope]);
-
-  const handleFilterChange = (key, value) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
-  };
-
-  const resetFilters = () => {
-    setFilters({
-      type: filters.type,
-      dateFrom: '',
-      dateTo: '',
-      deadlineFrom: '',
-      deadlineTo: '',
-      projectId: 'all',
-      assigneeId: 'all',
-      status: 'all',
-      priority: 'all',
-      customer: '',
-    });
-  };
+    return [];
+  }, [
+    filterType, dateFrom, dateTo, deadlineFrom, deadlineTo,
+    projectId, assigneeId, status, priority, customer,
+    safeDb, ur, scope, projectsById,
+  ]);
 
   const saveFilter = () => {
     if (!filterName.trim()) {
@@ -197,20 +250,20 @@ export default function Reports({ db, ur }) {
     };
     const updated = [...savedFilters, newFilter];
     setSavedFilters(updated);
-    localStorage.setItem('savedReportFilters', JSON.stringify(updated));
+    localStorage.setItem(SAVED_FILTERS_KEY, JSON.stringify(updated));
     setFilterName('');
     showToast('Фильтр сохранён', 'success');
   };
 
   const loadFilter = (filter) => {
-    setFilters(filter.filters);
+    Object.entries(filter.filters).forEach(([key, value]) => setFilter(key, value));
     setFilterName(filter.name);
   };
 
-  const deleteFilter = (id) => {
+  const deleteSavedFilter = (id) => {
     const updated = savedFilters.filter(f => f.id !== id);
     setSavedFilters(updated);
-    localStorage.setItem('savedReportFilters', JSON.stringify(updated));
+    localStorage.setItem(SAVED_FILTERS_KEY, JSON.stringify(updated));
   };
 
   const downloadXLSX = () => {
@@ -222,31 +275,23 @@ export default function Reports({ db, ur }) {
   };
 
   const renderResults = () => {
-    const type = filters.type;
     if (results.length === 0) {
       return <div className="empty-note p-4">Нет данных, соответствующих фильтрам</div>;
     }
 
-    if (type === 'tasks') {
+    if (filterType === 'tasks') {
       return (
         <div className="w-full overflow-x-auto">
           <table className="tbl" style={{ minWidth: '800px', fontSize: '13px' }}>
             <thead>
               <tr>
-                <th>#</th>
-                <th>Задача</th>
-                <th>Проект</th>
-                <th>Исполнитель</th>
-                <th>Статус</th>
-                <th>Приоритет</th>
-                <th>План (ч)</th>
-                <th>Факт (ч)</th>
-                <th>Срок исполнения</th>
+                <th>#</th><th>Задача</th><th>Проект</th><th>Исполнитель</th>
+                <th>Статус</th><th>Приоритет</th><th>План (ч)</th><th>Факт (ч)</th><th>Срок исполнения</th>
               </tr>
             </thead>
             <tbody>
               {results.map((t, idx) => {
-                const project = (safeDb.projects || []).find(p => p.id === t.projectId);
+                const project = projectsById.get(t.projectId);
                 const statusDef = TASK_STATUSES[t.status] || { label: t.status || 'Неизвестно', color: '#64748b' };
                 const priorityDef = PRIORITIES[t.priority] || { label: t.priority || 'Неизвестно', color: '#64748b' };
                 return (
@@ -267,26 +312,21 @@ export default function Reports({ db, ur }) {
           </table>
         </div>
       );
-    } else if (type === 'projects') {
+    }
+
+    if (filterType === 'projects') {
       return (
         <div className="w-full overflow-x-auto">
           <table className="tbl" style={{ minWidth: '600px', fontSize: '13px' }}>
             <thead>
               <tr>
-                <th>#</th>
-                <th>Код</th>
-                <th>Проект</th>
-                <th>Статус</th>
-                <th>Заказчик</th>
-                <th>Бюджет (ч)</th>
-                <th>План (ч)</th>
-                <th>Факт (ч)</th>
-                <th>Ответственный</th>
+                <th>#</th><th>Код</th><th>Проект</th><th>Статус</th><th>Заказчик</th>
+                <th>Бюджет (ч)</th><th>План (ч)</th><th>Факт (ч)</th><th>Ответственный</th>
               </tr>
             </thead>
             <tbody>
               {results.map((p, idx) => {
-                const stats = getProjectStats(p.id);
+                const stats = projectStatsById.get(p.id) || EMPTY_STATS;
                 return (
                   <tr key={p.id}>
                     <td>{idx + 1}</td>
@@ -305,34 +345,30 @@ export default function Reports({ db, ur }) {
           </table>
         </div>
       );
-    } else if (type === 'employees') {
+    }
+
+    if (filterType === 'employees') {
       return (
         <div className="w-full overflow-x-auto">
           <table className="tbl" style={{ minWidth: '600px', fontSize: '13px' }}>
             <thead>
               <tr>
-                <th>#</th>
-                <th>Сотрудник</th>
-                <th>Отдел (основной)</th>
-                <th>План (ч)</th>
-                <th>Факт (ч)</th>
-                <th>Кол-во задач</th>
+                <th>#</th><th>Сотрудник</th><th>Отдел (основной)</th>
+                <th>План (ч)</th><th>Факт (ч)</th><th>Кол-во задач</th>
               </tr>
             </thead>
             <tbody>
               {results.map((e, idx) => {
                 const deptName = getPrimaryDeptName(e, safeDb);
-                const tasks = (safeDb.tasks || []).filter(t => t.assigneeId === e.id);
-                const plan = tasks.reduce((s, t) => s + (t.plannedHours || 0), 0);
-                const fact = tasks.reduce((s, t) => s + getTaskSpent(t), 0);
+                const stats = employeeStatsById.get(e.id) || EMPTY_STATS;
                 return (
                   <tr key={e.id}>
                     <td>{idx + 1}</td>
                     <td><b>{e.last} {e.first}</b></td>
                     <td>{deptName}</td>
-                    <td>{plan}</td>
-                    <td>{fact}</td>
-                    <td>{tasks.length}</td>
+                    <td>{stats.plan}</td>
+                    <td>{stats.fact}</td>
+                    <td>{stats.count}</td>
                   </tr>
                 );
               })}
@@ -340,25 +376,22 @@ export default function Reports({ db, ur }) {
           </table>
         </div>
       );
-    } else if (type === 'worklog') {
+    }
+
+    if (filterType === 'worklog') {
       return (
         <div className="w-full overflow-x-auto">
           <table className="tbl" style={{ minWidth: '700px', fontSize: '13px' }}>
             <thead>
               <tr>
-                <th>#</th>
-                <th>Дата</th>
-                <th>Сотрудник</th>
-                <th>Задача</th>
-                <th>Проект</th>
-                <th>Часы</th>
-                <th>Комментарий</th>
+                <th>#</th><th>Дата</th><th>Сотрудник</th><th>Задача</th>
+                <th>Проект</th><th>Часы</th><th>Комментарий</th>
               </tr>
             </thead>
             <tbody>
               {results.map((l, idx) => {
-                const project = (safeDb.projects || []).find(p => p.id === l.projectId);
-                const user = (safeDb.employees || []).find(e => e.id === l.userId);
+                const project = projectsById.get(l.projectId);
+                const user = employeesById.get(l.userId);
                 return (
                   <tr key={idx}>
                     <td>{idx + 1}</td>
@@ -378,10 +411,9 @@ export default function Reports({ db, ur }) {
     }
   };
 
-  const type = filters.type;
-  const showDateRange = type !== 'employees';
-  const showDeadlineRange = type === 'tasks' || type === 'projects';
-  const showStatusPriority = type === 'tasks';
+  const showDateRange = filterType !== 'employees';
+  const showDeadlineRange = filterType === 'tasks' || filterType === 'projects';
+  const showStatusPriority = filterType === 'tasks';
 
   return (
     <div className="rep">
@@ -394,7 +426,7 @@ export default function Reports({ db, ur }) {
             {REPORT_TYPES.map(typeOption => (
               <button
                 key={typeOption.value}
-                className={`seg-btn${filters.type === typeOption.value ? ' on' : ''}`}
+                className={`seg-btn${filterType === typeOption.value ? ' on' : ''}`}
                 onClick={() => handleFilterChange('type', typeOption.value)}
               >
                 {typeOption.label}
@@ -407,110 +439,74 @@ export default function Reports({ db, ur }) {
           {showDateRange && (
             <>
               <label className="lbl m-0">
-                {type === 'worklog' ? 'Дата записи:' : type === 'projects' ? 'Начало:' : 'Создан с:'}
+                {filterType === 'worklog' ? 'Дата записи:' : filterType === 'projects' ? 'Начало:' : 'Создан с:'}
               </label>
-              <input
-                className="inp w-150"
-                type="date"
-                value={filters.dateFrom}
-                onChange={e => handleFilterChange('dateFrom', e.target.value)}
-              />
+              <input className="inp w-150" type="date" value={dateFrom}
+                onChange={e => handleFilterChange('dateFrom', e.target.value)} />
               <span>-</span>
-              <input
-                className="inp w-150"
-                type="date"
-                value={filters.dateTo}
-                onChange={e => handleFilterChange('dateTo', e.target.value)}
-              />
+              <input className="inp w-150" type="date" value={dateTo}
+                onChange={e => handleFilterChange('dateTo', e.target.value)} />
             </>
           )}
 
           {showDeadlineRange && (
             <>
               <label className="lbl m-0">
-                {type === 'projects' ? 'Окончание:' : 'Срок исполнения:'}
+                {filterType === 'projects' ? 'Окончание:' : 'Срок исполнения:'}
               </label>
-              <input
-                className="inp w-150"
-                type="date"
-                value={filters.deadlineFrom}
-                onChange={e => handleFilterChange('deadlineFrom', e.target.value)}
-              />
+              <input className="inp w-150" type="date" value={deadlineFrom}
+                onChange={e => handleFilterChange('deadlineFrom', e.target.value)} />
               <span>-</span>
-              <input
-                className="inp w-150"
-                type="date"
-                value={filters.deadlineTo}
-                onChange={e => handleFilterChange('deadlineTo', e.target.value)}
-              />
+              <input className="inp w-150" type="date" value={deadlineTo}
+                onChange={e => handleFilterChange('deadlineTo', e.target.value)} />
             </>
           )}
 
           <label className="lbl m-0">Проект:</label>
-          <select
-            className="inp sel w-180"
-            value={filters.projectId}
-            onChange={e => handleFilterChange('projectId', e.target.value)}
-          >
+          <select className="inp sel w-180" value={projectId}
+            onChange={e => handleFilterChange('projectId', e.target.value)}>
             <option value="all">Все проекты</option>
             {visibleProjects.map(p => <option key={p.id} value={p.id}>{p.code} - {p.name}</option>)}
           </select>
 
           <label className="lbl m-0">Исполнитель:</label>
-          <select
-            className="inp sel w-180"
-            value={filters.assigneeId}
-            onChange={e => handleFilterChange('assigneeId', e.target.value)}
-          >
+          <select className="inp sel w-180" value={assigneeId}
+            onChange={e => handleFilterChange('assigneeId', e.target.value)}>
             <option value="all">Все</option>
             {visibleEmployees.map(e => <option key={e.id} value={e.id}>{e.last} {e.first}</option>)}
           </select>
 
           <label className="lbl m-0">Заказчик:</label>
-          <input
-            className="inp w-200"
-            type="text"
-            value={filters.customer}
+          <input className="inp w-200" type="text" value={customer}
             onChange={e => handleFilterChange('customer', e.target.value)}
-            placeholder="поиск по названию"
-          />
+            placeholder="поиск по названию" />
 
           {showStatusPriority && (
             <>
               <label className="lbl m-0">Статус задачи:</label>
-              <select
-                className="inp sel w-140"
-                value={filters.status}
-                onChange={e => handleFilterChange('status', e.target.value)}
-              >
+              <select className="inp sel w-140" value={status}
+                onChange={e => handleFilterChange('status', e.target.value)}>
                 <option value="all">Все</option>
-                {Object.keys(TASK_STATUSES).map(st => <option key={st} value={st}>{TASK_STATUSES[st].label}</option>)}
+                {Object.keys(TASK_STATUSES).map(st =>
+                  <option key={st} value={st}>{TASK_STATUSES[st].label}</option>)}
               </select>
 
               <label className="lbl m-0">Приоритет:</label>
-              <select
-                className="inp sel w-140"
-                value={filters.priority}
-                onChange={e => handleFilterChange('priority', e.target.value)}
-              >
+              <select className="inp sel w-140" value={priority}
+                onChange={e => handleFilterChange('priority', e.target.value)}>
                 <option value="all">Все</option>
-                {Object.keys(PRIORITIES).map(pr => <option key={pr} value={pr}>{PRIORITIES[pr].label}</option>)}
+                {Object.keys(PRIORITIES).map(pr =>
+                  <option key={pr} value={pr}>{PRIORITIES[pr].label}</option>)}
               </select>
             </>
           )}
         </div>
 
         <div className="mt-3 flex gap-3 flex-wrap">
-          <button className="btn primary" onClick={applyFilters}>Применить</button>
           <button className="btn ghost" onClick={resetFilters}>Сбросить фильтры</button>
           <div className="flex gap-2 items-center">
-            <input
-              className="inp w-180"
-              type="text"
-              value={filterName}
-              onChange={e => setFilterName(e.target.value)}
-              placeholder="Название шаблона"
-            />
+            <input className="inp w-180" type="text" value={filterName}
+              onChange={e => setFilterName(e.target.value)} placeholder="Название шаблона" />
             <button className="btn ghost" onClick={saveFilter}>
               <Ic d={ICONS.plus} size={13} /> Сохранить фильтр
             </button>
@@ -537,11 +533,11 @@ export default function Reports({ db, ur }) {
                 criteria.push(`Срок исполнения: ${from} - ${to}`);
               }
               if (f.filters.projectId !== 'all') {
-                const proj = (safeDb.projects || []).find(p => p.id === f.filters.projectId);
+                const proj = projectsById.get(f.filters.projectId);
                 criteria.push(`Проект: ${proj?.code || '-'}`);
               }
               if (f.filters.assigneeId !== 'all') {
-                const emp = (safeDb.employees || []).find(e => e.id === f.filters.assigneeId);
+                const emp = employeesById.get(f.filters.assigneeId);
                 criteria.push(`Исполнитель: ${emp ? emp.last : '-'}`);
               }
               if (f.filters.status !== 'all') criteria.push(`Статус: ${TASK_STATUSES[f.filters.status]?.label || f.filters.status}`);
@@ -550,14 +546,13 @@ export default function Reports({ db, ur }) {
               const displayText = criteria.length ? criteria.join(' · ') : 'Все';
 
               return (
-                <div key={f.id} className="pj-card cursor-pointer p-3 relative" style={{ minWidth: '200px', maxWidth: '280px' }}>
+                <div key={f.id} className="pj-card cursor-pointer p-3 relative"
+                  style={{ minWidth: '200px', maxWidth: '280px' }}>
                   <div className="font-bold text-sm mb-1">{f.name}</div>
                   <div className="text-xs text-mut leading-tight">{displayText}</div>
-                  <button
-                    className="icon-btn absolute top-1 right-1"
-                    onClick={(e) => { e.stopPropagation(); deleteFilter(f.id); }}
-                    title="Удалить шаблон"
-                  >
+                  <button className="icon-btn absolute top-1 right-1"
+                    onClick={(e) => { e.stopPropagation(); deleteSavedFilter(f.id); }}
+                    title="Удалить шаблон">
                     <Ic d={ICONS.x} size={14} />
                   </button>
                   <div className="mt-2">

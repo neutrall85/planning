@@ -9,3 +9,6 @@ export { DelegationModal } from './DelegationModal';
 export { VacNowModal } from './VacNowModal';
 export { CreateEmployeeModal } from './CreateEmployeeModal';
 export { EditEmployeeModal } from './EditEmployeeModal';
+export { default as YearCalendarModal } from './YearCalendarModal';
+export { default as EmployeeTasksModal } from './EmployeeTasksModal';
+export { default as NoteEditorModal } from './NoteEditorModal';

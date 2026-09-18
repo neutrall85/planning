@@ -4,7 +4,7 @@ import { validateAttachment } from './fileValidation';
 import { appendFileVersion } from './fileVersions';
 
 /**
- * Читает File в data URL. Единственная точка чтения файла — чтобы не
+ * Читает File в data URL. Единственная точка чтения файла - чтобы не
  * дублировать обёртку FileReader в каждом месте загрузки.
  */
 export function readFileAsDataURL(file) {
@@ -25,16 +25,16 @@ export function readFileAsDataURL(file) {
  *   - формирует объект с id, uploadedBy, uploadedAt, folderId;
  *   - применяет версионирование поверх уже существующего списка.
  *
- * Ошибки отдельных файлов не прерывают обработку остальных — они
+ * Ошибки отдельных файлов не прерывают обработку остальных - они
  * собираются в errors, а accepted содержит только успешные. Так один
  * битый файл не блокирует загрузку всего пакета.
  *
  * Не мутирует вход: existingFiles читается, но не изменяется.
  *
  * @param {File[]} files
- * @param {object[]} existingFiles — текущий список файлов задачи/проекта
- * @param {string|null} folderId — папка, в которую кладём
- * @param {string} uploaderId — id сотрудника
+ * @param {object[]} existingFiles - текущий список файлов задачи/проекта
+ * @param {string|null} folderId - папка, в которую кладём
+ * @param {string} uploaderId - id сотрудника
  * @returns {Promise<{nextFiles: object[], accepted: number, rejected: number, errors: string[]}>}
  */
 export async function prepareAttachments(files, existingFiles, folderId, uploaderId) {

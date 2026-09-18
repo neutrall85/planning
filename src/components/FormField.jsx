@@ -46,8 +46,12 @@ export const FormField = ({
           </select>
         );
       }
+      // id пробрасывается внутрь Select, чтобы <label htmlFor={id}>
+      // действительно ссылалась на элемент управления (кастомный селект -
+      // это <button>, и раньше он не получал id).
       return (
         <Select
+          id={id}
           value={value ?? ''}
           onChange={onChange}
           options={options}

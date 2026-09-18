@@ -1,23 +1,43 @@
 // src/components/ProjectChat.jsx
+import { useCallback } from 'react';
 import Discussion from './Discussion';
 
-const ProjectChat = ({ projectId, store, currentUser, toast, employees, candidates, openTask, tasks }) => {
-  const handleTaskClick = (taskId) => {
+// Модульная пустая ссылка: стабильный [] для случаев, когда родитель
+// не передал массив. Инлайн `tasks || []` создавал бы новый массив на
+// каждом рендере.
+const EMPTY_ARRAY = Object.freeze([]);
+
+/**
+ * Чат проекта. Тонкая обёртка над Discussion: передаёт projectId и
+ * знает, как открыть задачу по клику из комментария.
+ */
+const ProjectChat = ({
+  projectId,
+  store,
+  currentUser,
+  toast,
+  employees,
+  candidates,
+  openTask,
+  tasks,
+  readOnly = false,
+}) => {
+  const handleTaskClick = useCallback((taskId) => {
     openTask(taskId, 'form', null, null, projectId, 'chat');
-  };
+  }, [openTask, projectId]);
 
   return (
     <Discussion
       store={store}
-      filter={{ projectId }}
+      projectId={projectId}
       currentUser={currentUser}
-      candidates={candidates || []}
-      readOnly={false}
+      candidates={candidates || EMPTY_ARRAY}
+      readOnly={readOnly}
       toast={toast}
       employees={employees}
       onTaskClick={handleTaskClick}
       showTaskLink={true}
-      tasks={tasks || []}
+      tasks={tasks || EMPTY_ARRAY}
     />
   );
 };
