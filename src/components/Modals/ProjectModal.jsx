@@ -9,6 +9,7 @@ import ProjectChat from '../ProjectChat';
 import { ProjectGallery } from '../ProjectGallery';
 import { Lightbox } from '../Lightbox';
 import { ProjectAccessModal } from './ProjectAccessModal';
+import { HistoryTab } from '../HistoryTab';
 import { useForm } from '../../hooks/useForm';
 import {
   useDataHelpers,
@@ -47,39 +48,17 @@ import { collectTaskPayloads } from '../../utils/templateNesting';
 const AIRCRAFT_TYPES = ['Су-57', 'МиГ-35', 'Ту-160', 'Ил-76', 'Ка-52', 'Другой'];
 const PROJECT_TYPE_OPTIONS = ['Ремонт', 'Модификация', 'КС', 'ИКУ'];
 
-/**
- * Копия проекта без поля access.
- *
- * access - не поле формы, а отдельная сущность со своим окном и
- * своим сервисным методом. Если он попадёт в initialValues, любой
- * внешний вызов setProjectAccess изменит initialValues в useForm,
- * JSON-сравнение покажет «dirty», и кнопка Сохранить активируется -
- * при том что форма проекта никаких правок не делает.
- */
 const stripAccess = (project) => {
   if (!project) return project;
   const { access, ...rest } = project;
   return rest;
 };
 
-/**
- * Список полей формы проекта, участвующих в проверке isDirty.
- * Определён на уровне модуля - стабильная ссылка.
- *
- * Поля, сохраняемые отдельными методами (файлы, папки, фото), в список
- * не входят: они не открывают кнопку «Сохранить» и не попадают в её
- * проверку.
- */
 const FORM_FIELDS = Object.freeze([
   'name', 'code', 'desc', 'ptype', 'customer', 'aircraftType', 'projectType',
   'priority', 'kbId', 'managerId', 'start', 'end', 'budget', 'status', 'longterm',
 ]);
 
-/**
- * Читает File как data URL и возвращает объект фото в форме, которую
- * ожидает values.photos. isMain здесь не выставляется - этим
- * управляет handlePhotoUpload, когда уже знает, первое ли это фото.
- */
 const readFileAsPhoto = (file, uploaderId) =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -243,12 +222,6 @@ export const ProjectModal = ({
     setAppliedTemplateName(template.name);
   }, [setFieldValue]);
 
-  /**
-   * Побочные действия (фото, файлы, папки) сохраняются через
-   * store.patchProject - точечно, без всей формы. Локальное состояние
-   * обновляется через setFieldValue для мгновенного отклика UI.
-   */
-
   const handlePhotoUpload = useCallback(async (files, onDone) => {
     try {
       const currentPhotos = values.photos || [];
@@ -387,6 +360,7 @@ export const ProjectModal = ({
     { id: 'tasks', label: `Задачи (${tasksCount})` },
     { id: 'chat', label: `Чат проекта (${store.getComments({ projectId: values.id }).length})` },
     { id: 'files', label: `Вложения (${filesCount})` },
+    ...(existing ? [{ id: 'hist', label: 'История' }] : []),
   ];
 
   const kbOptions = useMemo(() => db.kbs.map(k => ({ value: k.id, label: k.name })), [db.kbs]);
@@ -658,6 +632,10 @@ export const ProjectModal = ({
             canDelete={!readOnly && (canEditFields || values.managerId === ur.id || hasRole(ur, 'admin', 'director', 'project_manager'))}
             employeeName={empName}
           />
+        )}
+
+        {activeTab === 'hist' && existing && (
+          <HistoryTab history={values.history || []} empName={empName} />
         )}
 
         {lightboxIndex !== null && (values.photos || []).length > 0 && (

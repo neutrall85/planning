@@ -1,13 +1,20 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ModalShell } from '../ModalShell';
 import { useDataHelpers } from '../../hooks';
 import { VACATION_TYPES } from '../../utils/constants';
 import { TODAY, fmtDMY } from '../../utils/date';
+import { Select } from '../Select';
+import { optionsFromList } from '../../utils/selectOptions';
 
 export const VacNowModal = ({ db, onClose, toast }) => {
   const [filterDept, setFilterDept] = useState('all');
   const [sort, setSort] = useState('start');
   const { primaryDept, empName } = useDataHelpers(db);
+
+  const deptSelectOptions = useMemo(
+    () => optionsFromList(db.departments, 'Все подразделения', d => ({ value: d.id, label: d.name })),
+    [db.departments],
+  );
 
   const rows = db.vacations
     .filter(v => v.status === 'approved' && v.start <= TODAY && TODAY <= v.end)
@@ -26,10 +33,12 @@ export const VacNowModal = ({ db, onClose, toast }) => {
       </div>
     }>
       <div className="toolbar">
-        <select className="inp sel sm" value={filterDept} onChange={(e) => setFilterDept(e.target.value)}>
-          <option value="all">Все подразделения</option>
-          {db.departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-        </select>
+        <Select
+          className="sm"
+          value={filterDept}
+          onChange={setFilterDept}
+          options={deptSelectOptions}
+        />
         <div className="seg sm">
           <button className={'seg-btn' + (sort === 'start' ? ' on' : '')} onClick={() => setSort('start')}>по началу</button>
           <button className={'seg-btn' + (sort === 'end' ? ' on' : '')} onClick={() => setSort('end')}>по окончанию</button>

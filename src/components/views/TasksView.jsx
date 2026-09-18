@@ -4,6 +4,7 @@ import Kanban from '../Kanban';
 import TasksList from './TasksList';
 import FloatingMenu from '../FloatingMenu';
 import { SearchBox } from '../SearchBox';
+import { Select } from '../Select';
 import { TASK_STATUSES, TASK_STATUS_ORDER, PRIORITIES } from '../../utils/constants';
 import { fmtDMY, daysDiff, TODAY } from '../../utils/date';
 import { isTaskActive } from '../../utils/entityState';
@@ -17,6 +18,7 @@ import { useTasksDb } from '../../hooks/useDb';
 import Avatar from '../Avatar';
 import { getProjectColor } from '../../utils/projectHelpers';
 import { buildTaskMenu } from '../menus';
+import { optionsFromMap, optionsFromList } from '../../utils/selectOptions';
 
 const INITIAL_FILTERS = Object.freeze({
   projectId: 'all',
@@ -27,15 +29,10 @@ const INITIAL_FILTERS = Object.freeze({
   showOnlyMy: false,
 });
 
-/**
- * Карточка задачи на канбан-доске.
- *
- * memo-компонент: на hover колонки (dragOverCol → isDragOver на одной
- * колонке) карточки внутри неё не перерисовываются, потому что их
- * пропсы (task, project, assignee, spent, колбэки) не менялись. Раньше
- * карточка была инлайн-функцией внутри TasksView, и любой ре-рендер
- * колонки тянул все карточки.
- */
+// Источник константный - useMemo не нужен, массив строится один раз
+// при импорте модуля.
+const PRIORITY_SELECT_OPTIONS = optionsFromMap(PRIORITIES, 'Приоритет');
+
 const TaskCard = memo(function TaskCard({
   task,
   project,
@@ -105,8 +102,6 @@ function TasksView({
   const db = useTasksDb();
   const { tasks, projects, employees, departments } = db;
 
-  // Карты идентификаторов - один раз на срез. Используются в рендере
-  // каждой карточки вместо .find по массиву.
   const employeesById = useMemo(
     () => new Map(employees.map(e => [e.id, e])),
     [employees],
@@ -177,9 +172,6 @@ function TasksView({
     showToast(`Задача «${task.title}» удалена`, 'success');
   }, [store, showToast]);
 
-  // renderCard - стабильная ссылка для Kanban/KanbanColumn. Внутри сам
-  // создаёт <TaskCard />, memo которого пропустит рендер, если пропсы
-  // (task, project, assignee, spent, колбэки) не менялись.
   const renderTaskCard = useCallback((task) => {
     const project = projectsById.get(task.projectId);
     const assignee = task.assigneeId ? employeesById.get(task.assigneeId) : null;
@@ -207,6 +199,24 @@ function TasksView({
 
   const canCreate = canCreateTask(ur);
 
+  // Динамические опции - через optionsFromList. useMemo здесь нужен:
+  // источник меняется вместе с фильтрами (набор проектов и исполнителей
+  // зависит от baseTasks).
+  const projectSelectOptions = useMemo(
+    () => optionsFromList(projOptions, 'Проект', p => ({ value: p.id, label: p.code })),
+    [projOptions],
+  );
+
+  const assigneeSelectOptions = useMemo(
+    () => optionsFromList(execOptions, 'Исполнитель', e => ({ value: e.id, label: e.last })),
+    [execOptions],
+  );
+
+  const deptSelectOptions = useMemo(
+    () => optionsFromList(departments, 'Отдел', d => ({ value: d.id, label: d.name })),
+    [departments],
+  );
+
   return (
     <>
       <div className="toolbar">
@@ -232,45 +242,36 @@ function TasksView({
           className="filter-search"
         />
 
-        <select
-          className="inp sel sm filter-select"
+        <Select
+          className="filter-select"
           value={projectId}
-          onChange={e => setFilter('projectId', e.target.value)}
-        >
-          <option value="all">Проект</option>
-          {projOptions.map(p => <option key={p.id} value={p.id}>{p.code}</option>)}
-        </select>
+          onChange={v => setFilter('projectId', v)}
+          options={projectSelectOptions}
+        />
 
         {!isOnlyExecutor && (
-          <select
-            className="inp sel sm filter-select"
+          <Select
+            className="filter-select"
             value={assigneeId}
-            onChange={e => setFilter('assigneeId', e.target.value)}
-          >
-            <option value="all">Исполнитель</option>
-            {execOptions.map(e => <option key={e.id} value={e.id}>{e.last}</option>)}
-          </select>
+            onChange={v => setFilter('assigneeId', v)}
+            options={assigneeSelectOptions}
+          />
         )}
 
-        <select
-          className="inp sel sm filter-select"
+        <Select
+          className="filter-select"
           value={priority}
-          onChange={e => setFilter('priority', e.target.value)}
-        >
-          <option value="all">Приоритет</option>
-          {Object.entries(PRIORITIES).map(([k, v]) =>
-            <option key={k} value={k}>{v.label}</option>)}
-        </select>
+          onChange={v => setFilter('priority', v)}
+          options={PRIORITY_SELECT_OPTIONS}
+        />
 
         {!isOnlyExecutor && (
-          <select
-            className="inp sel sm filter-select"
+          <Select
+            className="filter-select filter-select-dept"
             value={deptId}
-            onChange={e => setFilter('deptId', e.target.value)}
-          >
-            <option value="all">Отдел</option>
-            {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </select>
+            onChange={v => setFilter('deptId', v)}
+            options={deptSelectOptions}
+          />
         )}
 
         {canSeeAll && (

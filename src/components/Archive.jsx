@@ -1,11 +1,13 @@
 // src/components/Archive.jsx
-import React from 'react';
+import React, { useMemo } from 'react';
 import { PROJECT_TYPES } from '../utils/constants';
 import { fmtDMY, TODAY } from '../utils/date';
 import { canRestore, canRestoreTask } from '../utils/permissions';
 import { isArchived } from '../utils/entityState';
 import { Ic, ICONS } from './Icons';
 import { useDataHelpers, useFilters } from '../hooks';
+import { Select } from './Select';
+import { optionsFromList } from '../utils/selectOptions';
 
 const INITIAL_FILTERS = Object.freeze({
   dateFrom: '',
@@ -20,8 +22,6 @@ export default function Archive({ db, ur, openTask, openProject, restoreTask, re
   const { filters, setFilter } = useFilters(INITIAL_FILTERS);
   const { dateFrom, dateTo, projectId, assigneeId, deptId } = filters;
 
-  // isArchived - единый предикат: закрытые, отменённые и архивированные
-  // сущности одинаково попадают в «архивный список».
   const archProjects = db.projects.filter(isArchived);
   const archTasks = db.tasks.filter(isArchived);
 
@@ -45,22 +45,19 @@ export default function Archive({ db, ur, openTask, openProject, restoreTask, re
     .map(id => db.projects.find(p => p.id === id))
     .filter(Boolean);
 
-  /**
-   * Ячейка действий над архивной задачей.
-   *
-   * Три состояния, каждое - явная проверка:
-   *   1. задача в архиве И права есть И проект позволяет
-   *      восстановление (canRestoreTask) → кнопка «Восстановить»;
-   *   2. задача в архиве И права есть, но проект в архиве →
-   *      подсказка, что сначала восстанавливают проект;
-   *   3. прочее (нет прав или задача не архивная) → ничего.
-   *
-   * Проверка isArchived(task) вынесена наружу намеренно: canRestoreTask
-   * отвечает только за «права + проект», а не за текущее состояние
-   * задачи. Так одна и та же функция подходит и для UI (здесь, где
-   * задача действительно архивная), и для сервиса (где восстанавливают
-   * задачу со снятым флагом архива).
-   */
+  const projectSelectOptions = useMemo(
+    () => optionsFromList(projOptions, 'Все проекты', p => ({ value: p.id, label: p.code })),
+    [projOptions],
+  );
+  const assigneeSelectOptions = useMemo(
+    () => optionsFromList(execs, 'Все исполнители', e => ({ value: e.id, label: e.last })),
+    [execs],
+  );
+  const deptSelectOptions = useMemo(
+    () => optionsFromList(db.departments, 'Все подразделения', d => ({ value: d.id, label: d.name })),
+    [db.departments],
+  );
+
   const renderRestoreCell = (task) => {
     if (!canRestore(ur) || !isArchived(task)) return null;
     if (canRestoreTask(ur, task, db)) {
@@ -92,18 +89,24 @@ export default function Archive({ db, ur, openTask, openProject, restoreTask, re
           value={dateTo}
           onChange={e => setFilter('dateTo', e.target.value)}
         />
-        <select className="inp sel sm" value={projectId} onChange={e => setFilter('projectId', e.target.value)}>
-          <option value="all">Все проекты</option>
-          {projOptions.map(p => <option key={p.id} value={p.id}>{p.code}</option>)}
-        </select>
-        <select className="inp sel sm" value={assigneeId} onChange={e => setFilter('assigneeId', e.target.value)}>
-          <option value="all">Все исполнители</option>
-          {execs.map(e => <option key={e.id} value={e.id}>{e.last}</option>)}
-        </select>
-        <select className="inp sel sm" value={deptId} onChange={e => setFilter('deptId', e.target.value)}>
-          <option value="all">Все подразделения</option>
-          {db.departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-        </select>
+        <Select
+          className="sm"
+          value={projectId}
+          onChange={v => setFilter('projectId', v)}
+          options={projectSelectOptions}
+        />
+        <Select
+          className="sm"
+          value={assigneeId}
+          onChange={v => setFilter('assigneeId', v)}
+          options={assigneeSelectOptions}
+        />
+        <Select
+          className="sm"
+          value={deptId}
+          onChange={v => setFilter('deptId', v)}
+          options={deptSelectOptions}
+        />
       </div>
 
       <div className="rep-panel">

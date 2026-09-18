@@ -6,6 +6,8 @@
 // меняет целевую сущность (plannedHours задачи или budget проекта),
 // и делать это из вьюхи через setDb - значит обходить общий слой и
 // терять аудит правильной формулировки.
+import { auditHours } from '../utils/auditHelpers';
+
 export class HoursRequestService {
   constructor({
     requestRepo,
@@ -36,8 +38,8 @@ export class HoursRequestService {
    * Решение по запросу изменения часов.
    *
    * Побочные эффекты при одобрении:
-   *   - задача: plannedHours := newH;
-   *   - проект: budget := newH.
+   *   - задача: plannedHours := newH, запись в task.history;
+   *   - проект: budget := newH, запись в project.history.
    * При отклонении целевая сущность не меняется.
    *
    * Идемпотентность: повторное решение бросает.
@@ -56,10 +58,41 @@ export class HoursRequestService {
     if (approved) {
       if (r.kind === 'task') {
         const t = this._taskRepo.findById(r.targetId);
-        if (t) this._taskRepo.save({ ...t, plannedHours: r.newH });
+        if (t) {
+          this._taskRepo.save({
+            ...t,
+            plannedHours: r.newH,
+            history: [
+              ...(t.history || []),
+              {
+                ts: Date.now(),
+                who: actorId,
+                text: `Запрос часов одобрен: ${auditHours(r.oldH)} → ${auditHours(r.newH)}`,
+              },
+            ],
+          });
+        }
       } else {
         const p = this._projectRepo.findById(r.targetId);
-        if (p) this._projectRepo.save({ ...p, budget: r.newH });
+        if (p) {
+          // Запись в историю проекта: пользователь, открыв карточку,
+          // видит, что бюджет менялся через запрос (а не молчаливой
+          // правкой формы). Формулировка симметрична задачной.
+          // ts и who - момент решения и утвердивший, а не автор запроса:
+          // для истории важно «кто и когда это санкционировал».
+          this._projectRepo.save({
+            ...p,
+            budget: r.newH,
+            history: [
+              ...(p.history || []),
+              {
+                ts: Date.now(),
+                who: actorId,
+                text: `Запрос часов одобрен: ${auditHours(r.oldH)} → ${auditHours(r.newH)}`,
+              },
+            ],
+          });
+        }
       }
     }
 

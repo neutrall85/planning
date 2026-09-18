@@ -7,6 +7,8 @@ import { useToast } from '../context/ToastContext';
 import { Ic, ICONS } from './Icons';
 import { useDataHelpers, useFilters } from '../hooks';
 import { getPrimaryDeptName } from '../utils/helpers';
+import { Select } from './Select';
+import { optionsFromMap, optionsFromList } from '../utils/selectOptions';
 
 const REPORT_TYPES = [
   { value: 'tasks', label: 'Задачи' },
@@ -31,6 +33,10 @@ const INITIAL_FILTERS = Object.freeze({
 const SAVED_FILTERS_KEY = 'savedReportFilters';
 
 const EMPTY_STATS = { plan: 0, fact: 0, count: 0 };
+
+// Константные опции - один раз на модуль.
+const STATUS_SELECT_OPTIONS = optionsFromMap(TASK_STATUSES, 'Все');
+const PRIORITY_SELECT_OPTIONS = optionsFromMap(PRIORITIES, 'Все');
 
 export default function Reports({ db, ur }) {
   const { showToast } = useToast();
@@ -62,9 +68,6 @@ export default function Reports({ db, ur }) {
   const allProjects = safeDb.projects || [];
   const allEmployees = safeDb.employees || [];
 
-  // Карты идентификаторов - один раз на срез. Раньше каждая строка
-  // таблиц отчёта делала линейный .find по проектам и сотрудникам,
-  // то есть O(rows · total). На больших отчётах это заметно.
   const projectsById = useMemo(
     () => new Map(allProjects.map(p => [p.id, p])),
     [allProjects],
@@ -74,10 +77,6 @@ export default function Reports({ db, ur }) {
     [allEmployees],
   );
 
-  // Агрегаты «план/факт/кол-во задач» по проектам и сотрудникам -
-  // один линейный проход по задачам вместо getProjectStats(p.id) на
-  // каждую строку. getProjectStats фильтровал весь tasks массив внутри
-  // каждого вызова.
   const projectStatsById = useMemo(() => {
     const map = new Map();
     const tasksList = safeDb.tasks || [];
@@ -119,6 +118,22 @@ export default function Reports({ db, ur }) {
     if (scope.all) return allEmployees;
     return allEmployees.filter(e => scope.empIds.has(e.id));
   }, [allEmployees, scope]);
+
+  const projectSelectOptions = useMemo(
+    () => optionsFromList(
+      visibleProjects, 'Все проекты',
+      p => ({ value: p.id, label: `${p.code} - ${p.name}` }),
+    ),
+    [visibleProjects],
+  );
+
+  const assigneeSelectOptions = useMemo(
+    () => optionsFromList(
+      visibleEmployees, 'Все',
+      e => ({ value: e.id, label: `${e.last} ${e.first}` }),
+    ),
+    [visibleEmployees],
+  );
 
   const handleFilterChange = setFilter;
 
@@ -435,69 +450,89 @@ export default function Reports({ db, ur }) {
           </div>
         </div>
 
-        <div className="toolbar flex flex-wrap gap-2 items-center">
+        <div className="toolbar filters-row">
           {showDateRange && (
-            <>
+            <div className="filter-group">
               <label className="lbl m-0">
-                {filterType === 'worklog' ? 'Дата записи:' : filterType === 'projects' ? 'Начало:' : 'Создан с:'}
+                {filterType === 'worklog'
+                  ? 'Дата записи:'
+                  : filterType === 'projects'
+                    ? 'Начало:'
+                    : 'ДАТА СОЗДАНИЯ:'}
               </label>
               <input className="inp w-150" type="date" value={dateFrom}
                 onChange={e => handleFilterChange('dateFrom', e.target.value)} />
-              <span>-</span>
+              <span className="filter-group-sep">-</span>
               <input className="inp w-150" type="date" value={dateTo}
                 onChange={e => handleFilterChange('dateTo', e.target.value)} />
-            </>
+            </div>
           )}
 
           {showDeadlineRange && (
-            <>
+            <div className="filter-group">
               <label className="lbl m-0">
                 {filterType === 'projects' ? 'Окончание:' : 'Срок исполнения:'}
               </label>
               <input className="inp w-150" type="date" value={deadlineFrom}
                 onChange={e => handleFilterChange('deadlineFrom', e.target.value)} />
-              <span>-</span>
+              <span className="filter-group-sep">-</span>
               <input className="inp w-150" type="date" value={deadlineTo}
                 onChange={e => handleFilterChange('deadlineTo', e.target.value)} />
-            </>
+            </div>
           )}
 
-          <label className="lbl m-0">Проект:</label>
-          <select className="inp sel w-180" value={projectId}
-            onChange={e => handleFilterChange('projectId', e.target.value)}>
-            <option value="all">Все проекты</option>
-            {visibleProjects.map(p => <option key={p.id} value={p.id}>{p.code} - {p.name}</option>)}
-          </select>
+          <div className="filter-group">
+            <label className="lbl m-0">Проект:</label>
+            <Select
+              className="w-180"
+              value={projectId}
+              onChange={v => handleFilterChange('projectId', v)}
+              options={projectSelectOptions}
+            />
+          </div>
 
-          <label className="lbl m-0">Исполнитель:</label>
-          <select className="inp sel w-180" value={assigneeId}
-            onChange={e => handleFilterChange('assigneeId', e.target.value)}>
-            <option value="all">Все</option>
-            {visibleEmployees.map(e => <option key={e.id} value={e.id}>{e.last} {e.first}</option>)}
-          </select>
+          <div className="filter-group">
+            <label className="lbl m-0">Исполнитель:</label>
+            <Select
+              className="w-180"
+              value={assigneeId}
+              onChange={v => handleFilterChange('assigneeId', v)}
+              options={assigneeSelectOptions}
+            />
+          </div>
 
-          <label className="lbl m-0">Заказчик:</label>
-          <input className="inp w-200" type="text" value={customer}
-            onChange={e => handleFilterChange('customer', e.target.value)}
-            placeholder="поиск по названию" />
+          <div className="filter-group">
+            <label className="lbl m-0">Заказчик:</label>
+            <input
+              className="inp w-200"
+              type="text"
+              value={customer}
+              onChange={e => handleFilterChange('customer', e.target.value)}
+              placeholder="поиск по названию"
+            />
+          </div>
 
           {showStatusPriority && (
             <>
-              <label className="lbl m-0">Статус задачи:</label>
-              <select className="inp sel w-140" value={status}
-                onChange={e => handleFilterChange('status', e.target.value)}>
-                <option value="all">Все</option>
-                {Object.keys(TASK_STATUSES).map(st =>
-                  <option key={st} value={st}>{TASK_STATUSES[st].label}</option>)}
-              </select>
+              <div className="filter-group">
+                <label className="lbl m-0">Статус задачи:</label>
+                <Select
+                  className="w-140"
+                  value={status}
+                  onChange={v => handleFilterChange('status', v)}
+                  options={STATUS_SELECT_OPTIONS}
+                />
+              </div>
 
-              <label className="lbl m-0">Приоритет:</label>
-              <select className="inp sel w-140" value={priority}
-                onChange={e => handleFilterChange('priority', e.target.value)}>
-                <option value="all">Все</option>
-                {Object.keys(PRIORITIES).map(pr =>
-                  <option key={pr} value={pr}>{PRIORITIES[pr].label}</option>)}
-              </select>
+              <div className="filter-group">
+                <label className="lbl m-0">Приоритет:</label>
+                <Select
+                  className="w-140"
+                  value={priority}
+                  onChange={v => handleFilterChange('priority', v)}
+                  options={PRIORITY_SELECT_OPTIONS}
+                />
+              </div>
             </>
           )}
         </div>

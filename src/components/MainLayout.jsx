@@ -258,7 +258,7 @@ export default function MainLayout({ store, user }) {
         <div className="logo">
           <div className="logo-mark">АП</div>
           <div>
-            <div className="logo-name">Авиагоризонт</div>
+            <div className="logo-name">АвиаГоризонт</div>
             <div className="logo-sub">планирование и учёт времени</div>
           </div>
         </div>

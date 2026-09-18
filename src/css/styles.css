@@ -417,6 +417,7 @@ input, select, textarea {
   text-align: left;
   cursor: pointer;
   gap: 8px;
+  width: 100%;
 }
 .custom-select-trigger > span:first-child {
   flex: 1;
@@ -426,6 +427,19 @@ input, select, textarea {
 }
 .custom-select-trigger:disabled {
   cursor: not-allowed;
+}
+
+/*
+ * Обёртка над контентом триггера: flex-контейнер, растягивается на всю
+ * доступную ширину кнопки. В multiple-режиме сюда кладётся «Выбрано: N».
+ */
+.custom-select-trigger-content {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /*
@@ -448,7 +462,28 @@ input, select, textarea {
   opacity: .7;
 }
 
+/*
+ * Позиционирование и ширина попапа - через CSS-переменные, которые
+ * Select.jsx пишет в useLayoutEffect (паттерн useStableModalHeight /
+ * TaskProgress / WorkloadBar: динамика - в переменные, не в inline-стиль).
+ *
+ *  --select-popup-left       - левый край попапа
+ *  --select-popup-top        - верх (если открыт вниз)
+ *  --select-popup-bottom     - низ (если открыт вверх)
+ *  --select-popup-min-width  - ширина триггера; попап не может быть уже
+ *
+ * Ширина попапа: max-content - растягивается под самую длинную опцию,
+ * но не меньше триггера и не больше вьюпорта минус отступы.
+ */
 .custom-select-popup {
+  position: fixed;
+  left: var(--select-popup-left, 0);
+  top: var(--select-popup-top, auto);
+  bottom: var(--select-popup-bottom, auto);
+  min-width: var(--select-popup-min-width, 0);
+  width: max-content;
+  max-width: calc(100vw - 16px);
+  max-height: 300px;
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -457,7 +492,6 @@ input, select, textarea {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  max-height: 300px;
   animation: popIn .15s ease;
 }
 
@@ -465,6 +499,9 @@ input, select, textarea {
   padding: 6px;
   border-bottom: 1px solid var(--line);
   flex: none;
+}
+.custom-select-search .inp {
+  width: 220px;
 }
 
 .custom-select-list {
@@ -474,6 +511,9 @@ input, select, textarea {
 }
 
 .custom-select-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 8px 12px;
   font-size: 14px;
   cursor: pointer;
@@ -489,6 +529,36 @@ input, select, textarea {
   background: #eff6ff;
   color: var(--acc);
   font-weight: 700;
+}
+.custom-select-option.hl {
+  background: #f1f5f9;
+}
+
+.custom-select-option-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.custom-select-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: 1px solid #cbd5e1;
+  border-radius: 3px;
+  font-size: 11px;
+  line-height: 1;
+  color: transparent;
+  flex-shrink: 0;
+}
+.custom-select-check.on {
+  background: #0ea5e9;
+  border-color: #0ea5e9;
+  color: #fff;
 }
 
 .custom-select-empty {
@@ -834,6 +904,8 @@ input, select, textarea {
 }
 .sec-actions {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
 }
 
@@ -1424,6 +1496,10 @@ input, select, textarea {
   width: 150px;
   flex-shrink: 0;
 }
+.toolbar .filter-select {
+  width: 150px;
+  flex-shrink: 0;
+}
 .toolbar .btn-group {
   display: flex;
   gap: 4px;
@@ -1451,6 +1527,59 @@ input, select, textarea {
 }
 .dept-pick input {
   accent-color: #2563eb;
+}
+
+/*
+ * Строка фильтров с переносом (Reports.jsx). Обычный .toolbar сидит
+ * на flex-wrap: nowrap и не переносит свои элементы; здесь перенос
+ * разрешён, потому что фильтров много.
+ *
+ * Перенос идёт по смысловым группам .filter-group - в каждой такой
+ * группе «лейбл + поле(я)» идёт одним неделимым блоком. Это устраняет
+ * разъезд пар: без обёрток flex переносил бы по отдельным элементам,
+ * и лейбл «СОЗДАН С:» мог оторваться от своих date-инпутов.
+ */
+.toolbar.filters-row {
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.toolbar.toolbar-wrap {
+  flex-wrap: wrap;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+  flex: 0 0 auto;
+}
+
+/* Лейбл внутри группы не переносится и не сжимается: «СОЗДАН С:»,
+   «СРОК ИСПОЛНЕНИЯ:» - короткие строки, но при нехватке места
+   рвутся на две строки, если их не защитить. */
+.filter-group .lbl {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Поля внутри группы сохраняют width из .w-150 / .w-180 и не
+   сжимаются флексом до нечитаемых 90 пикселей. */
+.filter-group .inp,
+.filter-group .custom-select-trigger {
+  flex: none;
+}
+
+.filter-group .w-140 { width: 140px; }
+.filter-group .w-150 { width: 150px; }
+.filter-group .w-180 { width: 180px; }
+.filter-group .w-200 { width: 200px; }
+
+.filter-group-sep {
+  color: var(--mut);
+  flex-shrink: 0;
 }
 
 
@@ -2368,52 +2497,6 @@ input, select, textarea {
   flex-wrap: wrap;
   flex: 1;
 }
-.st-load {
-  width: 170px;
-  flex: none;
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-.st-load-bar {
-  flex: 1;
-  height: 7px;
-  background: #e2e8f0;
-  border-radius: 99px;
-  overflow: hidden;
-}
-.st-load-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #0ea5e9, #2563eb);
-  border-radius: 99px;
-}
-.st-load-fill.over {
-  background: linear-gradient(90deg, #f59e0b, #ef4444);
-}
-.st-load-txt {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--mut);
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-.st-load-txt.over {
-  color: #dc2626;
-}
-.st-nums {
-  width: 70px;
-  flex: none;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-.st-nums b {
-  font-size: 16px;
-}
-.st-nums span {
-  font-size: 12px;
-  color: var(--mut);
-}
 
 
 /* ============================================================================
@@ -3164,9 +3247,27 @@ input, select, textarea {
   margin: 0;
 }
 .journal-filters > .inp,
-.journal-filters > .sel {
+.journal-filters > .custom-select-trigger {
   flex: none;
 }
+
+/*
+ * Ширины полей внутри журнала. Классы .w-150/.w-180/.w-200 из секции 5
+ * объявлены РАНЬШЕ, чем .inp (секция 7), и проигрывают ему по каскаду:
+ * одинаковая специфичность (0,1,0), а .inp { width: 100% } идёт позже.
+ * Двойной селектор поднимает специфичность до (0,2,0) и возвращает
+ * полям их реальную ширину - без этого они растягиваются на всю
+ * ширину тулбара.
+ */
+.journal-filters .w-150 { width: 150px; }
+.journal-filters .w-180 { width: 180px; }
+.journal-filters .w-200 { width: 200px; }
+
+/*
+ * Поиск - единственный тянущийся элемент: занимает оставшееся место,
+ * но не меньше 180px. Так на широком экране он прижмётся к правому
+ * краю, а на узком - уедет в скролл вместе с остальными фильтрами.
+ */
 .journal-search {
   flex: 1 1 auto;
   min-width: 180px;

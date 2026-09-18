@@ -1,9 +1,15 @@
 // src/services/ProjectService.js
 import { TODAY } from '../utils/date';
-import { PROJECT_STATUSES, PROJECT_TYPES } from '../utils/constants';
+import {
+  PROJECT_STATUSES,
+  PROJECT_TYPES,
+  PROJECT_PRIORITIES,
+  ADMIN_PROJECT_PRIORITIES,
+} from '../utils/constants';
 import { isArchived } from '../utils/entityState';
 import { syncExecutorRolesFor } from './roleSync';
 import {
+  auditHours,
   auditLabel,
   auditName,
   auditDetails,
@@ -11,6 +17,7 @@ import {
   auditToggle,
   auditListDelta,
   auditMark,
+  historyDelta,
 } from '../utils/auditHelpers';
 
 export class ProjectService {
@@ -35,7 +42,6 @@ export class ProjectService {
     this._canManageAccess = canManageAccess;
     this._canRestore = canRestore;
 
-    // Синхронизация производной роли executor - правило в roleSync.js.
     this._syncExecutorRoles = (empIds) =>
       syncExecutorRolesFor(empIds, { employeeRepo, taskRepo });
   }
@@ -80,6 +86,22 @@ export class ProjectService {
       }
     } else {
       this._audit.addAudit('Создание проекта', project.name, 'project', project.id, currentUserId);
+    }
+
+    if (isRestore) {
+      project.history = [
+        ...(project.history || []),
+        { ts: Date.now(), who: currentUserId, text: 'Восстановлен из архива' },
+      ];
+    } else if (!isNew) {
+      const entries = this._historyEntries(existing, project);
+      if (entries.length > 0) {
+        const ts = Date.now();
+        project.history = [
+          ...(project.history || []),
+          ...entries.map(text => ({ ts, who: currentUserId, text })),
+        ];
+      }
     }
 
     const affectedEmpIds = new Set();
@@ -128,6 +150,16 @@ export class ProjectService {
     if (isArchived(existing)) throw new Error('Проект в архиве - редактирование запрещено');
 
     const updated = { ...existing, ...patch };
+
+    const entries = this._historyEntries(existing, updated);
+    if (entries.length > 0) {
+      const ts = Date.now();
+      updated.history = [
+        ...(updated.history || []),
+        ...entries.map(text => ({ ts, who: currentUser?.id || 'system', text })),
+      ];
+    }
+
     this._projectRepo.save(updated);
 
     const changes = this._describeChanges(existing, updated);
@@ -173,6 +205,36 @@ export class ProjectService {
     return changes;
   }
 
+  _historyEntries(existing, next) {
+    const entries = [];
+    const employeeName = (id) => auditName(this._employeeRepo, id);
+    const priorityMap = (ptype) => ptype === 'admin' ? ADMIN_PROJECT_PRIORITIES : PROJECT_PRIORITIES;
+
+    historyDelta(entries, 'Название', existing.name, next.name, (v) => v ? `«${v}»` : '—');
+    historyDelta(entries, 'Код', existing.code, next.code);
+    historyDelta(entries, 'Тип проекта', existing.ptype, next.ptype, (v) => auditLabel(PROJECT_TYPES, v));
+    historyDelta(entries, 'Приоритет', existing.priority, next.priority, (v) => auditLabel(priorityMap(next.ptype), v));
+    historyDelta(entries, 'Ответственный', existing.managerId, next.managerId, employeeName);
+    historyDelta(entries, 'Бюджет', existing.budget, next.budget, auditHours);
+    historyDelta(entries, 'Дата начала', existing.start, next.start);
+    historyDelta(entries, 'Дата окончания', existing.end, next.end);
+    historyDelta(entries, 'Заказчик', existing.customer, next.customer);
+    historyDelta(entries, 'Тип ВС', existing.aircraftType, next.aircraftType);
+    historyDelta(entries, 'Категория', existing.projectType, next.projectType);
+
+    if (!!existing.longterm !== !!next.longterm) {
+      entries.push(next.longterm ? 'Долгосрочный проект включён' : 'Долгосрочный проект выключен');
+    }
+
+    if (existing.status !== next.status) {
+      entries.push(
+        `Статус: ${auditLabel(PROJECT_STATUSES, existing.status)} → ${auditLabel(PROJECT_STATUSES, next.status)}`
+      );
+    }
+
+    return entries;
+  }
+
   deleteProject(id, currentUserId) {
     const project = this._projectRepo.findById(id);
     if (project && isArchived(project)) {
@@ -207,12 +269,32 @@ export class ProjectService {
     }
 
     const userIds = Array.isArray(access?.userIds) ? [...access.userIds] : [];
+    const prevIds = Array.isArray(project.access?.userIds) ? project.access.userIds : [];
+
+    // «Доступ не изменился» - не пишем ни в историю, ни в аудит,
+    // не сохраняем: DataStore._notify() без реальных изменений
+    // — лишний каскадный рендер подписчиков.
+    const sameSet =
+      userIds.length === prevIds.length &&
+      userIds.every(id => prevIds.includes(id));
+    if (sameSet) return project;
+
     const names = userIds
       .map(id => this._employeeRepo.findById(id))
       .filter(Boolean)
       .map(e => `${e.last} ${e.first}`);
 
     project.access = { userIds };
+    project.history = [
+      ...(project.history || []),
+      {
+        ts: Date.now(),
+        who: currentUser.id,
+        text: names.length
+          ? `Доступ к проекту обновлён: ${names.join(', ')}`
+          : 'Доступ к проекту очищен',
+      },
+    ];
     this._projectRepo.save(project);
 
     this._audit.addAudit(

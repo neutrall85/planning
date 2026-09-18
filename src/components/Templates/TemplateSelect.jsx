@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../../hooks/useStore';
 import { useToast } from '../../context/ToastContext';
+import { Select } from '../Select';
 
 /**
  * Контролируемый селектор шаблонов.
@@ -20,8 +21,7 @@ export default function TemplateSelect({ kind, onApply, disabled = false }) {
 
   if (templates.length === 0) return null;
 
-  const handleChange = (event) => {
-    const id = event.target.value;
+  const handleChange = (id) => {
     setSelectedId(id);
     const template = id ? templates.find(t => t.id === id) : null;
 
@@ -39,19 +39,18 @@ export default function TemplateSelect({ kind, onApply, disabled = false }) {
     <div className="field-row">
       <label className="field-label">Шаблон</label>
       <div className="flex-1">
-        <select
-          className="inp sel"
+        <Select
           value={selectedId}
           onChange={handleChange}
           disabled={disabled}
-        >
-          <option value="">- Применить шаблон -</option>
-          {templates.map(t => (
-            <option key={t.id} value={t.id}>
-              {t.name}{t.isShared ? ' · общий' : ''}
-            </option>
-          ))}
-        </select>
+          options={[
+            { value: '', label: '- Применить шаблон -' },
+            ...templates.map(t => ({
+              value: t.id,
+              label: t.name + (t.isShared ? ' · общий' : ''),
+            })),
+          ]}
+        />
       </div>
     </div>
   );

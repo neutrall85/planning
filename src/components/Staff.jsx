@@ -17,22 +17,20 @@ import { CreateEmployeeModal } from "./Modals/CreateEmployeeModal";
 import Avatar from "./Avatar";
 import FloatingMenu from "./FloatingMenu";
 import { SearchBox } from "./SearchBox";
+import { Select } from "./Select";
 import { getPrimaryDeptName, getPositionInDept } from "../utils/helpers";
+import { optionsFromList, optionsFromMap } from "../utils/selectOptions";
 
 const INITIAL_FILTERS = Object.freeze({
   query: '',
+  kbId: 'all',
+  deptId: 'all',
+  role: 'all',
 });
 
-const NORM_HOURS = 160;
+const ROLE_SELECT_OPTIONS = optionsFromMap(ROLES, 'Все роли');
 
-/**
- * Совпадает ли сотрудник поисковой строке.
- *
- * Ищем по ФИО, личной должности и по должностям в отделах (они видны
- * в карточках). Названия отделов тоже учитываются - пользователь может
- * искать «аэродинамики».
- */
-const matchesQuery = (emp, q, db) => {
+const matchesQuery = (emp, q, departmentsById) => {
   if (!q) return true;
   const needle = q.toLowerCase();
   if (`${emp.last} ${emp.first}`.toLowerCase().includes(needle)) return true;
@@ -40,7 +38,7 @@ const matchesQuery = (emp, q, db) => {
 
   const deptText = (emp.departments || [])
     .map(d => {
-      const name = db.departments.find(x => x.id === d.deptId)?.name || '';
+      const name = departmentsById.get(d.deptId)?.name || '';
       const pos = d.position || '';
       return `${name} ${pos}`;
     })
@@ -48,6 +46,23 @@ const matchesQuery = (emp, q, db) => {
     .toLowerCase();
 
   return deptText.includes(needle);
+};
+
+const matchesFilters = (emp, filters, departmentsById) => {
+  const { query, kbId, deptId, role } = filters;
+  const empDepts = emp.departments || [];
+
+  if (role !== 'all' && !(emp.roles || []).includes(role)) return false;
+
+  if (deptId !== 'all' && !empDepts.some(d => d.deptId === deptId)) return false;
+
+  if (kbId !== 'all') {
+    const inKbDept = empDepts.some(d => departmentsById.get(d.deptId)?.kbId === kbId);
+    const isKbChief = (emp.kbIds || []).includes(kbId);
+    if (!inKbDept && !isKbChief) return false;
+  }
+
+  return matchesQuery(emp, query, departmentsById);
 };
 
 /**
@@ -62,18 +77,17 @@ const matchesQuery = (emp, q, db) => {
  * уже в заголовке секции. Плашка «совм» - только когда должность
  * относится к совмещению.
  *
- * Все «числовые» и «строковые» данные приходят снаружи примитивами
- * (plan, cnt, vacationEnd), а не через общий объект db. Это позволяет
- * React.memo работать: правка чужой задачи/отпуска не пересоздаёт
- * пропсы этой строки.
+ * Загрузка и количество задач отсюда убраны: эти показатели живут
+ * в отдельной вьюхе Workload, где capacity считается по реальному
+ * производственному календарю за выбранный период. Держать здесь
+ * копию с фиксированной нормой 160 ч/мес - значит показывать два
+ * разных процента загрузки для одного сотрудника на двух экранах.
  */
 const EmployeeRow = React.memo(({
   employee,
   isFired,
   ur,
   deptId,
-  plan,
-  cnt,
   vacationEnd,
   openDepts,
   openRoles,
@@ -81,11 +95,6 @@ const EmployeeRow = React.memo(({
   canFire,
   openEditEmployee,
 }) => {
-  const norm = NORM_HOURS;
-  const pct = Math.min(100, Math.round((plan / norm) * 100));
-
-  // getPositionInDept не читает db - третий аргумент в теле не
-  // используется, поэтому в deps его нет.
   const position = useMemo(
     () => getPositionInDept(employee, deptId),
     [employee, deptId],
@@ -163,13 +172,6 @@ const EmployeeRow = React.memo(({
           <span key={r} className="role-chip" style={{ background: ROLES[r].color + '1e', color: ROLES[r].color }}>{ROLES[r].short}</span>
         ))}
       </div>
-      {!isFired && (
-        <div className="st-load">
-          <div className="st-load-bar"><div className={`st-load-fill${plan > norm ? ' over' : ''}`} style={{ width: pct + '%' }} /></div>
-          <span className={`st-load-txt${plan > norm ? ' over' : ''}`}>{plan} ч · {Math.round((plan / norm) * 100)}%</span>
-        </div>
-      )}
-      <div className="st-nums"><b>{isFired ? '-' : cnt}</b><span>задач</span></div>
 
       {menuItems.length > 0 && (
         <FloatingMenu items={menuItems}>
@@ -198,34 +200,22 @@ export default function Staff({ store, db, setDb, ur, openRoles, openDepts, open
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   const { filters, setFilter } = useFilters(INITIAL_FILTERS);
-  const { query } = filters;
+  const { query, kbId, deptId, role } = filters;
 
-  // Загрузка по плановым часам активных задач - считаем один проход
-  // по всем задачам. Результат передаём в строки примитивами (plan, cnt),
-  // поэтому React.memo в EmployeeRow пропускает строки, у которых числа
-  // не изменились. Раньше каждая строка звала getEmployeeLoad с фильтром
-  // по всему массиву задач - это было O(n_employees × n_tasks) и плюс
-  // сбивало мемо: колбэк пересоздавался при каждом изменении задач.
-  const loadByEmp = useMemo(() => {
-    const map = new Map();
-    for (const t of db.tasks) {
-      if (t.archived || !t.assigneeId) continue;
-      if (t.status === 'closed' || t.status === 'cancelled') continue;
-      let cur = map.get(t.assigneeId);
-      if (!cur) {
-        cur = { plan: 0, cnt: 0 };
-        map.set(t.assigneeId, cur);
-      }
-      cur.plan += t.plannedHours || 0;
-      cur.cnt += 1;
-    }
-    return map;
-  }, [db.tasks]);
+  const departmentsById = useMemo(
+    () => new Map(db.departments.map(d => [d.id, d])),
+    [db.departments]
+  );
 
-  // Текущий отпуск сотрудника (approved и сегодня внутри [start, end]).
-  // Первый подходящий - как в исходном .find(). Наружу отдаём только
-  // end-дату (string | null): этого достаточно для бейджа и это даёт
-  // стабильный примитивный проп.
+  const kbSelectOptions = useMemo(
+    () => optionsFromList(db.kbs, 'Все КБ', (k) => ({ value: k.id, label: k.name })),
+    [db.kbs]
+  );
+  const deptSelectOptions = useMemo(
+    () => optionsFromList(db.departments, 'Все отделы', (d) => ({ value: d.id, label: d.name })),
+    [db.departments]
+  );
+
   const vacationEndByEmp = useMemo(() => {
     const map = new Map();
     for (const v of db.vacations) {
@@ -237,13 +227,13 @@ export default function Staff({ store, db, setDb, ur, openRoles, openDepts, open
   }, [db.vacations]);
 
   const filteredActiveEmployees = useMemo(
-    () => db.employees.filter(e => !e.fired && matchesQuery(e, query, db)),
-    [db, query]
+    () => db.employees.filter(e => !e.fired && matchesFilters(e, filters, departmentsById)),
+    [db.employees, filters, departmentsById]
   );
 
   const filteredFiredEmployees = useMemo(
-    () => db.employees.filter(e => e.fired && matchesQuery(e, query, db)),
-    [db, query]
+    () => db.employees.filter(e => e.fired && matchesFilters(e, filters, departmentsById)),
+    [db.employees, filters, departmentsById]
   );
 
   const noDeptEmployees = useMemo(() => {
@@ -280,13 +270,12 @@ export default function Staff({ store, db, setDb, ur, openRoles, openDepts, open
   const allVacs = useMemo(() => {
     const list = db.vacations
       .filter(v => {
-        if (!query) return true;
         const emp = db.employees.find(e => e.id === v.empId);
-        return emp && matchesQuery(emp, query, db);
+        return emp && matchesFilters(emp, filters, departmentsById);
       })
       .sort((a, b) => (a.start < b.start ? 1 : -1));
     return list;
-  }, [db.vacations, db.employees, db, query]);
+  }, [db.vacations, db.employees, filters, departmentsById]);
 
   const canFire = canFireEmployee(ur);
 
@@ -313,8 +302,6 @@ export default function Staff({ store, db, setDb, ur, openRoles, openDepts, open
     showToast(TOASTS.deptCreated(name), 'success');
   }, [prompt, setDb, showToast]);
 
-  // Один хелпер для всех мест рендера строки - единая сигнатура пропсов,
-  // чтобы не было рассинхрона между 4 секциями.
   const renderEmployeeRow = (e, deptId, isFired) => (
     <EmployeeRow
       key={e.id}
@@ -322,8 +309,6 @@ export default function Staff({ store, db, setDb, ur, openRoles, openDepts, open
       isFired={isFired}
       ur={ur}
       deptId={deptId}
-      plan={loadByEmp.get(e.id)?.plan || 0}
-      cnt={loadByEmp.get(e.id)?.cnt || 0}
       vacationEnd={vacationEndByEmp.get(e.id) || null}
       openDepts={openDepts}
       openRoles={openRoles}
@@ -336,7 +321,7 @@ export default function Staff({ store, db, setDb, ur, openRoles, openDepts, open
   const renderDepartment = (deptId) => {
     const members = deptMap.get(deptId) || [];
     if (!members.length) return null;
-    const dept = db.departments.find(d => d.id === deptId);
+    const dept = departmentsById.get(deptId);
     if (!dept) return null;
     const headNames = db.employees
       .filter(e => (e.headDeptIds || []).includes(deptId) && !e.fired)
@@ -356,31 +341,46 @@ export default function Staff({ store, db, setDb, ur, openRoles, openDepts, open
 
   return (
     <div className="staff">
-      <div className="sec-head">
-        <div className="sec-note">Привязку сотрудников к отделам меняют только HR-менеджер, суперадминистратор и генеральный директор. Загрузка - по плановым часам открытых задач, норма 160 ч/мес.</div>
-        <div className="sec-actions">
-          <SearchBox
-            value={query}
-            onChange={(v) => setFilter('query', v)}
-            placeholder="Поиск по ФИО, должности, отделу…"
-            className="staff-search"
-          />
-          {canEditRoles(ur) && (
-            <>
-              <button className="btn ghost sm" onClick={handleCreateKb}>
-                <Ic d={ICONS.plus} size={13} /> КБ
+      <div className="toolbar toolbar-wrap">
+        <SearchBox
+          value={query}
+          onChange={(v) => setFilter('query', v)}
+          placeholder="Поиск по ФИО, должности, отделу…"
+          className="staff-search"
+        />
+        <Select
+          className="filter-select"
+          value={kbId}
+          onChange={(v) => setFilter('kbId', v)}
+          options={kbSelectOptions}
+        />
+        <Select
+          className="filter-select filter-select-dept"
+          value={deptId}
+          onChange={(v) => setFilter('deptId', v)}
+          options={deptSelectOptions}
+        />
+        <Select
+          className="filter-select"
+          value={role}
+          onChange={(v) => setFilter('role', v)}
+          options={ROLE_SELECT_OPTIONS}
+        />
+        {canEditRoles(ur) && (
+          <div className="ml-auto flex gap-2">
+            <button className="btn ghost sm" onClick={handleCreateKb}>
+              <Ic d={ICONS.plus} size={13} /> КБ
+            </button>
+            <button className="btn ghost sm" onClick={handleCreateDept}>
+              <Ic d={ICONS.plus} size={13} /> Отдел
+            </button>
+            {canEditDepartments(ur) && (
+              <button className="btn primary sm" onClick={() => setShowCreateModal(true)}>
+                <Ic d={ICONS.plus} size={13} /> Добавить сотрудника
               </button>
-              <button className="btn ghost sm" onClick={handleCreateDept}>
-                <Ic d={ICONS.plus} size={13} /> Отдел
-              </button>
-              {canEditDepartments(ur) && (
-                <button className="btn primary sm" onClick={() => setShowCreateModal(true)}>
-                  <Ic d={ICONS.plus} size={13} /> Добавить сотрудника
-                </button>
-              )}
-            </>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </div>
 
       {showCreateModal && (
@@ -402,9 +402,11 @@ export default function Staff({ store, db, setDb, ur, openRoles, openDepts, open
         />
       )}
 
-      {query && filteredActiveEmployees.length === 0 && filteredFiredEmployees.length === 0 && (
-        <div className="empty-note p-4">Сотрудников по заданным условиям не найдено</div>
-      )}
+      {(query || kbId !== 'all' || deptId !== 'all' || role !== 'all')
+        && filteredActiveEmployees.length === 0
+        && filteredFiredEmployees.length === 0 && (
+          <div className="empty-note p-4">Сотрудников по заданным условиям не найдено</div>
+        )}
 
       {noDeptEmployees.length > 0 && (
         <div className="st-section">

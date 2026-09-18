@@ -4,6 +4,7 @@ import Kanban from '../Kanban';
 import Projects from '../Projects';
 import FloatingMenu from '../FloatingMenu';
 import { SearchBox } from '../SearchBox';
+import { Select } from '../Select';
 import {
   PROJECT_STATUSES,
   PROJECT_TYPES,
@@ -24,6 +25,7 @@ import { useConfirm } from '../../context/ConfirmContext';
 import { useFilters } from '../../hooks/useFilters';
 import { useTasksDb } from '../../hooks/useDb';
 import { buildProjectMenu } from '../menus';
+import { optionsFromMap, optionsFromList } from '../../utils/selectOptions';
 
 const INITIAL_FILTERS = Object.freeze({
   query: '',
@@ -35,15 +37,11 @@ const INITIAL_FILTERS = Object.freeze({
   showOnlyMy: false,
 });
 
-/**
- * Карточка проекта на канбан-доске.
- *
- * memo-компонент: агрегаты (plan, fact, assigneeIds) приходят готовыми
- * из projectStatsById; раскладка карточки не пересчитывает ничего сама.
- * memo сравнивает plan/fact по значению (числа), assigneeIds - по
- * ссылке из стабильной карты, поэтому на hover колонки карточки не
- * перерисовываются.
- */
+// Константные опции - на уровне модуля, useMemo не нужен.
+const STATUS_SELECT_OPTIONS = optionsFromMap(PROJECT_STATUSES, 'Статус');
+const TYPE_SELECT_OPTIONS = optionsFromMap(PROJECT_TYPES, 'Тип');
+const PRIORITY_SELECT_OPTIONS = optionsFromMap(PROJECT_PRIORITIES, 'Приоритет');
+
 const ProjectCard = memo(function ProjectCard({
   project,
   plan,
@@ -199,11 +197,6 @@ function ProjectsView({
     return list;
   }, [baseProjects, query, status, type, priority, participant, deptId, tasks, employeesById]);
 
-  // Агрегаты по проектам считаются один раз на срез tasks. Раньше это
-  // делалось в renderProjectCard, то есть N раз за рендер, и каждый раз
-  // пробегало по всем задачам. Сейчас один проход по задачам, результат
-  // в Map; карточка получает уже готовые числа и стабильную по ссылке
-  // копию assigneeIds.
   const projectStatsById = useMemo(() => {
     const map = new Map();
     const byProject = new Map();
@@ -283,6 +276,19 @@ function ProjectsView({
 
   const canCreateProject = hasRole(ur, 'admin', 'director', 'kb_chief', 'project_manager');
 
+  const participantSelectOptions = useMemo(
+    () => optionsFromList(
+      participantOptions, 'Участник',
+      emp => ({ value: emp.id, label: `${emp.last} ${emp.first}` }),
+    ),
+    [participantOptions],
+  );
+
+  const deptSelectOptions = useMemo(
+    () => optionsFromList(deptOptions, 'Отдел', d => ({ value: d.id, label: d.name })),
+    [deptOptions],
+  );
+
   return (
     <>
       <div className="toolbar">
@@ -308,32 +314,40 @@ function ProjectsView({
           className="filter-search"
         />
 
-        <select className="inp sel sm filter-select" value={status} onChange={e => setFilter('status', e.target.value)}>
-          <option value="all">Статус</option>
-          {Object.entries(PROJECT_STATUSES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-        </select>
+        <Select
+          className="filter-select"
+          value={status}
+          onChange={v => setFilter('status', v)}
+          options={STATUS_SELECT_OPTIONS}
+        />
 
-        <select className="inp sel sm filter-select" value={type} onChange={e => setFilter('type', e.target.value)}>
-          <option value="all">Тип</option>
-          {Object.entries(PROJECT_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-        </select>
+        <Select
+          className="filter-select"
+          value={type}
+          onChange={v => setFilter('type', v)}
+          options={TYPE_SELECT_OPTIONS}
+        />
 
-        <select className="inp sel sm filter-select" value={priority} onChange={e => setFilter('priority', e.target.value)}>
-          <option value="all">Приоритет</option>
-          {Object.entries(PROJECT_PRIORITIES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-        </select>
+        <Select
+          className="filter-select"
+          value={priority}
+          onChange={v => setFilter('priority', v)}
+          options={PRIORITY_SELECT_OPTIONS}
+        />
 
-        <select className="inp sel sm filter-select" value={participant} onChange={e => setFilter('participant', e.target.value)}>
-          <option value="all">Участник</option>
-          {participantOptions.map(emp => (
-            <option key={emp.id} value={emp.id}>{emp.last} {emp.first}</option>
-          ))}
-        </select>
+        <Select
+          className="filter-select"
+          value={participant}
+          onChange={v => setFilter('participant', v)}
+          options={participantSelectOptions}
+        />
 
-        <select className="inp sel sm filter-select filter-select-dept" value={deptId} onChange={e => setFilter('deptId', e.target.value)}>
-          <option value="all">Отдел</option>
-          {deptOptions.map(dept => <option key={dept.id} value={dept.id}>{dept.name}</option>)}
-        </select>
+        <Select
+          className="filter-select filter-select-dept"
+          value={deptId}
+          onChange={v => setFilter('deptId', v)}
+          options={deptSelectOptions}
+        />
 
         {canSeeAll && (
           <label className="dept-pick ml-auto">

@@ -8980,7 +8980,6 @@ export default function Staff({ db, setDb, ur, openRoles, openDepts, openVacatio
   return (
     <div className="staff">
       <div className="sec-head">
-        <div className="sec-note">Привязку сотрудников к отделам меняют только HR-менеджер, суперадминистратор и генеральный директор. Загрузка - по плановым часам открытых задач, норма 160 ч/мес.</div>
         {canEditRoles(ur) && (
           <div className="sec-actions">
             <button className="btn ghost sm" onClick={() => {

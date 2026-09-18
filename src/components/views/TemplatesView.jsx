@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useStore, useSelector } from '../../context/StoreContext';
 import { useAuth } from '../../hooks/useAuth';
+import { useFilters } from '../../hooks';
 import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import { canCreateTemplate } from '../../utils/permissions';
@@ -14,6 +15,7 @@ import { TEMPLATE_KINDS } from '../../utils/templateSchemas';
 import { countNestedTasks } from '../../utils/templateNesting';
 import TemplateModal from '../Templates/TemplateModal';
 import { SearchBox } from '../SearchBox';
+import { Select } from '../Select';
 import FloatingMenu from '../FloatingMenu';
 
 const KIND_LABELS = { task: 'Задача', project: 'Проект' };
@@ -37,6 +39,13 @@ const OWNERSHIP_FILTERS = Object.freeze([
   { id: 'shared', label: 'Общие' },
 ]);
 
+// Опции для селекта «Доступ» - один раз на модуль. Приводим {id, label}
+// к формату {value, label}, который ждёт Select.
+const OWNERSHIP_SELECT_OPTIONS = OWNERSHIP_FILTERS.map(opt => ({
+  value: opt.id,
+  label: opt.label,
+}));
+
 const INITIAL_FILTERS = Object.freeze({
   kind: 'all',
   ownership: 'all',
@@ -53,7 +62,13 @@ export default function TemplatesView() {
   const employees          = useSelector(s => s.employees);
   const projects           = useSelector(s => s.projects);
 
-  const [filters, setFilters] = useState(INITIAL_FILTERS);
+  // Фильтры - через общий useFilters: тот же паттерн, что в TasksView,
+  // ProjectsView, Archive, Journal, Staff. Раньше здесь было локальное
+  // useState + ручной handleFilterChange поверх setFilters, что
+  // дублировало хук и расходилось с остальными вьюхами. setFilter
+  // переименован под старое имя, чтобы места вызова ниже не менялись.
+  const { filters, setFilter: handleFilterChange } = useFilters(INITIAL_FILTERS);
+
   const [modal, setModal] = useState(null);
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const createMenuRef = useRef(null);
@@ -94,10 +109,6 @@ export default function TemplatesView() {
     () => filter.apply(templates, filters),
     [filter, templates, filters],
   );
-
-  const handleFilterChange = useCallback((key, value) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
-  }, []);
 
   const openTemplate = useCallback((template) => {
     const isMine = template.ownerId === currentUserId;
@@ -290,15 +301,12 @@ export default function TemplatesView() {
             className="template-search"
           />
 
-          <select
-            className="inp sel sm filter-select"
+          <Select
+            className="filter-select"
             value={filters.ownership}
-            onChange={e => handleFilterChange('ownership', e.target.value)}
-          >
-            {OWNERSHIP_FILTERS.map(opt => (
-              <option key={opt.id} value={opt.id}>{opt.label}</option>
-            ))}
-          </select>
+            onChange={(v) => handleFilterChange('ownership', v)}
+            options={OWNERSHIP_SELECT_OPTIONS}
+          />
         </div>
 
         <p className="mut sm mb-3">

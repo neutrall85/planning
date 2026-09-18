@@ -26,10 +26,10 @@ import {
 } from '../../../utils/permissions';
 import { isArchived } from '../../../utils/entityState';
 
+import { HistoryTab } from '../../HistoryTab';
 import { TaskFormTab } from './TaskFormTab';
 import { TaskTimeTab } from './TaskTimeTab';
 import { TaskSubtasksTab } from './TaskSubtasksTab';
-import { TaskHistoryTab } from './TaskHistoryTab';
 import { TaskNotesTab } from './TaskNotesTab';
 import { TaskModalFooter } from './TaskModalFooter';
 
@@ -39,21 +39,7 @@ import { TaskModalFooter } from './TaskModalFooter';
  * Компонент-оркестратор: сам не хранит бизнес-логику, а собирает её из
  * хуков (форма, шаблон, подзадачи, опции селектов, файлы, учёт времени,
  * заметки, сохранение, вкладки) и раскладывает результат по
- * presentational-компонентам вкладок. Такое разделение - ответ на
- * прежнее состояние файла: одна функция на ~1000 строк, где валидация,
- * бизнес-правила сохранения, работа с файлами, логами времени,
- * заметками и вся разметка были перемешаны в одном замыкании.
- *
- * Что где искать:
- *   useTaskFormState    - initialValues, validate, useForm
- *   useTaskTemplate      - применение шаблона задачи
- *   useTaskSubtasks      - реальные и черновые (из шаблона) подзадачи
- *   useTaskSelectOptions - опции селектов (проект/исполнитель/...)
- *   useTaskFileActions   - вложения и папки
- *   useTaskTimeLog       - внесение часов
- *   useTaskNotes         - личные заметки исполнителя
- *   useTaskSave          - сохранение и удаление (+ доменные проверки)
- *   useTaskTabSync       - активная вкладка и её автопереключение
+ * presentational-компонентам вкладок.
  */
 export const TaskModal = ({
   db, ur, taskId, initialTab = 'form', parentTaskId, initialProjectId, returnToProjectId,
@@ -162,14 +148,6 @@ export const TaskModal = ({
       : isCopy
         ? `Копирование задачи: ${copySource.title}`
         : 'Новая задача';
-
-  // Фильтр для Discussion. values.id меняется только при копировании
-  // задачи (см. buildInitialValues в useTaskFormState), values.projectId -
-  // при выборе проекта в форме. Оба этих изменения должны пересоздавать
-  // фильтр; все остальные ре-рендеры TaskModal - нет. Раньше здесь был
-  // инлайн-литерал, который создавал новую ссылку на каждый рендер и
-  // заставлял Discussion переподписываться на store.
-  
 
   const footer = (
     <TaskModalFooter
@@ -290,7 +268,7 @@ export const TaskModal = ({
         )}
 
         {activeTab === 'hist' && existing && (
-          <TaskHistoryTab history={values.history} empName={empName} />
+          <HistoryTab history={values.history} empName={empName} />
         )}
 
         {activeTab === 'notes' && isAssignee && !readOnly && existing && (

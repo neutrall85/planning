@@ -9,6 +9,8 @@ import { fmtDMY, fmtD, TODAY, iso, parseISO, addDays } from '../utils/date';
 import { getProjectColor } from '../utils/projectHelpers';
 import { Ic, ICONS } from './Icons';
 import Avatar from './Avatar';
+import { Select } from './Select';
+import { optionsFromList } from '../utils/selectOptions';
 
 const buildTaskTree = (tasks) => {
   const map = {};
@@ -36,8 +38,6 @@ const flattenTree = (nodes, level = 0, acc = []) => {
 };
 
 const computeCriticalPath = (tasks) => {
-  // dependencyId → задача; find по массиву внутри forEach - O(N²). Строим
-  // карту заранее, чтобы остался один линейный проход.
   const byId = new Map(tasks.map(t => [t.id, t]));
   const critical = new Set();
   tasks.forEach(t => {
@@ -51,13 +51,6 @@ const computeCriticalPath = (tasks) => {
   return critical;
 };
 
-/**
- * Индексы начала/конца задачи в массиве days.
- *
- * Раньше искал `days.indexOf(...)` - O(days) на каждый вызов, то есть
- * O(N·D) на рендер Ганта. Сейчас принимает Map<isoDate, index>,
- * построенную один раз в Gantt: O(1) на задачу.
- */
 const computeTaskIndices = (task, dayIndexByIso, daysLength, viewStart, viewEnd) => {
   const normalizeDate = (s) => (s ? s.slice(0, 10) : '');
   const sRaw = dayIndexByIso.get(normalizeDate(task.start));
@@ -96,18 +89,6 @@ const getTasksWord = (count) => {
   return 'задач';
 };
 
-/**
- * Строка задачи Ганта.
- *
- * memo-компонент: перерисовывается только когда меняется сама задача,
- * её окружение (уровень, развёрнутость, критичность) или стабильные
- * ссылки (days, map-ы, колбэки). Раскрытие/сворачивание соседней группы
- * больше не тянет за собой все строки.
- *
- * `employee` и `project` приходят снаружи как резолвнутые объекты - в
- * строке не остаётся `.find` по массивам. Раньше каждый рендер каждой
- * строки делал два линейных поиска.
- */
 const TaskRow = memo(function TaskRow({
   task, level, hasChildren, expanded, onToggle,
   daysLength, dayIndexByIso, DW, viewStart, viewEnd,
@@ -140,7 +121,6 @@ const TaskRow = memo(function TaskRow({
     ...(isCritical ? ['🔴 Критическая задача'] : []),
   ].join('\n');
 
-  // Стабильные обработчики, чтобы memo на строке не срывался инлайн-стрелками.
   const handleToggleClick = useCallback((e) => {
     e.stopPropagation();
     onToggle(task.id);
@@ -205,15 +185,6 @@ const TaskRow = memo(function TaskRow({
   );
 });
 
-/**
- * Группа задач одного проекта.
- *
- * memo-компонент. От родителя получает уже готовые карты сущностей
- * (`employeesById`, `projectsById`), стабильный `onToggleTask` и
- * `dayIndexByIso` - всё это не пересоздаётся на каждый рендер Ганта,
- * поэтому memo реально работает и раскрытие одной группы не трогает
- * соседние.
- */
 const ProjectGroup = memo(function ProjectGroup({
   project, tasks, daysLength, dayIndexByIso, DW, viewStart, viewEnd,
   employeesById, projectsById,
@@ -231,7 +202,6 @@ const ProjectGroup = memo(function ProjectGroup({
     const isExpanded = expandedTasks.has(node.id);
     const hasChildren = node.children && node.children.length > 0;
 
-    // Резолвим связи один раз здесь - строка получает готовые объекты.
     const employee = node.assigneeId ? employeesById.get(node.assigneeId) : null;
     const taskProject = projectsById.get(node.projectId) || project;
 
@@ -299,8 +269,6 @@ function Gantt({ ur, openTask, openProject }) {
   const { filters, setFilter } = useFilters(INITIAL_FILTERS);
   const { projectId, assigneeId, status } = filters;
 
-  // Карты идентификаторов - один раз на срез. Через них идут все
-  // резолвы assignee/project: никаких .find() в рендере.
   const employeesById = useMemo(
     () => new Map(employees.map(e => [e.id, e])),
     [employees],
@@ -329,8 +297,6 @@ function Gantt({ ur, openTask, openProject }) {
     if (status === 'closed' || status === 'cancelled') setFilter('status', 'all');
   }, [status, setFilter]);
 
-  // Стабильный тогл раскрытия. Функциональное обновление setState -
-  // единственный способ не зависеть от текущего expandedTasks в замыкании.
   const onToggleTask = useCallback((id) => {
     setExpandedTasks((prev) => {
       const next = new Set(prev);
@@ -438,6 +404,25 @@ function Gantt({ ur, openTask, openProject }) {
     return employees.filter(e => ids.has(e.id));
   }, [tasksForAssignee, employees]);
 
+  const projectSelectOptions = useMemo(
+    () => optionsFromList(projectOptions, 'Все проекты', p => ({ value: p.id, label: p.code })),
+    [projectOptions],
+  );
+  const assigneeSelectOptions = useMemo(
+    () => optionsFromList(
+      assigneeOptions, 'Все исполнители',
+      e => ({ value: e.id, label: `${e.last} ${e.first}` }),
+    ),
+    [assigneeOptions],
+  );
+  const statusSelectOptions = useMemo(
+    () => optionsFromList(
+      statusOptions, 'Все статусы',
+      ([key, val]) => ({ value: key, label: val.label }),
+    ),
+    [statusOptions],
+  );
+
   const projectGroups = useMemo(() => {
     const groups = new Map();
     allTasks.forEach(t => {
@@ -456,8 +441,6 @@ function Gantt({ ur, openTask, openProject }) {
   const days = useMemo(() => getDaysInRange(anchor, mode), [anchor, mode, getDaysInRange]);
   const daysLength = days.length;
 
-  // Быстрый обратный индекс iso-даты. Строится один раз на диапазон,
-  // используется в computeTaskIndices - там раньше был days.indexOf().
   const dayIndexByIso = useMemo(() => {
     const m = new Map();
     days.forEach((d, i) => m.set(d, i));
@@ -544,23 +527,26 @@ function Gantt({ ur, openTask, openProject }) {
   return (
     <div className="gantt-panel">
       <div className="gantt-filter-bar">
-        <select className="inp sel gantt-filter-select" value={projectId}
-          onChange={e => setFilter('projectId', e.target.value)}>
-          <option value="all">Все проекты</option>
-          {projectOptions.map(p => <option key={p.id} value={p.id}>{p.code}</option>)}
-        </select>
+        <Select
+          className="gantt-filter-select"
+          value={projectId}
+          onChange={v => setFilter('projectId', v)}
+          options={projectSelectOptions}
+        />
 
-        <select className="inp sel gantt-filter-select" value={assigneeId}
-          onChange={e => setFilter('assigneeId', e.target.value)}>
-          <option value="all">Все исполнители</option>
-          {assigneeOptions.map(e => <option key={e.id} value={e.id}>{e.last} {e.first}</option>)}
-        </select>
+        <Select
+          className="gantt-filter-select"
+          value={assigneeId}
+          onChange={v => setFilter('assigneeId', v)}
+          options={assigneeSelectOptions}
+        />
 
-        <select className="inp sel gantt-filter-select" value={status}
-          onChange={e => setFilter('status', e.target.value)}>
-          <option value="all">Все статусы</option>
-          {statusOptions.map(([key, val]) => <option key={key} value={key}>{val.label}</option>)}
-        </select>
+        <Select
+          className="gantt-filter-select"
+          value={status}
+          onChange={v => setFilter('status', v)}
+          options={statusSelectOptions}
+        />
 
         <div className="gantt-zoom">
           <button className="icon-btn" onClick={() => setZoomLevel(Math.max(0.5, zoomLevel - 0.25))}>−</button>

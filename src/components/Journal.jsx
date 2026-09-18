@@ -4,6 +4,8 @@ import { fmtDT, fmtDMY } from '../utils/date';
 import { useDataHelpers, useFilters } from '../hooks';
 import { downloadCsv } from '../utils/csvExport';
 import { SearchBox } from './SearchBox';
+import { Select } from './Select';
+import { optionsFromList } from '../utils/selectOptions';
 
 const safeDate = (ts) => {
   const d = new Date(ts);
@@ -18,7 +20,10 @@ const parseDayKey = (dayKey) => {
   return new Date(year, month - 1, day);
 };
 
-const ACTIONS = [
+// Полный список действий журнала. Уже в формате { value, label } -
+// хелпер не нужен, просто передаём массив в Select как есть.
+// Пункт «все действия» добавлен первым, это лейбл фильтра по умолчанию.
+const ACTION_OPTIONS = [
   { value: 'all', label: 'Все действия' },
   { value: 'Создание задачи', label: 'Создание задачи' },
   { value: 'Изменение задачи', label: 'Изменение задачи' },
@@ -65,9 +70,6 @@ export default function Journal({ db }) {
   const { dateFrom, dateTo, userId, action, search } = filters;
   const [page, setPage] = useState(1);
 
-  // Сброс пагинации - единственная побочная реакция на смену фильтра.
-  // Обёртка над setFilter честно возвращает наружу тот же интерфейс,
-  // а внутри делает «+ сбросить страницу».
   const handleFilterChange = (key, value) => {
     setFilter(key, value);
     setPage(1);
@@ -79,7 +81,8 @@ export default function Journal({ db }) {
 
   const userOptions = useMemo(() => {
     const userIds = new Set(allEntries.map(e => e.userId).filter(id => id !== 'system'));
-    return [...userIds].map(id => ({ id, name: empName(id) || id }));
+    const list = [...userIds].map(id => ({ id, name: empName(id) || id }));
+    return optionsFromList(list, 'Все', u => ({ value: u.id, label: u.name }));
   }, [allEntries, empName]);
 
   const filteredEntries = useMemo(() => {
@@ -227,23 +230,20 @@ export default function Journal({ db }) {
           />
 
           <label className="lbl m-0 flex-none">Пользователь:</label>
-          <select
-            className="inp sel w-180 flex-none"
+          <Select
+            className="w-180 flex-none"
             value={userId}
-            onChange={e => handleFilterChange('userId', e.target.value)}
-          >
-            <option value="all">Все</option>
-            {userOptions.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-          </select>
+            onChange={v => handleFilterChange('userId', v)}
+            options={userOptions}
+          />
 
           <label className="lbl m-0 flex-none">Действие:</label>
-          <select
-            className="inp sel w-200 flex-none"
+          <Select
+            className="w-200 flex-none"
             value={action}
-            onChange={e => handleFilterChange('action', e.target.value)}
-          >
-            {ACTIONS.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
-          </select>
+            onChange={v => handleFilterChange('action', v)}
+            options={ACTION_OPTIONS}
+          />
 
           <SearchBox
             value={search}

@@ -5,6 +5,7 @@ import { isArchived } from '../utils/entityState';
 import { syncExecutorRolesFor } from './roleSync';
 import {
   auditValue,
+  auditHours,
   auditLabel,
   auditName,
   auditDetails,
@@ -13,27 +14,13 @@ import {
   auditListDelta,
   auditHoursDelta,
   auditMark,
+  historyDelta,
 } from '../utils/auditHelpers';
 
 export class TaskService {
-  /**
-   * Конструктор принимает объект зависимостей, а не позиционный список.
-   *
-   * Раньше было десять позиционных аргументов подряд, среди которых
-   * три подряд идущих предиката с почти одинаковыми именами
-   * (canChangeStatus, canRestore, canRestoreTask). Перестановка двух
-   * из них местами не давала никакой ошибки на этапе создания сервиса -
-   * падало только при вызове конкретного метода, далеко от места
-   * ошибки. С объектом каждое имя видно у вызывающего, и такие
-   * перестановки становятся невозможны.
-   *
-   * Синхронизация производной роли executor - правило живёт в
-   * roleSync.js. Здесь только «склеиваем» его с конкретными
-   * репозиториями сервиса, чтобы в методах не повторять объект
-   * зависимостей.
-   */
   constructor({
     taskRepo,
+    projectRepo,
     employeeRepo,
     budgetService,
     notificationService,
@@ -45,6 +32,7 @@ export class TaskService {
     getData,
   }) {
     this._taskRepo = taskRepo;
+    this._projectRepo = projectRepo;
     this._employeeRepo = employeeRepo;
     this._budget = budgetService;
     this._notifications = notificationService;
@@ -60,6 +48,25 @@ export class TaskService {
   }
 
   getAll() { return this._taskRepo.findAll(); }
+
+  /**
+   * Добавить запись в историю произвольной сущности (проект, задача)
+   * через её репозиторий. Не мутирует входной объект, сохраняет
+   * иммутабельно - тот же контракт, что у Repository.save через setter.
+   *
+   * Не подходит для случаев, когда история пишется вместе с другими
+   * полями сущности в одном save (isSummary / budgetHours у родителя):
+   * там важен один атомарный save, а не два подряд.
+   */
+  _appendHistory(repo, id, entry) {
+    if (!id) return;
+    const entity = repo.findById(id);
+    if (!entity) return;
+    repo.save({
+      ...entity,
+      history: [...(entity.history || []), entry],
+    });
+  }
 
   upsertTask(task, currentUserId) {
     const existing = this._taskRepo.findById(task.id);
@@ -142,14 +149,92 @@ export class TaskService {
       if (!task.createdAt) task.createdAt = new Date().toISOString();
     }
 
+    // Записи в собственную историю задачи.
+    //
+    // Для подзадач фиксируем родителя - это единственное место, где
+    // связь «задача S есть подзадача T» появляется в истории; в
+    // дальнейшем она отражена в других полях карточки.
+    if (isRestore) {
+      task.history = [
+        ...(task.history || []),
+        { ts: Date.now(), who: currentUserId, text: 'Восстановлена из архива' },
+      ];
+    } else if (isNew && task.parentTaskId) {
+      const parent = this._taskRepo.findById(task.parentTaskId);
+      if (parent) {
+        task.history = [
+          ...(task.history || []),
+          { ts: Date.now(), who: currentUserId, text: `Создана как подзадача: «${parent.title}»` },
+        ];
+      }
+    } else if (!isNew) {
+      const entries = this._historyEntries(existing, task);
+      if (entries.length > 0) {
+        const ts = Date.now();
+        task.history = [
+          ...(task.history || []),
+          ...entries.map(text => ({ ts, who: currentUserId, text })),
+        ];
+      }
+    }
+
+    // Родительская задача (для подзадач): обновляем isSummary и
+    // budgetHours и при создании подзадачи пишем «Добавлена подзадача».
+    // Всё - в одном save, чтобы один notify на операцию.
     if (task.parentTaskId) {
       const parent = this._taskRepo.findById(task.parentTaskId);
-      if (parent && !parent.isSummary) {
-        parent.isSummary = true;
-        if (parent.budgetHours === undefined || parent.budgetHours === null) {
-          parent.budgetHours = parent.plannedHours || 0;
+      if (parent) {
+        let parentChanged = false;
+        if (!parent.isSummary) {
+          parent.isSummary = true;
+          if (parent.budgetHours === undefined || parent.budgetHours === null) {
+            parent.budgetHours = parent.plannedHours || 0;
+          }
+          parentChanged = true;
         }
-        this._taskRepo.save(parent);
+        if (isNew) {
+          parent.history = [
+            ...(parent.history || []),
+            { ts: Date.now(), who: currentUserId, text: `Добавлена подзадача: «${task.title}»` },
+          ];
+          parentChanged = true;
+        }
+        if (parentChanged) this._taskRepo.save(parent);
+      }
+    }
+
+    // Проект: пишем «Создана задача» только для КОРНЕВЫХ задач.
+    // Подзадача уже отражена в истории родителя («Добавлена подзадача»),
+    // а проект о ней знать не обязан - иначе одно событие всплывает в
+    // трёх историях сразу, и в истории проекта появляется шум из задач,
+    // которые пользователь там не создавал.
+    if (isNew && !task.parentTaskId && task.projectId) {
+      this._appendHistory(this._projectRepo, task.projectId, {
+        ts: Date.now(),
+        who: currentUserId,
+        text: `Создана задача: «${task.title}»`,
+      });
+    }
+
+    // Перенос между проектами: обе стороны узнают о событии. Пишем
+    // через _appendHistory - тот же приём, что для создания/удаления.
+    // Если задача была без проекта и появилась в нём - пишем только
+    // «перемещена из другого проекта»; если ушла - только «перемещена
+    // в другой проект». Обе записи в один ts, чтобы в UI они читались
+    // парой.
+    if (!isNew && existing.projectId !== task.projectId) {
+      const ts = Date.now();
+      if (existing.projectId) {
+        this._appendHistory(this._projectRepo, existing.projectId, {
+          ts, who: currentUserId,
+          text: `Задача перемещена в другой проект: «${task.title}»`,
+        });
+      }
+      if (task.projectId) {
+        this._appendHistory(this._projectRepo, task.projectId, {
+          ts, who: currentUserId,
+          text: `Задача перемещена из другого проекта: «${task.title}»`,
+        });
       }
     }
 
@@ -211,6 +296,16 @@ export class TaskService {
     if (patch.logs) {
       updated.actualHours = patch.logs.reduce((s, l) => s + (l.hours || 0), 0);
     }
+
+    const entries = this._historyEntries(existing, updated);
+    if (entries.length > 0) {
+      const ts = Date.now();
+      updated.history = [
+        ...(updated.history || []),
+        ...entries.map(text => ({ ts, who: currentUserId, text })),
+      ];
+    }
+
     this._taskRepo.save(updated);
 
     const changes = this._describeChanges(existing, updated);
@@ -268,6 +363,52 @@ export class TaskService {
     return changes;
   }
 
+  /**
+   * Человекочитаемые строки для вкладки «История» задачи.
+   */
+  _historyEntries(existing, next) {
+    const entries = [];
+    const employeeName = (id) => auditName(this._employeeRepo, id);
+    const projectCode = (id) => {
+      if (!id) return '—';
+      const data = this._getData?.() || {};
+      const project = (data.projects || []).find(p => p.id === id);
+      return project?.code || id;
+    };
+    const taskTitle = (id) => {
+      if (!id) return '—';
+      return this._taskRepo.findById(id)?.title || id;
+    };
+
+    historyDelta(entries, 'Исполнитель', existing.assigneeId, next.assigneeId, employeeName);
+    historyDelta(entries, 'Срок', existing.deadline, next.deadline);
+    historyDelta(entries, 'Дата начала', existing.start, next.start);
+    historyDelta(entries, 'Приоритет', existing.priority, next.priority, (v) => auditLabel(PRIORITIES, v));
+    historyDelta(entries, 'Проект', existing.projectId, next.projectId, projectCode);
+
+    if (!next.isSummary) {
+      historyDelta(entries, 'Плановые часы', existing.plannedHours, next.plannedHours, auditHours);
+    }
+
+    if (existing.parentTaskId !== next.parentTaskId) {
+      if (!existing.parentTaskId && next.parentTaskId) {
+        entries.push(`Назначена подзадачей: «${taskTitle(next.parentTaskId)}»`);
+      } else if (existing.parentTaskId && !next.parentTaskId) {
+        entries.push(`Откреплена от родительской задачи «${taskTitle(existing.parentTaskId)}»`);
+      } else {
+        entries.push(
+          `Родительская задача: «${taskTitle(existing.parentTaskId)}» → «${taskTitle(next.parentTaskId)}»`
+        );
+      }
+    }
+
+    if (!!existing.isHourly !== !!next.isHourly) {
+      entries.push(next.isHourly ? 'Режим часовой задачи включён' : 'Режим часовой задачи выключен');
+    }
+
+    return entries;
+  }
+
   deleteTask(id, currentUserId) {
     const task = this._taskRepo.findById(id);
     if (task && isArchived(task)) {
@@ -277,6 +418,7 @@ export class TaskService {
       this._audit.addAudit('Удаление задачи', task.title, 'task', id, currentUserId);
     }
     const parentId = task?.parentTaskId;
+    const projectId = task?.projectId;
     const affectedAssigneeId = task?.assigneeId;
 
     const children = this._taskRepo.findChildren(id);
@@ -287,15 +429,29 @@ export class TaskService {
 
     this._taskRepo.delete(id);
 
-    if (parentId) {
+    // Проект: пишем «Удалена задача» только для корневых задач -
+    // симметрично созданию. Удаление подзадачи фиксирует её родитель.
+    if (task && !task.parentTaskId && projectId) {
+      this._appendHistory(this._projectRepo, projectId, {
+        ts: Date.now(),
+        who: currentUserId,
+        text: `Удалена задача: «${task.title}»`,
+      });
+    }
+
+    if (parentId && task) {
       const parent = this._taskRepo.findById(parentId);
       if (parent) {
+        parent.history = [
+          ...(parent.history || []),
+          { ts: Date.now(), who: currentUserId, text: `Удалена подзадача: «${task.title}»` },
+        ];
         const remainingChildren = this._taskRepo.findChildren(parentId);
         if (remainingChildren.length === 0) {
           parent.isSummary = false;
           parent.budgetHours = null;
-          this._taskRepo.save(parent);
         }
+        this._taskRepo.save(parent);
         this._recalcSummaryChain(parent);
       }
     }
@@ -437,6 +593,13 @@ export class TaskService {
     }
     const oldBudget = task?.budgetHours ?? task?.plannedHours;
     const updated = this._budget.setBudget(taskId, newBudget);
+
+    updated.history = [
+      ...(updated.history || []),
+      { ts: Date.now(), who: currentUserId, text: `Бюджет: ${auditHours(oldBudget)} → ${auditHours(newBudget)}` },
+    ];
+    this._taskRepo.save(updated);
+
     this._audit.addAudit(
       'Изменение бюджета задачи',
       { Задача: updated.title, Бюджет: `${auditValue(oldBudget)} → ${newBudget}` },

@@ -171,6 +171,7 @@ class DataStore {
 
     this._taskService = new TaskService({
       taskRepo: this._taskRepo,
+      projectRepo: this._projectRepo,
       employeeRepo: this._employeeRepo,
       budgetService: this._budgetService,
       notificationService: this._notificationService,
