@@ -61,17 +61,17 @@ export default function EmployeeTasksModal({ db, employeeId, openTask, onClose }
           <table className="tbl employee-tasks-table">
             <thead>
               <tr>
-                <th>Задача</th>
-                <th>Проект</th>
-                <th className="text-right">План (ч)</th>
-                <th className="text-right">Факт (ч)</th>
-                <th>Срок</th>
+                <th className="text-left">Название задачи</th>
+                <th className="text-left">Проект</th>
+                <th className="text-center">План</th>
+                <th className="text-center">Факт</th>
+                <th className="text-center">Срок</th>
               </tr>
             </thead>
             <tbody>
               {tasks.map(t => (
                 <tr key={t.id}>
-                  <td>
+                  <td className="text-left">
                     <button
                       type="button"
                       className="link"
@@ -81,10 +81,10 @@ export default function EmployeeTasksModal({ db, employeeId, openTask, onClose }
                       {t.title}
                     </button>
                   </td>
-                  <td>{projectName(t.projectId)}</td>
-                  <td className="text-right">{t.plannedHours ?? '-'}</td>
-                  <td className="text-right">{getTaskSpent(t)}</td>
-                  <td>{t.deadline ? fmtDMY(t.deadline) : '-'}</td>
+                  <td className="text-left">{projectName(t.projectId)}</td>
+                  <td className="text-center">{t.plannedHours ?? '-'}</td>
+                  <td className="text-center">{getTaskSpent(t)}</td>
+                  <td className="text-center">{t.deadline ? fmtDMY(t.deadline) : '-'}</td>
                 </tr>
               ))}
             </tbody>

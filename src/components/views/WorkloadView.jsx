@@ -1,21 +1,22 @@
 // src/components/views/WorkloadView.jsx
 import { useState, useMemo, memo } from 'react';
+import { Select } from '../Select';
 import { SearchBox } from '../SearchBox';
-import WorkloadBar from '../WorkloadBar';
 import { Ic, ICONS } from '../Icons';
-import { getPrimaryDeptName } from '../../utils/helpers';
-import { computeScope } from '../../utils/permissions';
-import { resolvePeriod } from '../../utils/workCalendar';
-import { formatPeriodLabel } from '../../utils/periodLabel';
-import { TODAY, iso, parseISO } from '../../utils/date';
-import { useFilters } from '../../hooks/useFilters';
+import WorkloadBar from '../WorkloadBar';
 import { useWorkloadDb } from '../../hooks/useDb';
+import { useFilters } from '../../hooks/useFilters';
+import { computeScope } from '../../utils/permissions';
+import { getPrimaryDeptName } from '../../utils/helpers';
+import { resolvePeriod } from '../../utils/workCalendar';
+import { TODAY, iso, parseISO } from '../../utils/date';
+import { formatPeriodLabel } from '../../utils/periodLabel';
 
 const PERIOD_MODES = [
-  { id: 'month',   label: 'Месяц'   },
+  { id: 'month', label: 'Месяц' },
   { id: 'quarter', label: 'Квартал' },
-  { id: 'year',    label: 'Год'     },
-  { id: 'custom',  label: 'Период'  },
+  { id: 'year', label: 'Год' },
+  { id: 'custom', label: 'Период' },
 ];
 
 const SORT_FIELDS = [
@@ -25,6 +26,13 @@ const SORT_FIELDS = [
   { id: 'fact', label: 'Факт' },
   { id: 'util', label: 'Загрузка' },
 ];
+
+/**
+ * Опции поля «Сортировка». Собираются один раз на уровне модуля:
+ * SORT_FIELDS - константа, ссылка стабильна, useMemo в компоненте не
+ * нужен. Порядок опций в попапе нормализует сам Select (см. sortOptions).
+ */
+const SORT_OPTIONS = SORT_FIELDS.map((s) => ({ value: s.id, label: s.label }));
 
 const NUMERIC_SORTS = new Set(['plan', 'fact', 'util']);
 
@@ -36,9 +44,9 @@ const INITIAL_FILTERS = Object.freeze({
 
 const shiftAnchor = (mode, anchorIso, dir) => {
   const d = parseISO(anchorIso);
-  if (mode === 'month')        d.setMonth(d.getMonth() + dir);
+  if (mode === 'month') d.setMonth(d.getMonth() + dir);
   else if (mode === 'quarter') d.setMonth(d.getMonth() + dir * 3);
-  else                         d.setFullYear(d.getFullYear() + dir);
+  else d.setFullYear(d.getFullYear() + dir);
   return iso(d);
 };
 
@@ -47,14 +55,12 @@ const employeeLabel = (e) => `${e.last} ${e.first}`;
 function WorkloadView({ ur, store, openEmployeeTasks }) {
   const db = useWorkloadDb();
   const { employees } = db;
-
   const scope = useMemo(() => computeScope(ur, db), [ur, db]);
 
-  const [mode, setMode]             = useState('month');
-  const [anchor, setAnchor]         = useState(TODAY);
+  const [mode, setMode] = useState('month');
+  const [anchor, setAnchor] = useState(TODAY);
   const [customFrom, setCustomFrom] = useState(TODAY);
-  const [customTo, setCustomTo]     = useState(TODAY);
-
+  const [customTo, setCustomTo] = useState(TODAY);
   const { filters, setFilter } = useFilters(INITIAL_FILTERS);
   const { query, sortField, sortDir } = filters;
 
@@ -70,7 +76,7 @@ function WorkloadView({ ur, store, openEmployeeTasks }) {
 
   const rows = useMemo(() => {
     const map = store.getWorkload(from, to);
-    const empIndex = new Map(employees.map(e => [e.id, e]));
+    const empIndex = new Map(employees.map((e) => [e.id, e]));
     const out = [];
     for (const [empId, e] of map) {
       if (!scope.all && !scope.empIds.has(empId)) continue;
@@ -78,11 +84,11 @@ function WorkloadView({ ur, store, openEmployeeTasks }) {
       if (!employee) continue;
       out.push({
         employee,
-        planTotal:   e.planTotal,
-        factTotal:   e.factTotal,
-        capacity:    e.capacity,
+        planTotal: e.planTotal,
+        factTotal: e.factTotal,
+        capacity: e.capacity,
         utilization: e.capacity > 0 ? (e.planTotal / e.capacity) * 100 : 0,
-        deptName:    getPrimaryDeptName(employee, db),
+        deptName: getPrimaryDeptName(employee, db),
       });
     }
     return out;
@@ -91,9 +97,10 @@ function WorkloadView({ ur, store, openEmployeeTasks }) {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return rows;
-    return rows.filter(r =>
-      employeeLabel(r.employee).toLowerCase().includes(q) ||
-      r.deptName.toLowerCase().includes(q)
+    return rows.filter(
+      (r) =>
+        employeeLabel(r.employee).toLowerCase().includes(q) ||
+        r.deptName.toLowerCase().includes(q),
     );
   }, [rows, query]);
 
@@ -102,13 +109,20 @@ function WorkloadView({ ur, store, openEmployeeTasks }) {
     const mul = sortDir === 'asc' ? 1 : -1;
     list.sort((a, b) => {
       let va, vb;
-      if (sortField === 'plan')      { va = a.planTotal;   vb = b.planTotal;   }
-      else if (sortField === 'fact') { va = a.factTotal;   vb = b.factTotal;   }
-      else if (sortField === 'util') { va = a.utilization; vb = b.utilization; }
-      else if (sortField === 'dept') { va = a.deptName.toLowerCase(); vb = b.deptName.toLowerCase(); }
-      else                           { va = employeeLabel(a.employee).toLowerCase(); vb = employeeLabel(b.employee).toLowerCase(); }
+      if (sortField === 'plan') {
+        va = a.planTotal; vb = b.planTotal;
+      } else if (sortField === 'fact') {
+        va = a.factTotal; vb = b.factTotal;
+      } else if (sortField === 'util') {
+        va = a.utilization; vb = b.utilization;
+      } else if (sortField === 'dept') {
+        va = a.deptName.toLowerCase(); vb = b.deptName.toLowerCase();
+      } else {
+        va = employeeLabel(a.employee).toLowerCase();
+        vb = employeeLabel(b.employee).toLowerCase();
+      }
       if (va < vb) return -1 * mul;
-      if (va > vb) return  1 * mul;
+      if (va > vb) return 1 * mul;
       return 0;
     });
     return list;
@@ -122,7 +136,9 @@ function WorkloadView({ ur, store, openEmployeeTasks }) {
       capacity += r.capacity;
     }
     return {
-      plan, fact, capacity,
+      plan,
+      fact,
+      capacity,
       utilization: capacity > 0 ? (plan / capacity) * 100 : 0,
     };
   }, [filtered]);
@@ -143,10 +159,10 @@ function WorkloadView({ ur, store, openEmployeeTasks }) {
       <div className="rep-panel p-4">
         <div className="workload-toolbar">
           <div className="seg sm">
-            {PERIOD_MODES.map(m => (
+            {PERIOD_MODES.map((m) => (
               <button
-                key={m.id}
                 type="button"
+                key={m.id}
                 className={`seg-btn${mode === m.id ? ' on' : ''}`}
                 onClick={() => setMode(m.id)}
               >
@@ -172,7 +188,9 @@ function WorkloadView({ ur, store, openEmployeeTasks }) {
               >
                 <Ic d={ICONS.right} size={16} />
               </button>
-              <button className="btn ghost sm" onClick={() => setAnchor(TODAY)}>Сегодня</button>
+              <button className="btn ghost sm" onClick={() => setAnchor(TODAY)}>
+                Сегодня
+              </button>
             </div>
           ) : (
             <div className="workload-custom-range">
@@ -180,14 +198,14 @@ function WorkloadView({ ur, store, openEmployeeTasks }) {
                 type="date"
                 className="inp w-150"
                 value={customFrom}
-                onChange={e => setCustomFrom(e.target.value)}
+                onChange={(e) => setCustomFrom(e.target.value)}
               />
               <span className="mut">-</span>
               <input
                 type="date"
                 className="inp w-150"
                 value={customTo}
-                onChange={e => setCustomTo(e.target.value)}
+                onChange={(e) => setCustomTo(e.target.value)}
               />
             </div>
           )}
@@ -196,19 +214,17 @@ function WorkloadView({ ur, store, openEmployeeTasks }) {
         <div className="workload-toolbar mt-3">
           <SearchBox
             value={query}
-            onChange={v => setFilter('query', v)}
+            onChange={(v) => setFilter('query', v)}
             placeholder="Поиск по ФИО или отделу…"
             className="workload-search"
           />
-
           <label className="lbl m-0">Сортировка:</label>
-          <select
-            className="inp sel sm"
+          <Select
+            className="sm"
             value={sortField}
-            onChange={e => handleFieldChange(e.target.value)}
-          >
-            {SORT_FIELDS.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
-          </select>
+            onChange={handleFieldChange}
+            options={SORT_OPTIONS}
+          />
           <button
             type="button"
             className="icon-btn"
@@ -224,10 +240,8 @@ function WorkloadView({ ur, store, openEmployeeTasks }) {
         <div className="rep-panel-title">
           Загрузка сотрудников · {periodLabel} · {sorted.length}
         </div>
-
         <div className="workload-period-meta">
-          Рабочих дней: <b>{periodCapacity.workdays}</b>
-          {' · '}
+          Рабочих дней: <b>{periodCapacity.workdays}</b> ·{' '}
           Рабочих часов в периоде: <b>{periodCapacity.hours}</b>
           <span className="mut"> ({periodCapacity.hoursPerDay} ч / раб. день)</span>
         </div>
@@ -247,7 +261,7 @@ function WorkloadView({ ur, store, openEmployeeTasks }) {
                 </tr>
               </thead>
               <tbody>
-                {sorted.map(r => (
+                {sorted.map((r) => (
                   <tr
                     key={r.employee.id}
                     className="clickable-row"

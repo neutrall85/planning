@@ -19,7 +19,7 @@ import FloatingMenu from "./FloatingMenu";
 import { SearchBox } from "./SearchBox";
 import { Select } from "./Select";
 import { getPrimaryDeptName, getPositionInDept } from "../utils/helpers";
-import { optionsFromList, optionsFromMap } from "../utils/selectOptions";
+import { optionsFromMap } from "../utils/selectOptions";
 
 const INITIAL_FILTERS = Object.freeze({
   query: '',
@@ -30,6 +30,18 @@ const INITIAL_FILTERS = Object.freeze({
 
 const ROLE_SELECT_OPTIONS = optionsFromMap(ROLES, 'Все роли');
 
+/**
+ * Совпадает ли сотрудник поисковой строке.
+ *
+ * Ищем по ФИО, личной должности и по должностям в отделах (они видны
+ * в карточках). Названия отделов тоже учитываются - пользователь может
+ * искать «аэродинамики».
+ *
+ * departmentsById - предварительно построенный Map<id, department>.
+ * Раньше здесь был db.departments.find(...) внутри цикла по всем
+ * сотрудникам: O(n_employees × n_departments) на каждый вызов, а
+ * вызов идёт три раза (active / fired / vacations).
+ */
 const matchesQuery = (emp, q, departmentsById) => {
   if (!q) return true;
   const needle = q.toLowerCase();
@@ -48,18 +60,48 @@ const matchesQuery = (emp, q, departmentsById) => {
   return deptText.includes(needle);
 };
 
+/**
+ * Единый предикат: поиск + три фильтра. Один на все три списка
+ * (активные, уволенные, отпуска) - чтобы фильтр не разъехался между
+ * секциями.
+ *
+ * Каждый из фильтров КБ и отдела имеет четыре состояния:
+ *   'all'  - не фильтровать;
+ *   'any'  - только те, у кого есть КБ / отдел;
+ *   'none' - только те, у кого нет;
+ *   <id>   - конкретный.
+ *
+ * 'all' и 'any' - разные вещи: 'all' не накладывает ограничений,
+ * 'any' требует наличия привязки. Это нужно, чтобы «Все сотрудники»
+ * (весь штат) и «Все КБ» (только те, кто реально в КБ) различались.
+ */
 const matchesFilters = (emp, filters, departmentsById) => {
   const { query, kbId, deptId, role } = filters;
   const empDepts = emp.departments || [];
 
   if (role !== 'all' && !(emp.roles || []).includes(role)) return false;
 
-  if (deptId !== 'all' && !empDepts.some(d => d.deptId === deptId)) return false;
+  if (deptId === 'any') {
+    if (empDepts.length === 0) return false;
+  } else if (deptId === 'none') {
+    if (empDepts.length > 0) return false;
+  } else if (deptId !== 'all') {
+    if (!empDepts.some(d => d.deptId === deptId)) return false;
+  }
 
   if (kbId !== 'all') {
-    const inKbDept = empDepts.some(d => departmentsById.get(d.deptId)?.kbId === kbId);
-    const isKbChief = (emp.kbIds || []).includes(kbId);
-    if (!inKbDept && !isKbChief) return false;
+    const inAnyKb = empDepts.some(d => departmentsById.get(d.deptId)?.kbId);
+    const isAnyKbChief = (emp.kbIds || []).length > 0;
+
+    if (kbId === 'any') {
+      if (!inAnyKb && !isAnyKbChief) return false;
+    } else if (kbId === 'none') {
+      if (inAnyKb || isAnyKbChief) return false;
+    } else {
+      const inKbDept = empDepts.some(d => departmentsById.get(d.deptId)?.kbId === kbId);
+      const isKbChief = (emp.kbIds || []).includes(kbId);
+      if (!inKbDept && !isKbChief) return false;
+    }
   }
 
   return matchesQuery(emp, query, departmentsById);
@@ -77,11 +119,9 @@ const matchesFilters = (emp, filters, departmentsById) => {
  * уже в заголовке секции. Плашка «совм» - только когда должность
  * относится к совмещению.
  *
- * Загрузка и количество задач отсюда убраны: эти показатели живут
- * в отдельной вьюхе Workload, где capacity считается по реальному
- * производственному календарю за выбранный период. Держать здесь
- * копию с фиксированной нормой 160 ч/мес - значит показывать два
- * разных процента загрузки для одного сотрудника на двух экранах.
+ * memo-компонент: правка чужой задачи/отпуска не пересоздаёт пропсы
+ * этой строки. Всё, что передаётся снаружи, - примитивы или стабильные
+ * ссылки (employee, store, колбэки).
  */
 const EmployeeRow = React.memo(({
   employee,
@@ -169,7 +209,14 @@ const EmployeeRow = React.memo(({
       </div>
       <div className="st-roles">
         {employee.roles.map(r => (
-          <span key={r} className="role-chip" style={{ background: ROLES[r].color + '1e', color: ROLES[r].color }}>{ROLES[r].short}</span>
+          <span
+            key={r}
+            className="role-chip"
+            title={ROLES[r].label}
+            style={{ background: ROLES[r].color + '1e', color: ROLES[r].color }}
+          >
+            {ROLES[r].short}
+          </span>
         ))}
       </div>
 
@@ -207,15 +254,29 @@ export default function Staff({ store, db, setDb, ur, openRoles, openDepts, open
     [db.departments]
   );
 
-  const kbSelectOptions = useMemo(
-    () => optionsFromList(db.kbs, 'Все КБ', (k) => ({ value: k.id, label: k.name })),
-    [db.kbs]
-  );
-  const deptSelectOptions = useMemo(
-    () => optionsFromList(db.departments, 'Все отделы', (d) => ({ value: d.id, label: d.name })),
-    [db.departments]
-  );
+  // Опции КБ: четыре состояния - «Все сотрудники» (не фильтровать),
+  // «Все КБ» (только те, кто в каком-то КБ), конкретные КБ и «Вне КБ».
+  // Новый КБ, добавленный через handleCreateKb, автоматически появится
+  // в списке: он попадает в db.kbs, memo пересчитается.
+  const kbSelectOptions = useMemo(() => [
+    { value: 'all',  label: 'Все сотрудники' },
+    { value: 'any',  label: 'Все КБ' },
+    ...db.kbs.map(k => ({ value: k.id, label: k.name })),
+    { value: 'none', label: 'Вне КБ' },
+  ], [db.kbs]);
 
+  // Опции отделов: аналогично - «Все сотрудники», «Все отделы»,
+  // конкретные отделы и «Вне отделов». Новый отдел, добавленный через
+  // handleCreateDept, появится автоматически.
+  const deptSelectOptions = useMemo(() => [
+    { value: 'all',  label: 'Все сотрудники' },
+    { value: 'any',  label: 'Все отделы' },
+    ...db.departments.map(d => ({ value: d.id, label: d.name })),
+    { value: 'none', label: 'Вне отделов' },
+  ], [db.departments]);
+
+  // Текущий отпуск сотрудника (approved и сегодня внутри [start, end]).
+  // Первый подходящий. Наружу - только end-дата (string | null).
   const vacationEndByEmp = useMemo(() => {
     const map = new Map();
     for (const v of db.vacations) {
@@ -236,6 +297,10 @@ export default function Staff({ store, db, setDb, ur, openRoles, openDepts, open
     [db.employees, filters, departmentsById]
   );
 
+  // Секция «Руководство»: активные сотрудники без отдела и без роли
+  // главного конструктора. Директор - без отдела, с ролью director;
+  // ГК КБ - без отдела, но с ролью kb_chief (они рендерятся внутри
+  // секций своих КБ).
   const noDeptEmployees = useMemo(() => {
     return filteredActiveEmployees
       .filter(e => e.departments.length === 0 && !e.roles.includes('kb_chief'))
@@ -246,27 +311,78 @@ export default function Staff({ store, db, setDb, ur, openRoles, openDepts, open
       });
   }, [filteredActiveEmployees]);
 
+  // Карта «отдел → сотрудники этого отдела» после фильтрации.
+  // Используется как основа для рендера секций и как фильтр «остался
+  // ли кто-то в отделе». Один проход по отделам, не по сотрудникам.
   const deptMap = useMemo(() => {
     const map = new Map();
     db.departments.forEach(d => {
-      const members = filteredActiveEmployees.filter(e => e.departments.some(x => x.deptId === d.id));
+      const members = filteredActiveEmployees.filter(e =>
+        e.departments.some(x => x.deptId === d.id)
+      );
       if (members.length) map.set(d.id, members);
     });
     return map;
   }, [db.departments, filteredActiveEmployees]);
 
+  /**
+   * Секции по КБ.
+   *
+   * members - все сотрудники этого КБ, попавшие под фильтр: нужны
+   * только как «есть ли что показывать в секции КБ». Сами они
+   * распределяются по отделам через deptMap.
+   *
+   * deptsInKb - какие отделы рендерить внутри секции КБ. Если фильтр
+   * отдела сужен до конкретного, показывается только он. Иначе при
+   * фильтре «Отдел аэродинамики» сотрудник, числящийся в двух отделах,
+   * всплывал бы и во втором - потому что deptMap содержит его в обоих,
+   * а рендер шёл по всем отделам КБ.
+   *
+   * chiefs - главные конструкторы этого КБ. У них нет отдела, поэтому
+   * они попадают под фильтр отдела только как 'none'.
+   *
+   * Секция показывается, только если в ней есть хоть кто-то: члены
+   * отделов КБ или главный конструктор. deptsInKb (статический список
+   * отделов КБ) в условии не участвует - он не зависит от фильтра.
+   */
   const kbSections = useMemo(() => {
     return db.kbs.map(k => {
-      const deptsInKb = db.departments.filter(d => d.kbId === k.id);
-      const members = filteredActiveEmployees.filter(e => e.departments.some(d => deptsInKb.some(x => x.id === d.deptId)));
-      const chiefs = filteredActiveEmployees.filter(e => e.roles.includes('kb_chief') && (e.kbIds || []).includes(k.id));
-      if (members.length === 0 && deptsInKb.length === 0 && chiefs.length === 0) return null;
+      const allDeptsInKb = db.departments.filter(d => d.kbId === k.id);
+      const deptsInKb = deptId === 'all'
+        ? allDeptsInKb
+        : deptId === 'none'
+          ? []
+          : allDeptsInKb.filter(d => d.id === deptId);
+
+      const members = filteredActiveEmployees.filter(e =>
+        e.departments.some(d => allDeptsInKb.some(x => x.id === d.deptId))
+      );
+      const chiefs = filteredActiveEmployees.filter(e =>
+        e.roles.includes('kb_chief') && (e.kbIds || []).includes(k.id)
+      );
+
+      if (members.length === 0 && chiefs.length === 0) return null;
       return { kb: k, deptsInKb, members, chiefs };
     }).filter(Boolean);
-  }, [db.kbs, db.departments, filteredActiveEmployees]);
+  }, [db.kbs, db.departments, filteredActiveEmployees, deptId]);
 
-  const deptsWithoutKb = useMemo(() => db.departments.filter(d => d.kbId === null), [db.departments]);
+  /**
+   * Отделы вне КБ - те, где после фильтрации остались сотрудники.
+   * Если фильтр отдела сужен до конкретного, показывается только он.
+   * Случай deptId === 'none' сюда не доходит: при нём все сотрудники
+   * без отделов, deptMap пуст, условие выше отсекает всё.
+   */
+  const deptsWithoutKb = useMemo(() => {
+    return db.departments.filter(d => {
+      if (d.kbId !== null) return false;
+      if ((deptMap.get(d.id) || []).length === 0) return false;
+      if (deptId === 'all') return true;
+      return d.id === deptId;
+    });
+  }, [db.departments, deptMap, deptId]);
 
+  // Все отпуска - под теми же фильтрами, что и списки сотрудников.
+  // Иначе выбор «КБ «ЛА»» показывал бы отпуска всего завода.
   const allVacs = useMemo(() => {
     const list = db.vacations
       .filter(v => {
@@ -302,6 +418,8 @@ export default function Staff({ store, db, setDb, ur, openRoles, openDepts, open
     showToast(TOASTS.deptCreated(name), 'success');
   }, [prompt, setDb, showToast]);
 
+  // Один хелпер для всех мест рендера строки - единая сигнатура пропсов,
+  // чтобы не было рассинхрона между 4 секциями.
   const renderEmployeeRow = (e, deptId, isFired) => (
     <EmployeeRow
       key={e.id}
@@ -341,7 +459,13 @@ export default function Staff({ store, db, setDb, ur, openRoles, openDepts, open
 
   return (
     <div className="staff">
-      <div className="toolbar toolbar-wrap">
+      {/* Одна строка: поиск + 3 фильтра + кнопки действий.
+          Используем .toolbar - у него уже есть flex-wrap: nowrap и
+          правило .toolbar .filter-select { width: 150px }. Классы
+          staff-kb-select / staff-dept-select расширяют эти два
+          селекта до 220/260px: в них бывают длинные метки. Кнопки
+          прижаты вправо через ml-auto на обёртке. */}
+      <div className="toolbar">
         <SearchBox
           value={query}
           onChange={(v) => setFilter('query', v)}
@@ -349,13 +473,13 @@ export default function Staff({ store, db, setDb, ur, openRoles, openDepts, open
           className="staff-search"
         />
         <Select
-          className="filter-select"
+          className="filter-select staff-select"
           value={kbId}
           onChange={(v) => setFilter('kbId', v)}
           options={kbSelectOptions}
         />
         <Select
-          className="filter-select filter-select-dept"
+          className="filter-select staff-select"
           value={deptId}
           onChange={(v) => setFilter('deptId', v)}
           options={deptSelectOptions}
@@ -402,6 +526,8 @@ export default function Staff({ store, db, setDb, ur, openRoles, openDepts, open
         />
       )}
 
+      {/* Плашка «не найдено» - если хоть один фильтр активен и нет
+          ни одного сотрудника ни в активных, ни в уволенных. */}
       {(query || kbId !== 'all' || deptId !== 'all' || role !== 'all')
         && filteredActiveEmployees.length === 0
         && filteredFiredEmployees.length === 0 && (

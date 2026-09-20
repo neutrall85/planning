@@ -113,12 +113,15 @@ export class TaskService {
       const planned = parseFloat(task.plannedHours) || 0;
       if (!this._budget.canAddChildToParent(task.parentTaskId, planned, excludeId)) {
         const parent = this._taskRepo.findById(task.parentTaskId);
-        const parentName = parent ? `"${parent.title}"` : 'родительской задачи';
-        const remaining = this._budget.getRemainingHours(task.parentTaskId);
+        const parentName = parent ? `"${parent.title}"` : "родительской задачи";
+        // getEffectiveRemaining, а не getRemainingHours: отказ мог произойти
+        // и по локальному остатку родителя, и по бюджету корня дерева.
+        // Показываем минимум из двух - то же значение, по которому
+        // принималось решение.
+        const remaining = this._budget.getEffectiveRemaining(task.parentTaskId, excludeId);
         throw new Error(
-          `Невозможно добавить/обновить подзадачу: превышение бюджета ${parentName}. ` +
-          `Остаток бюджета: ${remaining !== null ? remaining : 'неизвестен'} ч. ` +
-          `Запрошено: ${planned} ч.`
+          `Невозможно добавить/обновить подзадачу в ${parentName}: доступно ` +
+          `${remaining !== null ? remaining : "неизвестно"} ч, запрошено ${planned} ч.`
         );
       }
     }

@@ -4647,6 +4647,11 @@ input, select, textarea {
   width: auto;
 }
 
+.staff .toolbar .staff-select {
+  width: 220px;
+  flex-shrink: 0;
+}
+
 .workload-period-meta {
   font-size: 14px;
   color: var(--mut);

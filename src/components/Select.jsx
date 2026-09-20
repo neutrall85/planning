@@ -5,18 +5,33 @@ import {
   SELECT_SEARCH_THRESHOLD,
   SELECT_POPUP_MAX_HEIGHT,
 } from '../utils/constants';
+import { sortOptions } from '../utils/selectOptions';
 
 /**
  * Кастомный выпадающий список с поиском и множественным выбором.
+ *
+ * Порядок опций нормализуется здесь: sortOptions поднимает служебные
+ * пункты ('', 'all', 'any', 'none') наверх, остальные раскладывает по
+ * алфавиту. Правило одно на весь проект - вызывающий код про сортировку
+ * не думает и не дублирует её в optionsFromMap / optionsFromList.
  *
  * Позиционирование попапа - через CSS-переменные --select-popup-*
  * (паттерн useStableModalHeight / TaskProgress / WorkloadBar).
  * В JSX попапа никаких style={{}} - разметка чистая, все значения
  * живут в .custom-select-popup и модификаторах.
  *
- * Ширина: min-width = ширина триггера, ширина по контенту (max-content),
- * max-width = вьюпорт минус отступы. Если попап шире триггера и у правого
- * края не влезает - сдвигаем left, прижимая попап к правому краю экрана.
+ * Навигация с клавиатуры - через onKeyDown на самом попапе, не через
+ * document-listener. Это принципиально: в проекте на keydown документа
+ * уже висят Modal (Escape), useNestedModalEscape (Escape, capture на
+ * window) и FloatingMenu (через useNestedModalEscape). Ещё один
+ * document-listener, который при этом пересоздаётся при каждом рендере
+ * (values в deps - новый массив для single-режима), давал гонку: нажатие
+ * стрелки уходило в устаревшее замыкание и подсветка сбрасывалась на
+ * первый элемент. Обработчик на попапе этой гонки не имеет - React
+ * пересоздаёт его сам на каждом рендере, значения всегда актуальные.
+ *
+ * Escape остаётся на документе (capture): он должен срабатывать, даже
+ * когда фокус на триггере, а не на попапе.
  */
 export const Select = ({
   id,
@@ -39,24 +54,32 @@ export const Select = ({
   const searchInputRef = useRef(null);
 
   const values = multiple && Array.isArray(value) ? value : [];
+
+  /**
+   * Опции в том порядке, в котором их увидит пользователь. useMemo по
+   * ссылке options - сортировка не пересчитывается, пока вызывающий код
+   * не пересоздал массив (а он этого не делает: списки собраны в
+   * useMemo либо на уровне модуля).
+   */
+  const sortedOptions = useMemo(() => sortOptions(options), [options]);
+
   const selectedSingle = multiple
     ? null
-    : options.find(o => String(o.value) === String(value));
+    : sortedOptions.find(o => String(o.value) === String(value));
 
   const shouldSearch = searchable === undefined
-    ? options.length > SELECT_SEARCH_THRESHOLD
+    ? sortedOptions.length > SELECT_SEARCH_THRESHOLD
     : searchable;
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return options;
+    if (!search.trim()) return sortedOptions;
     const q = search.toLowerCase();
-    return options.filter(o => o.label.toLowerCase().includes(q));
-  }, [options, search]);
+    return sortedOptions.filter(o => o.label.toLowerCase().includes(q));
+  }, [sortedOptions, search]);
 
   const openPopup = () => {
     if (disabled) return;
     setSearch('');
-    setHighlightIndex(-1);
     setOpen(true);
   };
 
@@ -69,14 +92,62 @@ export const Select = ({
   const toggle = () => (open ? close() : openPopup());
 
   /**
-   * Позиционирование попапа. Выполняется в useLayoutEffect до первого
-   * пейнта - чтобы не было «прыжка» из дефолтной позиции в вычисленную.
+   * Автоподсветка при открытии и при изменении строки поиска.
    *
-   * Порядок: выставляем left/top/min-width по триггеру, затем, после
-   * того как попап отрендерился и известен его offsetWidth, корректируем
-   * left, если попап выходит за правый край экрана. Высоту не считаем -
-   * max-height: 300px (SELECT_POPUP_MAX_HEIGHT) и overflow-y: auto в CSS
-   * сами разрулят.
+   * Правила:
+   *   - поиск не пуст → подсветить первый подходящий;
+   *   - поиск пуст, single, есть выбранное → подсветить его;
+   *   - иначе → подсветить первый.
+   *
+   * highlightIndex в deps нет: эффект реагирует на «открылись» и
+   * «поиск изменился», а не на навигацию. Иначе каждое нажатие стрелки
+   * сбрасывало бы выделение на первый элемент.
+   */
+  useEffect(() => {
+    if (!open) return;
+
+    if (filtered.length === 0) {
+      setHighlightIndex(-1);
+      return;
+    }
+
+    if (search.trim()) {
+      setHighlightIndex(0);
+      return;
+    }
+
+    if (!multiple && value !== null && value !== undefined && value !== '') {
+      const idx = filtered.findIndex(o => String(o.value) === String(value));
+      setHighlightIndex(idx >= 0 ? idx : 0);
+      return;
+    }
+
+    setHighlightIndex(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, search]);
+
+  /**
+   * Фокус на попап при открытии - чтобы keydown-события шли из него.
+   *
+   * Если попап searchable - фокус уходит на input поиска (см. отдельный
+   * эффект ниже). Input внутри попапа, событие всё равно всплывёт до
+   * onKeyDown попапа.
+   */
+  useEffect(() => {
+    if (open && popupRef.current && !shouldSearch) {
+      popupRef.current.focus();
+    }
+  }, [open, shouldSearch]);
+
+  useEffect(() => {
+    if (open && shouldSearch && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [open, shouldSearch]);
+
+  /**
+   * Позиционирование попапа. useLayoutEffect - до первого пейнта,
+   * чтобы не было «прыжка» из дефолтной позиции в вычисленную.
    */
   useLayoutEffect(() => {
     if (!open || !popupRef.current || !triggerRef.current) return;
@@ -86,14 +157,10 @@ export const Select = ({
     const vw = window.innerWidth;
     const EDGE = 8;
 
-    // Вертикаль: если снизу меньше SELECT_POPUP_MAX_HEIGHT, а сверху
-    // больше - открываем вверх, привязав низ попапа к верху триггера.
     const spaceBelow = window.innerHeight - triggerRect.bottom;
     const spaceAbove = triggerRect.top;
     const openUp = spaceBelow < SELECT_POPUP_MAX_HEIGHT && spaceAbove > spaceBelow;
 
-    // Горизонталь: по умолчанию левый край = левому краю триггера.
-    // Если попап не влезает справа - сдвигаем влево, но не за левый край.
     let left = triggerRect.left;
     if (left + popupWidth > vw - EDGE) {
       left = Math.max(EDGE, vw - popupWidth - EDGE);
@@ -114,9 +181,13 @@ export const Select = ({
     }
   }, [open, filtered.length]);
 
-  // Закрытие по клику вне и Escape. Слушаем keydown в capture-фазе, чтобы
-  // Escape гасил именно попап, а не родительскую модалку (Modal.jsx слушает
-  // window в bubble-фазе - stopPropagation в capture не даёт событию дойти).
+  // Закрытие по клику вне и Escape.
+  //
+  // Escape слушаем в capture-фазе на документе: попап рендерится в
+  // портал и может не иметь фокуса, если пользователь кликнул на
+  // триггер и потом отпустил - keydown должен всё равно закрыть попап,
+  // а не родительскую модалку. stopPropagation в capture не даёт
+  // событию дойти до Modal.jsx, который слушает в bubble-фазе.
   useEffect(() => {
     if (!open) return;
     const onDown = (e) => {
@@ -138,54 +209,13 @@ export const Select = ({
     };
   }, [open]);
 
-  // Навигация по списку с клавиатуры. Слушатель на документе: попап
-  // рендерится в портал, и фокус остаётся на кнопке-триггере.
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e) => {
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        setHighlightIndex(i => Math.min(filtered.length - 1, i + 1));
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        setHighlightIndex(i => Math.max(0, i - 1));
-      } else if (e.key === 'Home') {
-        e.preventDefault();
-        setHighlightIndex(0);
-      } else if (e.key === 'End') {
-        e.preventDefault();
-        setHighlightIndex(filtered.length - 1);
-      } else if (e.key === 'Enter') {
-        e.preventDefault();
-        if (highlightIndex >= 0 && filtered[highlightIndex]) {
-          handleSelect(filtered[highlightIndex]);
-        }
-      }
-    };
-    document.addEventListener('keydown', onKey, true);
-    return () => document.removeEventListener('keydown', onKey, true);
-  }, [open, filtered, highlightIndex, multiple, values]);
-
-  useEffect(() => {
-    if (open && shouldSearch && searchInputRef.current) {
-      searchInputRef.current.focus();
-    }
-  }, [open, shouldSearch]);
-
-  useEffect(() => {
-    if (highlightIndex >= filtered.length) {
-      setHighlightIndex(filtered.length - 1);
-    }
-  }, [filtered.length, highlightIndex]);
-
   const handleSelect = (opt) => {
     if (multiple) {
       const selectedKeys = new Set(values.map(String));
       const key = String(opt.value);
       if (selectedKeys.has(key)) selectedKeys.delete(key);
       else selectedKeys.add(key);
-      // Порядок = порядок опций, а не порядок кликов.
-      const next = options
+      const next = sortedOptions
         .map(o => o.value)
         .filter(v => selectedKeys.has(String(v)));
       onChange(next);
@@ -195,13 +225,41 @@ export const Select = ({
     }
   };
 
+  /**
+   * Клавиатура на попапе. React пересоздаёт этот обработчик на каждом
+   * рендере - filtered / highlightIndex / handleSelect всегда актуальны,
+   * без refs и без риска гонки. Событие от input поиска всплывает сюда
+   * (input внутри попапа), так что один обработчик покрывает оба случая:
+   * фокус на попапе и фокус на поиске.
+   */
+  const handlePopupKeyDown = (e) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlightIndex(i => Math.min(filtered.length - 1, i + 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlightIndex(i => Math.max(0, i - 1));
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      setHighlightIndex(0);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      setHighlightIndex(filtered.length - 1);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (highlightIndex >= 0 && filtered[highlightIndex]) {
+        handleSelect(filtered[highlightIndex]);
+      }
+    }
+  };
+
   const handleTriggerKeyDown = (e) => {
     if (disabled) return;
+    // Стрелка на закрытом триггере открывает попап. При открытом попапе
+    // фокус уходит в попап, и сюда событие не доходит.
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-      if (!open) {
-        e.preventDefault();
-        openPopup();
-      }
+      e.preventDefault();
+      openPopup();
     }
   };
 
@@ -244,6 +302,8 @@ export const Select = ({
           className="custom-select-popup"
           role="listbox"
           aria-multiselectable={multiple || undefined}
+          tabIndex={-1}
+          onKeyDown={handlePopupKeyDown}
         >
           {shouldSearch && (
             <div className="custom-select-search">

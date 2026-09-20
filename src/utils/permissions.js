@@ -1,18 +1,26 @@
 // src/utils/permissions.js
 import { isArchived } from './entityState';
 
-export const hasRole = (user, ...roles) => !!user && roles.some(r => user.roles.includes(r));
+// ============================================================================
+// Базовые предикаты ролей
+// ============================================================================
+
+export const hasRole = (user, ...roles) =>
+  !!user && roles.some(r => user.roles.includes(r));
+
+// Короткий псевдоним. Используется там, где hasRole читается как «есть роль»
+// (CommentPolicy.canPin), а не как «пользователь имеет право».
 export const has = hasRole;
 
-export const canEditDepartments = (user) => hasRole(user, "admin", "director", "hr");
-export const canManageAllVacations = (user) => hasRole(user, "admin", "director", "hr");
-export const canRestore = (user) => hasRole(user, "admin", "director", "project_manager");
-export const canCreateTask = (user) => hasRole(user, "admin", "director", "economist", "kb_chief", "head", "project_lead", "project_manager");
-export const canCreateProject = (user) => hasRole(user, "admin", "director", "kb_chief", "project_manager");
-export const canManageManager = (user) => hasRole(user, "admin", "director", "kb_chief", "project_manager");
-export const canExport = (user) => hasRole(user, "admin", "director", "economist");
-export const canEditRoles = (user) => hasRole(user, "admin");
-export const canFireEmployee = (user) => hasRole(user, "admin", "director", "hr");
+export const canEditDepartments      = (user) => hasRole(user, 'admin', 'director', 'hr');
+export const canManageAllVacations   = (user) => hasRole(user, 'admin', 'director', 'hr');
+export const canRestore              = (user) => hasRole(user, 'admin', 'director', 'project_manager');
+export const canCreateTask           = (user) => hasRole(user, 'admin', 'director', 'economist', 'kb_chief', 'head', 'project_lead', 'project_manager');
+export const canCreateProject        = (user) => hasRole(user, 'admin', 'director', 'kb_chief', 'project_manager');
+export const canManageManager        = (user) => hasRole(user, 'admin', 'director', 'kb_chief', 'project_manager');
+export const canExport               = (user) => hasRole(user, 'admin', 'director', 'economist');
+export const canEditRoles            = (user) => hasRole(user, 'admin');
+export const canFireEmployee         = (user) => hasRole(user, 'admin', 'director', 'hr');
 
 /**
  * Право сохранять шаблоны.
@@ -36,6 +44,32 @@ export const canCreateTemplate = (user) =>
  * административная операция уровня конфигурации системы.
  */
 export const canManageProductionCalendar = (user) => hasRole(user, 'admin');
+
+/**
+ * Право открыть вьюху по прямому URL.
+ *
+ * Основное правило: VIEWS в utils/routes.js описывает, какие viewId
+ * валидны для роутинга. Отдельный предикат доступа нужен только там,
+ * где видимость вьюхи в боковом меню не совпадает с её доступностью.
+ * Сейчас такой случай один - журнал аудита.
+ *
+ * Журнал отфильтрован из navItems для не-админов/не-директоров, но
+ * по прямому URL `#/view/journal` любой сотрудник до открытия этой
+ * проверки мог бы на него попасть: роутер смотрит только VIEWS,
+ * а тот список про строки, не про пользователя.
+ *
+ * Живёт здесь, а не в routes.js: routes.js - чистый модуль без
+ * знания о пользователях и ролях, и таким должен оставаться.
+ */
+export const canAccessView = (user, viewId) => {
+  if (!user) return false;
+  if (viewId === 'journal') return hasRole(user, 'admin', 'director');
+  return true;
+};
+
+// ============================================================================
+// Восстановление сущностей из архива
+// ============================================================================
 
 /**
  * Единственная точка правила «задачу с архивным проектом восстанавливать
@@ -64,9 +98,9 @@ export const canRestoreTask = (user, task, db) => {
   return !project || !isArchived(project);
 };
 
-// ---------------------------------------------------------------------------
-// Доступ к проекту
-// ---------------------------------------------------------------------------
+// ============================================================================
+// Доступ к проектам
+// ============================================================================
 
 /**
  * Явный доступ к проекту - через поле project.access.userIds.
@@ -81,8 +115,7 @@ export const hasProjectAccess = (user, project) => {
   if (!user || !project) return false;
   const access = project.access;
   if (!access) return false;
-  const userIds = Array.isArray(access.userIds) ? access.userIds : [];
-  return userIds.includes(user.id);
+  return (Array.isArray(access.userIds) ? access.userIds : []).includes(user.id);
 };
 
 /**
@@ -111,9 +144,9 @@ export const canSeeProjectByDefault = (user, project, db) => {
   return scope.all || scope.projIds.has(project.id);
 };
 
-// ---------------------------------------------------------------------------
-// Вспомогательные предикаты для прав на задачи.
-// ---------------------------------------------------------------------------
+// ============================================================================
+// Предикаты контекста (используются внутри правил статуса/редактирования)
+// ============================================================================
 
 const isKbChiefOf = (user, project) =>
   !!(project?.kbId && hasRole(user, 'kb_chief') && (user.kbIds || []).includes(project.kbId));
@@ -129,29 +162,34 @@ const isLeadOf = (user, project) =>
 
 const isAssignee = (user, task) => task.assigneeId === user.id;
 
-const isBlockedTransition = (newStatus) => newStatus === 'closed' || newStatus === 'cancelled';
+const isBlockedTransition = (newStatus) =>
+  newStatus === 'closed' || newStatus === 'cancelled';
 
+// Разрешённые переходы исполнителя в производственном проекте.
+// В административных проектах исполнитель может ставить любой статус -
+// см. ветку `if (!isProdProject) return true` в canChangeTaskStatus.
 const PROD_ASSIGNEE_TRANSITIONS = {
-  new: ['inwork'],
-  inwork: ['review'],
-  review: ['inwork'],
+  'new':    ['inwork'],
+  'inwork': ['review'],
+  'review': ['inwork'],
 };
+
+// ============================================================================
+// Права на редактирование полей и смену статуса
+// ============================================================================
 
 export const canEditTaskFields = (user, task, data) => {
   if (!user || !task || !data) return false;
   if (isArchived(task)) return false;
-  if (hasRole(user, "admin", "economist")) return true;
-  if (hasRole(user, "project_manager")) return false;
+  if (hasRole(user, 'admin', 'economist')) return true;
+  if (hasRole(user, 'project_manager')) return false;
   return false;
 };
 
 export const canChangeTaskStatus = (user, task, newStatus, data) => {
   if (!user || !task || !data) return false;
   if (isArchived(task)) return false;
-
-  if (task.status === 'closed' || task.status === 'cancelled') {
-    return hasRole(user, 'admin');
-  }
+  if (task.status === 'closed' || task.status === 'cancelled') return hasRole(user, 'admin');
 
   const project = data.projects.find(p => p.id === task.projectId);
   const isProdProject = !!(project && project.ptype !== 'admin');
@@ -160,12 +198,10 @@ export const canChangeTaskStatus = (user, task, newStatus, data) => {
   if (isKbChiefOf(user, project)) return true;
   if (isHeadOfAssignee(user, task, data)) return true;
   if (isLeadOf(user, project)) return true;
-
   if (isProdProject && hasRole(user, 'project_manager')) return false;
 
   if (!isAssignee(user, task)) return false;
   if (isBlockedTransition(newStatus)) return false;
-
   if (!isProdProject) return true;
 
   return (PROD_ASSIGNEE_TRANSITIONS[task.status] || []).includes(newStatus);
@@ -174,62 +210,53 @@ export const canChangeTaskStatus = (user, task, newStatus, data) => {
 export const canEditProjectFields = (user, project) => {
   if (!user || !project) return false;
   if (isArchived(project)) return false;
-  if (hasRole(user, "admin", "director")) return true;
-  if (hasRole(user, "project_manager")) return false;
+  if (hasRole(user, 'admin', 'director')) return true;
+  if (hasRole(user, 'project_manager')) return false;
   return false;
 };
 
 export const canChangeProjectStatus = (user, project, newStatus) => {
   if (!user || !project) return false;
   if (isArchived(project)) return false;
-
   if (hasRole(user, 'admin')) return true;
   if (hasRole(user, 'director')) return true;
   if (hasRole(user, 'project_manager')) return true;
 
   if (newStatus === 'closed' || newStatus === 'cancelled') {
-    const creatorId = project.creatorId || (project.history?.find(h => h.who !== 'system')?.who);
+    const creatorId = project.creatorId
+      || project.history?.find(h => h.who !== 'system')?.who;
     if (creatorId && creatorId === user.id) return true;
   }
 
   if (hasRole(user, 'kb_chief') && project.kbId && (user.kbIds || []).includes(project.kbId)) return true;
-
   return false;
 };
 
-export const assigneeOptions = (user, data) => {
-  if (!user || !data) return [];
-  let list = [];
-  const allEmployees = data.employees.filter(e => !e.fired);
-
-  if (hasRole(user, "admin", "director", "economist", "project_lead", "project_manager")) {
-    list = allEmployees;
-  } else if (hasRole(user, "kb_chief") && (user.kbIds || []).length) {
-    const deptIds = data.departments.filter(d => d.kbId && user.kbIds.includes(d.kbId)).map(d => d.id);
-    list = allEmployees.filter(e => e.id === user.id || e.departments.some(x => deptIds.includes(x.deptId)) || hasRole(e, "director"));
-  } else if (hasRole(user, "head")) {
-    list = allEmployees.filter(e => e.id === user.id || e.departments.some(x => (user.headDeptIds || []).includes(x.deptId)) || hasRole(e, "director"));
-  } else {
-    list = allEmployees.filter(e => e.id === user.id);
-  }
-  return list.sort((a, b) => {
-    const cmp = a.last.localeCompare(b.last);
-    return cmp !== 0 ? cmp : a.first.localeCompare(b.first);
-  });
-};
+// ============================================================================
+// Утверждение отпусков
+// ============================================================================
 
 export const canApproveVacation = (user, vacation, data) => {
-  if (hasRole(user, "admin", "director")) return true;
+  if (hasRole(user, 'admin', 'director')) return true;
+
   const emp = data.employees.find(e => e.id === vacation.empId);
   if (!emp || emp.id === user.id) return false;
+
   const primaryDeptId = emp.departments.find(x => x.primary)?.deptId;
-  if (hasRole(user, "head") && primaryDeptId && (user.headDeptIds || []).includes(primaryDeptId)) return true;
-  if (hasRole(user, "kb_chief")) {
+
+  if (hasRole(user, 'head') && primaryDeptId && (user.headDeptIds || []).includes(primaryDeptId)) return true;
+
+  if (hasRole(user, 'kb_chief')) {
     const dept = data.departments.find(d => d.id === primaryDeptId);
     if (dept && dept.kbId && (user.kbIds || []).includes(dept.kbId)) return true;
   }
+
   return false;
 };
+
+// ============================================================================
+// Область видимости (scope)
+// ============================================================================
 
 /**
  * Базовая видимость пользователя - без явного доступа к проектам.
@@ -245,27 +272,47 @@ export const canApproveVacation = (user, vacation, data) => {
  * видимости и явного оверрайда - это граница между «по роли» и
  * «персонально».
  */
-export function computeBaseScope(u, db) {
+function computeBaseScope(u, db) {
   if (!u || !db) return { all: false, empIds: new Set(), projIds: new Set() };
+
   const allE = new Set(db.employees.filter(e => !e.fired).map(e => e.id));
   const allP = new Set(db.projects.map(p => p.id));
-  if (hasRole(u, "admin", "director", "economist", "project_manager")) {
+
+  if (hasRole(u, 'admin', 'director', 'economist', 'project_manager')) {
     return { all: true, empIds: allE, projIds: allP };
   }
+
   const empIds = new Set([u.id]);
   const projIds = new Set();
-  if (hasRole(u, "kb_chief") && (u.kbIds || []).length) {
-    const dIds = db.departments.filter(d => d.kbId && u.kbIds.includes(d.kbId)).map(d => d.id);
-    db.employees.filter(e => !e.fired).forEach(e => { if (e.departments.some(x => dIds.includes(x.deptId))) empIds.add(e.id); });
-    db.projects.forEach(p => { if (p.kbId && u.kbIds.includes(p.kbId)) projIds.add(p.id); });
+
+  if (hasRole(u, 'kb_chief') && (u.kbIds || []).length) {
+    const dIds = db.departments
+      .filter(d => d.kbId && u.kbIds.includes(d.kbId))
+      .map(d => d.id);
+    db.employees.filter(e => !e.fired).forEach(e => {
+      if (e.departments.some(x => dIds.includes(x.deptId))) empIds.add(e.id);
+    });
+    db.projects.forEach(p => {
+      if (p.kbId && u.kbIds.includes(p.kbId)) projIds.add(p.id);
+    });
   }
-  if (hasRole(u, "head") && (u.headDeptIds || []).length) {
-    db.employees.filter(e => !e.fired).forEach(e => { if (e.departments.some(x => u.headDeptIds.includes(x.deptId))) empIds.add(e.id); });
+
+  if (hasRole(u, 'head') && (u.headDeptIds || []).length) {
+    db.employees.filter(e => !e.fired).forEach(e => {
+      if (e.departments.some(x => u.headDeptIds.includes(x.deptId))) empIds.add(e.id);
+    });
   }
-  if (hasRole(u, "project_lead")) db.projects.forEach(p => { if (p.managerId === u.id) projIds.add(p.id); });
+
+  if (hasRole(u, 'project_lead')) {
+    db.projects.forEach(p => {
+      if (p.managerId === u.id) projIds.add(p.id);
+    });
+  }
+
   db.tasks.forEach(t => {
     if (t.assigneeId && empIds.has(t.assigneeId)) projIds.add(t.projectId);
   });
+
   return { all: false, empIds, projIds };
 }
 
@@ -283,17 +330,28 @@ export function computeScope(u, db) {
   return scope;
 }
 
+/**
+ * Видна ли задача пользователю в его области видимости.
+ *
+ * Помимо попадания исполнителя / проекта в scope, здесь есть
+ * дополнительные проверки по ролям. Они дублируют часть computeBaseScope
+ * намеренно: scope строится один раз и может быть устаревшим к моменту
+ * вызова (в нём проекты, а не задачи), а taskVisible запрашивается
+ * точечно по конкретной задаче, и ему важно посчитать «прямо сейчас».
+ */
 export function taskVisible(u, scope, t, db) {
   if (!scope || !t) return false;
   if (scope.all) return true;
   if (t.assigneeId && scope.empIds.has(t.assigneeId)) return true;
   if (!scope.projIds.has(t.projectId)) return false;
+
   const proj = db.projects.find(p => p.id === t.projectId);
   if (!proj) return false;
+
   if (hasProjectAccess(u, proj)) return true;
-  if (hasRole(u, "project_lead") && proj.managerId === u.id) return true;
-  if (hasRole(u, "kb_chief") && proj.kbId && (u.kbIds || []).includes(proj.kbId)) return true;
-  if (hasRole(u, "head")) return true;
+  if (hasRole(u, 'project_lead') && proj.managerId === u.id) return true;
+  if (hasRole(u, 'kb_chief') && proj.kbId && (u.kbIds || []).includes(proj.kbId)) return true;
+  if (hasRole(u, 'head')) return true;
   return false;
 }
 
@@ -310,15 +368,4 @@ export function taskVisible(u, scope, t, db) {
 export function projectVisible(scope, project) {
   if (!scope || !project) return false;
   return scope.all || scope.projIds.has(project.id);
-}
-
-export function empName(db, id) {
-  const e = db.employees.find(x => x.id === id);
-  return e ? `${e.last} ${e.first}` : "-";
-}
-
-export function primaryDept(db, e) {
-  if (!e) return null;
-  const p = e.departments.find(x => x.primary) || e.departments[0];
-  return p ? db.departments.find(d => d.id === p.deptId) : null;
 }

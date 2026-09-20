@@ -1,6 +1,8 @@
+// src/components/Avatar.jsx
 import React, { memo, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { initials } from '../utils/date';
+import { DOMAIN } from '../utils/constants';
 
 /**
  * Аватар сотрудника с тултипом при наведении.
@@ -15,6 +17,11 @@ import { initials } from '../utils/date';
  * Rules of Hooks: если employee менялся с null на не-null (или наоборот)
  * на смонтированном компоненте, порядок хуков в двух рендерах различался,
  * и React падал с «Rendered fewer hooks than expected».
+ *
+ * Тултип показывает ФИО, служебный e-mail и (если есть) внутренний
+ * телефон. Состав полей формируется здесь, а не приходит пропсом:
+ * он одинаков во всех местах, где рендерится аватар, и не должен
+ * зависеть от того, что вызывающий код счёл нужным передать.
  */
 const Avatar = memo(function Avatar({ employee, size = 'sm', className = '' }) {
   const [tooltip, setTooltip] = useState({ visible: false, text: '', x: 0, y: 0 });
@@ -22,8 +29,14 @@ const Avatar = memo(function Avatar({ employee, size = 'sm', className = '' }) {
 
   if (!employee) return null;
 
-  const tooltipText = `${employee.last} ${employee.first}` +
-    (employee.extension ? `\nВн. телефон: ${employee.extension}` : '');
+  // В employee.email хранится короткий логин без домена (так же, как
+  // в моках и в поле ввода при логине). Тултип показывает полный
+  // адрес - тот же формат, что в профиле кабинета.
+  const tooltipText = [
+    `${employee.last} ${employee.first}`,
+    employee.email ? `E-mail: ${employee.email}@${DOMAIN}` : null,
+    employee.extension ? `Вн. телефон: ${employee.extension}` : null,
+  ].filter(Boolean).join('\n');
 
   const handleMouseEnter = () => {
     if (ref.current) {

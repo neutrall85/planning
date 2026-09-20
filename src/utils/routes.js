@@ -33,11 +33,24 @@ export const TABS = Object.freeze({
   [ROUTE.PROJECT]: Object.freeze(['info', 'tasks', 'chat', 'files']),
 });
 
-// Разделы, доступные из URL. Дублирует состав бокового меню: подделанный
-// фрагмент не сможет завести пользователя туда, куда он обычно не ходит.
+// Белый список экранов, доступных из URL.
+//
+// ВАЖНО: этот список - не «пункты бокового меню» (для них есть navItems
+// в MainLayout), а множество view, для которых существует case в
+// MainLayout.renderView(). Оба конца роутинга - parseRoute здесь и
+// route-эффект в MainLayout - обязаны опираться на этот список, а не
+// на список кнопок меню. Иначе:
+//   - кабинет (не в меню, но валидный экран) не открывается по URL;
+//   - пункты под роли (reports, journal) отсекаются по URL даже
+//     у пользователя с правами;
+//   - id, оставшийся от прошлой версии приложения, приводит
+//     на пустой экран (default: return null).
+//
+// Ранее здесь был 'workload' - рендера для него нет, workload
+// отображается под-вкладкой внутри Cabinet.
 export const VIEWS = Object.freeze([
   'tasks', 'gantt', 'calendar', 'projects', 'templates',
-  'staff', 'workload', 'reports', 'archive', 'requests',
+  'staff', 'reports', 'archive', 'requests',
   'journal', 'cabinet',
 ]);
 
