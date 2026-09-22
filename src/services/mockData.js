@@ -34,7 +34,7 @@ export function buildMockData() {
     { id: "aleksey.gendirov", last: "Гендиров", first: "Алексей", email: "aleksey.gendirov", pass: "Director2026!", position: "Генеральный директор", departments: [], roles: ["director"], kbIds: [], headDeptIds: [], phone: "+7 900 000-00-00", extension: "102", tab: "1002", notif: { deadlineEmail: true, overdueDigest: false, commentSub: true }, failed: 0, lockUntil: 0, fired: false, passwordHistory: [], photo: null },
     { id: "erik.ekonomistov", last: "Экономистов", first: "Эрик", email: "erik.ekonomistov", pass: "Econ2026!", position: "Главный экономист", departments: [{ deptId: "d_management", primary: true }], roles: ["economist"], kbIds: [], headDeptIds: [], phone: "+7 900 000-00-00", extension: "103", tab: "1003", notif: { deadlineEmail: true, overdueDigest: false, commentSub: true }, failed: 0, lockUntil: 0, fired: false, passwordHistory: [], photo: null },
     { id: "ivan.konstruktorov", last: "Конструкторов", first: "Иван", email: "ivan.konstruktorov", pass: "KbLa2026!", position: "Главный конструктор КБ «ЛА»", departments: [], roles: ["kb_chief", "executor"], kbIds: ["kb_la"], headDeptIds: [], phone: "+7 900 000-00-00", extension: "104", tab: "1004", notif: { deadlineEmail: true, overdueDigest: false, commentSub: true }, failed: 0, lockUntil: 0, fired: false, passwordHistory: [], photo: null },
-    { id: "e_belova", last: "Белова", first: "Наталья", email: "belova", pass: "KbAd2026!", position: "Главный конструктор КБ «АД»", departments: [], roles: ["kb_chief", "executor"], kbIds: ["kb_ad"], headDeptIds: [], phone: "+7 900 000-00-00", extension: "105", tab: "1005", notif: { deadlineEmail: true, overdueDigest: false, commentSub: true }, failed: 0, lockUntil: 0, fired: false, passwordHistory: [], photo: null },
+    { id: "mikhail.dvigatelev", last: "Двигателев", first: "Михаил", email: "mikhail.dvigatelev", pass: "KbAd2026!", position: "Главный конструктор КБ «АД»", departments: [], roles: ["kb_chief", "executor"], kbIds: ["kb_ad"], headDeptIds: [], phone: "+7 900 000-00-00", extension: "105", tab: "1005", notif: { deadlineEmail: true, overdueDigest: false, commentSub: true }, failed: 0, lockUntil: 0, fired: false, passwordHistory: [], photo: null },
     { id: "olga.personalova", last: "Персоналова", first: "Ольга", email: "olga.personalova", pass: "Hr2026!", position: "Руководитель отдела управления персоналом", departments: [{ deptId: "d_hr", primary: true }], roles: ["hr", "head", "executor"], kbIds: [], headDeptIds: ["d_hr"], phone: "+7 900 000-00-00", extension: "106", tab: "1006", notif: { deadlineEmail: true, overdueDigest: false, commentSub: true }, failed: 0, lockUntil: 0, fired: false, passwordHistory: [], photo: null },
     { id: "mikhail.otdelov", last: "Отделов", first: "Михаил", email: "mikhail.otdelov", pass: "Head2026!", position: "Начальник отдела аэродинамики", departments: [{ deptId: "d_aero", primary: true }, { deptId: "d_comp", primary: false }], roles: ["head", "executor", "project_lead"], kbIds: [], headDeptIds: ["d_aero", "d_comp"], phone: "+7 900 000-00-00", extension: "107", tab: "1007", notif: { deadlineEmail: true, overdueDigest: false, commentSub: true }, failed: 0, lockUntil: 0, fired: false, passwordHistory: [], photo: null },
     { id: "kirill.proektov", last: "Проектов", first: "Кирилл", email: "kirill.proektov", pass: "Pm2026!", position: "Инженер", departments: [{ deptId: "d_aero", primary: true }], roles: ["project_lead", "executor"], kbIds: [], headDeptIds: [], phone: "+7 900 000-00-00", extension: "116", tab: "1016", notif: { deadlineEmail: true, overdueDigest: false, commentSub: true }, failed: 0, lockUntil: 0, fired: false, passwordHistory: [], photo: null },
@@ -413,7 +413,7 @@ export function buildMockData() {
       logs: [ { id: uid(), userId: "erik.ekonomistov", date: makeDate(-2), hours: 8, note: "Сбор данных" } ]
     }),
     T("t23", "Руководство проектированием крыла", "p_lm24", "ivan.konstruktorov", 20, -10, 15, "inwork", "crit", "Общее руководство конструкторской группой."),
-    T("t24", "Расчёт газодинамики двигателя", "p_rd900", "e_belova", 30, -12, 20, "new", "high", "Расчёт параметров рабочего процесса."),
+    T("t24", "Расчёт газодинамики двигателя", "p_rd900", "mikhail.dvigatelev", 30, -12, 20, "new", "high", "Расчёт параметров рабочего процесса."),
     T("t25", "Координация аэродинамических расчётов", "p_aero", "mikhail.otdelov", 18, -5, 10, "inwork", "mid", "Сведение результатов.", {
       logs: [ { id: uid(), userId: "mikhail.otdelov", date: makeDate(-2), hours: 6, note: "Совещание" } ]
     }),
@@ -697,21 +697,21 @@ export function buildMockData() {
       targetType: 'task', targetId: 't23', targetTab: null,
     },
 
-    // ---------- e_belova (kb_chief АД) ----------
+    // ---------- mikhail.dvigatelev (kb_chief АД) ----------
     {
-      id: uid(), userId: 'e_belova',
+      id: uid(), userId: 'mikhail.dvigatelev',
       text: 'В КБ «АД» создан проект «Система управления двигателем РД-900».',
       ts: now - 3600000 * 22, read: false,
       targetType: 'project', targetId: 'p_sau', targetTab: null,
     },
     {
-      id: uid(), userId: 'e_belova',
+      id: uid(), userId: 'mikhail.dvigatelev',
       text: 'Задача «Термогазодинамический расчёт компрессора» перешла в статус «В работе».',
       ts: now - 3600000 * 36, read: false,
       targetType: 'task', targetId: 't10', targetTab: null,
     },
     {
-      id: uid(), userId: 'e_belova',
+      id: uid(), userId: 'mikhail.dvigatelev',
       text: 'Проект «Система электроснабжения нового поколения» переведён в статус «Активный».',
       ts: now - 3600000 * 60, read: true,
       targetType: 'project', targetId: 'p_energy', targetTab: null,
