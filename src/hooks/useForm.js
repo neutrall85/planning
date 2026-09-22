@@ -1,5 +1,5 @@
 // src/hooks/useForm.js
-import { useState, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 /**
  * Записать значение по точечному пути, не мутируя исходный объект.
@@ -15,11 +15,8 @@ import { useState, useMemo } from 'react';
  * объект delegation вручную на каждом чекбоксе и селекте.
  */
 const setByPath = (prev, path, value) => {
-  const keys = String(path).split('.');
-  const [head, ...rest] = keys;
-  if (rest.length === 0) {
-    return { ...prev, [head]: value };
-  }
+  const [head, ...rest] = String(path).split('.');
+  if (rest.length === 0) return { ...prev, [head]: value };
   const nested = prev && typeof prev[head] === 'object' && prev[head] !== null
     ? prev[head]
     : {};
@@ -79,9 +76,10 @@ export const useForm = (initialValues, validate, options) => {
       'которые участвуют в проверке isDirty. Это защищает от «тихого» ' +
       'сравнения служебных и побочных полей (файлы, логи, фотографии, ' +
       'actualHours), которые сохраняются отдельно и не должны открывать ' +
-      'кнопку «Сохранить».'
+      'кнопку «Сохранить».',
     );
   }
+
   const { fields } = options;
 
   const [values, setValues] = useState(initialValues);
@@ -99,21 +97,46 @@ export const useForm = (initialValues, validate, options) => {
 
   const isDirty = useMemo(() => {
     for (const key of fields) {
-      if (JSON.stringify(getByPath(values, key)) !== JSON.stringify(getByPath(initialValues, key))) {
+      if (
+        JSON.stringify(getByPath(values, key)) !==
+        JSON.stringify(getByPath(initialValues, key))
+      ) {
         return true;
       }
     }
     return false;
   }, [values, initialValues, fields]);
 
-  const handleChange = (field, value) => {
+  /**
+   * handleChange - стабильная ссылка.
+   *
+   * setValues из useState стабилен по контракту React, setByPath -
+   * чистая функция уровня модуля. Мемоизация не обязательна, но
+   * дешёвая и убирает шум при передаче handleChange в memo-компоненты.
+   */
+  const handleChange = useCallback((field, value) => {
     setValues((prev) => setByPath(prev, field, value));
     setTouched((prev) => ({ ...prev, [field]: true }));
-  };
+  }, []);
 
-  const setFieldValue = (field, value) => {
+  /**
+   * setFieldValue - стабильная ссылка.
+   *
+   * Раньше это была обычная функция, создаваемая заново каждый рендер.
+   * Эффекты, которые кладут её в зависимости (например, «подставить
+   * projectId родителя у новой подзадачи» в useTaskFormState),
+   * перезапускались каждый рендер. Если эффект при этом вызывает
+   * setFieldValue - получался цикл «setState → ререндер → новый
+   * setFieldValue → эффект снова сработал → Maximum update depth
+   * exceeded».
+   *
+   * useCallback с пустыми зависимостями: setValues стабилен,
+   * setByPath чистая. Никаких замыканий на изменяемые значения здесь
+   * нет.
+   */
+  const setFieldValue = useCallback((field, value) => {
     setValues((prev) => setByPath(prev, field, value));
-  };
+  }, []);
 
   const handleSubmit = (callback) => (e) => {
     e?.preventDefault();

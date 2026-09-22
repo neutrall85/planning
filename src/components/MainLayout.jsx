@@ -34,14 +34,6 @@ import {
 } from '../utils/routes';
 import { findFileById, findFolderById } from '../utils/fileLinks';
 
-/**
- * Маппинг targetType уведомления → вкладка раздела «Запросы и заявки».
- *
- * Запросы на изменение (changeRequest) здесь отсутствуют осознанно:
- * у них вкладка определяется конкретным changeKind, и notification несёт
- * его в поле targetTab. Обработка changeRequest — отдельная ветка в
- * handleNotificationNavigate.
- */
 const REQUESTS_TAB_BY_NOTIF_TYPE = Object.freeze({
   delegation: 'rd',
   registration: 'reg',
@@ -99,9 +91,6 @@ function MainLayout({ store, user }) {
     if (!targetType || !targetId) return;
     store.markNotificationRead(notification.id);
 
-    // Запросы на изменение: вкладка — конкретный changeKind, он лежит
-    // в targetTab. Если по какой-то причине её нет — открываем 'hours'
-    // (самый частый вид), чтобы клик не пропадал зря.
     if (targetType === 'changeRequest') {
       setRequestsTab(targetTab || 'hours');
       setView('requests');
@@ -155,83 +144,221 @@ function MainLayout({ store, user }) {
   const viewRef = useRef(view);
   useEffect(() => { viewRef.current = view; }, [view]);
 
+  /**
+   * Актуальный modal в ref.
+   *
+   * Эффект обработки route ниже зависит только от route: перезапускать
+   * его на каждое изменение modal нельзя — это привело бы к лишним
+   * вызовам openTask при каждом обновлении «той же» модалки.
+   */
+  const modalRef = useRef(modal);
+  useEffect(() => { modalRef.current = modal; }, [modal]);
+
+  /**
+   * Закрыть модалку и вернуться в доступный view.
+   *
+   * Два предохранителя против самоподдерживающейся петли:
+   *
+   *   1. fallbackView проверяется на доступность. Если viewRef.current
+   *      указывает на view, к которому у пользователя больше нет прав
+   *      (сменилась роль, уволили в другой вкладке), раньше
+   *      navigate('#/view/тот-же-недоступный') приводил к повторному
+   *      срабатыванию эффекта [route] → denyAccess → navigate — цикл.
+   *      Теперь при недоступности уходим на 'tasks' — оно всегда есть
+   *      в VIEWS и доступно любой роли.
+   *
+   *   2. Проверка window.location.hash !== fallback перед navigate.
+   *      Если адрес уже указывает на fallback (например, denyAccess
+   *      вызван из-за смены прав, но URL ещё актуален), navigate — no-op,
+   *      и эффект [desiredHash] не дёргается.
+   */
   const denyAccess = useCallback(() => {
     showToast('Доступ запрещён', 'error');
     closeModal();
-    const fallback = buildRoute({ kind: ROUTE.VIEW, id: viewRef.current });
-    if (fallback) navigate(fallback);
-  }, [showToast, closeModal, navigate]);
+    const fallbackView = canAccessView(user, viewRef.current)
+      ? viewRef.current
+      : 'tasks';
+    const fallback = buildRoute({ kind: ROUTE.VIEW, id: fallbackView });
+    if (fallback && window.location.hash !== fallback) navigate(fallback);
+  }, [showToast, closeModal, navigate, user]);
 
   const firstRouteWriteRef = useRef(true);
-  useEffect(() => {
-    if (firstRouteWriteRef.current) {
-      firstRouteWriteRef.current = false;
-      return;
-    }
-    if (desiredHash) navigate(desiredHash);
-  }, [desiredHash, navigate]);
 
+  /**
+   * Флаг «route-эффект запланировал setView / closeModal / openTask».
+   *
+   * Проблема. Два эффекта — «route → state» и «state → URL» — работают в
+   * одном коммите, но видят снимок значений на момент рендера. Обновления
+   * состояния асинхронны, поэтому:
+   *
+   *   - route-эффект на смену #/view/gantt вызывает setView('gantt'),
+   *     но view в его замыкании ещё 'tasks';
+   *   - URL-эффект в этом же коммите вычисляет desiredHash из устаревшего
+   *     view='tasks' и вызывает navigate('#/view/tasks'), откатывая URL;
+   *   - на следующем рендере route снова = {view:'tasks'}, route-эффект
+   *     возвращает view='tasks', URL-эффект снова navigate('#/view/gantt')
+   *     — и так по кругу до Maximum update depth exceeded и
+   *     Throttling navigation.
+   *
+   * Решение. Route-эффект объявлен РАНЬШЕ URL-эффекта и перед каждым
+   * запланированным изменением состояния выставляет routeSyncPendingRef.
+   * URL-эффект читает флаг и один круг пропускает navigate — этого круга
+   * хватает, чтобы state-обновление закоммитилось и desiredHash
+   * пересчитался из актуальных значений.
+   *
+   * Ref, а не state: значение должно быть видно в том же коммите, до
+   * ре-рендера. Синхронная защёлка, сбрасывается URL-эффектом.
+   */
+  const routeSyncPendingRef = useRef(false);
+
+  /**
+   * Эффект «route → state». Объявлен первым — чтобы выставить
+   * routeSyncPendingRef до того, как URL-эффект его проверит.
+   */
   useEffect(() => {
     if (!route) return;
+
     if (route.kind === ROUTE.VIEW) {
       if (!VIEWS.includes(route.id)) return;
       if (!canAccessView(user, route.id)) { denyAccess(); return; }
-      if (view !== route.id) setView(route.id);
-      if (modal) closeModal();
+      let changed = false;
+      if (view !== route.id) { setView(route.id); changed = true; }
+      if (modalRef.current) { closeModal(); changed = true; }
+      if (changed) routeSyncPendingRef.current = true;
       return;
     }
+
     if (route.kind === ROUTE.TASK) {
       const task = tasks.find(t => t.id === route.id);
-      if (!task || !taskVisible(user, scope, task, dbForScope)) { denyAccess(); return; }
-      if (modal?.type === 'task' && modal.taskId === route.id && modal.initialTab === route.tab) return;
+
+      // Случай «задачи нет» и случай «задача не видна» — разные.
+      //
+      // Задача удалена: закрытием/переключением модалки занимается
+      // тот, кто её удалил, — ModalRenderer.handleTaskDelete вызывает
+      // closeTaskWithReturn после store.deleteTask. На промежуточном
+      // рендере (задача уже удалена, modal ещё указывает на неё, route
+      // ещё указывает на неё, а closeTaskWithReturn вот-вот переключит
+      // модалку на родителя) вызов denyAccess() здесь порождает гонку
+      // двух navigate: наша попытка уйти на '#/view/...' конкурирует
+      // с переходом '#/task/parentId/subtasks' из closeTaskWithReturn.
+      // Победитель каждый раз разный, URL и route расходятся, эффект
+      // [route] перезапускается — цикл «state → URL → state», в
+      // консоли Maximum update depth exceeded и Throttling navigation.
+      //
+      // Задача есть, но не видна: это уже не транзитное состояние,
+      // а реальная смена прав/scope — обрабатываем через denyAccess.
+      if (!task) return;
+      if (!taskVisible(user, scope, task, dbForScope)) { denyAccess(); return; }
+
+      const m = modalRef.current;
+      const mTab = m?.initialTab || DEFAULT_TAB[ROUTE.TASK];
+      const routeTab = route.tab || DEFAULT_TAB[ROUTE.TASK];
+      if (m?.type === 'task' && m.taskId === route.id && mTab === routeTab) return;
+      routeSyncPendingRef.current = true;
       openTask(route.id, route.tab);
       return;
     }
+
     if (route.kind === ROUTE.PROJECT) {
       const project = projects.find(p => p.id === route.id);
-      if (!project || !projectVisible(scope, project)) { denyAccess(); return; }
-      if (modal?.type === 'project' && modal.projectId === route.id && modal.initialTab === route.tab) return;
+      // Симметрично TASK: удалённый проект не повод для denyAccess —
+      // переключение модалки делает closeProjectWithReturn из
+      // ModalRenderer.handleProjectDelete.
+      if (!project) return;
+      if (!projectVisible(scope, project)) { denyAccess(); return; }
+
+      const m = modalRef.current;
+      const mTab = m?.initialTab || DEFAULT_TAB[ROUTE.PROJECT];
+      const routeTab = route.tab || DEFAULT_TAB[ROUTE.PROJECT];
+      if (m?.type === 'project' && m.projectId === route.id && mTab === routeTab) return;
+      routeSyncPendingRef.current = true;
       openProject(route.id, route.tab);
       return;
     }
+
+    // Share-ссылка на файл. Здесь «сущность пропала» — это уже
+    // настоящая ошибка адреса: файл удалён или переехал вместе с
+    // владельцем. Транзитного состояния не бывает — парного
+    // «кто удалил, тот и закроет» у файловой ссылки нет, поэтому
+    // denyAccess остаётся.
     if (route.kind === ROUTE.FILE) {
       const found = findFileById(dbForScope, route.id);
       if (!found) { denyAccess(); return; }
       if (found.owner === 'task') {
         if (!taskVisible(user, scope, found.entity, dbForScope)) { denyAccess(); return; }
+        routeSyncPendingRef.current = true;
         openAtFile('task', found.entity.id, route.id);
         return;
       }
       if (!projectVisible(scope, found.entity)) { denyAccess(); return; }
+      routeSyncPendingRef.current = true;
       openAtFile('project', found.entity.id, route.id);
       return;
     }
+
     if (route.kind === ROUTE.FOLDER) {
       const found = findFolderById(dbForScope, route.id);
       if (!found) { denyAccess(); return; }
       if (found.owner === 'task') {
         if (!taskVisible(user, scope, found.entity, dbForScope)) { denyAccess(); return; }
+        routeSyncPendingRef.current = true;
         openAtFolder('task', found.entity.id, route.id);
         return;
       }
       if (!projectVisible(scope, found.entity)) { denyAccess(); return; }
+      routeSyncPendingRef.current = true;
       openAtFolder('project', found.entity.id, route.id);
       return;
     }
   }, [route]);
 
+  /**
+   * Эффект «state → URL».
+   *
+   * Порядок объявления: ПОСЛЕ route-эффекта. В одном коммите route-эффект
+   * успевает выставить routeSyncPendingRef, и этот эффект может его
+   * прочитать и пропустить navigate.
+   *
+   * firstRouteWriteRef — отдельный предохранитель от ложной навигации
+   * на самом первом рендере: если URL уже содержит '#/task/t01/form',
+   * а view ещё 'tasks', не нужно переписывать адрес на '#/view/tasks'
+   * только ради того, чтобы route-эффект тут же открыл модалку t01.
+   */
+  useEffect(() => {
+    if (firstRouteWriteRef.current) {
+      firstRouteWriteRef.current = false;
+      return;
+    }
+    if (routeSyncPendingRef.current) {
+      // Route-эффект планирует setView/closeModal/openTask. Navigate
+      // в этом же коммите откатил бы свежий URL назад, к значению,
+      // которое вычислено из ещё не применённого state. Пропускаем
+      // круг — на следующем рендере desiredHash пересчитается из
+      // актуальных modal/view и сойдётся с текущим URL.
+      routeSyncPendingRef.current = false;
+      return;
+    }
+    if (desiredHash) navigate(desiredHash);
+  }, [desiredHash, navigate]);
+
+  /**
+   * Проверка видимости открытой в модалке сущности.
+   * (без изменений — здесь различение уже сделано)
+   */
   useEffect(() => {
     if (!modal) return;
     if (modal.type === 'task' && modal.taskId) {
       const task = tasks.find(t => t.id === modal.taskId);
-      if (!task || !taskVisible(user, scope, task, dbForScope)) denyAccess();
+      if (!task) return;
+      if (!taskVisible(user, scope, task, dbForScope)) denyAccess();
       return;
     }
     if (modal.type === 'project' && modal.projectId) {
       const project = projects.find(p => p.id === modal.projectId);
-      if (!project || !projectVisible(scope, project)) denyAccess();
+      if (!project) return;
+      if (!projectVisible(scope, project)) denyAccess();
     }
-  }, [modal, tasks, projects, scope, user]);
+  }, [modal, tasks, projects, scope, user, dbForScope, denyAccess]);
 
   const renderView = () => {
     const common = { ur: user, openTask, openProject, store };
@@ -285,7 +412,10 @@ function MainLayout({ store, user }) {
           ))}
         </nav>
         <div className="side-foot">
-          <div className="user-card cursor-pointer" onClick={() => navigate('#/view/cabinet')}>
+          <div
+            className="user-card cursor-pointer"
+            onClick={() => navigate('#/view/cabinet')}
+          >
             <div className="avatar">
               {user.photo
                 ? <img src={user.photo} alt="Аватар" className="user-card-photo" />

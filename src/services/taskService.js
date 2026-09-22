@@ -1,8 +1,7 @@
 // src/services/TaskService.js
-import { TODAY, iso, fmtDMY, uid } from '../utils/date';
-import { TASK_STATUSES, PRIORITIES } from '../utils/constants';
 import { isArchived } from '../utils/entityState';
 import { syncExecutorRolesFor } from './roleSync';
+import { iso, TODAY, uid, fmtDMY } from '../utils/date';
 import {
   dependencyRule,
   deriveLockedValue,
@@ -10,18 +9,19 @@ import {
   shiftDates,
 } from '../utils/taskDependency';
 import {
-  auditValue,
-  auditHours,
-  auditLabel,
-  auditName,
-  auditDetails,
   auditDelta,
+  auditDetails,
   auditToggle,
   auditListDelta,
+  auditHours,
   auditHoursDelta,
+  auditLabel,
   auditMark,
+  auditName,
+  auditValue,
   historyDelta,
 } from '../utils/auditHelpers';
+import { TASK_STATUSES, PRIORITIES } from '../utils/constants';
 
 export class TaskService {
   constructor({
@@ -48,51 +48,31 @@ export class TaskService {
     this._canRestore = canRestore;
     this._canRestoreTask = canRestoreTask;
     this._getData = getData;
-
-    this._syncExecutorRoles = (empIds) =>
-      syncExecutorRolesFor(empIds, { employeeRepo, taskRepo });
+    this._syncExecutorRoles = (empIds) => syncExecutorRolesFor(empIds, {
+      employeeRepo,
+      taskRepo,
+    });
   }
 
-  getAll() { return this._taskRepo.findAll(); }
+  getAll() {
+    return this._taskRepo.findAll();
+  }
 
-  /**
-   * Добавить запись в историю произвольной сущности (проект, задача)
-   * через её репозиторий. Не мутирует входной объект, сохраняет
-   * иммутабельно - тот же контракт, что у Repository.save через setter.
-   *
-   * Не подходит для случаев, когда история пишется вместе с другими
-   * полями сущности в одном save (isSummary / budgetHours у родителя):
-   * там важен один атомарный save, а не два подряд.
-   */
   _appendHistory(repo, id, entry) {
     if (!id) return;
     const entity = repo.findById(id);
     if (!entity) return;
-    repo.save({
-      ...entity,
-      history: [...(entity.history || []), entry],
-    });
+    repo.save({ ...entity, history: [...(entity.history || []), entry] });
   }
 
-  /**
-   * Проставить зафиксированное зависимостью поле по предшественнику.
-   *
-   * Страховка на уровне сервиса: форма блокирует поле, но прямой
-   * вызов store.upsertTask / store.patchTask не должен оставлять
-   * задачу в несогласованном состоянии. Для часовой задачи оба конца
-   * (start === deadline) сходятся на вычисленное значение.
-   */
   _applyDependency(task) {
     if (!task?.dependencyId) return task;
     const predecessor = this._taskRepo.findById(task.dependencyId);
     if (!predecessor) return task;
-
     const rule = dependencyRule(task.dependencyType);
     if (!rule) return task;
-
-    const value = deriveLockedValue(task, predecessor);
+    const value = deriveLockedValue(task.dependencyType, predecessor);
     if (value == null) return task;
-
     if (task.isHourly) {
       if (task.start === value && task.deadline === value) return task;
       return { ...task, start: value, deadline: value };
@@ -101,31 +81,17 @@ export class TaskService {
     return { ...task, [rule.locked]: value };
   }
 
-  /**
-   * Сдвинуть зависимые задачи вслед за изменением дат предшественника.
-   *
-   * Для каждой задачи B с B.dependencyId === after.id правило её типа
-   * определяет, какое поле after отслеживается. Если оно изменилось
-   * на delta дней, вся B сдвигается на ту же delta - так сохраняется
-   * длительность и согласованность зафиксированного поля. Дочерние
-   * задачи B (те, кто зависит от неё) сдвигаются рекурсивно.
-   *
-   * visited защищает от циклов в повреждённых данных.
-   */
   _propagateDependencyShift(before, after, currentUserId, visited = new Set()) {
     if (!before || !after || visited.has(after.id)) return;
     visited.add(after.id);
-
     const dependents = this._taskRepo.find(
-      (t) => t.dependencyId === after.id && !t.archived
+      (t) => t.dependencyId === after.id && !t.archived,
     );
     if (dependents.length === 0) return;
-
     const ts = Date.now();
     for (const dep of dependents) {
       const delta = predecessorDelta(dep.dependencyType, before, after);
       if (!delta) continue;
-
       const shifted = shiftDates(dep, delta);
       const sign = delta > 0 ? '+' : '';
       shifted.history = [
@@ -150,7 +116,6 @@ export class TaskService {
     }
 
     const isRestore = !isNew && isArchived(existing) && !isArchived(task);
-
     if (isRestore) {
       const user = this._employeeRepo.findById(currentUserId);
       if (!user || !this._canRestore(user)) {
@@ -161,8 +126,7 @@ export class TaskService {
       }
     } else if (!isNew && existing.status !== task.status && currentUserId !== 'system') {
       const user = this._employeeRepo.findById(currentUserId);
-      const allowed = user && this._canChangeStatus(user, existing, task.status, this._getData());
-      if (!allowed) {
+      if (!(user && this._canChangeStatus(user, existing, task.status, this._getData()))) {
         throw new Error('Переход в этот статус не разрешён для вашей роли');
       }
     }
@@ -173,11 +137,9 @@ export class TaskService {
       task.actualHours = 0;
     }
 
-    // Страховка: зафиксированное зависимостью поле всегда согласовано
-    // с предшественником. Делаем до всех проверок бюджета и родителей -
-    // дальнейшая логика видит уже финальные значения.
     task = this._applyDependency(task);
 
+    // Новая summary-задача: бюджета ещё нет, инициализируем из плана.
     if (isNew && task.isSummary && task.budgetHours === undefined) {
       task.budgetHours = task.plannedHours || 0;
     }
@@ -191,32 +153,103 @@ export class TaskService {
       const planned = parseFloat(task.plannedHours) || 0;
       if (!this._budget.canAddChildToParent(task.parentTaskId, planned, excludeId)) {
         const parent = this._taskRepo.findById(task.parentTaskId);
-        const parentName = parent ? `"${parent.title}"` : "родительской задачи";
-        // getEffectiveRemaining, а не getRemainingHours: отказ мог произойти
-        // и по локальному остатку родителя, и по бюджету корня дерева.
-        // Показываем минимум из двух - то же значение, по которому
-        // принималось решение.
+        const parentName = parent ? `"${parent.title}"` : 'родительской задачи';
         const remaining = this._budget.getEffectiveRemaining(task.parentTaskId, excludeId);
         throw new Error(
-          `Невозможно добавить/обновить подзадачу в ${parentName}: доступно ` +
-          `${remaining !== null ? remaining : "неизвестно"} ч, запрошено ${planned} ч.`
+          `Невозможно добавить/обновить подзадачу в ${parentName}: ` +
+          `доступно ${remaining !== null ? remaining : 'неизвестно'} ч, ` +
+          `запрошено ${planned} ч.`,
         );
       }
     }
 
     if (!isNew) {
-      if (!task.isSummary && task.plannedHours != null) {
-        const children = this._taskRepo.findChildren(task.id);
-        const sumChildren = children.reduce((acc, t) => acc + (parseFloat(t.plannedHours) || 0), 0);
+      // Summary-задача — это не только флаг isSummary, но и фактическое
+      // наличие потомков. В данных может быть задача с детьми, но без
+      // флага (например, если задача стала родителем «на ходу», через
+      // создание подзадачи). Для бюджета важна фактическая структура.
+      const hasChildren = this._taskRepo.findChildren(task.id).length > 0;
+      const functionallySummary = task.isSummary || hasChildren;
+
+      if (functionallySummary) {
+        /**
+         * Изменение «Плановых часов» у summary-задачи.
+         *
+         * Для summary-задачи plannedHours и budgetHours — это одна и
+         * та же величина: сколько часов можно распределить на
+         * собственные logs и на подзадачи. Держать их синхронно —
+         * единственный способ не путать пользователя и не терять
+         * изменения.
+         *
+         * Правило:
+         *   1. Пользователь не менял значение → оставляем как было
+         *      (budgetHours = existing.budgetHours ?? plannedHours,
+         *      plannedHours = existing.plannedHours).
+         *   2. Пользователь изменил → новый бюджет не может быть
+         *      меньше уже занятого (собственные logs + планы потомков,
+         *      которые BudgetService считает по листьям, без двойного
+         *      счёта промежуточных узлов). Если меньше — бросаем с
+         *      числами и понятным текстом. Если проходит — применяем
+         *      одновременно к budgetHours и plannedHours.
+         *
+         * Раньше здесь был молчаливый откат:
+         *     task.plannedHours = existing.plannedHours;
+         *     task.budgetHours = existing.budgetHours ?? existing.plannedHours;
+         * Пользователь менял поле, нажимал «Сохранить», значение
+         * возвращалось к старому без каких-либо сообщений. Это и был
+         * баг «часы не меняются».
+         */
+        const newBudgetRaw = parseFloat(task.plannedHours);
+        const oldBudget = parseFloat(
+          existing.budgetHours ?? existing.plannedHours ?? NaN,
+        );
+
+        if (!Number.isFinite(newBudgetRaw)) {
+          // plannedHours пустой или NaN — оставляем прежние значения,
+          // форму не переписываем. Такое может прийти, если форма
+          // отдала пустоту вместо числа.
+          task.plannedHours = existing.plannedHours;
+          task.budgetHours = existing.budgetHours;
+        } else if (newBudgetRaw === oldBudget) {
+          // Не менялось — синхронизируем без проверок.
+          task.plannedHours = existing.plannedHours;
+          task.budgetHours = existing.budgetHours ?? existing.plannedHours ?? 0;
+        } else {
+          // Меняется: проверяем, что новый бюджет не меньше занятого.
+          // «Занятое» считаем через остаток: occupied = oldBudget − remaining.
+          // Это честнее, чем собирать ownActual и descendantsPlan вручную:
+          // getRemainingHours уже учитывает правила (листья vs
+          // промежуточные узлы), и дублировать их здесь не нужно.
+          const remaining = this._budget.getRemainingHours(existing.id);
+          const occupied = Number.isFinite(remaining)
+            ? oldBudget - remaining
+            : 0;
+
+          if (newBudgetRaw < occupied) {
+            throw new Error(
+              `Новый бюджет (${newBudgetRaw} ч) меньше занятого: ` +
+              `${occupied} ч (собственные логи + планы подзадач). ` +
+              `Уменьшите планы подзадач или увеличьте значение.`,
+            );
+          }
+
+          task.plannedHours = newBudgetRaw;
+          task.budgetHours = newBudgetRaw;
+        }
+      } else if (task.plannedHours != null) {
+        // Обычная (не summary) задача: план — это просто план.
+        // Проверяем только, что он не меньше суммы планов уже
+        // существующих подзадач (детей быть не должно по условию, но
+        // проверка бесплатна и защищает от повреждённых данных).
+        const sumChildren = this._taskRepo
+          .findChildren(task.id)
+          .reduce((acc, t) => acc + (parseFloat(t.plannedHours) || 0), 0);
         if (sumChildren > parseFloat(task.plannedHours)) {
           throw new Error(
-            `Сумма плановых часов подзадач (${sumChildren} ч) превышает новый план задачи "${task.title}" (${task.plannedHours} ч).`
+            `Сумма плановых часов подзадач (${sumChildren} ч) превышает ` +
+            `новый план задачи "${task.title}" (${task.plannedHours} ч).`,
           );
         }
-      }
-      if (task.isSummary && task.plannedHours !== undefined && task.plannedHours !== existing.plannedHours) {
-        task.plannedHours = existing.plannedHours;
-        task.budgetHours = existing.budgetHours ?? existing.plannedHours ?? 0;
       }
     } else {
       if (task.parentTaskId) {
@@ -227,14 +260,11 @@ export class TaskService {
           task.parentTaskId = null;
         }
       }
-      if (!task.createdAt) task.createdAt = new Date().toISOString();
+      if (!task.createdAt) {
+        task.createdAt = new Date().toISOString();
+      }
     }
 
-    // Записи в собственную историю задачи.
-    //
-    // Для подзадач фиксируем родителя - это единственное место, где
-    // связь «задача S есть подзадача T» появляется в истории; в
-    // дальнейшем она отражена в других полях карточки.
     if (isRestore) {
       task.history = [
         ...(task.history || []),
@@ -254,14 +284,11 @@ export class TaskService {
         const ts = Date.now();
         task.history = [
           ...(task.history || []),
-          ...entries.map(text => ({ ts, who: currentUserId, text })),
+          ...entries.map((text) => ({ ts, who: currentUserId, text })),
         ];
       }
     }
 
-    // Родительская задача (для подзадач): обновляем isSummary и
-    // budgetHours и при создании подзадачи пишем «Добавлена подзадача».
-    // Всё - в одном save, чтобы один notify на операцию.
     if (task.parentTaskId) {
       const parent = this._taskRepo.findById(task.parentTaskId);
       if (parent) {
@@ -284,11 +311,6 @@ export class TaskService {
       }
     }
 
-    // Проект: пишем «Создана задача» только для КОРНЕВЫХ задач.
-    // Подзадача уже отражена в истории родителя («Добавлена подзадача»),
-    // а проект о ней знать не обязан - иначе одно событие всплывает в
-    // трёх историях сразу, и в истории проекта появляется шум из задач,
-    // которые пользователь там не создавал.
     if (isNew && !task.parentTaskId && task.projectId) {
       this._appendHistory(this._projectRepo, task.projectId, {
         ts: Date.now(),
@@ -297,23 +319,19 @@ export class TaskService {
       });
     }
 
-    // Перенос между проектами: обе стороны узнают о событии. Пишем
-    // через _appendHistory - тот же приём, что для создания/удаления.
-    // Если задача была без проекта и появилась в нём - пишем только
-    // «перемещена из другого проекта»; если ушла - только «перемещена
-    // в другой проект». Обе записи в один ts, чтобы в UI они читались
-    // парой.
     if (!isNew && existing.projectId !== task.projectId) {
       const ts = Date.now();
       if (existing.projectId) {
         this._appendHistory(this._projectRepo, existing.projectId, {
-          ts, who: currentUserId,
+          ts,
+          who: currentUserId,
           text: `Задача перемещена в другой проект: «${task.title}»`,
         });
       }
       if (task.projectId) {
         this._appendHistory(this._projectRepo, task.projectId, {
-          ts, who: currentUserId,
+          ts,
+          who: currentUserId,
           text: `Задача перемещена из другого проекта: «${task.title}»`,
         });
       }
@@ -321,13 +339,7 @@ export class TaskService {
 
     this._taskRepo.save(task);
 
-    // Сдвиг зависимых задач вслед за изменением дат этой задачи.
-    // Порядок: сначала сохранили себя, потом сдвинули тех, кто от нас
-    // зависит - иначе новый предшественник ещё не виден репозиторию в
-    // момент, когда начнём рекурсию.
-    if (!isNew) {
-      this._propagateDependencyShift(existing, task, currentUserId);
-    }
+    if (!isNew) this._propagateDependencyShift(existing, task, currentUserId);
 
     if (isNew) {
       this._audit.addAudit('Создание задачи', task.title, 'task', task.id, currentUserId);
@@ -381,7 +393,6 @@ export class TaskService {
     if (!existing) throw new Error('Задача не найдена');
     if (isArchived(existing)) throw new Error('Задача в архиве - редактирование запрещено');
 
-    // let, а не const: _applyDependency может вернуть новый объект.
     let updated = { ...existing, ...patch };
     if (patch.logs) {
       updated.actualHours = patch.logs.reduce((s, l) => s + (l.hours || 0), 0);
@@ -393,7 +404,7 @@ export class TaskService {
       const ts = Date.now();
       updated.history = [
         ...(updated.history || []),
-        ...entries.map(text => ({ ts, who: currentUserId, text })),
+        ...entries.map((text) => ({ ts, who: currentUserId, text })),
       ];
     }
 
@@ -422,50 +433,53 @@ export class TaskService {
 
   _describeChanges(existing, next) {
     const changes = {};
-
     auditDelta(changes, 'Название', existing.title, next.title, (v) => (v ? `«${v}»` : '-'));
     auditDelta(changes, 'Дата начала', existing.start, next.start);
     auditDelta(changes, 'Срок', existing.deadline, next.deadline);
-    auditDelta(changes, 'Плановые часы', existing.plannedHours, next.plannedHours);
+
+    // Для summary-задачи plannedHours и budgetHours — одна и та же
+    // величина, но в diff хочется видеть человекочитаемую строку
+    // «Бюджет задачи». Обычная задача пишет plannedHours как раньше.
+    if (existing.isSummary) {
+      auditDelta(
+        changes,
+        'Бюджет задачи',
+        existing.budgetHours ?? existing.plannedHours,
+        next.budgetHours ?? next.plannedHours,
+        (v) => (v == null ? '—' : `${v} ч`),
+      );
+    } else {
+      auditDelta(changes, 'Плановые часы', existing.plannedHours, next.plannedHours);
+    }
+
     auditDelta(changes, 'Статус', existing.status, next.status, (v) => auditLabel(TASK_STATUSES, v));
     auditDelta(changes, 'Приоритет', existing.priority, next.priority, (v) => auditLabel(PRIORITIES, v));
     auditDelta(changes, 'Исполнитель', existing.assigneeId, next.assigneeId, (v) => auditName(this._employeeRepo, v));
-
     auditToggle(changes, 'Суммарная задача', existing.isSummary, next.isSummary, 'включена', 'выключена');
     auditToggle(changes, 'Часовая задача', existing.isHourly, next.isHourly, 'включена', 'выключена');
-
     auditMark(changes, 'Описание', existing.desc, next.desc, 'изменено');
     auditMark(changes, 'Проект', existing.projectId, next.projectId, 'изменён');
     auditMark(changes, 'Родительская задача', existing.parentTaskId, next.parentTaskId, 'изменена');
     auditMark(changes, 'Зависимость', existing.dependencyId, next.dependencyId, 'изменена');
-
     if (existing.isHourly && next.isHourly) {
       const prevRange = `${auditValue(existing.startTime)}–${auditValue(existing.endTime)}`;
       const nextRange = `${auditValue(next.startTime)}–${auditValue(next.endTime)}`;
       if (prevRange !== nextRange) changes['Время'] = `${prevRange} → ${nextRange}`;
     }
-
     if (next.dependencyId) {
       auditDelta(changes, 'Тип зависимости', existing.dependencyType, next.dependencyType);
     }
-
     auditListDelta(changes, 'Вложения', existing.files, next.files, (f) => f.id, (f) => f.name);
     auditHoursDelta(changes, 'Записи часов', existing.logs, next.logs, next.plannedHours);
-
     return changes;
   }
 
-  /**
-   * Человекочитаемые строки для вкладки «История» задачи.
-   */
   _historyEntries(existing, next) {
     const entries = [];
     const employeeName = (id) => auditName(this._employeeRepo, id);
     const projectCode = (id) => {
       if (!id) return '—';
-      const data = this._getData?.() || {};
-      const project = (data.projects || []).find(p => p.id === id);
-      return project?.code || id;
+      return ((this._getData?.() || {}).projects || []).find((p) => p.id === id)?.code || id;
     };
     const taskTitle = (id) => {
       if (!id) return '—';
@@ -478,7 +492,18 @@ export class TaskService {
     historyDelta(entries, 'Приоритет', existing.priority, next.priority, (v) => auditLabel(PRIORITIES, v));
     historyDelta(entries, 'Проект', existing.projectId, next.projectId, projectCode);
 
-    if (!next.isSummary) {
+    if (next.isSummary) {
+      // Для summary-задачи в history пишем «Бюджет задачи», чтобы
+      // изменение бюджета отличалось от изменения плана обычной
+      // задачи и читалось в контексте.
+      historyDelta(
+        entries,
+        'Бюджет задачи',
+        existing.budgetHours ?? existing.plannedHours,
+        next.budgetHours ?? next.plannedHours,
+        auditHours,
+      );
+    } else {
       historyDelta(entries, 'Плановые часы', existing.plannedHours, next.plannedHours, auditHours);
     }
 
@@ -489,26 +514,21 @@ export class TaskService {
         entries.push(`Откреплена от родительской задачи «${taskTitle(existing.parentTaskId)}»`);
       } else {
         entries.push(
-          `Родительская задача: «${taskTitle(existing.parentTaskId)}» → «${taskTitle(next.parentTaskId)}»`
+          `Родительская задача: «${taskTitle(existing.parentTaskId)}» → «${taskTitle(next.parentTaskId)}»`,
         );
       }
     }
-
     if (!!existing.isHourly !== !!next.isHourly) {
       entries.push(next.isHourly ? 'Режим часовой задачи включён' : 'Режим часовой задачи выключен');
     }
-
     return entries;
   }
 
   deleteTask(id, currentUserId) {
     const task = this._taskRepo.findById(id);
-    if (task && isArchived(task)) {
-      throw new Error('Задача в архиве - удаление запрещено');
-    }
-    if (task) {
-      this._audit.addAudit('Удаление задачи', task.title, 'task', id, currentUserId);
-    }
+    if (task && isArchived(task)) throw new Error('Задача в архиве - удаление запрещено');
+    if (task) this._audit.addAudit('Удаление задачи', task.title, 'task', id, currentUserId);
+
     const parentId = task?.parentTaskId;
     const projectId = task?.projectId;
     const affectedAssigneeId = task?.assigneeId;
@@ -521,8 +541,6 @@ export class TaskService {
 
     this._taskRepo.delete(id);
 
-    // Проект: пишем «Удалена задача» только для корневых задач -
-    // симметрично созданию. Удаление подзадачи фиксирует её родитель.
     if (task && !task.parentTaskId && projectId) {
       this._appendHistory(this._projectRepo, projectId, {
         ts: Date.now(),
@@ -538,8 +556,10 @@ export class TaskService {
           ...(parent.history || []),
           { ts: Date.now(), who: currentUserId, text: `Удалена подзадача: «${task.title}»` },
         ];
-        const remainingChildren = this._taskRepo.findChildren(parentId);
-        if (remainingChildren.length === 0) {
+        // Если подзадач больше не осталось — снимаем флаг summary и
+        // очищаем budgetHours. plannedHours оставляем как есть: это
+        // «первоначальный план», он всё ещё осмыслен.
+        if (this._taskRepo.findChildren(parentId).length === 0) {
           parent.isSummary = false;
           parent.budgetHours = null;
         }
@@ -549,7 +569,6 @@ export class TaskService {
     }
 
     if (affectedAssigneeId) this._syncExecutorRoles([affectedAssigneeId]);
-
     this._notify();
   }
 
@@ -571,17 +590,14 @@ export class TaskService {
     if (task.assigneeId !== empId) {
       throw new Error('Заметки может оставлять только исполнитель задачи');
     }
-
     const title = String(noteData?.title ?? '').trim();
     const text = String(noteData?.text ?? '').trim();
-    if (!title && !text) {
-      throw new Error('Заметка не может быть пустой');
-    }
+    if (!title && !text) throw new Error('Заметка не может быть пустой');
 
     const notes = { ...(task.notes || {}) };
     const list = Array.isArray(notes[empId]) ? [...notes[empId]] : [];
-
     const isNew = !noteData.id;
+
     if (isNew) {
       list.push({
         id: 'note_' + uid(),
@@ -591,15 +607,13 @@ export class TaskService {
         updatedAt: Date.now(),
       });
     } else {
-      const idx = list.findIndex(n => n.id === noteData.id);
+      const idx = list.findIndex((n) => n.id === noteData.id);
       if (idx < 0) throw new Error('Заметка не найдена');
       list[idx] = { ...list[idx], title, text, updatedAt: Date.now() };
     }
-
     notes[empId] = list;
     task.notes = notes;
     this._taskRepo.save(task);
-
     this._audit.addAudit(
       isNew ? 'Добавлена личная заметка' : 'Изменена личная заметка',
       task.title,
@@ -607,7 +621,6 @@ export class TaskService {
       task.id,
       empId,
     );
-
     this._notify();
     return task;
   }
@@ -616,23 +629,16 @@ export class TaskService {
     const task = this._taskRepo.findById(taskId);
     if (!task) throw new Error('Задача не найдена');
     if (isArchived(task)) throw new Error('Задача в архиве - редактирование запрещено');
-    if (task.assigneeId !== empId) {
-      throw new Error('Удалять можно только свои заметки');
-    }
-
+    if (task.assigneeId !== empId) throw new Error('Удалять можно только свои заметки');
     const notes = { ...(task.notes || {}) };
     const list = Array.isArray(notes[empId])
-      ? notes[empId].filter(n => n.id !== noteId)
+      ? notes[empId].filter((n) => n.id !== noteId)
       : [];
-
     if (list.length === 0) delete notes[empId];
     else notes[empId] = list;
-
     task.notes = notes;
     this._taskRepo.save(task);
-
     this._audit.addAudit('Удалена личная заметка', task.title, 'task', task.id, empId);
-
     this._notify();
     return task;
   }
@@ -646,7 +652,11 @@ export class TaskService {
     const all = this._taskRepo.findAll();
     for (const task of all) {
       if (task.archived) continue;
-      if ((task.status === 'closed' || task.status === 'cancelled') && task.closedAt && task.closedAt < cutoffIso) {
+      if (
+        (task.status === 'closed' || task.status === 'cancelled') &&
+        task.closedAt &&
+        task.closedAt < cutoffIso
+      ) {
         task.archived = true;
         task.archivedAt = TODAY;
         this._taskRepo.save(task);
@@ -656,7 +666,13 @@ export class TaskService {
     }
     if (changed) {
       if (affectedEmpIds.size) this._syncExecutorRoles(affectedEmpIds);
-      this._audit.addAudit('Автоматическая архивация задач', `Задачи, закрытые более ${months} мес., перемещены в архив`, null, null, 'system');
+      this._audit.addAudit(
+        'Автоматическая архивация задач',
+        `Задачи, закрытые более ${months} мес., перемещены в архив`,
+        null,
+        null,
+        'system',
+      );
       this._notify();
     }
   }
@@ -676,22 +692,20 @@ export class TaskService {
     }
   }
 
-  getRemainingHours(taskId) { return this._budget.getRemainingHours(taskId); }
+  getRemainingHours(taskId) {
+    return this._budget.getRemainingHours(taskId);
+  }
 
   setBudget(taskId, newBudget, currentUserId) {
     const task = this._taskRepo.findById(taskId);
-    if (task && isArchived(task)) {
-      throw new Error('Задача в архиве - редактирование запрещено');
-    }
+    if (task && isArchived(task)) throw new Error('Задача в архиве - редактирование запрещено');
     const oldBudget = task?.budgetHours ?? task?.plannedHours;
     const updated = this._budget.setBudget(taskId, newBudget);
-
     updated.history = [
       ...(updated.history || []),
       { ts: Date.now(), who: currentUserId, text: `План: ${auditHours(oldBudget)} → ${auditHours(newBudget)}` },
     ];
     this._taskRepo.save(updated);
-
     this._audit.addAudit(
       'Изменение плановых часов задачи',
       { Задача: updated.title, План: `${auditValue(oldBudget)} → ${newBudget}` },
@@ -704,8 +718,9 @@ export class TaskService {
   }
 
   applyDelegation(fromId, toId, start, end, statuses) {
-    const tasks = this._taskRepo.findByAssignee(fromId)
-      .filter(t => !t.archived && statuses.includes(t.status) && (!t.deadline || t.deadline >= start));
+    const tasks = this._taskRepo
+      .findByAssignee(fromId)
+      .filter((t) => !t.archived && statuses.includes(t.status) && (!t.deadline || t.deadline >= start));
     for (const task of tasks) {
       task.assigneeId = toId;
       task.history = task.history || [];
@@ -714,7 +729,7 @@ export class TaskService {
       task.history.push({
         ts: Date.now(),
         who: 'system',
-        text: `Задача переназначена с ${fromName} на ${toName} на период отпуска с ${fmtDMY(start)} по ${fmtDMY(end)}`
+        text: `Задача переназначена с ${fromName} на ${toName} на период отпуска с ${fmtDMY(start)} по ${fmtDMY(end)}`,
       });
       this._taskRepo.save(task);
     }
@@ -725,14 +740,22 @@ export class TaskService {
   }
 
   revertDelegation(fromId, toId) {
-    const tasks = this._taskRepo.findByAssignee(toId)
-      .filter(t => !t.archived && t.history && t.history.some(h => h.text.includes(`переназначена с ${this._employeeRepo.findById(fromId)?.last || ''}`)));
+    const tasks = this._taskRepo
+      .findByAssignee(toId)
+      .filter(
+        (t) =>
+          !t.archived &&
+          t.history &&
+          t.history.some((h) =>
+            h.text.includes(`переназначена с ${this._employeeRepo.findById(fromId)?.last || ''}`),
+          ),
+      );
     for (const task of tasks) {
       task.assigneeId = fromId;
       task.history.push({
         ts: Date.now(),
         who: 'system',
-        text: `Задача возвращена ${this._employeeRepo.findById(fromId)?.last || 'сотруднику'} по окончании отпуска`
+        text: `Задача возвращена ${this._employeeRepo.findById(fromId)?.last || 'сотруднику'} по окончании отпуска`,
       });
       this._taskRepo.save(task);
     }

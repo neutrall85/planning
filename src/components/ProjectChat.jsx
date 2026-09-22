@@ -11,7 +11,7 @@ const EMPTY_ARRAY = Object.freeze([]);
  * Чат проекта. Тонкая обёртка над Discussion: передаёт projectId и
  * знает, как открыть задачу по клику из комментария.
  */
-const ProjectChat = ({
+export const ProjectChat = ({
   projectId,
   store,
   currentUser,
@@ -41,5 +41,3 @@ const ProjectChat = ({
     />
   );
 };
-
-export default ProjectChat;

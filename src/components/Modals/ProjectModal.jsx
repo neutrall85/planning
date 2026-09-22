@@ -1,55 +1,52 @@
 // src/components/Modals/ProjectModal.jsx
-import { useState, useMemo, useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ModalShell } from '../ModalShell';
 import { Tabs } from '../Tabs';
-import { FileManager } from '../FileManager';
-import { TaskTable } from '../TaskTable';
 import { FormField } from '../FormField';
-import ProjectChat from '../ProjectChat';
 import { ProjectGallery } from '../ProjectGallery';
 import { Lightbox } from '../Lightbox';
-import { ProjectAccessModal } from './ProjectAccessModal';
 import { ProjectFooterActions } from './ProjectFooterActions';
+import { ProjectAccessModal } from './ProjectAccessModal';
+import { TaskTable } from '../TaskTable';
 import { HistoryTab } from '../HistoryTab';
-import { useForm } from '../../hooks/useForm';
-import {
-  useDataHelpers,
-  useControlledTab,
-  useStableModalHeight,
-} from '../../hooks';
-import { useChatUnreadCount, useChatTotalCount } from '../../hooks/useChatStats';
+import { ProjectChat } from '../ProjectChat';
+import { FileManager } from '../FileManager';
+import { TemplateSelect } from '../Templates/TemplateSelect';
 import { useConfirm } from '../../context/ConfirmContext';
+import { useDataHelpers } from '../../hooks/useDataHelpers';
+import { useControlledTab } from '../../hooks/useControlledTab';
+import { useStableModalHeight } from '../../hooks/useStableModalHeight';
+import { useForm } from '../../hooks/useForm';
+import { useChatUnreadCount, useChatTotalCount } from '../../hooks/useChatStats';
+import {
+  hasRole,
+  canCreateProject,
+  canEditProjectFields,
+  canChangeProjectStatus,
+  canManageManager,
+  canManageProjectAccess,
+} from '../../utils/permissions';
+import { isArchived } from '../../utils/entityState';
 import {
   PROJECT_STATUSES,
   PROJECT_TYPES,
+  priorityOptionsForProjectType,
+  withSyncedPriority,
   DIALOGS,
   TOASTS,
   FILE_LIMITS,
   FILE_MESSAGES,
-  priorityOptionsForProjectType,
-  withSyncedPriority,
 } from '../../utils/constants';
-import { TODAY, iso, addDays, uid, fmtDMY } from '../../utils/date';
-import {
-  canEditProjectFields,
-  canChangeProjectStatus,
-  canCreateProject,
-  canManageManager,
-  canManageProjectAccess,
-  hasRole,
-} from '../../utils/permissions';
+import { getProjectColor } from '../../utils/projectHelpers';
 import {
   sanitizeUnitIdsForPtype,
   unitOptionsForPtype,
 } from '../../utils/projectUnits';
-import { isArchived } from '../../utils/entityState';
-import { getProjectColor } from '../../utils/projectHelpers';
 import { prepareAttachments } from '../../utils/fileUpload';
 import { createFolder } from '../../utils/fileTree';
-import { Ic, ICONS } from '../Icons';
-import { TemplateSelect } from '../Templates';
-import { applyTemplatePayload } from '../../utils/templateSchemas';
 import { collectTaskPayloads } from '../../utils/templateNesting';
+import { applyTemplatePayload } from '../../utils/templateSchemas';
+import { iso, addDays, TODAY, fmtDMY, uid } from '../../utils/date';
 
 const AIRCRAFT_TYPES = ['Су-57', 'МиГ-35', 'Ту-160', 'Ил-76', 'Ка-52', 'Другой'];
 const PROJECT_TYPE_OPTIONS = ['Ремонт', 'Модификация', 'КС', 'ИКУ'];
@@ -59,20 +56,19 @@ const FORM_FIELDS = Object.freeze([
   'priority', 'unitIds', 'managerId', 'start', 'end', 'budget', 'status', 'longterm',
 ]);
 
-const readFileAsPhoto = (file, uploaderId) =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (ev) => resolve({
-      id: uid(),
-      name: file.name,
-      url: ev.target.result,
-      uploadedBy: uploaderId,
-      uploadedAt: new Date().toISOString(),
-      isMain: false,
-    });
-    reader.onerror = () => reject(new Error('Ошибка чтения файла'));
-    reader.readAsDataURL(file);
+const readFileAsPhoto = (file, uploaderId) => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = (ev) => resolve({
+    id: uid(),
+    name: file.name,
+    url: ev.target.result,
+    uploadedBy: uploaderId,
+    uploadedAt: new Date().toISOString(),
+    isMain: false,
   });
+  reader.onerror = () => reject(new Error('Ошибка чтения файла'));
+  reader.readAsDataURL(file);
+});
 
 const applyPtypeChange = (prev, nextPtype, db) => {
   const next = withSyncedPriority(prev, nextPtype);
@@ -100,115 +96,63 @@ export const ProjectModal = ({
 }) => {
   const { empName, getTaskSpent } = useDataHelpers(db);
   const { confirm } = useConfirm();
+
   const existing = projectId ? db.projects.find(p => p.id === projectId) : null;
   const copySource = copyFromId ? db.projects.find(p => p.id === copyFromId) : null;
   const isCopy = !existing && !!copySource;
   const isNew = !existing;
   const readOnly = !!(existing && isArchived(existing));
-  const canEditFields = !readOnly && (existing ? canEditProjectFields(ur, existing) : canCreateProject(ur));
-  const canChangeStatus = !readOnly && existing && canChangeProjectStatus(ur, existing, null);
-  const canChangeManager = !readOnly && (existing ? canManageManager(ur) : canCreateProject(ur));
 
+  const canEditFields = !readOnly && (existing
+    ? canEditProjectFields(ur, existing)
+    : canCreateProject(ur));
+  const canChangeStatus = !readOnly && existing
+    && canChangeProjectStatus(ur, existing, null);
+  const canChangeManager = !readOnly && (existing
+    ? canManageManager(ur)
+    : canCreateProject(ur));
   const canCreateFromProject = canCreateProject(ur);
-  const canManageAccess = !readOnly && existing && canManageProjectAccess(ur, existing);
+  const canManageAccess = !readOnly && existing
+    && canManageProjectAccess(ur, existing);
 
   const [lightboxIndex, setLightboxIndex] = useState(null);
   const [appliedTemplateName, setAppliedTemplateName] = useState(null);
   const [accessOpen, setAccessOpen] = useState(false);
-
-  const [pendingTemplateTasks, setPendingTemplateTasks] = useState(() =>
-    isCopy
-      ? collectTaskPayloads(
-          db.tasks.filter(t => t.projectId === copySource.id && !t.archived)
-        )
-      : []
+  const [pendingTemplateTasks, setPendingTemplateTasks] = useState(
+    () => (isCopy ? collectTaskPayloads(
+      db.tasks.filter(t => t.projectId === copySource.id && !t.archived),
+    ) : []),
   );
 
-  const [activeTab, handleTabChange] = useControlledTab(initialTab, onTabChange);
+  // isSaving (state) + savingRef (sync guard). Оба нужны: state даёт
+  // визуальную блокировку кнопок после первого ре-рендера; ref
+  // отсекает второе нажатие, пришедшее между стартом saveHandler и
+  // коммитом setSaving(true).
+  const [isSaving, setIsSaving] = useState(false);
+  const savingRef = useRef(false);
 
-  const bodyRef = useStableModalHeight(activeTab);
+  // runExclusive защищает async-хендлеры файлов/фото. Пока первый вызов
+  // не завершился (await prepareAttachments читает файлы через
+  // FileReader), второй вызов не стартует — иначе оба захватят один и
+  // тот же снимок values.files, и второй перезапишет результат первого
+  // (classic lost update). Общий лок на files и photos ещё и
+  // предотвращает перекрёстную перезапись через patchProject, где
+  // каждый вызов шлёт свой частичный patch: {...existing, ...patch}.
+  const runningRef = useRef(false);
+  const valuesRef = useRef(null); // заполним ниже после useForm
 
-  const initialValues = existing
-    ? existing
-    : isCopy
-      ? {
-          ...copySource,
-          id: 'p_' + uid(),
-          managerId: '',
-          status: 'active',
-          archived: false,
-          archivedAt: null,
-          closedAt: null,
-          creatorId: ur.id,
-          history: [
-            { ts: Date.now(), who: ur.id, text: `Скопирован из «${copySource.name}»` },
-          ],
-          access: { userIds: [] },
-          files: [],
-          folders: [],
-          photos: [],
-        }
-      : {
-          id: 'p_' + uid(),
-          code: '',
-          name: '',
-          desc: '',
-          unitIds: [],
-          managerId: '',
-          start: TODAY,
-          end: iso(addDays(new Date(), 30)),
-          status: 'active',
-          budget: 100,
-          color: '#64748b',
-          ptype: 'prod',
-          longterm: false,
-          archived: false,
-          archivedAt: null,
-          closedAt: null,
-          creatorId: ur.id,
-          customer: '',
-          aircraftType: '',
-          projectType: '',
-          priority: 'NORM',
-          history: [{ ts: Date.now(), who: ur.id, text: 'Проект создан' }],
-          access: { userIds: [] },
-          files: [],
-          folders: [],
-          photos: [],
-        };
-
-  const validate = useCallback((values) => {
-    const errors = {};
-    if (!values.name?.trim()) errors.name = 'Название обязательно';
-    if (!values.code?.trim()) errors.code = 'Код обязателен';
-    if (!values.start) errors.start = 'Дата начала обязательна';
-    if (!values.customer?.trim()) errors.customer = 'Заказчик обязателен';
-
-    const isAdmin = values.ptype === 'admin';
-
-    if (!isAdmin) {
-      if (!values.aircraftType) errors.aircraftType = 'Выберите тип ВС';
-      if (!values.projectType) errors.projectType = 'Выберите категорию';
-      if (!values.managerId) errors.managerId = 'Ответственный обязателен';
-      if (!values.unitIds || values.unitIds.length === 0) {
-        errors.unitIds = 'Выберите хотя бы одно КБ';
-      }
-      if (!values.end) errors.end = 'Дата окончания обязательна';
+  const runExclusive = useCallback(async (fn) => {
+    if (runningRef.current) return;
+    runningRef.current = true;
+    try {
+      return await fn();
+    } finally {
+      runningRef.current = false;
     }
-
-    const budgetFilled = values.budget !== '' && values.budget !== null && values.budget !== undefined;
-    if (isAdmin) {
-      if (budgetFilled && (isNaN(+values.budget) || +values.budget <= 0)) {
-        errors.budget = 'Бюджет должен быть > 0';
-      }
-    } else if (!budgetFilled || isNaN(+values.budget) || +values.budget <= 0) {
-      errors.budget = 'Бюджет должен быть > 0';
-    }
-
-    if (!values.priority) errors.priority = 'Приоритет обязателен';
-    if (!values.status) errors.status = 'Статус обязателен';
-    return errors;
   }, []);
+
+  const [activeTab, handleTabChange] = useControlledTab(initialTab, onTabChange);
+  const bodyRef = useStableModalHeight(activeTab);
 
   const {
     values,
@@ -220,7 +164,93 @@ export const ProjectModal = ({
     setValues,
     isValid,
     isDirty,
-  } = useForm(initialValues, validate, { fields: FORM_FIELDS });
+  } = useForm(
+    existing
+      ? existing
+      : isCopy
+        ? {
+            ...copySource,
+            id: 'p_' + uid(),
+            managerId: '',
+            status: 'active',
+            archived: false,
+            archivedAt: null,
+            closedAt: null,
+            creatorId: ur.id,
+            history: [{
+              ts: Date.now(),
+              who: ur.id,
+              text: `Скопирован из «${copySource.name}»`,
+            }],
+            access: { userIds: [] },
+            files: [],
+            folders: [],
+            photos: [],
+          }
+        : {
+            id: 'p_' + uid(),
+            code: '',
+            name: '',
+            desc: '',
+            unitIds: [],
+            managerId: '',
+            start: TODAY,
+            end: iso(addDays(new Date(), 30)),
+            status: 'active',
+            budget: 100,
+            color: '#64748b',
+            ptype: 'prod',
+            longterm: false,
+            archived: false,
+            archivedAt: null,
+            closedAt: null,
+            creatorId: ur.id,
+            customer: '',
+            aircraftType: '',
+            projectType: '',
+            priority: 'NORM',
+            history: [{ ts: Date.now(), who: ur.id, text: 'Проект создан' }],
+            access: { userIds: [] },
+            files: [],
+            folders: [],
+            photos: [],
+          },
+    useCallback((values) => {
+      const errors = {};
+      if (!values.name?.trim()) errors.name = 'Название обязательно';
+      if (!values.code?.trim()) errors.code = 'Код обязателен';
+      if (!values.start) errors.start = 'Дата начала обязательна';
+      if (!values.customer?.trim()) errors.customer = 'Заказчик обязателен';
+
+      const isAdmin = values.ptype === 'admin';
+      if (!isAdmin) {
+        if (!values.aircraftType) errors.aircraftType = 'Выберите тип ВС';
+        if (!values.projectType) errors.projectType = 'Выберите категорию';
+        if (!values.managerId) errors.managerId = 'Ответственный обязателен';
+        if (!values.unitIds || values.unitIds.length === 0) errors.unitIds = 'Выберите хотя бы одно КБ';
+        if (!values.end) errors.end = 'Дата окончания обязательна';
+      }
+
+      const budgetFilled = values.budget !== '' && values.budget !== null && values.budget !== undefined;
+      if (isAdmin) {
+        if (budgetFilled && (isNaN(+values.budget) || +values.budget <= 0)) {
+          errors.budget = 'Бюджет должен быть > 0';
+        }
+      } else if (!budgetFilled || isNaN(+values.budget) || +values.budget <= 0) {
+        errors.budget = 'Бюджет должен быть > 0';
+      }
+
+      if (!values.priority) errors.priority = 'Приоритет обязателен';
+      if (!values.status) errors.status = 'Статус обязателен';
+      return errors;
+    }, []),
+    { fields: FORM_FIELDS },
+  );
+
+  // Актуальный снимок values для async-хендлеров. useCallback их
+  // захватывает на момент создания; после await ссылка на values из
+  // замыкания уже неактуальна.
+  useEffect(() => { valuesRef.current = values; }, [values]);
 
   const isAdminProject = values.ptype === 'admin';
 
@@ -257,115 +287,123 @@ export const ProjectModal = ({
       setPendingTemplateTasks([]);
       return;
     }
-
-    const patch = applyTemplatePayload('project', template.payload);
-    const { tasks: nestedTasks, ...projectFields } = patch;
-    Object.keys(projectFields).forEach(field => setFieldValue(field, projectFields[field]));
-
-    const cleanTasks = Array.isArray(nestedTasks) ? nestedTasks : [];
-    setPendingTemplateTasks(cleanTasks);
+    const { tasks: nestedTasks, ...projectFields } = applyTemplatePayload('project', template.payload);
+    Object.keys(projectFields).forEach((field) => setFieldValue(field, projectFields[field]));
+    setPendingTemplateTasks(Array.isArray(nestedTasks) ? nestedTasks : []);
     setAppliedTemplateName(template.name);
   }, [setFieldValue]);
 
-  const handlePhotoUpload = useCallback(async (files, onDone) => {
-    try {
-      const currentPhotos = values.photos || [];
-
-      const valid = [];
-      for (const file of files) {
-        if (!file.type.startsWith('image/')) {
-          toast(FILE_MESSAGES.notImage, 'error');
-          continue;
+  const handlePhotoUpload = useCallback((files, onDone) =>
+    runExclusive(async () => {
+      try {
+        const current = valuesRef.current;
+        const currentPhotos = current.photos || [];
+        const valid = [];
+        for (const file of files) {
+          if (!file.type.startsWith('image/')) {
+            toast(FILE_MESSAGES.notImage, 'error');
+            continue;
+          }
+          if (file.size > FILE_LIMITS.image) {
+            toast(FILE_MESSAGES.imageTooLarge, 'error');
+            continue;
+          }
+          valid.push(file);
         }
-        if (file.size > FILE_LIMITS.image) {
-          toast(FILE_MESSAGES.imageTooLarge, 'error');
-          continue;
+        if (valid.length === 0) return;
+
+        const newPhotos = await Promise.all(
+          valid.map(file => readFileAsPhoto(file, ur.id)),
+        );
+        if (currentPhotos.length === 0 && newPhotos.length > 0) {
+          newPhotos[0].isMain = true;
         }
-        valid.push(file);
+        const updatedPhotos = [...currentPhotos, ...newPhotos];
+        setFieldValue('photos', updatedPhotos);
+        if (existing) store.patchProject(existing.id, { photos: updatedPhotos });
+        toast(`Загружено фото: ${newPhotos.length}`, 'success');
+      } catch (err) {
+        toast(err.message || 'Ошибка загрузки фото', 'error');
+      } finally {
+        onDone?.();
       }
-      if (valid.length === 0) return;
+    }), [runExclusive, existing, store, setFieldValue, toast, ur.id]);
 
-      const newPhotos = await Promise.all(
-        valid.map((file) => readFileAsPhoto(file, ur.id))
-      );
-
-      if (currentPhotos.length === 0 && newPhotos.length > 0) {
-        newPhotos[0].isMain = true;
+  const handlePhotoDelete = useCallback((photoId) =>
+    runExclusive(async () => {
+      if (!await confirm(DIALOGS.deleteProjectPhoto)) return;
+      const current = valuesRef.current;
+      const currentPhotos = current.photos || [];
+      const removed = currentPhotos.find(p => p.id === photoId);
+      const updatedPhotos = currentPhotos.filter(p => p.id !== photoId);
+      if (removed?.isMain && updatedPhotos.length > 0) {
+        updatedPhotos[0] = { ...updatedPhotos[0], isMain: true };
       }
-
-      const updatedPhotos = [...currentPhotos, ...newPhotos];
       setFieldValue('photos', updatedPhotos);
       if (existing) store.patchProject(existing.id, { photos: updatedPhotos });
-      toast(`Загружено фото: ${newPhotos.length}`, 'success');
-    } catch (err) {
-      toast(err.message || 'Ошибка загрузки фото', 'error');
-    } finally {
-      onDone?.();
-    }
-  }, [values.photos, existing, store, setFieldValue, toast, ur.id]);
-
-  const handlePhotoDelete = useCallback(async (photoId) => {
-    const ok = await confirm(DIALOGS.deleteProjectPhoto);
-    if (!ok) return;
-    const currentPhotos = values.photos || [];
-    const updatedPhotos = currentPhotos.filter(p => p.id !== photoId);
-    const deletedWasMain = currentPhotos.find(p => p.id === photoId)?.isMain;
-    if (deletedWasMain && updatedPhotos.length > 0) {
-      updatedPhotos[0].isMain = true;
-    }
-    setFieldValue('photos', updatedPhotos);
-    if (existing) store.patchProject(existing.id, { photos: updatedPhotos });
-    toast(TOASTS.photoDeleted, 'info');
-  }, [values.photos, existing, store, setFieldValue, toast, confirm]);
+      toast(TOASTS.photoDeleted, 'info');
+    }), [runExclusive, existing, store, setFieldValue, toast, confirm]);
 
   const handleSetMain = useCallback((photoId) => {
-    const currentPhotos = values.photos || [];
-    const updatedPhotos = currentPhotos.map(p => ({
+    const current = valuesRef.current;
+    const updatedPhotos = (current.photos || []).map(p => ({
       ...p,
       isMain: p.id === photoId,
     }));
     setFieldValue('photos', updatedPhotos);
     if (existing) store.patchProject(existing.id, { photos: updatedPhotos });
     toast('Главное фото обновлено', 'success');
-  }, [values.photos, existing, store, setFieldValue, toast]);
+  }, [existing, store, setFieldValue, toast]);
 
-  const handleOpenLightbox = useCallback((index) => {
-    setLightboxIndex(index);
-  }, []);
-
-  const handleCloseLightbox = useCallback(() => {
-    setLightboxIndex(null);
-  }, []);
+  const handleOpenLightbox = useCallback((index) => setLightboxIndex(index), []);
+  const handleCloseLightbox = useCallback(() => setLightboxIndex(null), []);
 
   const handlePrevPhoto = useCallback(() => {
     if (lightboxIndex === null || lightboxIndex === undefined) return;
-    const photos = values.photos || [];
-    setLightboxIndex((prev) => (prev === 0 ? photos.length - 1 : prev - 1));
-  }, [lightboxIndex, values.photos]);
+    const photos = valuesRef.current.photos || [];
+    setLightboxIndex(prev => (prev === 0 ? photos.length - 1 : prev - 1));
+  }, [lightboxIndex]);
 
   const handleNextPhoto = useCallback(() => {
     if (lightboxIndex === null || lightboxIndex === undefined) return;
-    const photos = values.photos || [];
-    setLightboxIndex((prev) => (prev === photos.length - 1 ? 0 : prev + 1));
-  }, [lightboxIndex, values.photos]);
+    const photos = valuesRef.current.photos || [];
+    setLightboxIndex(prev => (prev === photos.length - 1 ? 0 : prev + 1));
+  }, [lightboxIndex]);
 
+  // saveHandler с in-flight lock: сначала синхронная проверка savingRef
+  // (отсекает повторный вызов до ре-рендера), затем isSaving для
+  // визуальной блокировки кнопки.
   const saveHandler = useCallback((vals) => {
-    const isAdmin = vals.ptype === 'admin';
-
-    const projectToSave = {
-      ...vals,
-      color: getProjectColor(vals),
-      budget: vals.budget ? +vals.budget : null,
-      managerId: isAdmin ? '' : vals.managerId,
-      end: vals.end || null,
-    };
-    onSave(projectToSave, isNew, { templateTasks: pendingTemplateTasks });
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setIsSaving(true);
+    try {
+      const isAdmin = vals.ptype === 'admin';
+      onSave({
+        ...vals,
+        color: getProjectColor(vals),
+        budget: vals.budget ? +vals.budget : null,
+        managerId: isAdmin ? '' : vals.managerId,
+        end: vals.end || null,
+      }, isNew, { templateTasks: pendingTemplateTasks });
+    } finally {
+      savingRef.current = false;
+      setIsSaving(false);
+    }
   }, [isNew, onSave, pendingTemplateTasks]);
 
   const deleteHandler = useCallback(async () => {
-    const ok = await confirm(DIALOGS.deleteProject(existing.name));
-    if (!ok) return;
-    onDelete(existing.id);
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setIsSaving(true);
+    try {
+      const ok = await confirm(DIALOGS.deleteProject(existing.name));
+      if (!ok) return;
+      onDelete(existing.id);
+    } finally {
+      savingRef.current = false;
+      setIsSaving(false);
+    }
   }, [existing, onDelete, confirm]);
 
   const filesCount = values.files?.length || 0;
@@ -377,95 +415,100 @@ export const ProjectModal = ({
 
   const displayedTasks = useMemo(
     () => [...draftTasks, ...taskList],
-    [draftTasks, taskList]
+    [draftTasks, taskList],
   );
-
-  const tasksCount = displayedTasks.length;
 
   const tabs = [
     { id: 'info', label: 'Информация' },
-    { id: 'tasks', label: `Задачи (${tasksCount})` },
+    { id: 'tasks', label: `Задачи (${displayedTasks.length})` },
     { id: 'chat', label: 'Чат проекта', count: chatTotal, badge: chatUnread },
     { id: 'files', label: `Вложения (${filesCount})` },
     ...(existing ? [{ id: 'hist', label: 'История' }] : []),
   ];
 
   const employeeOptions = useMemo(
-    () => db.employees.filter(e => !e.fired).map(e => ({ value: e.id, label: `${e.last} ${e.first}` })),
-    [db.employees]
+    () => db.employees.filter(e => !e.fired).map(e => ({
+      value: e.id,
+      label: `${e.last} ${e.first}`,
+    })),
+    [db.employees],
   );
 
   const unitOptions = useMemo(
     () => unitOptionsForPtype(values.ptype, db),
-    [values.ptype, db.kbs, db.departments]
+    [values.ptype, db.kbs, db.departments],
   );
 
   const priorityOptions = useMemo(
     () => priorityOptionsForProjectType(values.ptype),
-    [values.ptype]
+    [values.ptype],
   );
 
   const statusOptions = useMemo(
     () => Object.entries(PROJECT_STATUSES).map(([k, v]) => ({ value: k, label: v })),
-    []
+    [],
   );
 
   const candidates = useMemo(() => {
     const ids = new Set(
-      db.tasks
-        .filter(t => t.projectId === values.id)
-        .map(t => t.assigneeId)
-        .filter(Boolean)
+      db.tasks.filter(t => t.projectId === values.id).map(t => t.assigneeId).filter(Boolean),
     );
     if (values.managerId) ids.add(values.managerId);
-    return [...ids].map(id => db.employees.find(e => e.id === id)).filter(Boolean);
+    return [...ids]
+      .map(id => db.employees.find(e => e.id === id))
+      .filter(Boolean);
   }, [db, values.id, values.managerId]);
 
-  const handleFileUpload = useCallback(async (files, folderId = null) => {
-    const result = await prepareAttachments(files, values.files, folderId, ur.id);
+  const handleFileUpload = useCallback((files, folderId = null) =>
+    runExclusive(async () => {
+      const current = valuesRef.current;
+      const result = await prepareAttachments(files, current.files, folderId, ur.id);
+      if (result.accepted > 0) {
+        setFieldValue('files', result.nextFiles);
+        if (existing) store.patchProject(existing.id, { files: result.nextFiles });
+        toast(
+          result.accepted === 1
+            ? TOASTS.fileUploaded(result.acceptedFiles[0].name)
+            : TOASTS.filesUploaded(result.accepted),
+          'success',
+        );
+      }
+      if (result.rejected > 0) {
+        toast(TOASTS.filesRejected(result.errors.join('; ')), 'warning');
+      }
+    }), [runExclusive, existing, store, setFieldValue, toast, ur.id]);
 
-    if (result.accepted > 0) {
-      setFieldValue('files', result.nextFiles);
-      if (existing) store.patchProject(existing.id, { files: result.nextFiles });
-      toast(
-        result.accepted === 1
-          ? TOASTS.fileUploaded(result.acceptedFiles[0].name)
-          : TOASTS.filesUploaded(result.accepted),
-        'success'
-      );
-    }
-    if (result.rejected > 0) {
-      toast(TOASTS.filesRejected(result.errors.join('; ')), 'warning');
-    }
-  }, [values.files, existing, store, setFieldValue, toast, ur.id]);
-
-  const handleFileDelete = useCallback(async (fileId) => {
-    const ok = await confirm(DIALOGS.deleteFile);
-    if (!ok) return;
-    const updatedFiles = (values.files || []).filter(f => f.id !== fileId);
-    setFieldValue('files', updatedFiles);
-    if (existing) store.patchProject(existing.id, { files: updatedFiles });
-    toast(TOASTS.fileDeleted, 'info');
-  }, [values.files, existing, store, setFieldValue, toast, confirm]);
+  const handleFileDelete = useCallback((fileId) =>
+    runExclusive(async () => {
+      if (!await confirm(DIALOGS.deleteFile)) return;
+      const current = valuesRef.current;
+      const updatedFiles = (current.files || []).filter(f => f.id !== fileId);
+      setFieldValue('files', updatedFiles);
+      if (existing) store.patchProject(existing.id, { files: updatedFiles });
+      toast(TOASTS.fileDeleted, 'info');
+    }), [runExclusive, existing, store, setFieldValue, toast, confirm]);
 
   const handleCreateFolder = useCallback((name, parentId) => {
+    const current = valuesRef.current;
     const newFolder = createFolder(name, parentId, ur.id);
-    const updatedFolders = [...(values.folders || []), newFolder];
+    const updatedFolders = [...(current.folders || []), newFolder];
     setFieldValue('folders', updatedFolders);
     if (existing) store.patchProject(existing.id, { folders: updatedFolders });
-  }, [values.folders, existing, store, setFieldValue, ur.id]);
+  }, [existing, store, setFieldValue, ur.id]);
 
   const handleDeleteFolder = useCallback((folderId) => {
-    const updatedFolders = (values.folders || []).filter(f => f.id !== folderId);
+    const current = valuesRef.current;
+    const updatedFolders = (current.folders || []).filter(f => f.id !== folderId);
     setFieldValue('folders', updatedFolders);
     if (existing) store.patchProject(existing.id, { folders: updatedFolders });
-  }, [values.folders, existing, store, setFieldValue]);
+  }, [existing, store, setFieldValue]);
 
-  const saveDisabled = !(canEditFields || (existing && canChangeStatus) || canChangeManager)
+  // isSaving входит в saveDisabled — симметрично TaskModal.
+  const saveDisabled = isSaving
+    || !(canEditFields || (existing && canChangeStatus) || canChangeManager)
     || (isNew ? !isValid : !isValid || !isDirty);
 
   const showBackButton = !!returnToProjectId;
-
   const modalTitle = readOnly
     ? 'Проект (Архив)'
     : existing
@@ -474,22 +517,6 @@ export const ProjectModal = ({
         ? `Копирование проекта: ${copySource.name}`
         : 'Новый проект';
 
-  const footerActions = (
-    <ProjectFooterActions
-      readOnly={readOnly}
-      existing={existing}
-      ur={ur}
-      canCreateFromProject={canCreateFromProject}
-      canManageAccess={canManageAccess}
-      values={values}
-      db={db}
-      toast={toast}
-      onDelete={deleteHandler}
-      onCopy={onCopy}
-      onOpenAccess={() => setAccessOpen(true)}
-    />
-  );
-
   return (
     <>
       <ModalShell
@@ -497,7 +524,22 @@ export const ProjectModal = ({
         onClose={onClose}
         width={900}
         className="modal-project"
-        actions={footerActions}
+        actions={(
+          <ProjectFooterActions
+            readOnly={readOnly}
+            existing={existing}
+            ur={ur}
+            canCreateFromProject={canCreateFromProject}
+            canManageAccess={canManageAccess}
+            values={values}
+            db={db}
+            toast={toast}
+            onDelete={deleteHandler}
+            onCopy={onCopy}
+            onOpenAccess={() => setAccessOpen(true)}
+            disabled={isSaving}
+          />
+        )}
         saveLabel={isNew ? 'Создать проект' : 'Сохранить'}
         saveDisabled={saveDisabled}
         onSave={handleSubmit(saveHandler)}
@@ -534,16 +576,39 @@ export const ProjectModal = ({
                 {isNew && !isCopy && (
                   <TemplateSelect kind="project" onApply={applyTemplate} />
                 )}
-
                 {isNew && appliedTemplateName && (
                   <div className="info-box">
                     Применён шаблон: <b>{appliedTemplateName}</b>
                   </div>
                 )}
 
-                <FormField label="Название" required value={values.name} onChange={(v) => handleChange('name', v)} error={touched.name && errors.name} disabled={!canEditFields} inline />
-                <FormField label="Описание" type="textarea" rows={2} value={values.desc} onChange={(v) => handleChange('desc', v)} disabled={!canEditFields} inline />
-                <FormField label="Заказчик" required value={values.customer} onChange={(v) => handleChange('customer', v)} error={touched.customer && errors.customer} disabled={!canEditFields} inline />
+                <FormField
+                  label="Название"
+                  required
+                  value={values.name}
+                  onChange={(v) => handleChange('name', v)}
+                  error={touched.name && errors.name}
+                  disabled={!canEditFields}
+                  inline
+                />
+                <FormField
+                  label="Описание"
+                  type="textarea"
+                  rows={2}
+                  value={values.desc}
+                  onChange={(v) => handleChange('desc', v)}
+                  disabled={!canEditFields}
+                  inline
+                />
+                <FormField
+                  label="Заказчик"
+                  required
+                  value={values.customer}
+                  onChange={(v) => handleChange('customer', v)}
+                  error={touched.customer && errors.customer}
+                  disabled={!canEditFields}
+                  inline
+                />
 
                 <div className="fields-row">
                   <FormField
@@ -556,18 +621,56 @@ export const ProjectModal = ({
                     disabled={!canEditFields}
                     inline
                   />
-                  <FormField label="Код" required value={values.code} onChange={(v) => handleChange('code', v)} error={touched.code && errors.code} disabled={!canEditFields} inline />
+                  <FormField
+                    label="Код"
+                    required
+                    value={values.code}
+                    onChange={(v) => handleChange('code', v)}
+                    error={touched.code && errors.code}
+                    disabled={!canEditFields}
+                    inline
+                  />
                 </div>
 
                 {!isAdminProject && (
                   <div className="fields-row">
-                    <FormField label="Тип ВС" required type="select" options={AIRCRAFT_TYPES.map(t => ({ value: t, label: t }))} value={values.aircraftType} onChange={(v) => handleChange('aircraftType', v)} error={touched.aircraftType && errors.aircraftType} disabled={!canEditFields} inline />
-                    <FormField label="Категория" required type="select" options={PROJECT_TYPE_OPTIONS.map(t => ({ value: t, label: t }))} value={values.projectType} onChange={(v) => handleChange('projectType', v)} error={touched.projectType && errors.projectType} disabled={!canEditFields} inline />
+                    <FormField
+                      label="Тип ВС"
+                      required
+                      type="select"
+                      options={AIRCRAFT_TYPES.map(t => ({ value: t, label: t }))}
+                      value={values.aircraftType}
+                      onChange={(v) => handleChange('aircraftType', v)}
+                      error={touched.aircraftType && errors.aircraftType}
+                      disabled={!canEditFields}
+                      inline
+                    />
+                    <FormField
+                      label="Категория"
+                      required
+                      type="select"
+                      options={PROJECT_TYPE_OPTIONS.map(t => ({ value: t, label: t }))}
+                      value={values.projectType}
+                      onChange={(v) => handleChange('projectType', v)}
+                      error={touched.projectType && errors.projectType}
+                      disabled={!canEditFields}
+                      inline
+                    />
                   </div>
                 )}
 
                 <div className="fields-row">
-                  <FormField label="Приоритет" required type="select" options={priorityOptions} value={values.priority} onChange={(v) => handleChange('priority', v)} error={touched.priority && errors.priority} disabled={!canEditFields} inline />
+                  <FormField
+                    label="Приоритет"
+                    required
+                    type="select"
+                    options={priorityOptions}
+                    value={values.priority}
+                    onChange={(v) => handleChange('priority', v)}
+                    error={touched.priority && errors.priority}
+                    disabled={!canEditFields}
+                    inline
+                  />
                   <FormField
                     label="Подразделения"
                     required={!isAdminProject}
@@ -583,13 +686,52 @@ export const ProjectModal = ({
                 </div>
 
                 <div className="fields-row">
-                  <FormField label="Дата начала" required type="date" value={values.start} onChange={(v) => handleChange('start', v)} error={touched.start && errors.start} disabled={!canEditFields} inline />
-                  <FormField label="Дата окончания" required={!isAdminProject} type="date" value={values.end} onChange={(v) => handleChange('end', v)} error={touched.end && errors.end} disabled={!canEditFields} inline />
+                  <FormField
+                    label="Дата начала"
+                    required
+                    type="date"
+                    value={values.start}
+                    onChange={(v) => handleChange('start', v)}
+                    error={touched.start && errors.start}
+                    disabled={!canEditFields}
+                    inline
+                  />
+                  <FormField
+                    label="Дата окончания"
+                    required={!isAdminProject}
+                    type="date"
+                    value={values.end}
+                    onChange={(v) => handleChange('end', v)}
+                    error={touched.end && errors.end}
+                    disabled={!canEditFields}
+                    inline
+                  />
                 </div>
 
                 <div className="fields-row">
-                  <FormField label="Бюджет, ч" required={!isAdminProject} type="number" min="0" step="0.5" value={values.budget} onChange={(v) => handleChange('budget', v)} error={touched.budget && errors.budget} disabled={!canEditFields} inline />
-                  <FormField label="Статус" required type="select" options={statusOptions} value={values.status} onChange={(v) => handleChange('status', v)} error={touched.status && errors.status} disabled={!canChangeStatus} inline />
+                  <FormField
+                    label="Бюджет, ч"
+                    required={!isAdminProject}
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={values.budget}
+                    onChange={(v) => handleChange('budget', v)}
+                    error={touched.budget && errors.budget}
+                    disabled={!canEditFields}
+                    inline
+                  />
+                  <FormField
+                    label="Статус"
+                    required
+                    type="select"
+                    options={statusOptions}
+                    value={values.status}
+                    onChange={(v) => handleChange('status', v)}
+                    error={touched.status && errors.status}
+                    disabled={!canChangeStatus}
+                    inline
+                  />
                 </div>
 
                 {!isAdminProject && (
@@ -617,16 +759,16 @@ export const ProjectModal = ({
               {existing && (
                 <button
                   className="btn primary sm"
-                  onClick={() => { openTask(null, 'form', null, existing.id, existing.id); }}
+                  onClick={() => openTask(null, 'form', null, existing.id, existing.id)}
                   disabled={readOnly}
                 >
-                  <Ic d={ICONS.plus} size={14} /> Создать задачу
+                  Создать задачу
                 </button>
               )}
             </div>
             <TaskTable
               tasks={displayedTasks}
-              onRowClick={(id) => { openTask(id, 'form', null, null, existing.id); }}
+              onRowClick={(id) => openTask(id, 'form', null, null, existing.id)}
               columns={['title', 'assignee', 'status', 'planned', 'fact', 'deadline']}
               db={db}
               getTaskSpent={getTaskSpent}
@@ -659,8 +801,10 @@ export const ProjectModal = ({
             onDelete={handleFileDelete}
             onCreateFolder={handleCreateFolder}
             onDeleteFolder={handleDeleteFolder}
-            canUpload={!readOnly && (canEditFields || values.managerId === ur.id || hasRole(ur, 'admin', 'director', 'project_manager'))}
-            canDelete={!readOnly && (canEditFields || values.managerId === ur.id || hasRole(ur, 'admin', 'director', 'project_manager'))}
+            canUpload={!readOnly && (canEditFields || values.managerId === ur.id
+              || hasRole(ur, 'admin', 'director', 'project_manager'))}
+            canDelete={!readOnly && (canEditFields || values.managerId === ur.id
+              || hasRole(ur, 'admin', 'director', 'project_manager'))}
             employeeName={empName}
           />
         )}

@@ -13,7 +13,7 @@ export default function ProjectProgress({ project, plan, fact }) {
     <div className="pj-budget">
       <div className="pj-budget-row">
         <span>Плановые часы: <b>{budget} ч</b></span>
-        <span>План: <b className={overPlan ? 'red' : ''}>{plan} ч</b></span>
+        <span>План задач: <b className={overPlan ? 'red' : ''}>{plan} ч</b></span>
         <span>Факт: <b>{fact} ч</b></span>
         <span>Использовано: <b>{usePct}%</b></span>
       </div>

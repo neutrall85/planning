@@ -1,20 +1,31 @@
 // src/components/discussion/CommentComposer.jsx
-import { useState, useRef, useLayoutEffect, useCallback } from 'react';
-import { FILE_LIMITS, FILE_MESSAGES } from '../../utils/constants';
-import { useMentions } from '../../hooks';
-import { ICONS, Ic } from '../Icons';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { Ic, ICONS } from '../Icons';
 import MentionPopup from './MentionPopup';
+import { useMentions } from '../../hooks/useMentions';
+import { FILE_LIMITS, FILE_MESSAGES } from '../../utils/constants';
 
 const REPLY_PREFIX_RE = /^@?[^\s,]+\s+[^\s,]+,\s*/;
 
 /**
  * Композер комментария: текст, вложения-изображения, @-упоминания.
  *
- * Принимает projectId и taskId отдельными пропсами - в них уходит
- * созданный комментарий. Один из них может быть null (чат проекта:
- * только projectId; чат задачи: оба).
+ * Внутри — in-flight lock (sendingRef + isSending). Без него:
+ *
+ *   - между store.addComment({...}) и очисткой state (setText('') /
+ *     setAttachments([])) стоит await store.addAttachment(...) в цикле
+ *     по вложениям. Пока цикл идёт, text и attachments ещё не сброшены,
+ *     и повторный Enter (автоповтор клавиши) или клик по «Отправить»
+ *     пройдут валидацию заново — создастся второй комментарий с тем же
+ *     текстом и повторной загрузкой вложений;
+ *
+ *   - sendingRef отсекает повтор синхронно, ещё до того, как React
+ *     успеет показать disabled на кнопке (между setIsSending(true) и
+ *     его коммитом есть такт).
+ *
+ * isSending — для UI: disabled кнопки и подмена подписи на «Отправка…».
  */
-export default function CommentComposer({
+function CommentComposer({
   store,
   projectId = null,
   taskId = null,
@@ -31,6 +42,8 @@ export default function CommentComposer({
   const [text, setText] = useState('');
   const [attachments, setAttachments] = useState([]);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const sendingRef = useRef(false);
   const textareaRef = useRef(null);
 
   const mentions = useMentions({
@@ -86,39 +99,43 @@ export default function CommentComposer({
     }
   }, [readOnly, toast]);
 
-  const removeAttachment = (idx) => setAttachments(prev => prev.filter((_, i) => i !== idx));
-
   const send = async () => {
-    if (readOnly) return;
+    if (readOnly || sendingRef.current) return;
     if (!text.trim() && attachments.length === 0) {
       toast?.('Введите текст или прикрепите изображение', 'warning');
       return;
     }
 
-    const created = store.addComment({
-      projectId: projectId || null,
-      taskId: taskId || null,
-      parentId: replyTo || null,
-      authorId: currentUser.id,
-      text: text.trim(),
-      attachments: [],
-    });
+    sendingRef.current = true;
+    setIsSending(true);
+    try {
+      const created = store.addComment({
+        projectId: projectId || null,
+        taskId: taskId || null,
+        parentId: replyTo || null,
+        authorId: currentUser.id,
+        text: text.trim(),
+        attachments: [],
+      });
+      if (created?.id) onCommentCreated?.(created.id);
 
-    if (created?.id) onCommentCreated?.(created.id);
-
-    for (const file of attachments) {
-      try {
-        await store.addAttachment(created.id, file);
-      } catch (err) {
-        toast?.(`Ошибка загрузки ${file.name}: ${err.message}`, 'error');
+      for (const file of attachments) {
+        try {
+          await store.addAttachment(created.id, file);
+        } catch (err) {
+          toast?.(`Ошибка загрузки ${file.name}: ${err.message}`, 'error');
+        }
       }
-    }
 
-    setText('');
-    setReplyTo(null);
-    setAttachments([]);
-    mentions.reset();
-    toast?.('Комментарий добавлен', 'success');
+      setText('');
+      setReplyTo(null);
+      setAttachments([]);
+      mentions.reset();
+      toast?.('Комментарий добавлен', 'success');
+    } finally {
+      sendingRef.current = false;
+      setIsSending(false);
+    }
   };
 
   const onKeyDown = (e) => {
@@ -133,6 +150,9 @@ export default function CommentComposer({
       return;
     }
     e.preventDefault();
+    // Синхронный guard для автоповтора Enter: пока первый вызов send()
+    // не завершился, повторные нажатия не проходят.
+    if (sendingRef.current) return;
     send();
   };
 
@@ -143,8 +163,7 @@ export default function CommentComposer({
     <div className="cm-composer">
       {replyTo && (
         <div className="reply-banner">
-          Ответ на комментарий{' '}
-          {parentAuthor ? `${parentAuthor.last} ${parentAuthor.first}` : ''}
+          Ответ на комментарий {parentAuthor ? `${parentAuthor.last} ${parentAuthor.first}` : ''}
           <button className="link" onClick={cancelReply}>отменить</button>
         </div>
       )}
@@ -175,9 +194,13 @@ export default function CommentComposer({
       {attachments.length > 0 && (
         <div className="cm-attachments">
           {attachments.map((file, idx) => (
-            <div key={idx} className="cm-attachment-chip">
+            <div className="cm-attachment-chip" key={idx}>
               <span className="text-sm">{file.name}</span>
-              <button className="icon-btn xs" onClick={() => removeAttachment(idx)}>
+              <button
+                className="icon-btn xs"
+                onClick={() => setAttachments(prev => prev.filter((_, i) => i !== idx))}
+                disabled={isSending}
+              >
                 <Ic d={ICONS.x} size={12} />
               </button>
             </div>
@@ -190,11 +213,18 @@ export default function CommentComposer({
           Участники получат уведомление; упомянутые - отдельно.
         </span>
         <div className="flex gap-2">
-          <button className="btn primary sm" onClick={send}>
-            <Ic d={ICONS.chat} size={13} /> Отправить
+          <button
+            className="btn primary sm"
+            onClick={send}
+            disabled={isSending}
+          >
+            <Ic d={ICONS.chat} size={13} /> {isSending ? 'Отправка…' : 'Отправить'}
           </button>
         </div>
       </div>
     </div>
   );
 }
+
+export default CommentComposer;
+export { CommentComposer };

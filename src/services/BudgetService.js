@@ -1,4 +1,24 @@
 // src/services/BudgetService.js
+//
+// Правила бюджета задачи и проекта.
+//
+// Ключевая идея: у суммарной задачи есть собственный бюджет
+// (budgetHours), а её потомки расходуют этот бюджет своими плановыми
+// часами. Плюс сама задача может списывать часы через logs. Остаток
+// бюджета — это «сколько ещё можно распределить по дереву».
+//
+// Сервис считает:
+//   - фактические часы задачи (сумма logs);
+//   - сумму планов листовых задач дерева (см. _sumDescendantsPlanned —
+//     промежуточные узлы не считаются, их план — агрегат по потомкам,
+//     а не собственная работа);
+//   - остаток по этой задаче как по корню своей ветки;
+//   - возможность добавить/изменить дочернюю задачу;
+//   - соответствие планов подзадач плану родителя;
+//   - лимит бюджета проекта.
+//
+// Модуль не знает про историю, аудит, уведомления. Все побочные
+// эффекты (запись в history, аудит, notify) — на вызывающем сервисе.
 
 export class BudgetService {
   constructor({ taskRepo, projectRepo, employeeRepo }) {
@@ -7,17 +27,20 @@ export class BudgetService {
     this._employeeRepo = employeeRepo;
   }
 
-  // Рекурсивный подсчёт суммы плановых часов подзадач (без учёта фактических).
-  // Публичный API для отчётов и внешних потребителей. В проверках бюджета
-  // не используется - там _sumDescendantsPlanned (плоская сумма).
+  /**
+   * Суммарные плановые часы листьев дерева задач.
+   *
+   * Используется в отчётах. Отличие от _sumDescendantsPlanned: та
+   * тоже считает по листьям, но без учёта собственных logs. Здесь
+   * для не-суммарной задачи возвращаются её плановые часы, для
+   * суммарной — сумма по листьям.
+   */
   calcSummaryHours(taskId, visited = new Set()) {
     if (visited.has(taskId)) return 0;
     visited.add(taskId);
-
     const task = this._taskRepo.findById(taskId);
     if (!task) return 0;
     if (!task.isSummary) return parseFloat(task.plannedHours) || 0;
-
     const children = this._taskRepo.findChildren(taskId);
     let sum = 0;
     for (const child of children) {
@@ -26,8 +49,7 @@ export class BudgetService {
     return sum;
   }
 
-  // Получение фактических часов задачи из её собственных логов.
-  // НЕ рекурсивно: логи подзадач учитываются отдельно, через сами подзадачи.
+  /** Фактические часы: сумма всех logs задачи. */
   getActualHours(task) {
     if (!task) return 0;
     return (task.logs || []).reduce((sum, log) => sum + (log.hours || 0), 0);
@@ -56,71 +78,110 @@ export class BudgetService {
   }
 
   /**
-   * Плоская сумма плановых часов всех потомков задачи.
+   * Плоская сумма плановых часов листовых потомков задачи.
    *
-   * «Плоская» - ключевое. Суммируются планы всех уровней вложенности:
-   * и A, и B внутри A, и C внутри B. Не схлопывается до листьев, как
-   * calcSummaryHours - потому что в модели «вложенная ветка берёт часы
-   * из общего бюджета корня» промежуточные узлы тоже расходуют бюджет.
+   * Суммируются только планы задач БЕЗ собственных подзадач. Планы
+   * промежуточных узлов не считаются: если у узла есть потомки, его
+   * plannedHours — это агрегат (декомпозиция), а не собственная
+   * работа. Если посчитать и узел, и его детей, дерево искусственно
+   * «перегружается»: для цепочки «узел на 20 → подзадача на 20»
+   * сумма окажется 40 вместо 20, и создание подзадачи будет
+   * блокироваться на ровном месте.
    *
-   * excludeTaskId - при обновлении существующей задачи её текущий план
-   * не учитывается, чтобы не сравнивать новое значение с ним же.
+   * Определяем «лист» по наличию детей, а не по флагу isSummary:
+   * в данных (в т.ч. в моке) бывает задача с подзадачами, но без
+   * выставленного isSummary. Для бюджета важна фактическая структура
+   * дерева, а не булев флаг.
+   *
+   * excludeTaskId — при обновлении существующей задачи её текущий
+   * план не учитывается. Исключение работает на любом уровне
+   * поддерева: узел с этим id пропускается вместе со своими потомками.
    */
   _sumDescendantsPlanned(taskId, excludeTaskId = null, visited = new Set()) {
     if (visited.has(taskId)) return 0;
     visited.add(taskId);
-
     let sum = 0;
     for (const child of this._taskRepo.findChildren(taskId)) {
       if (child.id === excludeTaskId) continue;
-      sum += parseFloat(child.plannedHours) || 0;
-      sum += this._sumDescendantsPlanned(child.id, excludeTaskId, visited);
+      const hasChildren = this._taskRepo.findChildren(child.id).length > 0;
+      if (!hasChildren) {
+        sum += parseFloat(child.plannedHours) || 0;
+      } else {
+        sum += this._sumDescendantsPlanned(child.id, excludeTaskId, visited);
+      }
     }
     return sum;
   }
 
   /**
-   * Остаток часов для задачи как «корня своей ветки».
+   * Остаток бюджета задачи.
    *
-   * budget - own logs - плоская сумма планов всех потомков.
+   * Формула: бюджет − собственные logs − плоская сумма планов
+   * листовых потомков. Промежуточные узлы не вычитаются отдельно —
+   * их план уже представлен планами их листьев.
    *
-   * Считается по этой задаче, а не по её родителю: UI показывает остаток
-   * той задачи, которая открыта. Для корневой задачи это «сколько ещё
-   * можно распределить по дереву», для промежуточной - её собственный
-   * доступный запас.
+   * Бюджет берётся из budgetHours, а если его нет — из plannedHours.
+   * budgetHours ставится автоматически при переводе задачи в суммарную
+   * (см. TaskService.upsertTask) — до этого момента «бюджетом» служит
+   * обычный план.
+   *
+   * Возвращает null, если задачи нет или бюджет не число: с null на
+   * вызывающем проще, чем с NaN — вызывающий явно решает, что показать
+   * («остаток неизвестен»).
    */
   getRemainingHours(taskId) {
+    return this.getEffectiveRemaining(taskId, null);
+  }
+
+  /**
+   * Остаток бюджета задачи с исключением конкретного узла из потомков.
+   *
+   * Отличие от getRemainingHours: позволяет не учитывать одну задачу
+   * (вместе с её поддеревом) в сумме планов потомков. Нужно при
+   * обновлении существующей подзадачи — её текущий план не должен
+   * вычитаться против нового значения (иначе «планирую 5, у меня уже
+   * было 5, но осталось 0»).
+   *
+   * Используется в TaskService.upsertTask в ветке ошибки, когда
+   * canAddChildToParent вернул false: чтобы показать «доступно X ч,
+   * запрошено Y ч».
+   *
+   * @returns {number|null} число часов или null, если задача не найдена
+   *   или бюджет не число.
+   */
+  getEffectiveRemaining(taskId, excludeTaskId = null) {
     const task = this._taskRepo.findById(taskId);
     if (!task) return null;
-
-    const ownActual = this.getActualHours(task);
-    const descendantsPlan = this._sumDescendantsPlanned(taskId);
     const budget = parseFloat(task.budgetHours ?? task.plannedHours ?? 0);
-
+    if (!Number.isFinite(budget)) return null;
+    const ownActual = this.getActualHours(task);
+    const descendantsPlan = this._sumDescendantsPlanned(taskId, excludeTaskId);
     return budget - ownActual - descendantsPlan;
   }
 
   /**
    * Проверка возможности добавления/изменения подзадачи.
    *
-   * Две независимые проверки:
+   * Модель бюджета: если у задачи есть собственный план
+   * (plannedHours / budgetHours), то этот план — верхняя граница для
+   * «своих логов + планов подзадач». Добавление подзадачи в такую
+   * задачу — это декомпозиция: часы родителя перераспределяются в
+   * подзадачу, а не занимают дополнительное место в бюджете корня.
+   * Значит, достаточно локальной проверки, что estimate помещается
+   * в свободный слот родителя. Глобальная проверка от корня тут не
+   * нужна: она бы считала план родителя ещё раз, поверх его же
+   * подзадач.
    *
-   * (1) Локальная - остаток бюджета прямого родителя:
-   *       own logs parent + планы прямых детей parent (кроме exclude)
-   *       + estimate ≤ plannedHours parent
-   *     Ловит «подзадача больше родителя» и «у родителя не осталось
-   *     свободных часов после своих логов и других подзадач».
+   * Глобальная проверка от корня остаётся для случая, когда у
+   * родителя нет собственного плана (plannedHours == null /
+   * budgetHours == null). Такая задача — просто контейнер, и
+   * единственный ограничитель для неё — бюджет корня дерева.
    *
-   * (2) Глобальная - от корня дерева:
-   *       own logs корня + плоская сумма планов всех потомков корня
-   *       (кроме exclude) + estimate ≤ budget корня
-   *     Ловит «вложенная ветка съела корневой бюджет». Именно это
-   *     правило останавливает создание C под B в сценарии
-   *     «24 = 12 своих + 10 + 2, дальше нельзя».
-   *
-   * Проверки не сводятся друг к другу: (1) может пройти при (2) = false
-   * (у A есть свой запас, но корень исчерпан), и наоборот (глобально
-   * место есть, но конкретный родитель не может дать больше своего плана).
+   * Раньше глобальная проверка выполнялась всегда. Это ломало
+   * декомпозицию: у задачи «11» с планом 20 при попытке добавить
+   * подзадачу на 20 ч локальная проверка проходила (20 ≤ 20), но
+   * глобальная падала, потому что в корне дерева план родителя уже
+   * был «занят», и добавление ещё 20 давало превышение.
    *
    * @param {string} parentId
    * @param {number} childEstimate - плановые часы новой/изменяемой подзадачи
@@ -130,73 +191,89 @@ export class BudgetService {
   canAddChildToParent(parentId, childEstimate, excludeTaskId = null) {
     const parent = this._taskRepo.findById(parentId);
     if (!parent) return true;
-
     const estimate = parseFloat(childEstimate) || 0;
 
-    // (1) Локальная проверка.
-    // Если у родителя нет плана (административный проект) - ограничения нет.
-    if (parent.plannedHours != null) {
-      const parentPlan = parseFloat(parent.plannedHours) || 0;
-      const ownActual = this.getActualHours(parent);
+    const parentPlan = parseFloat(parent.budgetHours ?? parent.plannedHours ?? NaN);
 
+    if (Number.isFinite(parentPlan)) {
+      // Локальная проверка: подзадача должна помещаться в план
+      // родителя. Если помещается — считаем, что запрос корректен,
+      // дальше не спускаемся.
+      const ownActual = this.getActualHours(parent);
       let childrenPlan = 0;
       for (const child of this._taskRepo.findChildren(parentId)) {
         if (child.id === excludeTaskId) continue;
         childrenPlan += parseFloat(child.plannedHours) || 0;
       }
-
-      if (ownActual + childrenPlan + estimate > parentPlan) return false;
+      return ownActual + childrenPlan + estimate <= parentPlan;
     }
 
-    // (2) Глобальная проверка от корня.
+    // План родителя не задан — ограничиваемся бюджетом корня.
     const root = this._findRoot(parent);
     const rootBudget = parseFloat(root.budgetHours ?? root.plannedHours ?? 0);
-    const rootOwnActual = this.getActualHours(root);
-    const descendantsPlan = this._sumDescendantsPlanned(root.id, excludeTaskId);
-
-    return (rootOwnActual + descendantsPlan + estimate) <= rootBudget;
+    return (
+      this.getActualHours(root) +
+      this._sumDescendantsPlanned(root.id, excludeTaskId) +
+      estimate <= rootBudget
+    );
   }
 
-  // Проверка бюджета проекта (для задач)
+  /**
+   * Лимит плановых часов проекта.
+   *
+   * Сумма плановых часов всех задач проекта + запрошенное значение
+   * не должна превышать бюджет проекта. Проверка не применяется к
+   * административным и архивным проектам, а также если бюджет не задан.
+   *
+   * Бросает - потому что вызывающий (TaskService.upsertTask) уже в
+   * контексте обработки ошибки и ждёт исключение, а не булев результат.
+   */
   checkProjectBudget(projectId, taskId, plannedHours) {
     const project = this._projectRepo.findById(projectId);
     if (!project || project.budget == null || project.ptype === 'admin' || project.archived) {
       return true;
     }
-    const otherTasks = this._taskRepo.findByProject(projectId)
-      .filter(t => t.id !== taskId && !t.archived);
-    const sumOther = otherTasks.reduce((acc, t) => acc + (parseFloat(t.plannedHours) || 0), 0);
-    const newTotal = sumOther + (parseFloat(plannedHours) || 0);
-    if (newTotal > project.budget) {
+    // Считаем только листья дерева: у summary-задачи её собственный
+    // plannedHours — агрегат по потомкам, а не отдельная работа.
+    // Включать и узел, и его детей — двойной счёт; учитывать только
+    // узел и пропускать детей — потеря части плана, если у узла
+    // осталась какая-то собственная работа. Оба варианта неверны,
+    // единственный корректный — считать листья.
+    const sumOther = this._taskRepo
+      .findByProject(projectId)
+      .filter(t => t.id !== taskId && !t.archived)
+      .filter(t => this._taskRepo.findChildren(t.id).length === 0)
+      .reduce((acc, t) => acc + (parseFloat(t.plannedHours) || 0), 0);
+
+    if (sumOther + (parseFloat(plannedHours) || 0) > project.budget) {
       throw new Error(
-        `Превышение плановых часов проекта! План: ${project.budget} ч, сумма остальных задач: ${sumOther} ч, запрошено: ${plannedHours || 0} ч.`
+        `Превышение плановых часов проекта! План: ${project.budget} ч, ` +
+        `сумма остальных задач: ${sumOther} ч, запрошено: ${plannedHours || 0} ч.`,
       );
     }
     return true;
   }
 
   /**
-   * Установка бюджета для суммарной задачи.
+   * Установка бюджета суммарной задачи.
    *
    * Проверяем, что новый бюджет покрывает собственные логи и плоскую
-   * сумму планов всех потомков. Раньше здесь был calcSummaryHours -
-   * он схлопывал вложенность до листьев и не видел промежуточные
-   * планы, из-за чего бюджет можно было урезать ниже фактически
-   * занятого.
+   * сумму планов листовых потомков.
    */
   setBudget(taskId, newBudget) {
     const task = this._taskRepo.findById(taskId);
     if (!task) throw new Error('Задача не найдена');
     if (!task.isSummary) throw new Error('Только для суммарных задач');
-    if (typeof newBudget !== 'number' || newBudget < 0) throw new Error('План должен быть неотрицательным числом');
-
+    if (typeof newBudget !== 'number' || newBudget < 0) {
+      throw new Error('План должен быть неотрицательным числом');
+    }
     const ownActual = this.getActualHours(task);
     const descendantsPlan = this._sumDescendantsPlanned(taskId);
 
     if (ownActual + descendantsPlan > newBudget) {
       throw new Error(
-        `Новый план (${newBudget} ч) меньше фактических часов задачи (${ownActual} ч) ` +
-        `и суммарного плана подзадач (${descendantsPlan} ч).`
+        `Новый план (${newBudget} ч) меньше фактических часов задачи ` +
+        `(${ownActual} ч) и суммарного плана подзадач (${descendantsPlan} ч).`,
       );
     }
     task.budgetHours = newBudget;
@@ -204,18 +281,30 @@ export class BudgetService {
     return task;
   }
 
-  // Проверка, что сумма подзадач не превышает бюджет не-суммарной родительской
-  // задачи (для совместимости).
+  /**
+   * Сумма планов подзадач не должна превышать план родителя.
+   *
+   * Отдельная проверка от canAddChildToParent: та считает «влезет ли
+   * новая подзадача», эта — «не превышен ли план родителя сейчас».
+   * Используется при обновлении родителя и при удалении подзадачи,
+   * когда после изменения состава нужно перепроверить сумму.
+   */
   checkSubtaskBudget(parentId, excludeTaskId = null) {
     const parent = this._taskRepo.findById(parentId);
     if (!parent) return;
     if (parent.isSummary || parent.plannedHours == null) return;
-    const children = this._taskRepo.findChildren(parentId)
-      .filter(t => t.id !== excludeTaskId);
-    const sumChildren = children.reduce((acc, t) => acc + (parseFloat(t.plannedHours) || 0), 0);
+
+    const sumChildren = this._taskRepo
+      .findChildren(parentId)
+      .filter(t => t.id !== excludeTaskId)
+      .reduce((acc, t) => acc + (parseFloat(t.plannedHours) || 0), 0);
+
     if (sumChildren > parent.plannedHours) {
       throw new Error(
-        `Сумма плановых часов подзадач (${sumChildren} ч) превышает плановые часы родительской задачи "${parent.title}" (${parent.plannedHours} ч). Уменьшите часы подзадач или увеличьте плановые часы родителя.`
+        `Сумма плановых часов подзадач (${sumChildren} ч) превышает ` +
+        `плановые часы родительской задачи "${parent.title}" ` +
+        `(${parent.plannedHours} ч). Уменьшите часы подзадач или ` +
+        `увеличьте плановые часы родителя.`,
       );
     }
   }

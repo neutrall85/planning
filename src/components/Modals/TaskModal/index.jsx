@@ -1,11 +1,10 @@
 // src/components/Modals/TaskModal/index.jsx
-import { useState, useMemo, useCallback } from 'react';
+import { useMemo, useCallback } from 'react';
 import { ModalShell } from '../../ModalShell';
 import { Tabs } from '../../Tabs';
 import { FileManager } from '../../FileManager';
 import Discussion from '../../Discussion';
 import { HistoryTab } from '../../HistoryTab';
-import { Ic, ICONS } from '../../Icons';
 import NoteEditorModal from '../NoteEditorModal';
 import { TaskFormTab } from './TaskFormTab';
 import { TaskTimeTab } from './TaskTimeTab';
@@ -14,8 +13,6 @@ import { TaskNotesTab } from './TaskNotesTab';
 import { TaskFooterActions } from './TaskFooterActions';
 import { useConfirm } from '../../../context/ConfirmContext';
 import { useDataHelpers } from '../../../hooks/useDataHelpers';
-import { useControlledTab } from '../../../hooks/useControlledTab';
-import { useStableModalHeight } from '../../../hooks/useStableModalHeight';
 import { useChatUnreadCount, useChatTotalCount } from '../../../hooks/useChatStats';
 import { useTaskFormState } from '../../../hooks/useTaskFormState';
 import { useTaskTemplate } from '../../../hooks/useTaskTemplate';
@@ -140,7 +137,11 @@ export const TaskModal = ({
     closeNoteEditor, handleSaveNote, handleDeleteNote,
   } = useTaskNotes({ existing, ur, store, toast });
 
-  const { saveHandler, deleteHandler } = useTaskSave({
+  // isSaving приходит из useTaskSave: пока идёт сохранение/удаление,
+  // кнопки блокируются. См. комментарий в useTaskSave о разделении
+  // isSaving (state, для UI) и savingRef (sync guard, для отсечения
+  // повторного вызова между стартом и коммитом).
+  const { saveHandler, deleteHandler, isSaving } = useTaskSave({
     existing, isNew, db, vacOverlap, toast, onSave, onDelete, ur,
     subtasks, draftSubtasks, pendingTemplateSubtasks, confirm, store, empName,
   });
@@ -171,7 +172,12 @@ export const TaskModal = ({
   );
 
   const showBackButton = returnToProjectId || returnToTaskId || returnToEmployeeTasksId;
-  const saveDisabled = !(canEditFields || (existing && canChangeStatus))
+
+  // isSaving входит в saveDisabled — иначе окно гонки: confirm() может
+  // висеть долго, пользователь жмёт Save повторно, второй вызов стартует
+  // вторую цепочку проверок/подтверждений поверх той же формы.
+  const saveDisabled = isSaving
+    || !(canEditFields || (existing && canChangeStatus))
     || (isNew ? !isValid : !isValid || !isDirty);
 
   const modalTitle = readOnly
@@ -204,15 +210,6 @@ export const TaskModal = ({
     );
   }, [existing, db.employees]);
 
-  /**
-   * Колбэки запроса изменения. Оба показываются только исполнителю и
-   * только у существующей (не в архиве) задачи.
-   *
-   * Запрос срока скрыт для часовой задачи: у неё start === deadline, и
-   * сдвиг срока — это изменение сразу двух полей (режима задачи), а не
-   * согласование одного значения с руководителем. Кнопки запроса часов
-   * у часовой задачи тоже нет — там часы выводятся из startTime/endTime.
-   */
   const canRequestChange = !readOnly && existing && isAssignee && !!onChangeReq;
   const requestHours = canRequestChange && !values.isHourly
     ? () => onChangeReq('hours', 'task', values.id)
@@ -220,6 +217,20 @@ export const TaskModal = ({
   const requestDeadline = canRequestChange && !values.isHourly
     ? () => onChangeReq('deadline', 'task', values.id)
     : null;
+
+  const goToSubtask = useCallback((subtaskId) => {
+    // subtaskId === null → создание новой подзадачи.
+    // returnToTaskId — текущая задача, чтобы «Назад» вернул сюда.
+    openTask(
+      subtaskId,
+      'form',
+      subtaskId ? null : values.id,
+      null,
+      null,
+      null,
+      values.id,
+    );
+  }, [openTask, values.id]);
 
   const footerActions = (
     <TaskFooterActions
@@ -233,6 +244,7 @@ export const TaskModal = ({
       toast={toast}
       onDelete={deleteHandler}
       onCopy={onCopy}
+      disabled={isSaving}
     />
   );
 
@@ -298,15 +310,11 @@ export const TaskModal = ({
             tasks={displayedSubtasks}
             showCreateButton={!!existing}
             readOnly={readOnly}
-            onCreateSubtask={() => {
-              onClose();
-              setTimeout(() => openTask(null, 'form', values.id, null, null, null, values.id), 50);
-            }}
-            onRowClick={(id) => {
-              onClose();
-              setTimeout(() => openTask(id, 'form', null, null, null, null, values.id), 50);
-            }}
-            db={db} getTaskSpent={getTaskSpent} empName={empName}
+            onCreateSubtask={() => goToSubtask(null)}
+            onRowClick={(id) => goToSubtask(id)}
+            db={db}
+            getTaskSpent={getTaskSpent}
+            empName={empName}
           />
         )}
 

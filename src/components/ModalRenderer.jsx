@@ -133,6 +133,15 @@ export default function ModalRenderer({
 
   const handleTaskDelete = useCallback(async (id) => {
     try {
+      // Порядок важен: MainLayout полагается на то, что к моменту,
+      // когда route-эффект увидит route ещё указывающим на удалённую
+      // задачу, её уже не будет в tasks (см. комментарий в
+      // MainLayout.jsx над обработкой ROUTE.TASK). Если сначала
+      // переключить модалку на родителя, а task ещё жива в tasks,
+      // route-эффект застаёт modal=P, route=S, tasks содержит S -
+      // и вызывает openTask(S, ...) заново, открывая уже удаляемую
+      // подзадачу. Это гоняет desiredHash/route друг за другом и
+      // даёт Maximum update depth exceeded.
       await store.deleteTask(id);
       closeTaskWithReturn();
     } catch (error) {

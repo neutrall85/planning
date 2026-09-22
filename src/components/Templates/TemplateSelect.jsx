@@ -8,7 +8,7 @@ import { Select } from '../Select';
  * При выборе передаёт родителю объект шаблона (или null, если выбран пустой пункт).
  * Держит выбранное значение, чтобы пользователь видел, какой шаблон применён.
  */
-export default function TemplateSelect({ kind, onApply, disabled = false }) {
+export function TemplateSelect({ kind, onApply, disabled = false }) {
   const { store } = useStore();
   const { showToast } = useToast();
   const [templates, setTemplates] = useState(() => store.getTemplates(kind));

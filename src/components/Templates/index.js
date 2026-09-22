@@ -1,5 +1,5 @@
-export { default as TemplateSelect } from './TemplateSelect';
-export { default as TemplateActions } from './TemplateActions';
+export { TemplateSelect } from './TemplateSelect';
+export { TemplateActions } from './TemplateActions';
 export { default as TemplateModal } from './TemplateModal';
 export { default as DraftListItem } from './DraftListItem';
 export { default as TaskNodeFields } from './TaskNodeFields';

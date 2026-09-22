@@ -1,7 +1,7 @@
 // src/hooks/useTaskFormState.js
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useForm } from './useForm';
-import { TODAY, iso, addDays, uid } from '../utils/date';
+import { iso, TODAY, addDays, uid } from '../utils/date';
 import { applyHourlyMode, hoursBetween } from '../utils/hourlyTask';
 import { dependencyRule } from '../utils/taskDependency';
 
@@ -29,18 +29,50 @@ const stripNotes = (task) => {
  * history, actualHours, parentTaskId в части случаев).
  */
 const FORM_FIELDS = Object.freeze([
-  'title', 'desc', 'projectId', 'assigneeId', 'priority', 'plannedHours',
-  'start', 'deadline', 'status', 'isHourly', 'startTime', 'endTime',
-  'isSummary', 'dependencyId', 'dependencyType',
+  'title',
+  'desc',
+  'projectId',
+  'assigneeId',
+  'priority',
+  'plannedHours',
+  'start',
+  'deadline',
+  'status',
+  'isHourly',
+  'startTime',
+  'endTime',
+  'isSummary',
+  'dependencyId',
+  'dependencyType',
 ]);
 
-function buildInitialValues({ existing, isCopy, copySource, isNew, effectiveProjectId, parentTaskId, ur }) {
+function buildInitialValues({
+  existing,
+  isCopy,
+  copySource,
+  isNew,
+  effectiveProjectId,
+  parentTaskId,
+  ur,
+}) {
   if (existing) {
+    // Summary-задача: показываем в поле «Плановые часы» актуальный
+    // бюджет (budgetHours). plannedHours у неё — «первоначальный
+    // план», он мог разойтись с бюджетом после ручных правок или
+    // запросов. Если показать plannedHours, пользователь увидит
+    // устаревшее число, изменит его — а apply в TaskService
+    // сравнит с budgetHours и либо молча ничего не сделает, либо
+    // сработает по неверной базе.
+    const shownPlanned = existing.isSummary
+      ? (existing.budgetHours ?? existing.plannedHours)
+      : existing.plannedHours;
+
     return applyHourlyMode({
       ...stripNotes(existing),
-      isHourly:  existing.isHourly  ?? false,
+      plannedHours: shownPlanned,
+      isHourly: existing.isHourly ?? false,
       startTime: existing.startTime || '09:00',
-      endTime:   existing.endTime   || '18:00',
+      endTime: existing.endTime || '18:00',
     });
   }
   if (isCopy) {
@@ -56,15 +88,17 @@ function buildInitialValues({ existing, isCopy, copySource, isNew, effectiveProj
       endTime: copySource.endTime || '18:00',
       logs: [],
       history: [
-        { ts: Date.now(), who: ur.id, text: `Скопирована из «${copySource.title}»` },
+        {
+          ts: Date.now(),
+          who: ur.id,
+          text: `Скопирована из «${copySource.title}»`,
+        },
       ],
       delegatedFrom: null,
       archived: false,
       archivedAt: null,
       closedAt: null,
       creatorId: ur.id,
-      // Копия не наследует зависимость: сроки копии берутся из
-      // источника, а не подтягиваются к чужому предшественнику.
       dependencyId: null,
       files: [],
       folders: [],
@@ -81,9 +115,9 @@ function buildInitialValues({ existing, isCopy, copySource, isNew, effectiveProj
     start: TODAY,
     deadline: iso(addDays(new Date(), 14)),
     status: 'new',
-    isHourly:  false,
+    isHourly: false,
     startTime: '09:00',
-    endTime:   '18:00',
+    endTime: '18:00',
     logs: [],
     history: [],
     delegatedFrom: null,
@@ -116,68 +150,123 @@ function buildInitialValues({ existing, isCopy, copySource, isNew, effectiveProj
  * наружу как lockedField - форма блокирует его для правки.
  */
 export function useTaskFormState({
-  existing, isCopy, copySource, isNew, isProjectLocked, effectiveProjectId,
-  parentTaskId, db, ur,
+  existing,
+  isCopy,
+  copySource,
+  isNew,
+  isProjectLocked,
+  effectiveProjectId,
+  parentTaskId,
+  db,
+  ur,
 }) {
-  const initialValues = buildInitialValues({
-    existing, isCopy, copySource, isNew, effectiveProjectId, parentTaskId, ur,
-  });
-
-  const validate = useCallback((values) => {
-    const errors = {};
-    if (!values.title?.trim()) errors.title = 'Название обязательно';
-    if (isProjectLocked) {
-      if (!values.projectId) errors.projectId = 'Проект не определён';
-    } else {
-      if (!values.projectId || values.projectId === '') errors.projectId = 'Выберите проект';
-    }
-    if (!values.assigneeId || values.assigneeId === '') errors.assigneeId = 'Выберите исполнителя';
-    if (!values.start) errors.start = 'Дата начала обязательна';
-    const project = db.projects.find(p => p.id === values.projectId);
-    const isAdminProj = project && project.ptype === 'admin';
-    if (!isAdminProj) {
-      const planned = parseFloat(values.plannedHours);
-      if (isNaN(planned) || planned <= 0) errors.plannedHours = 'Плановые часы обязательны (число > 0)';
-      if (!values.deadline) errors.deadline = 'Срок исполнения обязателен';
-    }
-    if (values.isHourly) {
-      if (!values.startTime) errors.startTime = 'Укажите время начала';
-      if (!values.endTime)   errors.endTime   = 'Укажите время окончания';
-      if (values.startTime && values.endTime
-          && hoursBetween(values.startTime, values.endTime) === null) {
-        errors.endTime = 'Время окончания должно быть позже времени начала';
-      }
-    }
-    if (!values.priority) errors.priority = 'Приоритет обязателен';
-    if (!values.status) errors.status = 'Статус обязателен';
-    return errors;
-  }, [db, isProjectLocked]);
-
   const {
-    values, handleChange, handleSubmit, errors, touched,
-    setValues, setTouched, setFieldValue, isValid, isDirty,
-  } = useForm(initialValues, validate, { fields: FORM_FIELDS });
+    values,
+    handleChange,
+    handleSubmit,
+    errors,
+    touched,
+    setValues,
+    setTouched,
+    setFieldValue,
+    isValid,
+    isDirty,
+  } = useForm(
+    buildInitialValues({
+      existing,
+      isCopy,
+      copySource,
+      isNew,
+      effectiveProjectId,
+      parentTaskId,
+      ur,
+    }),
+    useCallback((values) => {
+      const errors = {};
+      if (!values.title?.trim()) errors.title = 'Название обязательно';
+      if (isProjectLocked) {
+        if (!values.projectId) errors.projectId = 'Проект не определён';
+      } else if (!values.projectId || values.projectId === '') {
+        errors.projectId = 'Выберите проект';
+      }
+      if (!values.assigneeId || values.assigneeId === '') {
+        errors.assigneeId = 'Выберите исполнителя';
+      }
+      if (!values.start) errors.start = 'Дата начала обязательна';
 
-  const updateValues = useCallback((patch) => {
-    setValues(prev => applyHourlyMode({ ...prev, ...patch }));
-    setTouched(prev => {
-      const next = { ...prev };
-      Object.keys(patch).forEach(key => { next[key] = true; });
-      return next;
-    });
-  }, [setValues, setTouched]);
+      const project = db.projects.find((p) => p.id === values.projectId);
+      if (!(project && project.ptype === 'admin')) {
+        const planned = parseFloat(values.plannedHours);
+        if (isNaN(planned) || planned <= 0) {
+          errors.plannedHours = 'Плановые часы обязательны (число > 0)';
+        }
+        if (!values.deadline) errors.deadline = 'Срок исполнения обязателен';
+      }
 
-  // Новая задача, создаваемая из карточки родителя: как только у
-  // родителя определился проект, подставляем его в форму, если поле
-  // ещё не заполнено вручную.
+      if (values.isHourly) {
+        if (!values.startTime) errors.startTime = 'Укажите время начала';
+        if (!values.endTime) errors.endTime = 'Укажите время окончания';
+        if (
+          values.startTime &&
+          values.endTime &&
+          hoursBetween(values.startTime, values.endTime) === null
+        ) {
+          errors.endTime = 'Время окончания должно быть позже времени начала';
+        }
+      }
+      if (!values.priority) errors.priority = 'Приоритет обязателен';
+      if (!values.status) errors.status = 'Статус обязателен';
+      return errors;
+    }, [db, isProjectLocked]),
+    { fields: FORM_FIELDS },
+  );
+
+  const updateValues = useCallback(
+    (patch) => {
+      setValues((prev) => applyHourlyMode({ ...prev, ...patch }));
+      setTouched((prev) => {
+        const next = { ...prev };
+        Object.keys(patch).forEach((key) => {
+          next[key] = true;
+        });
+        return next;
+      });
+    },
+    [setValues, setTouched],
+  );
+
+  /**
+   * Подстановка projectId у новой подзадачи.
+   *
+   * setFieldValue в deps убран: после мемоизации в useForm он стабилен,
+   * но держать функцию в deps стоит только там, где эффект должен
+   * реагировать на её смену. Здесь такой необходимости нет.
+   *
+   * Держим актуальную ссылку в ref и вызываем через неё - стандартный
+   * приём «latest ref» из документации React (см. «Separating Events
+   * from Effects»). Логика та же: если у новой задачи уже задан
+   * parentTaskId и у неё нет projectId, взять projectId родителя. После
+   * первого срабатывания values.projectId станет непустым, и условие
+   * перестанет выполняться - повторных setFieldValue не будет.
+   *
+   * Раньше setFieldValue был в deps и пересоздавался на каждом рендере
+   * (см. useForm до правки), из-за чего этот эффект запускался каждый
+   * рендер. В связке с setState это давало цикл «Maximum update depth
+   * exceeded» при переходах между родительской и дочерней задачей.
+   */
+  const setFieldValueRef = useRef(setFieldValue);
+  useEffect(() => {
+    setFieldValueRef.current = setFieldValue;
+  }, [setFieldValue]);
+
   useEffect(() => {
     if (isNew && parentTaskId && !values.projectId) {
-      const parent = db.tasks.find(t => t.id === parentTaskId);
+      const parent = db.tasks.find((t) => t.id === parentTaskId);
       if (parent && parent.projectId) {
-        setFieldValue('projectId', parent.projectId);
+        setFieldValueRef.current('projectId', parent.projectId);
       }
     }
-  }, [parentTaskId, db.tasks, isNew, values.projectId, setFieldValue]);
+  }, [parentTaskId, db.tasks, isNew, values.projectId]);
 
   /**
    * Правило зависимости для текущего выбора. lockedFieldName - какое
@@ -191,10 +280,10 @@ export function useTaskFormState({
     ? dependencyRule(values.dependencyType)
     : null;
   const predecessor = values.dependencyId
-    ? db.tasks.find(t => t.id === values.dependencyId)
+    ? db.tasks.find((t) => t.id === values.dependencyId)
     : null;
   const lockedFieldName = predRule?.locked ?? null;
-  const lockedValue = (predecessor && predRule)
+  const lockedValue = predecessor && predRule
     ? predecessor[predRule.source] ?? null
     : null;
   const currentLockedValue = lockedFieldName ? values[lockedFieldName] : null;
@@ -210,16 +299,25 @@ export function useTaskFormState({
   useEffect(() => {
     if (!lockedFieldName || lockedValue == null) return;
     if (currentLockedValue === lockedValue) return;
-    setValues(prev => prev.isHourly
-      ? { ...prev, start: lockedValue, deadline: lockedValue }
-      : { ...prev, [lockedFieldName]: lockedValue });
+    setValues((prev) =>
+      prev.isHourly
+        ? { ...prev, start: lockedValue, deadline: lockedValue }
+        : { ...prev, [lockedFieldName]: lockedValue },
+    );
   }, [lockedFieldName, lockedValue, currentLockedValue, setValues]);
 
   return {
-    values, handleChange, updateValues, handleSubmit, errors, touched,
-    setValues, setTouched, setFieldValue, isValid, isDirty,
-    // Имя поля, реально заблокированного (только если есть чему его
-    // научить); null - все поля дат редактируемы.
+    values,
+    handleChange,
+    updateValues,
+    handleSubmit,
+    errors,
+    touched,
+    setValues,
+    setTouched,
+    setFieldValue,
+    isValid,
+    isDirty,
     lockedField: lockedValue != null ? lockedFieldName : null,
   };
 }

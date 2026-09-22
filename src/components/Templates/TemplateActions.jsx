@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Ic, ICONS } from '../Icons';
 import TemplateModal from './TemplateModal';
 
-export default function TemplateActions({
+export function TemplateActions({
   kind,
   source,
   nested = [],

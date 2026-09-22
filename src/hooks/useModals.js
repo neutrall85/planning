@@ -1,5 +1,15 @@
 // src/hooks/useModals.js
 import { useCallback, useRef, useState } from 'react';
+import { ROUTE, DEFAULT_TAB, TABS } from '../utils/routes';
+
+/**
+ * Привести вкладку к значению из белого списка. Тот же набор
+ * констант, что использует buildRoute / parseRoute — гарантирует,
+ * что modal.initialTab всегда совпадает с route.tab после нормализации
+ * и guard в MainLayout «модалка уже на этой вкладке» не проскакивает.
+ */
+const normalizeTab = (kind, tab) =>
+  (TABS[kind] || []).includes(tab) ? tab : DEFAULT_TAB[kind];
 
 export function useModals({ store, user }) {
   const [modal, setModal] = useState(null);
@@ -22,7 +32,9 @@ export function useModals({ store, user }) {
     returnToEmployeeTasksId = null,
   ) => open({
     type: 'task',
-    taskId, initialTab, parentTaskId, initialProjectId,
+    taskId,
+    initialTab: normalizeTab(ROUTE.TASK, initialTab),
+    parentTaskId, initialProjectId,
     returnToProjectId, returnToProjectTab,
     returnToTaskId, returnToTaskTab,
     returnToEmployeeTasksId,
@@ -34,26 +46,12 @@ export function useModals({ store, user }) {
     returnToProjectId = null,
     returnToProjectTab = 'info',
   ) => open({
-    type: 'project', projectId, initialTab, returnToProjectId, returnToProjectTab,
+    type: 'project',
+    projectId,
+    initialTab: normalizeTab(ROUTE.PROJECT, initialTab),
+    returnToProjectId, returnToProjectTab,
   }), [open]);
 
-  /**
-   * Открытие владельца по share-ссылке на файл или папку.
-   *
-   * Общая идея: share-ссылка не открывает собственное окно - она
-   * открывает карточку владельца (задачи или проекта) на вкладке
-   * «Вложения» и просит FileManager подсветить конкретный узел.
-   *
-   * highlightFileId / highlightFolderId - транзитные поля дескриптора:
-   * их читает ModalRenderer и прокидывает в TaskModal/ProjectModal,
-   * оттуда - в FileManager. Сама модалка их семантику не знает, для
-   * неё это «пожелание сфокусироваться на узле».
-   *
-   * Раздельные методы openAtFile / openAtFolder, а не один openAt с
-   * kind-параметром: вызовы читаются лучше (openAtFile(...) понятнее,
-   * чем openAt('file', ...)), а внутренняя ветка task/project всё
-   * равно дублируется в обоих.
-   */
   const openAtFile = useCallback((ownerKind, ownerId, fileId) => {
     if (ownerKind === 'task') {
       open({ type: 'task', taskId: ownerId, initialTab: 'files', highlightFileId: fileId });
@@ -70,29 +68,9 @@ export function useModals({ store, user }) {
     }
   }, [open]);
 
-  /**
-   * Отдельный тип модалки под управление доступом к проекту.
-   *
-   * Внутри карточки проекта доступ открывается локальным состоянием
-   * ProjectModal (кнопка в футере), но из контекстного меню карточки
-   * канбана/списка самой карточки нет - клик должен открывать модалку
-   * доступа сразу, минуя карточку. Тот же приём, что у openEmployeeTasks:
-   * собственный тип модалки на самостоятельное окно.
-   */
   const openProjectAccess = useCallback((projectId) =>
     open({ type: 'projectAccess', projectId }), [open]);
 
-  /**
-   * Открыть модалку запроса на изменение.
-   *
-   * changeKind — id правила из utils/changeKinds ('hours' | 'deadline').
-   * targetType — 'task' | 'project' (у deadline — только task).
-   * targetId   — id целевой сущности.
-   *
-   * Единый метод вместо отдельного openHoursReq/openDeadlineReq: вид
-   * изменения — параметр, а не повод для отдельной точки входа. Новые
-   * виды изменений (приоритет, статус) не потребуют правок здесь.
-   */
   const openChangeReq = useCallback((changeKind, targetType, targetId) =>
     open({ type: 'changeReq', changeKind, targetType, targetId }), [open]);
 
@@ -117,13 +95,6 @@ export function useModals({ store, user }) {
   const openEmployeeTasks = useCallback((empId) =>
     open({ type: 'employeeTasks', empId }), [open]);
 
-  // Копирование задачи и проекта - две ветки одного правила:
-  //   options.returnToModal === true - открыто изнутри модалки-источника
-  //     (кнопка "Копировать" в футере). Кнопка "Назад" и закрытие по X
-  //     вернут в исходную сущность.
-  //   без опции - открыто из канбана/списка/календаря (контекстное меню
-  //     карточки). Возврат не задан: закрытие просто закрывает модалку,
-  //     пользователь остаётся на исходном экране.
   const openCopyTask = useCallback((sourceTaskId, options) => {
     const returnToModal = options?.returnToModal === true;
     return open({
