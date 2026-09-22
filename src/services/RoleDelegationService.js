@@ -1,5 +1,6 @@
 // src/services/RoleDelegationService.js
 import { fmtDMY } from '../utils/date';
+import { normalizeRejectionReason } from '../utils/rejection';
 
 export class RoleDelegationService {
   constructor({
@@ -33,13 +34,26 @@ export class RoleDelegationService {
     this._notify();
   }
 
-  decide(delegationId, approved, actorId) {
+  /**
+   * Решение по делегированию ролей.
+   *
+   * reason обязателен при approved === false. Нормализация и проверка -
+   * в normalizeRejectionReason (utils/rejection). Уходит в аудит,
+   * в уведомление инициатору и в поле rejectionReason самой записи.
+   */
+  decide(delegationId, approved, actorId, reason = null) {
     const rd = this._roleDelegationRepo.findById(delegationId);
     if (!rd) throw new Error('Делегирование не найдено');
     if (rd.status !== 'pending') throw new Error('Решение по этому делегированию уже принято');
 
+    const trimmedReason = normalizeRejectionReason(approved, reason);
+
     const status = approved ? 'active' : 'rejected';
-    this._roleDelegationRepo.save({ ...rd, status });
+    this._roleDelegationRepo.save({
+      ...rd,
+      status,
+      rejectionReason: trimmedReason,
+    });
 
     const details = {
       from: this._name(rd.fromId),
@@ -49,6 +63,8 @@ export class RoleDelegationService {
     if (approved) {
       details.start = fmtDMY(rd.start);
       details.end = rd.end ? fmtDMY(rd.end) : 'до отмены';
+    } else {
+      details['Причина отклонения'] = trimmedReason;
     }
 
     this._audit.addAudit(
@@ -56,7 +72,7 @@ export class RoleDelegationService {
       details, 'roleDelegation', delegationId, actorId,
     );
 
-    this._notifications.notifyRoleDelegationDecision(rd, approved, actorId);
+    this._notifications.notifyRoleDelegationDecision(rd, approved, actorId, trimmedReason);
     this._notify();
     return rd;
   }

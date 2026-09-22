@@ -1,15 +1,33 @@
-// src/components/Modals/TaskModal/TaskModalFooter.jsx
+// src/components/Modals/TaskModal/TaskFooterActions.jsx
 import { Ic, ICONS } from '../../Icons';
 import { TemplateActions } from '../../Templates';
 import { collectTaskPayloads } from '../../../utils/templateNesting';
 
-/** Нижняя панель карточки задачи: удаление, копирование, шаблон, отмена, сохранение. */
-export function TaskModalFooter({
-  readOnly, existing, canEditFields, isAuthor, onDelete,
-  onCopy, canCreateFromTask, values, db, toast, onClose, onSubmit, saveDisabled,
+/**
+ * Левый блок футера карточки задачи: удаление, копирование, «В шаблон».
+ *
+ * Правая часть (spacer + «Отмена» + «Создать/Сохранить») живёт в
+ * ModalShell - здесь её нет, чтобы не дублировать разметку, уже
+ * описанную один раз.
+ *
+ * Условие внутри JSX (`cond && <button>`) даёт `false` в фрагменте -
+ * React не рендерит пустые узлы, обёрток `{...} ? <></> : null`
+ * не требуется.
+ */
+export function TaskFooterActions({
+  readOnly,
+  existing,
+  canEditFields,
+  isAuthor,
+  canCreateFromTask,
+  values,
+  db,
+  toast,
+  onDelete,
+  onCopy,
 }) {
   return (
-    <div className="modal-foot">
+    <>
       {!readOnly && existing && (canEditFields || isAuthor) && (
         <button className="btn danger" onClick={onDelete}>
           <Ic d={ICONS.trash} size={14} /> Удалить
@@ -36,12 +54,6 @@ export function TaskModalFooter({
           disabled={!values.title?.trim()}
         />
       )}
-
-      <div className="spacer" />
-      <button className="btn ghost" onClick={onClose}>Отмена</button>
-      <button className="btn primary" onClick={onSubmit} disabled={saveDisabled}>
-        {existing ? 'Сохранить' : 'Создать задачу'}
-      </button>
-    </div>
+    </>
   );
 }

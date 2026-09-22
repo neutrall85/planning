@@ -18,6 +18,12 @@
 // «Отклонение регистрации». Создание сотрудника вызывается с
 // { audit: false } - иначе в журнал попадут обе записи, а фильтр в
 // Journal.jsx ожидает одну.
+//
+// reason при approved === false обязателен: отклонять без объяснения
+// нельзя (правило проекта, а не UI-украшение). Нормализация и проверка
+// вынесены в utils/rejection.
+import { normalizeRejectionReason } from '../utils/rejection';
+
 export class RegistrationRequestService {
   constructor({ requestRepo, employeeService, auditService, notify }) {
     this._requestRepo = requestRepo;
@@ -30,10 +36,12 @@ export class RegistrationRequestService {
     return this._requestRepo.findAll();
   }
 
-  decide(requestId, approved, actorId) {
+  decide(requestId, approved, actorId, reason = null) {
     const r = this._requestRepo.findById(requestId);
     if (!r) throw new Error('Заявка не найдена');
     if (r.status !== 'pending') throw new Error('Решение по этой заявке уже принято');
+
+    const trimmedReason = normalizeRejectionReason(approved, reason);
 
     const fullName = `${r.last} ${r.first}`;
 
@@ -53,10 +61,14 @@ export class RegistrationRequestService {
         'registration', requestId, actorId,
       );
     } else {
-      this._requestRepo.save({ ...r, status: 'rejected' });
+      this._requestRepo.save({
+        ...r,
+        status: 'rejected',
+        rejectionReason: trimmedReason,
+      });
       this._audit.addAudit(
         'Отклонение регистрации',
-        { email: r.email, employee: fullName, reason: r.rejectionReason || 'Не указана' },
+        { email: r.email, employee: fullName, 'Причина отклонения': trimmedReason },
         'registration', requestId, actorId,
       );
     }

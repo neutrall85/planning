@@ -169,7 +169,7 @@ export class BudgetService {
     const newTotal = sumOther + (parseFloat(plannedHours) || 0);
     if (newTotal > project.budget) {
       throw new Error(
-        `Превышение бюджета проекта! Бюджет: ${project.budget} ч, сумма остальных задач: ${sumOther} ч, запрошено: ${plannedHours || 0} ч.`
+        `Превышение плановых часов проекта! План: ${project.budget} ч, сумма остальных задач: ${sumOther} ч, запрошено: ${plannedHours || 0} ч.`
       );
     }
     return true;
@@ -188,14 +188,14 @@ export class BudgetService {
     const task = this._taskRepo.findById(taskId);
     if (!task) throw new Error('Задача не найдена');
     if (!task.isSummary) throw new Error('Только для суммарных задач');
-    if (typeof newBudget !== 'number' || newBudget < 0) throw new Error('Бюджет должен быть неотрицательным числом');
+    if (typeof newBudget !== 'number' || newBudget < 0) throw new Error('План должен быть неотрицательным числом');
 
     const ownActual = this.getActualHours(task);
     const descendantsPlan = this._sumDescendantsPlanned(taskId);
 
     if (ownActual + descendantsPlan > newBudget) {
       throw new Error(
-        `Новый бюджет (${newBudget} ч) меньше фактических часов задачи (${ownActual} ч) ` +
+        `Новый план (${newBudget} ч) меньше фактических часов задачи (${ownActual} ч) ` +
         `и суммарного плана подзадач (${descendantsPlan} ч).`
       );
     }
@@ -215,7 +215,7 @@ export class BudgetService {
     const sumChildren = children.reduce((acc, t) => acc + (parseFloat(t.plannedHours) || 0), 0);
     if (sumChildren > parent.plannedHours) {
       throw new Error(
-        `Сумма плановых часов подзадач (${sumChildren} ч) превышает бюджет родительской задачи "${parent.title}" (${parent.plannedHours} ч). Уменьшите часы подзадач или увеличьте бюджет родителя.`
+        `Сумма плановых часов подзадач (${sumChildren} ч) превышает плановые часы родительской задачи "${parent.title}" (${parent.plannedHours} ч). Уменьшите часы подзадач или увеличьте плановые часы родителя.`
       );
     }
   }

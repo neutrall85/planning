@@ -177,6 +177,14 @@ export class ProjectService {
     return updated;
   }
 
+  /**
+   * Дифф по полям проекта для журнала аудита.
+   *
+   * Подразделения - массив id. auditListDelta сравнит составы и
+   * напишет «добавлены: kb_la; удалены: kb_ad» - имена на этом
+   * уровне недоступны (у сервиса нет kbRepo), а id КБ и отделов
+   * короткие и читаемые, поэтому keyOf и nameOf здесь тождественны.
+   */
   _describeChanges(existing, next) {
     const changes = {};
 
@@ -186,7 +194,7 @@ export class ProjectService {
     auditDelta(changes, 'Тип', existing.ptype, next.ptype, (v) => auditLabel(PROJECT_TYPES, v));
     auditDelta(changes, 'Приоритет', existing.priority, next.priority);
     auditDelta(changes, 'Ответственный', existing.managerId, next.managerId, (v) => auditName(this._employeeRepo, v));
-    auditDelta(changes, 'Бюджет', existing.budget, next.budget);
+    auditDelta(changes, 'План', existing.budget, next.budget);
     auditDelta(changes, 'Дата начала', existing.start, next.start);
     auditDelta(changes, 'Дата окончания', existing.end, next.end);
     auditDelta(changes, 'Заказчик', existing.customer, next.customer);
@@ -196,7 +204,14 @@ export class ProjectService {
     auditToggle(changes, 'Долгосрочный', existing.longterm, next.longterm, 'включён', 'выключен');
 
     auditMark(changes, 'Описание', existing.desc, next.desc, 'изменено');
-    auditMark(changes, 'Подразделение', existing.kbId, next.kbId, 'изменено');
+    auditListDelta(
+      changes,
+      'Подразделения',
+      existing.unitIds,
+      next.unitIds,
+      (id) => id,
+      (id) => id,
+    );
 
     auditListDelta(changes, 'Вложения', existing.files, next.files, (f) => f.id, (f) => f.name);
     auditListDelta(changes, 'Фото', existing.photos, next.photos, (p) => p.id, (p) => p.name);
@@ -215,7 +230,7 @@ export class ProjectService {
     historyDelta(entries, 'Тип проекта', existing.ptype, next.ptype, (v) => auditLabel(PROJECT_TYPES, v));
     historyDelta(entries, 'Приоритет', existing.priority, next.priority, (v) => auditLabel(priorityMap(next.ptype), v));
     historyDelta(entries, 'Ответственный', existing.managerId, next.managerId, employeeName);
-    historyDelta(entries, 'Бюджет', existing.budget, next.budget, auditHours);
+    historyDelta(entries, 'План', existing.budget, next.budget, auditHours);
     historyDelta(entries, 'Дата начала', existing.start, next.start);
     historyDelta(entries, 'Дата окончания', existing.end, next.end);
     historyDelta(entries, 'Заказчик', existing.customer, next.customer);

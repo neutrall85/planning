@@ -1,24 +1,42 @@
 // src/components/views/TasksView.jsx
-import { useMemo, useState, useCallback, memo } from 'react';
-import Kanban from '../Kanban';
-import TasksList from './TasksList';
-import FloatingMenu from '../FloatingMenu';
-import { SearchBox } from '../SearchBox';
-import { Select } from '../Select';
-import { TASK_STATUSES, TASK_STATUS_ORDER, PRIORITIES } from '../../utils/constants';
-import { fmtDMY, daysDiff, TODAY } from '../../utils/date';
-import { isTaskActive } from '../../utils/entityState';
-import { taskVisible, computeScope, hasRole, canCreateTask } from '../../utils/permissions';
-import { changeTaskStatus, deleteTask } from '../../utils/taskActions';
+import { useState, useMemo, useCallback, memo } from 'react';
 import { useToast } from '../../context/ToastContext';
-import { ICONS, Ic } from '../Icons';
-import { useDataHelpers } from '../../hooks/useDataHelpers';
-import { useFilters } from '../../hooks/useFilters';
-import { useTasksDb } from '../../hooks/useDb';
+import Kanban from '../Kanban';
+import { Select } from '../Select';
+import { SearchBox } from '../SearchBox';
+import { SortControl } from '../SortControl';
+import { ToggleSwitch } from '../ToggleSwitch';
+import { ViewFooter } from '../ViewFooter';
+import { ViewModeToggle } from '../ViewModeToggle';
 import Avatar from '../Avatar';
-import { getProjectColor } from '../../utils/projectHelpers';
-import { buildTaskMenu } from '../menus';
+import { UnreadBadge } from '../UnreadBadge';
+import FloatingMenu from '../FloatingMenu';
+import { Ic, ICONS } from '../Icons';
+import TasksList from './TasksList';
+import { useFilters } from '../../hooks/useFilters';
+import { useSort } from '../../hooks/useSort';
+import { useTasksDb } from '../../hooks/useDb';
+import { useDataHelpers } from '../../hooks/useDataHelpers';
+import { useUnreadCommentIndex } from '../../hooks/useChatStats';
+import {
+  TASK_STATUSES,
+  TASK_STATUS_ORDER,
+  PRIORITIES,
+} from '../../utils/constants';
+import {
+  computeScope,
+  taskVisible,
+  canSeeAllContent,
+  canCreateTask,
+} from '../../utils/permissions';
+import { isTaskActive } from '../../utils/entityState';
+import { chatKey } from '../../utils/chatKey';
+import { buildTaskMenu } from '../menus/taskMenu';
+import { changeTaskStatus, deleteTask } from '../../utils/taskActions';
+import { taskSortValue, makeComparator } from '../../utils/sorting';
 import { optionsFromMap, optionsFromList } from '../../utils/selectOptions';
+import { getProjectColor } from '../../utils/projectHelpers';
+import { TODAY, fmtDMY, daysDiff } from '../../utils/date';
 
 const INITIAL_FILTERS = Object.freeze({
   projectId: 'all',
@@ -27,39 +45,50 @@ const INITIAL_FILTERS = Object.freeze({
   deptId: 'all',
   query: '',
   showOnlyMy: false,
+  sortField: 'priority',
+  sortDir: 'desc',
 });
 
-// Источник константный - useMemo не нужен, массив строится один раз
-// при импорте модуля.
+const SORT_OPTIONS = [
+  { value: 'priority', label: 'По приоритету' },
+  { value: 'deadline', label: 'По сроку' },
+  { value: 'title', label: 'По названию' },
+  { value: 'assignee', label: 'По исполнителю' },
+  { value: 'project', label: 'По проекту' },
+  { value: 'planned', label: 'По плановым часам' },
+  { value: 'fact', label: 'По фактическим часам' },
+];
+
+const NUMERIC_SORTS = new Set(['planned', 'fact']);
 const PRIORITY_SELECT_OPTIONS = optionsFromMap(PRIORITIES, 'Приоритет');
 
 const TaskCard = memo(function TaskCard({
-  task,
-  project,
-  assignee,
-  spent,
-  db,
-  user,
-  openTask,
-  onMove,
-  onDelete,
-  onCopy,
-  onMakeTemplate,
+  task, project, assignee, spent, unread, db, user,
+  openTask, onMove, onDelete, onCopy, onMakeTemplate,
 }) {
-  const overdue = task.deadline && !['closed', 'cancelled'].includes(task.status) && task.deadline < TODAY;
-  const soon = task.deadline && !overdue && !['closed', 'cancelled'].includes(task.status) && daysDiff(TODAY, task.deadline) <= 3;
-  const priorityDef = PRIORITIES[task.priority] || { label: task.priority || 'Нет', color: '#64748b' };
+  const overdue = task.deadline
+    && !['closed', 'cancelled'].includes(task.status)
+    && task.deadline < TODAY;
+  const soon = task.deadline
+    && !overdue
+    && !['closed', 'cancelled'].includes(task.status)
+    && daysDiff(TODAY, task.deadline) <= 3;
+
+  const priorityDef = PRIORITIES[task.priority] || {
+    label: task.priority || 'Нет',
+    color: '#64748b',
+  };
 
   const menuItems = buildTaskMenu({
-    task, user, db, openTask,
-    onMove, onDelete, onCopy, onMakeTemplate,
+    task, user, db, openTask, onMove, onDelete, onCopy, onMakeTemplate,
   });
 
   const handleOpen = () => openTask(task.id);
 
   return (
-    <FloatingMenu items={menuItems}>
-      {({ anchorProps }) => (
+    <FloatingMenu
+      items={menuItems}
+      children={({ anchorProps }) => (
         <div {...anchorProps} onClick={handleOpen}>
           <div className="kcard-prio" style={{ background: priorityDef.color }} />
           <div className="kcard-title">{task.title}</div>
@@ -81,48 +110,56 @@ const TaskCard = memo(function TaskCard({
             </span>
           </div>
           <div className="kcard-foot">
-            <span className={'kdl' + (overdue ? ' late' : soon ? ' soon' : '')}>
+            <span className={`kdl${overdue ? ' late' : soon ? ' soon' : ''}`}>
               {task.deadline
-                ? (overdue
+                ? overdue
                   ? `просрочено ${-daysDiff(TODAY, task.deadline)} дн`
-                  : `до ${fmtDMY(task.deadline)}`)
+                  : `до ${fmtDMY(task.deadline)}`
                 : 'без дедлайна'}
             </span>
           </div>
+          <UnreadBadge count={unread} />
         </div>
       )}
-    </FloatingMenu>
+    />
   );
 });
 
-function TasksView({
-  ur, openTask, store,
-  openCopyTask, openTemplateFromTask,
-}) {
+function TasksView({ ur, openTask, store, openCopyTask, openTemplateFromTask }) {
   const db = useTasksDb();
   const { tasks, projects, employees, departments } = db;
 
   const employeesById = useMemo(
     () => new Map(employees.map(e => [e.id, e])),
-    [employees],
+    [employees]
   );
   const projectsById = useMemo(
     () => new Map(projects.map(p => [p.id, p])),
-    [projects],
+    [projects]
   );
 
   const { showToast } = useToast();
   const { getTaskSpent } = useDataHelpers(db);
+
   const scope = useMemo(() => computeScope(ur, db), [ur, db]);
-  const canSeeAll = hasRole(ur, 'admin', 'director', 'economist', 'kb_chief', 'head', 'project_lead', 'project_manager');
+  const canSeeAll = canSeeAllContent(ur);
+  const unreadIndex = useUnreadCommentIndex(ur.id);
 
   const [viewMode, setViewMode] = useState('kanban');
+
   const { filters, setFilter } = useFilters(INITIAL_FILTERS);
   const { projectId, assigneeId, priority, deptId, query, showOnlyMy } = filters;
 
+  const {
+    field: sortField,
+    dir: sortDir,
+    handleFieldChange: handleSortFieldChange,
+    handleDirToggle: handleSortDirToggle,
+  } = useSort({ filters, setFilter, numericFields: NUMERIC_SORTS });
+
   const baseTasks = useMemo(
     () => tasks.filter(t => isTaskActive(t) && taskVisible(ur, scope, t, db)),
-    [tasks, ur, scope, db],
+    [tasks, ur, scope, db]
   );
 
   const filteredTasks = useMemo(() => {
@@ -139,13 +176,18 @@ function TasksView({
     if (query.trim()) {
       const s = query.trim().toLowerCase();
       list = list.filter(t =>
-        t.title.toLowerCase().includes(s) ||
-        (projectsById.get(t.projectId)?.name || '').toLowerCase().includes(s)
+        t.title.toLowerCase().includes(s)
+        || (projectsById.get(t.projectId)?.name || '').toLowerCase().includes(s)
       );
     }
     if (showOnlyMy) list = list.filter(t => t.assigneeId === ur.id);
     return list;
   }, [baseTasks, employeesById, projectsById, ur, projectId, assigneeId, priority, deptId, query, showOnlyMy]);
+
+  const sortedTasks = useMemo(() => {
+    const valueOf = t => taskSortValue(t, sortField, { projectsById, employeesById, getTaskSpent });
+    return [...filteredTasks].sort(makeComparator(valueOf, sortDir));
+  }, [filteredTasks, sortField, sortDir, projectsById, employeesById, getTaskSpent]);
 
   const projOptions = useMemo(() => {
     const ids = new Set(baseTasks.map(t => t.projectId).filter(Boolean));
@@ -160,9 +202,10 @@ function TasksView({
   const isOnlyExecutor = ur.roles.length === 1 && ur.roles[0] === 'executor';
 
   const handleMoveTask = useCallback((taskId, newStatus) => {
-    const task = tasks.find(t => t.id === taskId);
-    const ok = changeTaskStatus({ task, newStatus, user: ur, db, store });
-    if (ok === false) {
+    if (changeTaskStatus({
+      task: tasks.find(t => t.id === taskId),
+      newStatus, user: ur, db, store,
+    }) === false) {
       showToast('У вас нет прав на изменение статуса этой задачи.', 'error');
     }
   }, [tasks, ur, db, store, showToast]);
@@ -176,12 +219,14 @@ function TasksView({
     const project = projectsById.get(task.projectId);
     const assignee = task.assigneeId ? employeesById.get(task.assigneeId) : null;
     const spent = getTaskSpent(task);
+    const unread = unreadIndex.get(chatKey({ taskId: task.id })) || 0;
     return (
       <TaskCard
         task={task}
         project={project}
         assignee={assignee}
         spent={spent}
+        unread={unread}
         db={db}
         user={ur}
         openTask={openTask}
@@ -191,64 +236,38 @@ function TasksView({
         onMakeTemplate={openTemplateFromTask}
       />
     );
-  }, [
-    projectsById, employeesById, getTaskSpent, db, ur,
-    openTask, handleMoveTask, handleDeleteTask,
-    openCopyTask, openTemplateFromTask,
-  ]);
+  }, [projectsById, employeesById, getTaskSpent, unreadIndex, db, ur, openTask, handleMoveTask, handleDeleteTask, openCopyTask, openTemplateFromTask]);
 
   const canCreate = canCreateTask(ur);
 
-  // Динамические опции - через optionsFromList. useMemo здесь нужен:
-  // источник меняется вместе с фильтрами (набор проектов и исполнителей
-  // зависит от baseTasks).
   const projectSelectOptions = useMemo(
     () => optionsFromList(projOptions, 'Проект', p => ({ value: p.id, label: p.code })),
-    [projOptions],
+    [projOptions]
   );
-
   const assigneeSelectOptions = useMemo(
     () => optionsFromList(execOptions, 'Исполнитель', e => ({ value: e.id, label: e.last })),
-    [execOptions],
+    [execOptions]
   );
-
   const deptSelectOptions = useMemo(
     () => optionsFromList(departments, 'Отдел', d => ({ value: d.id, label: d.name })),
-    [departments],
+    [departments]
   );
 
   return (
     <>
-      <div className="toolbar">
-        <div className="btn-group">
-          <button
-            className={`btn ghost sm ${viewMode === 'list' ? 'active' : ''}`}
-            onClick={() => setViewMode('list')}
-          >
-            <Ic d={ICONS.list} size={15} /> Список
-          </button>
-          <button
-            className={`btn ghost sm ${viewMode === 'kanban' ? 'active' : ''}`}
-            onClick={() => setViewMode('kanban')}
-          >
-            <Ic d={ICONS.kanban} size={15} /> Канбан
-          </button>
-        </div>
-
+      <div className="toolbar toolbar-wrap">
         <SearchBox
           value={query}
           onChange={v => setFilter('query', v)}
           placeholder="Поиск..."
           className="filter-search"
         />
-
         <Select
           className="filter-select"
           value={projectId}
           onChange={v => setFilter('projectId', v)}
           options={projectSelectOptions}
         />
-
         {!isOnlyExecutor && (
           <Select
             className="filter-select"
@@ -257,14 +276,12 @@ function TasksView({
             options={assigneeSelectOptions}
           />
         )}
-
         <Select
           className="filter-select"
           value={priority}
           onChange={v => setFilter('priority', v)}
           options={PRIORITY_SELECT_OPTIONS}
         />
-
         {!isOnlyExecutor && (
           <Select
             className="filter-select filter-select-dept"
@@ -273,28 +290,18 @@ function TasksView({
             options={deptSelectOptions}
           />
         )}
-
-        {canSeeAll && (
-          <label className="dept-pick ml-auto">
-            <input
-              type="checkbox"
-              checked={showOnlyMy}
-              onChange={e => setFilter('showOnlyMy', e.target.checked)}
-            />
-            <span>Мои задачи</span>
-          </label>
-        )}
-
-        {canCreate && (
-          <button className="btn primary" onClick={() => openTask(null)}>
-            <Ic d={ICONS.plus} size={15} /> Создать
-          </button>
-        )}
+        <SortControl
+          options={SORT_OPTIONS}
+          field={sortField}
+          dir={sortDir}
+          onFieldChange={handleSortFieldChange}
+          onToggleDir={handleSortDirToggle}
+        />
       </div>
 
       {viewMode === 'kanban' ? (
         <Kanban
-          items={filteredTasks}
+          items={sortedTasks}
           statusOrder={TASK_STATUS_ORDER}
           statusMap={TASK_STATUSES}
           renderCard={renderTaskCard}
@@ -302,9 +309,10 @@ function TasksView({
         />
       ) : (
         <TasksList
-          tasks={filteredTasks}
+          tasks={sortedTasks}
           db={db}
           user={ur}
+          unreadIndex={unreadIndex}
           openTask={openTask}
           onMove={handleMoveTask}
           onDelete={handleDeleteTask}
@@ -312,6 +320,26 @@ function TasksView({
           onMakeTemplate={openTemplateFromTask}
         />
       )}
+
+      <ViewFooter
+        action={canCreate && (
+          <button
+            className="btn primary"
+            onClick={() => openTask(null)}
+          >
+            <Ic d={ICONS.plus} size={15} /> Создать
+          </button>
+        )}
+      >
+        <ViewModeToggle value={viewMode} onChange={setViewMode} />
+        {canSeeAll && (
+          <ToggleSwitch
+            checked={showOnlyMy}
+            onChange={v => setFilter('showOnlyMy', v)}
+            label="Мои задачи"
+          />
+        )}
+      </ViewFooter>
     </>
   );
 }

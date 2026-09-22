@@ -21,6 +21,8 @@ export const canManageManager        = (user) => hasRole(user, 'admin', 'directo
 export const canExport               = (user) => hasRole(user, 'admin', 'director', 'economist');
 export const canEditRoles            = (user) => hasRole(user, 'admin');
 export const canFireEmployee         = (user) => hasRole(user, 'admin', 'director', 'hr');
+export const canSeeAllContent = (user) =>
+  hasRole(user, 'admin', 'director', 'economist', 'kb_chief', 'head', 'project_lead', 'project_manager');
 
 /**
  * Право сохранять шаблоны.
@@ -103,6 +105,21 @@ export const canRestoreTask = (user, task, db) => {
 // ============================================================================
 
 /**
+ * Есть ли пересечение между kbIds пользователя и unitIds проекта.
+ *
+ * Сам предикат - про пересечение множеств и ничего больше: он не
+ * проверяет роли. Навешивание роли (kb_chief) - ответственность
+ * вызывающего: с точки зрения кода «проект в зоне ответственности
+ * пользователя по КБ», и точка, которая решает «а имеет ли право
+ * этот пользователь по своей роли», - разные вопросы. Разделение
+ * сохраняет имя предиката честным: если завтра роль kb_chief
+ * расширится или появится ещё одна роль с привязкой к КБ, здесь
+ * ничего не изменится.
+ */
+const projectBelongsToUserKbs = (user, project) =>
+  (project?.unitIds || []).some(id => (user.kbIds || []).includes(id));
+
+/**
  * Явный доступ к проекту - через поле project.access.userIds.
  * Роль-доступ не входит сюда: он часть базовой видимости
  * (см. computeBaseScope) и отдельно учитывается в модалке как
@@ -126,8 +143,7 @@ export const hasProjectAccess = (user, project) => {
 export const canManageProjectAccess = (user, project) => {
   if (!user || !project) return false;
   if (hasRole(user, 'admin', 'director', 'project_manager')) return true;
-  if (hasRole(user, 'kb_chief') && project.kbId && (user.kbIds || []).includes(project.kbId)) return true;
-  return false;
+  return hasRole(user, 'kb_chief') && projectBelongsToUserKbs(user, project);
 };
 
 /**
@@ -147,9 +163,6 @@ export const canSeeProjectByDefault = (user, project, db) => {
 // ============================================================================
 // Предикаты контекста (используются внутри правил статуса/редактирования)
 // ============================================================================
-
-const isKbChiefOf = (user, project) =>
-  !!(project?.kbId && hasRole(user, 'kb_chief') && (user.kbIds || []).includes(project.kbId));
 
 const isHeadOfAssignee = (user, task, data) => {
   if (!hasRole(user, 'head') || !task.assigneeId) return false;
@@ -178,11 +191,45 @@ const PROD_ASSIGNEE_TRANSITIONS = {
 // Права на редактирование полей и смену статуса
 // ============================================================================
 
+/**
+ * Право редактировать поля задачи.
+ *
+ * Правило: исполнитель задачи не редактирует её поля - даже если у
+ * него есть другая роль, дающая право редактирования (economist,
+ * director). Это разделение обязанностей: параметры задачи (часы,
+ * сроки, приоритет) задаёт руководитель, а не тот, кто её исполняет.
+ * Иначе исполнитель может выставить себе удобные часы или сдвинуть
+ * срок.
+ *
+ * Проверка на исполнителя - ПЕРВАЯ после проверки архива. Если бы она
+ * стояла после ролевых проверок, роль economist/director успела бы
+ * вернуть true, и правило «даже если его другая роль позволяет это
+ * делать» не сработало бы.
+ *
+ * Остальные роли:
+ *   - admin / director / economist - если НЕ исполнитель задачи;
+ *   - project_manager - никогда: он ведёт проект целиком, поля
+ *     конкретной задачи - не его зона;
+ *   - главный конструктор КБ - если проект задачи в его КБ;
+ *   - руководитель отдела - если исполнитель задачи его подчинённый
+ *     (сам исполнитель сюда не попадает: он отсечён выше);
+ *   - ответственный по проекту - если он ведёт проект задачи.
+ */
 export const canEditTaskFields = (user, task, data) => {
   if (!user || !task || !data) return false;
   if (isArchived(task)) return false;
-  if (hasRole(user, 'admin', 'economist')) return true;
+
+  if (hasRole(user, 'admin')) return true;
+  if (isAssignee(user, task)) return false;
+
+  if (hasRole(user, 'director', 'economist')) return true;
   if (hasRole(user, 'project_manager')) return false;
+
+  const project = data.projects.find(p => p.id === task.projectId);
+  if (hasRole(user, 'kb_chief') && projectBelongsToUserKbs(user, project)) return true;
+  if (isHeadOfAssignee(user, task, data)) return true;
+  if (isLeadOf(user, project)) return true;
+
   return false;
 };
 
@@ -195,7 +242,7 @@ export const canChangeTaskStatus = (user, task, newStatus, data) => {
   const isProdProject = !!(project && project.ptype !== 'admin');
 
   if (hasRole(user, 'admin', 'director')) return true;
-  if (isKbChiefOf(user, project)) return true;
+  if (hasRole(user, 'kb_chief') && projectBelongsToUserKbs(user, project)) return true;
   if (isHeadOfAssignee(user, task, data)) return true;
   if (isLeadOf(user, project)) return true;
   if (isProdProject && hasRole(user, 'project_manager')) return false;
@@ -228,12 +275,11 @@ export const canChangeProjectStatus = (user, project, newStatus) => {
     if (creatorId && creatorId === user.id) return true;
   }
 
-  if (hasRole(user, 'kb_chief') && project.kbId && (user.kbIds || []).includes(project.kbId)) return true;
-  return false;
+  return hasRole(user, 'kb_chief') && projectBelongsToUserKbs(user, project);
 };
 
 // ============================================================================
-// Утверждение отпусков
+// Утверждение и управление отпусками
 // ============================================================================
 
 export const canApproveVacation = (user, vacation, data) => {
@@ -252,6 +298,93 @@ export const canApproveVacation = (user, vacation, data) => {
   }
 
   return false;
+};
+
+/**
+ * Право управлять конкретным отпуском: править поля, менять статус,
+ * удалять.
+ *
+ * Одно правило на все три операции - намеренно. Набор ролей и условие
+ * по статусу у них одинаковые, а три отдельные формулы - источник
+ * расхождений вида «править можно, а удалить нельзя» без внятной
+ * причины.
+ *
+ * Правила:
+ *
+ *   - admin / director - могут всё и всегда. Они выше кадровой операции
+ *     и именно они разблокируют ситуацию, когда HR ошибся и утвердил
+ *     отпуск, который дальше править нельзя.
+ *
+ *   - Утверждённый отпуск заморожен для всех остальных. HR здесь не
+ *     исключение: правило «утверждённый отпуск нельзя редактировать
+ *     или удалить» - уровня домена, а не уровня ролей. Иначе HR мог бы
+ *     задним числом переписать уже согласованный факт.
+ *
+ *   - Неутверждённый (pending / rejected):
+ *       - HR - любой: кадровая операция;
+ *       - остальные - только свой собственный.
+ *
+ * Раньше правило было размазано: в модалке жило
+ * canEditStatus = canEditDelegation, в таблице Staff удаление шло через
+ * setDb, а в Кабинете - через store.deleteVacation без сервисных проверок.
+ * Теперь единственная точка - здесь, и сервис обязательно спрашивает
+ * этот предикат.
+ *
+ * @param {object} user
+ * @param {object} vacation - существующая запись отпуска
+ */
+export const canManageVacation = (user, vacation) => {
+  if (!user || !vacation) return false;
+  if (hasRole(user, 'admin', 'director')) return true;
+  if (vacation.status === 'approved') return false;
+  if (hasRole(user, 'hr')) return true;
+  return vacation.empId === user.id;
+};
+
+/**
+ * Право создать отпуск конкретному сотруднику.
+ *
+ * Отдельный предикат, а не переиспользование canManageVacation: у
+ * создания нет существующей записи, а значит и нет статуса, на который
+ * опирается правило «утверждённый заморожен».
+ *
+ *   - admin / director / hr - завести отпуск любому (через Персонал);
+ *   - обычный сотрудник - только себе (через Кабинет).
+ *
+ * @param {object} user
+ * @param {string} empId - id сотрудника, которому заводится отпуск
+ */
+export const canCreateVacationFor = (user, empId) => {
+  if (!user || !empId) return false;
+  if (hasRole(user, 'admin', 'director', 'hr')) return true;
+  return empId === user.id;
+};
+
+/**
+ * Право редактировать делегирование в отпуске.
+ *
+ * HR может менять делегирование только в собственном отпуске: в чужом
+ * это решение самого сотрудника - кому передать свои задачи. Подмена
+ * делегирования со стороны HR означала бы, что за сотрудника решают,
+ * кто будет вести его задачи в его отсутствие, - а это его
+ * ответственность, не кадровая.
+ *
+ * Роли выше HR (admin, director) ограничения не имеют: они и так
+ * управляют людьми напрямую, и запрет на уровне кадров им не
+ * адресован.
+ *
+ * Предикат намеренно про ОДНО поле (delegation). Остальные поля формы
+ * HR правит по canManageVacation, который дополнительно блокирует
+ * правку на утверждённом отпуске. Этот предикат статус не смотрит:
+ * проверка «отпуск утверждён - ничего не правим» живёт выше,
+ * в canManageVacation, и до этого места вызов доходит только когда
+ * форма уже признана редактируемой.
+ */
+export const canEditVacationDelegation = (user, vacationOwnerId) => {
+  if (!user) return false;
+  if (hasRole(user, 'admin', 'director')) return true;
+  if (!hasRole(user, 'hr')) return true;
+  return vacationOwnerId === user.id;
 };
 
 // ============================================================================
@@ -293,7 +426,7 @@ function computeBaseScope(u, db) {
       if (e.departments.some(x => dIds.includes(x.deptId))) empIds.add(e.id);
     });
     db.projects.forEach(p => {
-      if (p.kbId && u.kbIds.includes(p.kbId)) projIds.add(p.id);
+      if (projectBelongsToUserKbs(u, p)) projIds.add(p.id);
     });
   }
 
@@ -350,7 +483,7 @@ export function taskVisible(u, scope, t, db) {
 
   if (hasProjectAccess(u, proj)) return true;
   if (hasRole(u, 'project_lead') && proj.managerId === u.id) return true;
-  if (hasRole(u, 'kb_chief') && proj.kbId && (u.kbIds || []).includes(proj.kbId)) return true;
+  if (hasRole(u, 'kb_chief') && projectBelongsToUserKbs(u, proj)) return true;
   if (hasRole(u, 'head')) return true;
   return false;
 }

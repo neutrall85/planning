@@ -83,6 +83,20 @@ function ProductionCalendarView({ store }) {
     }
   };
 
+  const handleGoToday = () => {
+    const currentYear = new Date().getFullYear();
+    if (years.some(y => y.year === currentYear)) {
+      setSelectedYear(currentYear);
+      return;
+    }
+    try {
+      store.addProductionCalendarYear(currentYear);
+      setSelectedYear(currentYear);
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
   const handleAddDays = (kind) => {
     if (!activeYear) return;
     const text = dateDrafts[kind];
@@ -189,32 +203,23 @@ function ProductionCalendarView({ store }) {
         <div className="pc-year-tabs">
           {years.map(y => (
             <button
-              key={y.year}
               type="button"
               className={`tab${y.year === selectedYear ? ' on' : ''}`}
               onClick={() => setSelectedYear(y.year)}
+              key={y.year}
             >
               {y.year}
             </button>
           ))}
-
+          <button
+            type="button"
+            className="btn ghost sm"
+            onClick={handleGoToday}
+          >
+            Сегодня
+          </button>
           <div className="pc-year-add">
-            <input
-              type="number"
-              className="inp w-140"
-              placeholder="Год"
-              min="2000"
-              max="2100"
-              value={newYearDraft}
-              onChange={e => setNewYearDraft(e.target.value)}
-            />
-            <button
-              type="button"
-              className="btn ghost sm"
-              onClick={handleAddYear}
-            >
-              <Ic d={ICONS.plus} size={13} /> Год
-            </button>
+            ...
           </div>
         </div>
       </div>

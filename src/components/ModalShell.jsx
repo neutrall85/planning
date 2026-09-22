@@ -1,8 +1,26 @@
+// src/components/ModalShell.jsx
 import { Modal } from './Modal';
 import { Ic, ICONS } from './Icons';
 
+/**
+ * Каркас модалки: шапка, тело, подвал.
+ *
+ * Футер собирается одним из трёх способов:
+ *
+ *   1. `footer` передан явно - используется как есть.
+ *   2. `actions` передан - стандартный футер с массивом кнопок слева
+ *      от spacer: «Отмена» и «Сохранить» на месте, слева добавляются
+ *      переданные действия.
+ *   3. Ни то, ни другое - стандартный футер только с «Отмена/Сохранить».
+ *
+ * subtitle - вторая строка под заголовком. Пробрасывается в Modal,
+ * который отвечает за разметку. Подзаголовок не участвует в футере
+ * или действиях, не влияет на showSave / saveDisabled - это чистая
+ * метаинформация шапки.
+ */
 export const ModalShell = ({
   title,
+  subtitle = null,
   onClose,
   children,
   onSave,
@@ -10,6 +28,7 @@ export const ModalShell = ({
   width = 640,
   className = '',
   footer = null,
+  actions = null,
   showSave = true,
   saveDisabled = false,
   showBack = false,
@@ -22,6 +41,7 @@ export const ModalShell = ({
     ? footer
     : (showSave ? (
         <div className="modal-foot">
+          {actions}
           <div className="spacer" />
           <button className="btn ghost" onClick={onClose}>Отмена</button>
           <button className="btn primary" onClick={onSave} disabled={saveDisabled}>
@@ -30,16 +50,6 @@ export const ModalShell = ({
         </div>
       ) : null);
 
-  /**
-   * Кнопка «Назад» - единый приём для всех модалок с контекстом возврата.
-   * Разметка описана здесь один раз, поэтому TaskModal, ProjectModal,
-   * NoteEditorModal, HoursRequestModal и любые будущие модалки не
-   * дублируют её у себя в headerBefore.
-   *
-   * Обработчик по умолчанию - onClose. Проп onBack пригодится, если
-   * понадобится отдельное поведение (например, возврат в родительскую
-   * модалку вместо полного закрытия).
-   */
   const backButton = showBack ? (
     <button type="button" className="btn ghost sm" onClick={onBack || onClose}>
       <Ic d={ICONS.left} size={14} /> {backLabel}
@@ -49,6 +59,7 @@ export const ModalShell = ({
   return (
     <Modal
       title={title}
+      subtitle={subtitle}
       onClose={onClose}
       width={width}
       className={className}

@@ -70,6 +70,13 @@ export default function YearCalendarModal({ store, onClose }) {
         >
           <Ic d={ICONS.right} size={16} />
         </button>
+        <button
+          type="button"
+          className="btn ghost sm"
+          onClick={() => setYear(new Date().getFullYear())}
+        >
+          Сегодня
+        </button>
         <span className="yc-today-hint">Сегодня: {fmtDMY(todayIso)}</span>
       </div>
 

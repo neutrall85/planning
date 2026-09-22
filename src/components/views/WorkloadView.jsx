@@ -1,11 +1,12 @@
 // src/components/views/WorkloadView.jsx
 import { useState, useMemo, memo } from 'react';
-import { Select } from '../Select';
 import { SearchBox } from '../SearchBox';
+import { SortControl } from '../SortControl';
 import { Ic, ICONS } from '../Icons';
 import WorkloadBar from '../WorkloadBar';
 import { useWorkloadDb } from '../../hooks/useDb';
 import { useFilters } from '../../hooks/useFilters';
+import { useSort } from '../../hooks/useSort';
 import { computeScope } from '../../utils/permissions';
 import { getPrimaryDeptName } from '../../utils/helpers';
 import { resolvePeriod } from '../../utils/workCalendar';
@@ -19,6 +20,11 @@ const PERIOD_MODES = [
   { id: 'custom', label: 'Период' },
 ];
 
+/**
+ * Опции поля «Сортировка». Собираются один раз на уровне модуля:
+ * SORT_FIELDS - константа, ссылка стабильна, useMemo в компоненте не
+ * нужен. Порядок опций в попапе нормализует сам Select (см. sortOptions).
+ */
 const SORT_FIELDS = [
   { id: 'name', label: 'ФИО' },
   { id: 'dept', label: 'Отдел' },
@@ -27,13 +33,11 @@ const SORT_FIELDS = [
   { id: 'util', label: 'Загрузка' },
 ];
 
-/**
- * Опции поля «Сортировка». Собираются один раз на уровне модуля:
- * SORT_FIELDS - константа, ссылка стабильна, useMemo в компоненте не
- * нужен. Порядок опций в попапе нормализует сам Select (см. sortOptions).
- */
 const SORT_OPTIONS = SORT_FIELDS.map((s) => ({ value: s.id, label: s.label }));
 
+// Числовые поля — при смене поля дефолт «по убыванию» (сначала самые
+// большие). Строковые — «по возрастанию» (А→Я). То же правило, что в
+// TasksView / ProjectsView; вынесено в useSort.
 const NUMERIC_SORTS = new Set(['plan', 'fact', 'util']);
 
 const INITIAL_FILTERS = Object.freeze({
@@ -61,8 +65,12 @@ function WorkloadView({ ur, store, openEmployeeTasks }) {
   const [anchor, setAnchor] = useState(TODAY);
   const [customFrom, setCustomFrom] = useState(TODAY);
   const [customTo, setCustomTo] = useState(TODAY);
+
   const { filters, setFilter } = useFilters(INITIAL_FILTERS);
-  const { query, sortField, sortDir } = filters;
+  const { query } = filters;
+
+  const { field: sortField, dir: sortDir, handleFieldChange: handleSortFieldChange, handleDirToggle: handleSortDirToggle } =
+    useSort({ filters, setFilter, numericFields: NUMERIC_SORTS });
 
   const { from, to } = useMemo(
     () => resolvePeriod(mode, anchor, customFrom, customTo),
@@ -143,15 +151,6 @@ function WorkloadView({ ur, store, openEmployeeTasks }) {
     };
   }, [filtered]);
 
-  const handleFieldChange = (field) => {
-    setFilter('sortField', field);
-    setFilter('sortDir', NUMERIC_SORTS.has(field) ? 'desc' : 'asc');
-  };
-
-  const toggleSortDir = () => {
-    setFilter('sortDir', sortDir === 'asc' ? 'desc' : 'asc');
-  };
-
   const periodLabel = formatPeriodLabel(mode, anchor, from, to);
 
   return (
@@ -219,20 +218,14 @@ function WorkloadView({ ur, store, openEmployeeTasks }) {
             className="workload-search"
           />
           <label className="lbl m-0">Сортировка:</label>
-          <Select
-            className="sm"
-            value={sortField}
-            onChange={handleFieldChange}
+          <SortControl
             options={SORT_OPTIONS}
+            field={sortField}
+            dir={sortDir}
+            onFieldChange={handleSortFieldChange}
+            onToggleDir={handleSortDirToggle}
+            compact
           />
-          <button
-            type="button"
-            className="icon-btn"
-            onClick={toggleSortDir}
-            title={sortDir === 'asc' ? 'По возрастанию' : 'По убыванию'}
-          >
-            <Ic d={sortDir === 'asc' ? ICONS.up : ICONS.down} size={16} />
-          </button>
         </div>
       </div>
 

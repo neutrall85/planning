@@ -10,6 +10,7 @@ import {
   canRestoreTask,
 } from '../utils/permissions';
 import { isCountableTask } from '../utils/workloadFilters';
+import { chatKey } from '../utils/chatKey';
 
 // Репозитории
 import { TaskRepository } from '../repositories/TaskRepository';
@@ -20,12 +21,13 @@ import { NotificationRepository } from '../repositories/NotificationRepository';
 import { AuditRepository } from '../repositories/AuditRepository';
 import { DepartmentRepository } from '../repositories/DepartmentRepository';
 import { KbRepository } from '../repositories/KbRepository';
-import { HoursRequestRepository } from '../repositories/HoursRequestRepository';
+import { ChangeRequestRepository } from '../repositories/ChangeRequestRepository';
 import { RoleDelegationRepository } from '../repositories/RoleDelegationRepository';
 import { CommentRepository } from '../repositories/CommentRepository';
 import { TemplateRepository } from '../repositories/TemplateRepository';
 import { ProductionCalendarRepository } from '../repositories/ProductionCalendarRepository';
 import { RegistrationRequestRepository } from '../repositories/RegistrationRequestRepository';
+import { ChatReadRepository } from '../repositories/ChatReadRepository';
 
 // Сервисы
 import { BudgetService } from './BudgetService';
@@ -38,46 +40,52 @@ import { NotificationService } from './NotificationService';
 import { AuditService } from './AuditService';
 import { DepartmentService } from './DepartmentService';
 import { KbService } from './KbService';
-import { HoursRequestService } from './HoursRequestService';
+import { ChangeRequestService } from './ChangeRequestService';
 import { RoleDelegationService } from './RoleDelegationService';
 import { CommentService } from './CommentService';
 import { TemplateService } from './TemplateService';
 import { WorkloadService } from './WorkloadService';
 import { ProductionCalendarService } from './ProductionCalendarService';
 import { RegistrationRequestService } from './RegistrationRequestService';
+import { ChatReadService } from './ChatReadService';
 
 // Утилиты
 import { WorkCalendar } from '../utils/workCalendar';
 
 class DataMigrator {
   static migrate(data) {
-    let changed = false;
+    const notes = new Set();
+
     data.tasks = data.tasks.map(t => {
-      if (t.assigneeIds && t.assigneeIds.length > 0 && !t.assigneeId) {
-        changed = true;
+      if (Array.isArray(t.assigneeIds) && !t.assigneeId) {
+        notes.add('задачи приведены к формату с одним исполнителем');
         const { assigneeIds, ...rest } = t;
-        return { ...rest, assigneeId: assigneeIds[0] };
-      }
-      if (t.assigneeIds && t.assigneeIds.length === 0 && !t.assigneeId) {
-        changed = true;
-        const { assigneeIds, ...rest } = t;
-        return { ...rest, assigneeId: null };
+        return { ...rest, assigneeId: assigneeIds[0] ?? null };
       }
       return t;
     });
+
     data.tasks = data.tasks.map(t => {
-      let updated = { ...t };
+      const updated = { ...t };
       if (updated.actualHours === undefined) {
         updated.actualHours = 0;
-        changed = true;
+        notes.add('добавлены поля actualHours/budgetHours');
       }
       if (updated.isSummary && updated.budgetHours === undefined) {
         updated.budgetHours = updated.plannedHours || 0;
-        changed = true;
+        notes.add('добавлены поля actualHours/budgetHours');
       }
       return updated;
     });
-    return { data, changed };
+
+    data.projects = data.projects.map(p => {
+      if (Array.isArray(p.unitIds)) return p;
+      notes.add('подразделения проектов перенесены в unitIds');
+      const { kbId, ...rest } = p;
+      return { ...rest, unitIds: kbId ? [kbId] : [] };
+    });
+
+    return { data, changed: notes.size > 0, notes: [...notes] };
   }
 }
 
@@ -87,7 +95,7 @@ class DataStore {
 
   constructor() {
     this._data = buildMockData();
-    const { data, changed } = DataMigrator.migrate(this._data);
+    const { data, changed, notes } = DataMigrator.migrate(this._data);
     this._data = data;
     if (changed) {
       this._data.audit.unshift({
@@ -95,7 +103,7 @@ class DataStore {
         ts: Date.now(),
         userId: 'system',
         action: 'Миграция данных',
-        details: 'Задачи приведены к формату с одним исполнителем и добавлены поля actualHours/budgetHours',
+        details: notes.join('; '),
         targetType: null,
         targetId: null,
       });
@@ -105,9 +113,6 @@ class DataStore {
     this._data.regRequests = this._data.regRequests || [];
     this._data.session = { userId: null };
 
-    // AuditService создаём первым - он нужен миграции комментариев.
-    // Сразу связываем репозиторий с иммутабельным setter'ом, иначе
-    // вызовы addAudit после subscribe не будут уведомлять подписчиков.
     this._auditRepo = new AuditRepository(
       () => this._data.audit,
       (next) => this._setSlice('audit', next),
@@ -116,9 +121,9 @@ class DataStore {
 
     this._data.comments = this._data.comments || [];
     this._data.templates = this._data.templates || [];
+    this._data.chatReads = this._data.chatReads || [];
     this._migrateComments();
 
-    // Репозитории - все через [_get, _set] пару.
     this._taskRepo = new TaskRepository(...this._slicePair('tasks'));
     this._projectRepo = new ProjectRepository(...this._slicePair('projects'));
     this._employeeRepo = new EmployeeRepository(...this._slicePair('employees'));
@@ -126,23 +131,15 @@ class DataStore {
     this._notificationRepo = new NotificationRepository(...this._slicePair('notifications'));
     this._deptRepo = new DepartmentRepository(...this._slicePair('departments'));
     this._kbRepo = new KbRepository(...this._slicePair('kbs'));
-    this._hoursRequestRepo = new HoursRequestRepository(...this._slicePair('hoursRequests'));
+    this._changeRequestRepo = new ChangeRequestRepository(...this._slicePair('changeRequests'));
     this._roleDelegationRepo = new RoleDelegationRepository(...this._slicePair('roleDelegations'));
     this._commentRepo = new CommentRepository(...this._slicePair('comments'));
     this._templateRepo = new TemplateRepository(...this._slicePair('templates'));
     this._productionCalendarRepo = new ProductionCalendarRepository(...this._slicePair('productionCalendar'));
     this._registrationRequestRepo = new RegistrationRequestRepository(...this._slicePair('regRequests'));
+    this._chatReadRepo = new ChatReadRepository(...this._slicePair('chatReads'));
 
-    // Общий колбэк уведомления подписчиков. Один и тот же инстанс
-    // передаётся во все сервисы: чтобы не плодить по замыканию на каждый.
     const notify = () => this._notify();
-
-    // Сервисы (AuditService уже создан выше).
-    //
-    // Все сервисы принимают объект зависимостей. Единый стиль: любое
-    // добавление/перестановка зависимости не требует помнить порядок
-    // позиционных аргументов, а вызовы читаются как декларация того,
-    // что сервис получает.
 
     this._productionCalendarService = new ProductionCalendarService({
       repo: this._productionCalendarRepo,
@@ -222,8 +219,8 @@ class DataStore {
       notify,
     });
 
-    this._hoursRequestService = new HoursRequestService({
-      requestRepo: this._hoursRequestRepo,
+    this._changeRequestService = new ChangeRequestService({
+      requestRepo: this._changeRequestRepo,
       taskRepo: this._taskRepo,
       projectRepo: this._projectRepo,
       notificationService: this._notificationService,
@@ -260,6 +257,11 @@ class DataStore {
       taskService: this._taskService,
     });
 
+    this._chatReadService = new ChatReadService({
+      chatReadRepo: this._chatReadRepo,
+      notify,
+    });
+
     this._workCalendar = new WorkCalendar({
       getYearData:    (year) => this._productionCalendarService.getYearData(year),
       getDataVersion: ()     => this._productionCalendarService.version,
@@ -269,10 +271,6 @@ class DataStore {
     this._syncAllExecutorRoles();
     this._taskService.archiveOldTasks(3);
   }
-
-  // -----------------------------------------------------------------
-  // Иммутабельные срезы.
-  // -----------------------------------------------------------------
 
   _slicePair = (name) => [
     () => this._data[name],
@@ -284,10 +282,6 @@ class DataStore {
     this._data = { ...this._data, [name]: next };
     this._notify();
   };
-
-  // -----------------------------------------------------------------
-  // Публичные методы (стрелки - стабильная идентичность между рендерами).
-  // -----------------------------------------------------------------
 
   setDb = (updater) => {
     const next = updater(this._data);
@@ -340,31 +334,35 @@ class DataStore {
     return result;
   };
 
-  decideVacation = (vacationId, approved) => {
+  decideVacation = (vacationId, approved, reason = null) => {
     const user = this._authService.getCurrentUser();
-    return this._vacationService.decide(vacationId, approved, user?.id || 'system');
+    return this._vacationService.decide(vacationId, approved, user?.id || 'system', reason);
   };
 
-  decideRoleDelegation = (delegationId, approved) => {
+  decideRoleDelegation = (delegationId, approved, reason = null) => {
     const user = this._authService.getCurrentUser();
-    return this._roleDelegationService.decide(delegationId, approved, user?.id || 'system');
+    return this._roleDelegationService.decide(delegationId, approved, user?.id || 'system', reason);
   };
 
-  decideHoursRequest = (requestId, approved) => {
+  /**
+   * Решение по запросу на изменение (часов / срока / …). reason
+   * обязателен при approved === false.
+   */
+  decideChangeRequest = (requestId, approved, reason = null) => {
     const user = this._authService.getCurrentUser();
-    return this._hoursRequestService.decide(requestId, approved, user?.id || 'system');
+    return this._changeRequestService.decide(
+      requestId, approved, user?.id || 'system', reason,
+    );
   };
 
-  decideRegistration = (requestId, approved) => {
+  decideRegistration = (requestId, approved, reason = null) => {
     const user = this._authService.getCurrentUser();
-    return this._registrationRequestService.decide(requestId, approved, user?.id || 'system');
+    return this._registrationRequestService.decide(
+      requestId, approved, user?.id || 'system', reason,
+    );
   };
 
   get data() { return this._data; }
-
-  // -----------------------------------------------------------------
-  // Публичный API подписок.
-  // -----------------------------------------------------------------
 
   getSnapshot = () => this._data;
 
@@ -385,15 +383,12 @@ class DataStore {
         try {
           listeners[i]();
         } catch (err) {
-          // Изолируем подписчиков: сбой одного не должен лишить
-          // уведомления остальных и не должен уронить саму нотификацию.
           console.error('[DataStore] подписчик', i, 'упал:', err);
         }
       }
     });
   }
 
-  // Управление сессией
   getCurrentUser() { return this._authService.getCurrentUser(); }
 
   login = (email, password) => {
@@ -502,18 +497,19 @@ class DataStore {
   }
   markNotificationRead(id) { this._notificationService.markRead(id); }
 
-  notifyHoursRequestCreated(request, directorIds, targetTitle) {
-    const user = this._authService.getCurrentUser();
-    this._notificationService.notifyHoursRequestCreated(
-      request, directorIds, targetTitle, user?.id || 'system',
-    );
-  }
   notifyRoleDelegationCreated(delegation) {
     const user = this._authService.getCurrentUser();
     this._notificationService.notifyRoleDelegationCreated(delegation, user?.id || 'system');
   }
 
-  addHoursRequest(req) { this._hoursRequestService.addRequest(req); }
+  /**
+   * Создание запроса на изменение. recipientIds — кому адресован
+   * запрос (директора/админы). Уведомление получателям и автору
+   * отправляется внутри сервиса — вызывающему не нужно об этом помнить.
+   */
+  addChangeRequest = (req, recipientIds = []) => {
+    this._changeRequestService.addRequest(req, recipientIds);
+  };
 
   upsertRoleDelegation(rd) {
     const user = this._authService.getCurrentUser();
@@ -538,6 +534,10 @@ class DataStore {
   }
   toggleReaction(commentId, emoji) { return this.setReaction(commentId, emoji); }
   addAttachment(commentId, file) { return this._commentService.addAttachment(commentId, file); }
+
+  // Отметки прочтения чата
+  markChatRead = (userId, filter) =>
+    this._chatReadService.markRead(userId, chatKey(filter), Date.now());
 
   // Шаблоны
   getTemplates(kind) {
@@ -681,24 +681,6 @@ class DataStore {
     }
   }
 
-  // Deprecated обёртки (совместимость)
-  notifyVacationDecision = (vacation, approved) => {
-    this._notificationService.notifyVacationDecision(vacation, approved);
-  };
-  notifyRoleDelegationDecision = (delegation, approved) => {
-    const user = this._authService.getCurrentUser();
-    this._notificationService.notifyRoleDelegationDecision(
-      delegation, approved, user?.id || 'system',
-    );
-  };
-  notifyHoursRequestDecision = (request, approved, targetTitle) => {
-    const user = this._authService.getCurrentUser();
-    this._notificationService.notifyHoursRequestDecision(
-      request, approved, targetTitle, user?.id || 'system',
-    );
-  };
-
-  // Внутренние хелперы (для тестов и миграций)
   _archiveOldTasks(months) { this._taskService.archiveOldTasks(months); }
   _calcSummaryHours(taskId) { return this._budgetService.calcSummaryHours(taskId); }
   _recalcSummaryHoursChain(taskId) {

@@ -2,6 +2,7 @@
 import { useMemo } from 'react';
 import { useSelector } from '../context/StoreContext';
 import { flattenInRenderOrder, countOccurrences } from '../utils/commentTree';
+import { commentInChat } from '../utils/commentFilter';
 
 // Стабильная ссылка на пустой массив: useSelector должен возвращать
 // одну и ту же ссылку, пока срез не менялся, иначе useSyncExternalStore
@@ -11,26 +12,17 @@ const EMPTY = Object.freeze([]);
 /**
  * Список комментариев и производные выборки.
  *
- * Раньше здесь стояла прямая подписка через store.subscribe - обход
- * подписчиков в DataStore._notify шёл без try/catch, и один упавший
- * подписчик лишал уведомления всех, кто стоял за ним. Сейчас _notify
- * изолирует каждый вызов, поэтому стандартный useSelector(s => s.comments)
- * надёжен и не зависит от порядка подписок.
+ * Принадлежность чату определяется общей функцией commentInChat - тем
+ * же правилом, что используют useChatUnreadCount и useUnreadCommentIndex.
+ * Единственный источник правды, расхождений между рендером и счётчиком
+ * не бывает.
  */
 export function useCommentList(projectId, taskId, searchQuery, sortOrder) {
   const allComments = useSelector((s) => s.comments || EMPTY);
 
   const comments = useMemo(() => {
     return allComments
-      .filter((c) => {
-        if (projectId && c.projectId !== projectId) return false;
-        // taskId задан → комментарии этой задачи.
-        // taskId null/undefined → чат проекта: показываем все проектные
-        // комментарии, включая привязанные к задачам (они рендерятся
-        // со ссылкой на задачу, см. showTaskLink в ProjectChat).
-        if (taskId && c.taskId !== taskId) return false;
-        return true;
-      })
+      .filter((c) => commentInChat(c, projectId, taskId))
       .sort((a, b) => {
         if (a.pinned && !b.pinned) return -1;
         if (!a.pinned && b.pinned) return 1;

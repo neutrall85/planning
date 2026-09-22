@@ -7,6 +7,7 @@ import { Lightbox } from './Lightbox';
 import { DiscussionProvider } from './discussion/context';
 import { CommentPolicy } from './discussion/CommentPolicy';
 import { useCommentList } from '../hooks';
+import { readLastReadAt } from '../hooks/useChatStats';
 import DiscussionHeader from './discussion/DiscussionHeader';
 import SortToolbar from './discussion/SortToolbar';
 import CommentTree from './discussion/CommentTree';
@@ -20,13 +21,6 @@ export { extractMentions };
  * Таймер снятия класса «comment-flash» держим в ref и снимаем в
  * cleanup-эффекте при размонтировании Discussion - чтобы после ухода
  * с вкладки он не пытался трогать DOM.
- *
- * Внутри useLayoutEffect свой cleanup не ставим специально:
- * `setTargetId(null)` в конце перезапускает этот же эффект, и cleanup
- * снял бы только что запланированный таймер (класс исчез бы мгновенно).
- * `el.isConnected` - защита от работы с уже откреплённым узлом: если
- * комментарий к моменту срабатывания таймера удалён из DOM, ничего не
- * делаем.
  *
  * `comments` в deps - чтобы повторный вызов на тот же targetId после
  * изменения списка сработал снова.
@@ -60,11 +54,6 @@ function useScrollToComment(comments) {
  * быть null:
  *   - чат проекта (ProjectChat): только projectId;
  *   - чат задачи (TaskModal): оба.
- *
- * Раньше снаружи приходил объект `filter`; в вызывающем коде он был
- * инлайн-литералом и создавал лишние переподписки. Раздельные примитивы
- * убирают эту проблему из API: нестабильную ссылку теперь физически
- * некуда положить.
  */
 export default function Discussion({
   store,
@@ -86,6 +75,40 @@ export default function Discussion({
   const [editText, setEditText] = useState('');
   const [lightbox, setLightbox] = useState({ index: null, list: [] });
 
+  /**
+   * Точка отсчёта «прочитано до». Всё, что старше и чужое, считается
+   * прочитанным; всё, что новее - подсвечивается как непрочитанное.
+   *
+   * Стартовое значение - что успело прочитаться до открытия чата
+   * (из store, через readLastReadAt - разовое чтение без подписки).
+   * Первое открытие - cutoff = 0, вся история подсвечена.
+   *
+   * Дальше cutoff двигается вперёд:
+   *   - при открытии чата (эффект ниже);
+   *   - при отправке своего сообщения (handleCommentCreated) - старые
+   *     непрочитанные «гаснут».
+   */
+  const [readCutoff, setReadCutoff] = useState(() =>
+    readLastReadAt(store, currentUser.id, { projectId, taskId })
+  );
+
+  const isCommentUnread = useCallback(
+    (c) => c.authorId !== currentUser.id && c.createdAt > readCutoff,
+    [currentUser.id, readCutoff],
+  );
+
+  // Пометка «прочитано = сейчас» при открытии чата и при закрытии:
+  // счётчики на вкладке и карточке обнуляются сразу, а не по закрытию
+  // модалки. Cleanup закрывает окно между открытием и закрытием -
+  // если во время просмотра пришли новые сообщения, они тоже попадут
+  // в прочитанные.
+  useEffect(() => {
+    const userId = currentUser.id;
+    const filter = { projectId, taskId };
+    store.markChatRead(userId, filter);
+    return () => store.markChatRead(userId, filter);
+  }, [store, currentUser.id, projectId, taskId]);
+
   const { comments, visibleComments, matchSteps } = useCommentList(
     projectId, taskId, searchQuery, sortOrder,
   );
@@ -93,9 +116,17 @@ export default function Discussion({
   const scrollToComment = useScrollToComment(comments);
 
   /**
-   * Текущий шаг навигации. -1 - «ещё не переходили»: первое «вниз»
-   * ведёт на первое вхождение, первое «вверх» - на последнее.
+   * Отправка нового сообщения: сдвигаем readCutoff вперёд - все
+   * прежние непрочитанные гаснут; отмечаем чат прочитанным в store -
+   * счётчики на вкладке и карточке обнуляются; прокручиваем к
+   * созданному комментарию.
    */
+  const handleCommentCreated = useCallback((commentId) => {
+    setReadCutoff(Date.now());
+    store.markChatRead(currentUser.id, { projectId, taskId });
+    scrollToComment(commentId);
+  }, [store, currentUser.id, projectId, taskId, scrollToComment]);
+
   const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
 
   useEffect(() => {
@@ -209,6 +240,7 @@ export default function Discussion({
     tasks,
     readOnly,
     onReply: setReplyTo,
+    isCommentUnread,
   };
 
   return (
@@ -250,7 +282,7 @@ export default function Discussion({
             comments={comments}
             getAuthor={getAuthor}
             readOnly={readOnly}
-            onCommentCreated={scrollToComment}
+            onCommentCreated={handleCommentCreated}
           />
         ) : readOnly ? (
           <div className="info-box">

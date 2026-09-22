@@ -4,7 +4,7 @@ import { useSelector } from '../context/StoreContext';
 import {
   TaskModal,
   ProjectModal,
-  HoursRequestModal,
+  ChangeRequestModal,
   RolesModal,
   DeptsModal,
   VacationModal,
@@ -25,7 +25,7 @@ export default function ModalRenderer({
   store,
   openTask,
   openProject,
-  openHoursReq,
+  openChangeReq,
   openEmployeeTasks,
   openCopyTask,
   openCopyProject,
@@ -39,19 +39,17 @@ export default function ModalRenderer({
   const departments = useSelector(s => s.departments);
   const kbs         = useSelector(s => s.kbs);
 
-  // Мини-db под каждую модалку: изменение vacations не должно пересоздавать
-  // ссылку db у ProjectModal и HoursRequestModal, которым vacations не нужен.
-  // ModalRenderer всё равно подписан на все шесть срезов, но модалка
-  // перерисовывается только если поменялся её собственный набор.
   const taskDb = useMemo(
     () => ({ tasks, projects, employees, departments, vacations }),
     [tasks, projects, employees, departments, vacations],
   );
   const projectDb = useMemo(
-    () => ({ tasks, projects, employees, kbs }),
-    [tasks, projects, employees, kbs],
+    () => ({ tasks, projects, employees, kbs, departments }),
+    [tasks, projects, employees, kbs, departments],
   );
-  const hoursDb = useMemo(
+  // Мини-db под модалку запроса изменения: ей нужны только целевые
+  // сущности, чтобы показать текущее значение.
+  const changeReqDb = useMemo(
     () => ({ tasks, projects }),
     [tasks, projects],
   );
@@ -110,22 +108,6 @@ export default function ModalRenderer({
     onClose();
   }, [modal, onClose, openProject]);
 
-  // Копирование, инициированное кнопкой "Копировать" в футере модалки.
-  // Отличие от копирования из контекстного меню карточки в канбане/
-  // списке/календаре: при копировании изнутри модалки пользователь
-  // ожидает возврата в исходную сущность (кнопка "Назад" и закрытие
-  // через X). При копировании из меню карточки возврат не нужен -
-  // закрытие уводит с копии, пользователь остаётся на исходном экране.
-  //
-  // Один обработчик на задачу и проект: контекст копирования известен
-  // из modal.type, поэтому ветвление внутри - честнее, чем две почти
-  // идентичные обёртки. Колбэк стабилен, пока не сменился тип модалки
-  // (строковое сравнение в deps), значит проп onCopy у модалок не
-  // пересоздаётся между рендерами одного и того же modal.type.
-  //
-  // Вторая ветка копирования - из канбана/списка/календаря - не проходит
-  // через ModalRenderer: buildTaskMenu / buildProjectMenu вызывают
-  // openCopyTask / openCopyProject напрямую, без флага returnToModal.
   const copySourceType = modal?.type;
 
   const handleCopyFromModal = useCallback((sourceId) => {
@@ -180,12 +162,22 @@ export default function ModalRenderer({
     }
   }, [store, closeProjectWithReturn, handleError]);
 
-  const handleHoursSubmit = useCallback(async (r) => {
+  /**
+   * Создание запроса на изменение.
+   *
+   * Получатели (директора и админы) собираются здесь и передаются в
+   * store.addChangeRequest вторым аргументом — сервис отправит им
+   * уведомление. Раньше этот шаг вычислялся, но до сервиса не доходил:
+   * директор узнавал о запросе, только если сам открывал раздел.
+   */
+  const handleChangeReqSubmit = useCallback(async (r) => {
     try {
-      const directorIds = employees
-        .filter(e => e.roles.includes('director') && !e.fired)
+      const recipientIds = employees
+        .filter(e =>
+          !e.fired && (e.roles.includes('director') || e.roles.includes('admin'))
+        )
         .map(e => e.id);
-      store.addHoursRequest(r, directorIds);
+      store.addChangeRequest(r, recipientIds);
       onClose();
     } catch (error) {
       handleError(error);
@@ -200,6 +192,10 @@ export default function ModalRenderer({
       handleError(error);
     }
   }, [store, onClose, handleError]);
+
+  const handleVacationDelete = useCallback(async (id) => {
+    store.deleteVacation(id);
+  }, [store]);
 
   const handleDelegationSubmit = useCallback(async (rd) => {
     try {
@@ -227,12 +223,14 @@ export default function ModalRenderer({
           returnToProjectId={modal.returnToProjectId}
           returnToTaskId={modal.returnToTaskId}
           returnToEmployeeTasksId={modal.returnToEmployeeTasksId}
+          highlightFileId={modal.highlightFileId || null}
+          highlightFolderId={modal.highlightFolderId || null}
           onClose={closeTaskWithReturn}
           onCopy={handleCopyFromModal}
           onTabChange={onTabChange}
           onSave={handleTaskSave}
           onDelete={handleTaskDelete}
-          onHoursReq={openHoursReq}
+          onChangeReq={openChangeReq}
           store={store}
           openTask={openTask}
           toast={toast}
@@ -248,6 +246,8 @@ export default function ModalRenderer({
           copyFromId={modal.copyFromId}
           returnToProjectId={modal.returnToProjectId}
           initialTab={modal.initialTab || 'info'}
+          highlightFileId={modal.highlightFileId || null}
+          highlightFolderId={modal.highlightFolderId || null}
           onClose={closeProjectWithReturn}
           onCopy={handleCopyFromModal}
           onTabChange={onTabChange}
@@ -259,37 +259,28 @@ export default function ModalRenderer({
         />
       );
 
-    case 'hours':
+    case 'changeReq':
       return (
-        <HoursRequestModal
-          db={hoursDb}
+        <ChangeRequestModal
+          db={changeReqDb}
           ur={ur}
-          kind={modal.kind}
+          changeKind={modal.changeKind}
+          targetType={modal.targetType}
           targetId={modal.targetId}
           onClose={onClose}
-          onSubmit={handleHoursSubmit}
+          onSubmit={handleChangeReqSubmit}
           toast={toast}
         />
       );
 
     case 'roles':
       return (
-        <RolesModal
-          store={store}
-          empId={modal.empId}
-          onClose={onClose}
-          toast={toast}
-        />
+        <RolesModal store={store} empId={modal.empId} onClose={onClose} toast={toast} />
       );
 
     case 'depts':
       return (
-        <DeptsModal
-          store={store}
-          empId={modal.empId}
-          onClose={onClose}
-          toast={toast}
-        />
+        <DeptsModal store={store} empId={modal.empId} onClose={onClose} toast={toast} />
       );
 
     case 'vacation':
@@ -301,6 +292,7 @@ export default function ModalRenderer({
           forEmpId={modal.forEmpId || null}
           onClose={onClose}
           onSave={handleVacationSave}
+          onDelete={handleVacationDelete}
           toast={toast}
         />
       );
@@ -366,12 +358,7 @@ export default function ModalRenderer({
 
     case 'createEmployee':
       return (
-        <CreateEmployeeModal
-          store={store}
-          ur={ur}
-          onClose={onClose}
-          toast={toast}
-        />
+        <CreateEmployeeModal store={store} ur={ur} onClose={onClose} toast={toast} />
       );
 
     case 'editEmployee':

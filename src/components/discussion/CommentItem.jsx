@@ -16,7 +16,7 @@ export default function CommentItem({ comment, depth, children }) {
   const {
     currentUser, getAuthor, editingId, searchQuery,
     showTaskLink, onTaskClick, tasks,
-    readOnly, setReaction,
+    readOnly, setReaction, isCommentUnread,
   } = useDiscussion();
 
   const rootRef = useRef(null);
@@ -25,6 +25,8 @@ export default function CommentItem({ comment, depth, children }) {
   const author = getAuthor(comment.authorId);
   const task = comment.taskId && tasks?.find(t => t.id === comment.taskId);
   const myReaction = CommentPolicy.getUserReaction(comment, currentUser.id);
+
+  const isUnread = isCommentUnread(comment);
 
   const textContent = searchQuery.trim()
     ? highlightText(comment.text, searchQuery.trim())
@@ -41,10 +43,13 @@ export default function CommentItem({ comment, depth, children }) {
     picker.close();
   };
 
-  // Класс на обёртке: отступ накапливается за счёт вложенности самих обёрток.
-  // depth === 0 → без отступа; depth >= 1 → 26px, но каждый уровень вложен
-  // в предыдущий, поэтому суммарный отступ = 26 * depth.
   const wrapperClass = 'cm-item' + (depth > 0 ? ' cm-item--nested' : '');
+
+  const cmClass =
+    'cm' +
+    (depth > 0 ? ' reply' : '') +
+    (comment.pinned ? ' pinned' : '') +
+    (isUnread ? ' unread' : '');
 
   return (
     <div
@@ -52,10 +57,7 @@ export default function CommentItem({ comment, depth, children }) {
       ref={rootRef}
       className={wrapperClass}
     >
-      <div
-        className={'cm' + (depth > 0 ? ' reply' : '') + (comment.pinned ? ' pinned' : '')}
-        onClick={handleCommentClick}
-      >
+      <div className={cmClass} onClick={handleCommentClick}>
         <div className="cm-head">
           <Avatar employee={author} size="xs" />
           <span className="cm-author">{author ? `${author.last} ${author.first}` : '-'}</span>

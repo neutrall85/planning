@@ -1,5 +1,5 @@
 // src/components/FileManager.jsx
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Ic, ICONS } from './Icons';
 import { SearchBox } from './SearchBox';
 import { fmtDMY, fmtDT } from '../utils/date';
@@ -14,6 +14,8 @@ import {
 import { DIALOGS, TOASTS, FILE_ROOT_LABEL } from '../utils/constants';
 import { useConfirm } from '../context/ConfirmContext';
 import { useToast } from '../context/ToastContext';
+import { copyToClipboard } from '../utils/clipboard';
+import { fileShareUrl, folderShareUrl } from '../utils/fileLinks';
 import FloatingMenu from './FloatingMenu';
 
 const formatSize = (size) => {
@@ -21,6 +23,11 @@ const formatSize = (size) => {
   if (size < 1048576) return (size / 1024).toFixed(1) + ' КБ';
   return (size / 1048576).toFixed(1) + ' МБ';
 };
+
+const COPY_TOASTS = Object.freeze({
+  ok: 'Ссылка скопирована',
+  fail: 'Не удалось скопировать ссылку',
+});
 
 const Breadcrumb = ({ items, onNavigate }) => (
   <div className="file-breadcrumb">
@@ -55,50 +62,100 @@ const FilePathButton = ({ folders, folderId, onNavigate }) => {
   );
 };
 
-const FolderRow = ({ folder, canDelete, onOpen, onDelete }) => (
-  <div className="file-item file-folder clickable-row" onClick={onOpen}>
-    <Ic d={ICONS.folder} size={24} />
-    <div className="file-info">
-      <div className="file-name">{folder.name}</div>
-      <div className="file-meta">Папка</div>
-    </div>
-    {canDelete && (
-      <button
-        type="button"
-        className="icon-btn danger"
-        onClick={(e) => { e.stopPropagation(); onDelete(); }}
-        title="Удалить папку"
-      >
-        <Ic d={ICONS.trash} size={14} />
-      </button>
-    )}
-  </div>
-);
+const FolderRow = ({ folder, canDelete, onOpen, onDelete, onCopyLink, highlighted }) => {
+  // Меню вместо одинокой иконки удаления: у папки теперь два действия -
+  // «скопировать ссылку» (доступно всем) и «удалить» (под правом).
+  // FloatingMenu - тот же компонент, что в DocumentRow; единый вид
+  // контекстных действий по вложениям.
+  const menuItems = [
+    {
+      id: 'copy',
+      label: 'Скопировать ссылку',
+      icon: ICONS.link,
+      onClick: onCopyLink,
+    },
+    canDelete && { type: 'divider' },
+    canDelete && {
+      id: 'del',
+      label: 'Удалить папку',
+      icon: ICONS.trash,
+      danger: true,
+      onClick: onDelete,
+    },
+  ].filter(Boolean);
 
-const DocumentRow = ({ doc, onDelete, canDelete, employeeName }) => {
+  const cls = `file-item file-folder clickable-row${highlighted ? ' file-folder--shared' : ''}`;
+
+  return (
+    <div className={cls} onClick={onOpen}>
+      <Ic d={ICONS.folder} size={24} />
+      <div className="file-info">
+        <div className="file-name">{folder.name}</div>
+        <div className="file-meta">Папка</div>
+      </div>
+      {/*
+        stopPropagation на обёртке: клик по кнопке меню не должен
+        проваливаться в onOpen строки (открытие папки). Тот же приём,
+        что у кнопки «Удалить» в старой версии FolderRow.
+      */}
+      <span onClick={(e) => e.stopPropagation()}>
+        <FloatingMenu items={menuItems}>
+          {({ buttonProps }) => (
+            <button
+              {...buttonProps}
+              className="icon-btn"
+              title="Действия"
+              aria-label={`Действия с папкой ${folder.name}`}
+            >
+              <Ic d={ICONS.more} size={15} />
+            </button>
+          )}
+        </FloatingMenu>
+      </span>
+    </div>
+  );
+};
+
+const DocumentRow = ({ doc, onDelete, canDelete, employeeName, onCopyLink, highlighted }) => {
   const [expanded, setExpanded] = useState(false);
   const { latest, versions } = doc;
   const hasHistory = versions.length > 1;
 
-  const menuItems = [
-    hasHistory && {
+  // Порядок пунктов меню: сначала «поделиться» (безопасное действие),
+  // потом действия над версиями, потом удаление. Разделители только
+  // там, где они разделяют разные категории - чтобы не было двух
+  // подряд идущих разделителей при hasHistory && !canDelete.
+  const menuItems = [];
+  menuItems.push({
+    id: 'copy',
+    label: 'Скопировать ссылку',
+    icon: ICONS.link,
+    onClick: () => onCopyLink(latest.id),
+  });
+  if (hasHistory) {
+    menuItems.push({ type: 'divider' });
+    menuItems.push({
       id: 'history',
       label: expanded ? 'Скрыть историю' : `История версий (${versions.length})`,
       icon: ICONS.archive,
       onClick: () => setExpanded(v => !v),
-    },
-    canDelete && hasHistory && { type: 'divider' },
-    canDelete && {
+    });
+  }
+  if (canDelete) {
+    menuItems.push({ type: 'divider' });
+    menuItems.push({
       id: 'del',
       label: 'Удалить последнюю версию',
       icon: ICONS.trash,
       danger: true,
       onClick: () => onDelete(latest.id),
-    },
-  ].filter(Boolean);
+    });
+  }
+
+  const wrapperCls = `file-document${highlighted ? ' file-document--shared' : ''}`;
 
   return (
-    <div className="file-document">
+    <div className={wrapperCls}>
       <div className="file-item">
         <Ic d={ICONS.file} size={24} />
         <div className="file-info">
@@ -177,6 +234,8 @@ const AllFilesList = ({
   onDelete,
   employeeName,
   onNavigateToFolder,
+  onCopyLink,
+  highlightFileId = null,
   emptyMessage = 'Файлов нет',
 }) => {
   if (documents.length === 0) {
@@ -185,45 +244,58 @@ const AllFilesList = ({
 
   return (
     <div className="file-all-list">
-      {documents.map(f => (
-        <div key={f.id} className="file-item">
-          <Ic d={ICONS.file} size={24} />
-          <div className="file-info">
-            <div className="file-name">
-              {f.name}
-              {f.version > 1 && <span className="file-version-badge">v{f.version}</span>}
+      {documents.map(f => {
+        const highlighted = highlightFileId && f.id === highlightFileId;
+        const cls = `file-item${highlighted ? ' file-item--shared' : ''}`;
+        return (
+          <div key={f.id} className={cls}>
+            <Ic d={ICONS.file} size={24} />
+            <div className="file-info">
+              <div className="file-name">
+                {f.name}
+                {f.version > 1 && <span className="file-version-badge">v{f.version}</span>}
+              </div>
+              <div className="file-meta">
+                <FilePathButton
+                  folders={folders}
+                  folderId={f.folderId}
+                  onNavigate={onNavigateToFolder}
+                />
+                {' · '}
+                {formatSize(f.size)} · загрузил {employeeName(f.uploadedBy)}
+              </div>
             </div>
-            <div className="file-meta">
-              <FilePathButton
-                folders={folders}
-                folderId={f.folderId}
-                onNavigate={onNavigateToFolder}
-              />
-              {' · '}
-              {formatSize(f.size)} · загрузил {employeeName(f.uploadedBy)}
-            </div>
-          </div>
-          <a
-            href={f.url}
-            download={f.name}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn ghost sm"
-          >
-            Скачать
-          </a>
-          {canDelete && (
+            <a
+              href={f.url}
+              download={f.name}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn ghost sm"
+            >
+              Скачать
+            </a>
             <button
               type="button"
-              className="icon-btn danger"
-              onClick={() => onDelete(f.id)}
-              title="Удалить"
+              className="icon-btn"
+              onClick={() => onCopyLink(f.id)}
+              title="Скопировать ссылку"
+              aria-label={`Скопировать ссылку на файл ${f.name}`}
             >
-              <Ic d={ICONS.trash} size={14} />
+              <Ic d={ICONS.link} size={15} />
             </button>
-          )}
-        </div>
-      ))}
+            {canDelete && (
+              <button
+                type="button"
+                className="icon-btn danger"
+                onClick={() => onDelete(f.id)}
+                title="Удалить"
+              >
+                <Ic d={ICONS.trash} size={14} />
+              </button>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 };
@@ -231,6 +303,8 @@ const AllFilesList = ({
 export const FileManager = ({
   files = [],
   folders = [],
+  highlightFileId = null,
+  highlightFolderId = null,
   onUpload,
   onDelete,
   onCreateFolder,
@@ -294,6 +368,60 @@ export const FileManager = ({
   const navigateToFolder = useCallback((folderId) => {
     navigate({ folderId, showAll: false, searchQuery: '' });
   }, [navigate]);
+
+  /**
+   * Авто-навигация к подсвеченной папке.
+   *
+   * Открываем родителя папки, а не саму папку: пользователь должен
+   * видеть узел в контексте (его соседей и крошки), чтобы понимать,
+   * куда он попал. Открыть содержимое папки сразу - тоже вариант,
+   * но тогда «где я» приходится восстанавливать из крошек, а строка
+   * самой папки нигде не видна. Для файловой ссылки аналог - тот же
+   * приём: открываем папку-владельца и подсвечиваем файл.
+   *
+   * Ref-защёлка: эффект идемпотентен, но deps (folders, files) могут
+   * пересоздаваться - без защёлки каждое обновление вложений
+   * возвращало бы пользователя к подсвеченному узлу.
+   */
+  const highlightFolderRef = useRef(null);
+  useEffect(() => {
+    if (!highlightFolderId) return;
+    if (highlightFolderRef.current === highlightFolderId) return;
+    const folder = folders.find(f => f.id === highlightFolderId);
+    if (!folder) return;
+    highlightFolderRef.current = highlightFolderId;
+    setHistory([]);
+    setView({
+      folderId: folder.parentId ?? null,
+      showAll: false,
+      searchQuery: '',
+    });
+  }, [highlightFolderId, folders]);
+
+  const highlightFileRef = useRef(null);
+  useEffect(() => {
+    if (!highlightFileId) return;
+    if (highlightFileRef.current === highlightFileId) return;
+    const file = files.find(f => f.id === highlightFileId);
+    if (!file) return;
+    highlightFileRef.current = highlightFileId;
+    setHistory([]);
+    setView({
+      folderId: file.folderId ?? null,
+      showAll: false,
+      searchQuery: '',
+    });
+  }, [highlightFileId, files]);
+
+  const handleCopyFileLink = useCallback(async (fileId) => {
+    const ok = await copyToClipboard(fileShareUrl(fileId));
+    showToast(ok ? COPY_TOASTS.ok : COPY_TOASTS.fail, ok ? 'success' : 'warning');
+  }, [showToast]);
+
+  const handleCopyFolderLink = useCallback(async (folderId) => {
+    const ok = await copyToClipboard(folderShareUrl(folderId));
+    showToast(ok ? COPY_TOASTS.ok : COPY_TOASTS.fail, ok ? 'success' : 'warning');
+  }, [showToast]);
 
   const handleCreateFolder = async () => {
     const name = await prompt(DIALOGS.createFolder);
@@ -398,6 +526,8 @@ export const FileManager = ({
           onDelete={onDelete}
           employeeName={employeeName}
           onNavigateToFolder={navigateToFolder}
+          onCopyLink={handleCopyFileLink}
+          highlightFileId={highlightFileId}
           emptyMessage="Ничего не найдено"
         />
       )}
@@ -410,6 +540,8 @@ export const FileManager = ({
           onDelete={onDelete}
           employeeName={employeeName}
           onNavigateToFolder={navigateToFolder}
+          onCopyLink={handleCopyFileLink}
+          highlightFileId={highlightFileId}
         />
       )}
 
@@ -422,20 +554,31 @@ export const FileManager = ({
               key={folder.id}
               folder={folder}
               canDelete={canDelete}
+              highlighted={folder.id === highlightFolderId}
               onOpen={() => navigateToFolder(folder.id)}
               onDelete={() => handleDeleteFolder(folder)}
+              onCopyLink={() => handleCopyFolderLink(folder.id)}
             />
           ))}
 
-          {documents.map(doc => (
-            <DocumentRow
-              key={doc.name}
-              doc={doc}
-              onDelete={onDelete}
-              canDelete={canDelete}
-              employeeName={employeeName}
-            />
-          ))}
+          {documents.map(doc => {
+            // Подсветка срабатывает и если ссылка ведёт на не-последнюю
+            // версию: пользователь ждёт «вот этот файл», а не «вот эта
+            // строка документа». Проверяем все версии, не только latest.
+            const highlighted = highlightFileId
+              && doc.versions.some(v => v.id === highlightFileId);
+            return (
+              <DocumentRow
+                key={doc.name}
+                doc={doc}
+                onDelete={onDelete}
+                canDelete={canDelete}
+                employeeName={employeeName}
+                highlighted={highlighted}
+                onCopyLink={handleCopyFileLink}
+              />
+            );
+          })}
         </>
       )}
     </div>

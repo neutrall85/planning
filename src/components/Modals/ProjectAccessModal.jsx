@@ -65,13 +65,38 @@ export const ProjectAccessModal = ({ db, projectId, onClose, toast, store }) => 
 
   const save = useCallback(() => {
     try {
+      const prevIds = Array.isArray(project?.access?.userIds)
+        ? project.access.userIds
+        : [];
+      const namesOf = (ids) => ids
+        .map(id => db.employees.find(e => e.id === id))
+        .filter(Boolean)
+        .map(e => `${e.last} ${e.first}`);
+
+      const addedNames   = namesOf(userIds.filter(id => !prevIds.includes(id)));
+      const removedNames = namesOf(prevIds.filter(id => !userIds.includes(id)));
+
       store.setProjectAccess(projectId, { userIds });
-      toast('Доступ к проекту обновлён', 'success');
+
+      // Один тост на все случаи. Если пользователь и открыл, и закрыл
+      // доступ в одном сохранении - обе части уходят в одну строку через
+      // "; ". Два отдельных тоста подряд здесь были бы шумом: пользователь
+      // совершил одно действие - одно подтверждение.
+      const parts = [];
+      if (addedNames.length)   parts.push(`открыт для ${addedNames.join(', ')}`);
+      if (removedNames.length) parts.push(`закрыт для ${removedNames.join(', ')}`);
+
+      toast(
+        parts.length
+          ? `Доступ к проекту ${parts.join('; ')}`
+          : 'Доступ к проекту обновлён',
+        'success',
+      );
       onClose();
     } catch (error) {
       toast(error.message || 'Не удалось обновить доступ', 'error');
     }
-  }, [projectId, userIds, store, toast, onClose]);
+  }, [projectId, userIds, project, db.employees, store, toast, onClose]);
 
   if (!project) return null;
 

@@ -6,6 +6,7 @@ import {
   canEditDepartments,
   canEditRoles,
   canManageAllVacations,
+  canManageVacation,
   canFireEmployee,
 } from "../utils/permissions";
 import { Ic, ICONS } from "./Icons";
@@ -241,7 +242,7 @@ const EmployeeRow = React.memo(({
 export default function Staff({ store, db, setDb, ur, openRoles, openDepts, openVacation }) {
   const { empName } = useDataHelpers(db);
   const { showToast } = useToast();
-  const { prompt } = useConfirm();
+  const { prompt, confirm } = useConfirm();
   const [showFired, setShowFired] = useState(false);
   const [editEmployeeId, setEditEmployeeId] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -256,8 +257,6 @@ export default function Staff({ store, db, setDb, ur, openRoles, openDepts, open
 
   // Опции КБ: четыре состояния - «Все сотрудники» (не фильтровать),
   // «Все КБ» (только те, кто в каком-то КБ), конкретные КБ и «Вне КБ».
-  // Новый КБ, добавленный через handleCreateKb, автоматически появится
-  // в списке: он попадает в db.kbs, memo пересчитается.
   const kbSelectOptions = useMemo(() => [
     { value: 'all',  label: 'Все сотрудники' },
     { value: 'any',  label: 'Все КБ' },
@@ -265,9 +264,7 @@ export default function Staff({ store, db, setDb, ur, openRoles, openDepts, open
     { value: 'none', label: 'Вне КБ' },
   ], [db.kbs]);
 
-  // Опции отделов: аналогично - «Все сотрудники», «Все отделы»,
-  // конкретные отделы и «Вне отделов». Новый отдел, добавленный через
-  // handleCreateDept, появится автоматически.
+  // Опции отделов: аналогично.
   const deptSelectOptions = useMemo(() => [
     { value: 'all',  label: 'Все сотрудники' },
     { value: 'any',  label: 'Все отделы' },
@@ -276,7 +273,6 @@ export default function Staff({ store, db, setDb, ur, openRoles, openDepts, open
   ], [db.departments]);
 
   // Текущий отпуск сотрудника (approved и сегодня внутри [start, end]).
-  // Первый подходящий. Наружу - только end-дата (string | null).
   const vacationEndByEmp = useMemo(() => {
     const map = new Map();
     for (const v of db.vacations) {
@@ -312,8 +308,6 @@ export default function Staff({ store, db, setDb, ur, openRoles, openDepts, open
   }, [filteredActiveEmployees]);
 
   // Карта «отдел → сотрудники этого отдела» после фильтрации.
-  // Используется как основа для рендера секций и как фильтр «остался
-  // ли кто-то в отделе». Один проход по отделам, не по сотрудникам.
   const deptMap = useMemo(() => {
     const map = new Map();
     db.departments.forEach(d => {
@@ -328,22 +322,11 @@ export default function Staff({ store, db, setDb, ur, openRoles, openDepts, open
   /**
    * Секции по КБ.
    *
-   * members - все сотрудники этого КБ, попавшие под фильтр: нужны
-   * только как «есть ли что показывать в секции КБ». Сами они
-   * распределяются по отделам через deptMap.
-   *
    * deptsInKb - какие отделы рендерить внутри секции КБ. Если фильтр
-   * отдела сужен до конкретного, показывается только он. Иначе при
-   * фильтре «Отдел аэродинамики» сотрудник, числящийся в двух отделах,
-   * всплывал бы и во втором - потому что deptMap содержит его в обоих,
-   * а рендер шёл по всем отделам КБ.
+   * отдела сужен до конкретного, показывается только он.
    *
    * chiefs - главные конструкторы этого КБ. У них нет отдела, поэтому
    * они попадают под фильтр отдела только как 'none'.
-   *
-   * Секция показывается, только если в ней есть хоть кто-то: члены
-   * отделов КБ или главный конструктор. deptsInKb (статический список
-   * отделов КБ) в условии не участвует - он не зависит от фильтра.
    */
   const kbSections = useMemo(() => {
     return db.kbs.map(k => {
@@ -368,9 +351,6 @@ export default function Staff({ store, db, setDb, ur, openRoles, openDepts, open
 
   /**
    * Отделы вне КБ - те, где после фильтрации остались сотрудники.
-   * Если фильтр отдела сужен до конкретного, показывается только он.
-   * Случай deptId === 'none' сюда не доходит: при нём все сотрудники
-   * без отделов, deptMap пуст, условие выше отсекает всё.
    */
   const deptsWithoutKb = useMemo(() => {
     return db.departments.filter(d => {
@@ -382,7 +362,6 @@ export default function Staff({ store, db, setDb, ur, openRoles, openDepts, open
   }, [db.departments, deptMap, deptId]);
 
   // Все отпуска - под теми же фильтрами, что и списки сотрудников.
-  // Иначе выбор «КБ «ЛА»» показывал бы отпуска всего завода.
   const allVacs = useMemo(() => {
     const list = db.vacations
       .filter(v => {
@@ -418,8 +397,7 @@ export default function Staff({ store, db, setDb, ur, openRoles, openDepts, open
     showToast(TOASTS.deptCreated(name), 'success');
   }, [prompt, setDb, showToast]);
 
-  // Один хелпер для всех мест рендера строки - единая сигнатура пропсов,
-  // чтобы не было рассинхрона между 4 секциями.
+  // Один хелпер для всех мест рендера строки - единая сигнатура пропсов.
   const renderEmployeeRow = (e, deptId, isFired) => (
     <EmployeeRow
       key={e.id}
@@ -457,14 +435,39 @@ export default function Staff({ store, db, setDb, ur, openRoles, openDepts, open
     );
   };
 
+  /**
+   * Удаление отпуска из таблицы «Все отпуска».
+   *
+   * Единственный путь - store.deleteVacation. Обход через setDb
+   * закрыт: он терял аудит и откат активного делегирования.
+   *
+   * Права проверяет VacationService (canManageVacation): здесь мы
+   * даже не пытаемся проверять их повторно, чтобы не было второй
+   * точки правды. Кнопка удаления просто не рендерится, если строка
+   * недоступна для управления (см. условия в разметке); а если
+   * вызов всё же проскочит - сервис выбросит внятную ошибку, которую
+   * мы поймаем и покажем тостом.
+   *
+   * Принимает объект отпуска (не id) - вызывающему он нужен для
+   * форматирования периода в confirm, а сервису передаём vac.id.
+   */
+  const handleVacationDelete = useCallback(async (vac) => {
+    if (!await confirm({
+      title: 'Удалить отпуск',
+      message: `Удалить отпуск ${fmtDMY(vac.start)}–${fmtDMY(vac.end)}?`,
+      confirmLabel: 'Удалить',
+      danger: true,
+    })) return;
+    try {
+      store.deleteVacation(vac.id);
+    } catch (err) {
+      showToast(err.message || 'Не удалось удалить отпуск', 'error');
+    }
+  }, [store, showToast, confirm]);
+
   return (
     <div className="staff">
-      {/* Одна строка: поиск + 3 фильтра + кнопки действий.
-          Используем .toolbar - у него уже есть flex-wrap: nowrap и
-          правило .toolbar .filter-select { width: 150px }. Классы
-          staff-kb-select / staff-dept-select расширяют эти два
-          селекта до 220/260px: в них бывают длинные метки. Кнопки
-          прижаты вправо через ml-auto на обёртке. */}
+      {/* Одна строка: поиск + 3 фильтра + кнопки действий. */}
       <div className="toolbar">
         <SearchBox
           value={query}
@@ -592,6 +595,14 @@ export default function Staff({ store, db, setDb, ur, openRoles, openDepts, open
                 {allVacs.map(v => {
                   const e = db.employees.find(x => x.id === v.empId);
                   if (e && e.fired) return null;
+
+                  // Право на действия для этой строки.
+                  // Для HR на утверждённом отпуске - false (иконка
+                  // «просмотр», кнопка удаления не рендерится).
+                  // Для HR на неутверждённом - true.
+                  // Для admin/director - всегда true.
+                  const canManage = canManageVacation(ur, v);
+
                   return (
                     <tr key={v.id}>
                       <td><b>{empName(v.empId)}</b></td>
@@ -603,8 +614,32 @@ export default function Staff({ store, db, setDb, ur, openRoles, openDepts, open
                         {{ pending: 'На утверждении', approved: 'Утверждён', rejected: 'Отклонён' }[v.status]}
                       </span></td>
                       <td>
-                        <button className="icon-btn" onClick={() => openVacation(v.id, null)}><Ic d={ICONS.edit} size={14} /></button>
-                        <button className="icon-btn danger" onClick={() => { setDb((s) => ({ ...s, vacations: s.vacations.filter(x => x.id !== v.id) })); }}><Ic d={ICONS.trash} size={14} /></button>
+                        {canManage ? (
+                          <>
+                            <button
+                              className="icon-btn"
+                              onClick={() => openVacation(v.id, null)}
+                              title="Редактировать"
+                            >
+                              <Ic d={ICONS.edit} size={14} />
+                            </button>
+                            <button
+                              className="icon-btn danger"
+                              onClick={() => handleVacationDelete(v)}
+                              title="Удалить"
+                            >
+                              <Ic d={ICONS.trash} size={14} />
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            className="icon-btn"
+                            onClick={() => openVacation(v.id, null)}
+                            title="Просмотр"
+                          >
+                            <Ic d={ICONS.eye} size={14} />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );

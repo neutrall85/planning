@@ -4,11 +4,14 @@ import { fmtDMY, TODAY } from '../../utils/date';
 import FloatingMenu from '../FloatingMenu';
 import { Ic, ICONS } from '../Icons';
 import { buildTaskMenu } from '../menus';
+import { chatKey } from '../../utils/chatKey';
+import { UnreadBadge } from '../UnreadBadge';
 
 export default function TasksList({
   tasks,
   db,
   user,
+  unreadIndex,
   openTask,
   onMove,
   onDelete,
@@ -28,6 +31,7 @@ export default function TasksList({
         const overdue = task.deadline && !['closed','cancelled'].includes(task.status) && task.deadline < TODAY;
         const status = TASK_STATUSES[task.status]?.label || task.status;
         const priority = PRIORITIES[task.priority]?.label || task.priority;
+        const unread = unreadIndex.get(chatKey({ taskId: task.id })) || 0;
 
         const menuItems = buildTaskMenu({
           task,
@@ -93,6 +97,7 @@ export default function TasksList({
                 <div className="pj-foot">
                   {overdue && <span className="red text-12 font-semibold">Просрочено</span>}
                 </div>
+                <UnreadBadge count={unread} />
               </div>
             )}
           </FloatingMenu>

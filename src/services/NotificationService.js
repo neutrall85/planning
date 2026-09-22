@@ -1,24 +1,8 @@
 import { uid, fmtDMY } from '../utils/date';
 import { TASK_STATUSES, PROJECT_STATUSES, ROLES } from '../utils/constants';
 import { extractMentions } from '../utils/mentionParser';
+import { CHANGE_KINDS } from '../utils/changeKinds';
 
-/**
- * Сервис уведомлений.
- *
- * Каждое уведомление несёт три навигационных поля:
- *   - targetType - раздел, куда ведёт клик (task / project / hours / ...);
- *   - targetId   - id сущности;
- *   - targetTab  - конкретная вкладка внутри сущности (опционально).
- *
- * targetTab нужен там, где клик должен открыть не первую вкладку, а
- * конкретную: например, уведомление об упоминании в чате ведёт прямо
- * в «Обсуждение», а не в «Данные». Если оно null - потребитель
- * (MainLayout) подставит дефолтную вкладку раздела.
- *
- * @param {NotificationRepository} notificationRepo
- * @param {() => void} notify - триггер подписчиков store
- * @param {() => Object} getData - доступ к текущим данным { tasks, projects, employees, comments }
- */
 export class NotificationService {
   constructor({ notificationRepo, notify, getData }) {
     this._notificationRepo = notificationRepo;
@@ -26,14 +10,12 @@ export class NotificationService {
     this._getData = getData || (() => ({}));
   }
 
-  /** Публичное создание (триггерит рендер). */
   addNotification(userId, text, target = null) {
     const n = this._addNotification(userId, text, target);
     this._notify();
     return n;
   }
 
-  /** Внутреннее создание (без рендера - для батчинга в семантических методах). */
   _addNotification(userId, text, target = null) {
     if (!userId) return null;
     const notif = {
@@ -212,14 +194,6 @@ export class NotificationService {
     this._notify();
   }
 
-  /**
-   * Уведомление о комментарии.
-   *
-   * Все получатели (упомянутые, исполнитель, автор задачи, ответивший в
-   * ветке, менеджер проекта) ведут в чат: смысл уведомления - «посмотри
-   * комментарий», а он виден только на вкладке обсуждения. Поэтому
-   * targetTab жёстко 'chat' - и для задач, и для проектов.
-   */
   notifyComment(comment) {
     const { tasks = [], projects = [], employees = [], comments = [] } = this._getData();
     const author = employees.find((e) => e.id === comment.authorId);
@@ -263,13 +237,15 @@ export class NotificationService {
     if (recipients.size) this._notify();
   }
 
-  notifyVacationDecision(vacation, approved) {
+  notifyVacationDecision(vacation, approved, reason = null) {
     const period = `${fmtDMY(vacation.start)}-${fmtDMY(vacation.end)}`;
-    this._addNotification(
-      vacation.empId,
-      `Ваш отпуск ${period} ${approved ? 'утверждён' : 'отклонён'}.`,
-      { targetType: 'vacation', targetId: vacation.id },
-    );
+    const text = approved
+      ? `Ваш отпуск ${period} утверждён.`
+      : `Ваш отпуск ${period} отклонён. Причина: ${reason}`;
+    this._addNotification(vacation.empId, text, {
+      targetType: 'vacation',
+      targetId: vacation.id,
+    });
     this._notify();
   }
 
@@ -295,42 +271,78 @@ export class NotificationService {
     this._notify();
   }
 
-  notifyRoleDelegationDecision(delegation, approved, actorId) {
+  notifyRoleDelegationDecision(delegation, approved, actorId, reason = null) {
     if (!delegation.fromId || delegation.fromId === actorId) return;
     const roles = delegation.roles.map((r) => ROLES[r]?.label || r).join(', ');
-    this._addNotification(
-      delegation.fromId,
-      `${this._name(delegation.toId)} ${approved ? 'принял(а)' : 'отклонил(а)'} делегирование ролей: ${roles}`,
-      { targetType: 'delegation', targetId: delegation.id },
-    );
+    const text = approved
+      ? `${this._name(delegation.toId)} принял(а) делегирование ролей: ${roles}`
+      : `${this._name(delegation.toId)} отклонил(а) делегирование ролей: ${roles}. Причина: ${reason}`;
+    this._addNotification(delegation.fromId, text, {
+      targetType: 'delegation',
+      targetId: delegation.id,
+    });
     this._notify();
   }
 
-  notifyHoursRequestCreated(request, directorIds, targetTitle, actorId) {
-    const targetKind = request.kind === 'task' ? 'задаче' : 'проекту';
-    directorIds.forEach((id) => {
+  /**
+   * Уведомление о создании запроса на изменение.
+   *
+   * Получатели (массив recipientIds) формируются вызывающим — сервис
+   * не решает, кто должен согласовывать. Автор запроса всегда получает
+   * подтверждение отправки.
+   *
+   * targetTab = request.changeKind: уведомление открывает вкладку
+   * раздела «Запросы и заявки», соответствующую виду изменения. Вкладки
+   * этих видов совпадают по id с ключами CHANGE_KINDS — это осознанное
+   * решение, чтобы не заводить отдельный маппинг «вид → вкладка».
+   */
+  notifyChangeRequestCreated(request, recipientIds, targetTitle, actorId) {
+    const kind = CHANGE_KINDS[request.changeKind];
+    if (!kind) return;
+
+    const fromName = this._name(actorId);
+    const targetLine = kind.notifyCreatedText(request.targetType, targetTitle);
+
+    (recipientIds || []).forEach((id) => {
       if (id === actorId) return;
-      this._addNotification(
-        id,
-        `Запрос на изменение часов по ${targetKind} "${targetTitle}" от ${this._name(actorId)}.`,
-        { targetType: 'hours', targetId: request.id },
-      );
+      this._addNotification(id, `${targetLine} от ${fromName}.`, {
+        targetType: 'changeRequest',
+        targetId: request.id,
+        targetTab: request.changeKind,
+      });
     });
+
     this._addNotification(
       actorId,
-      `Ваш запрос на изменение часов по ${targetKind} "${targetTitle}" отправлен на рассмотрение.`,
-      { targetType: 'hours', targetId: request.id },
+      `${targetLine}: ваш запрос отправлен на рассмотрение.`,
+      {
+        targetType: 'changeRequest',
+        targetId: request.id,
+        targetTab: request.changeKind,
+      },
     );
+
     this._notify();
   }
 
-  notifyHoursRequestDecision(request, approved, targetTitle, actorId) {
-    const targetKind = request.kind === 'task' ? 'задаче' : 'проекту';
-    this._addNotification(
-      request.reqId,
-      `Ваш запрос на изменение часов по ${targetKind} "${targetTitle}" ${approved ? 'утверждён' : 'отклонён'}.`,
-      { targetType: 'hours', targetId: request.id },
-    );
+  /**
+   * Уведомление автору запроса о решении. При отклонении причина
+   * встраивается в текст — читается прямо в колокольчике.
+   */
+  notifyChangeRequestDecision(request, approved, targetTitle, actorId, reason = null) {
+    const kind = CHANGE_KINDS[request.changeKind];
+    if (!kind) return;
+
+    const targetLine = kind.notifyCreatedText(request.targetType, targetTitle);
+    const text = approved
+      ? `${targetLine}: ваш запрос утверждён.`
+      : `${targetLine}: ваш запрос отклонён. Причина: ${reason}`;
+
+    this._addNotification(request.reqId, text, {
+      targetType: 'changeRequest',
+      targetId: request.id,
+      targetTab: request.changeKind,
+    });
     this._notify();
   }
 

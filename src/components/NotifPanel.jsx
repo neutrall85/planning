@@ -1,6 +1,24 @@
 import { fmtDT, fmtDMY, iso } from '../utils/date';
 import { Ic, ICONS } from './Icons';
 
+/**
+ * Иконка уведомления по его типу.
+ *
+ * Для старых типов — прямая карта. Для changeRequest — функция от
+ * targetTab: уведомления о сроке и о часах принадлежат одному типу
+ * (changeRequest), но визуально должны различаться — иначе пользователь
+ * не отличит «просят сдвинуть срок» от «просят добавить часов».
+ *
+ * Ключ hours оставлен: если в сторе остались уведомления от старой
+ * схемы (до переезда на changeRequest), они не потеряют иконку.
+ */
+const iconForNotification = (n) => {
+  if (n.targetType === 'changeRequest') {
+    return n.targetTab === 'deadline' ? ICONS.cal : ICONS.clock;
+  }
+  return TYPE_ICONS[n.targetType] || TYPE_ICONS.default;
+};
+
 const TYPE_ICONS = {
   task: ICONS.tasks,
   project: ICONS.folder,
@@ -59,7 +77,7 @@ export default function NotifPanel({ list, currentUserId, markAllRead, onNavigat
                 onClick={() => handleClick(n)}
               >
                 <div className="notif-icon">
-                  <Ic d={TYPE_ICONS[n.targetType] || TYPE_ICONS.default} size={14} />
+                  <Ic d={iconForNotification(n)} size={14} />
                 </div>
                 <div className="notif-content">
                   <div className="notif-text">{n.text}</div>

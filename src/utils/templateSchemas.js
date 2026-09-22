@@ -6,6 +6,15 @@ const MAX_NODES = 100;
 
 const TASK_PRIORITIES = ['low', 'mid', 'high', 'crit'];
 const DEPENDENCY_TYPES = ['FS', 'SS', 'FF', 'SF'];
+
+// Полный список приоритетов проекта, допустимых в шаблоне. Здесь именно
+// все шесть значений, и это осознанно: санитайз (sanitizeBySchema) должен
+// принимать любое из возможных, вне зависимости от того, к какому типу
+// проекта шаблон потом применят. Шаблон производственного и шаблон
+// административного проекта используют разные наборы (PROJECT_PRIORITIES
+// и ADMIN_PROJECT_PRIORITIES в utils/constants), но в момент сохранения
+// шаблона ptype может быть ещё не выбран. Ограничение «по типу проекта» —
+// задача формы (priorityOptionsForProjectType), а не санитайза.
 const PROJECT_PRIORITIES = ['AOG', 'CRIT', 'NORM', 'high', 'mid', 'low'];
 
 const trimmedString = (value, max = MAX_STR) => {
@@ -139,19 +148,20 @@ export const TEMPLATE_FIELDS_META = Object.freeze({
         { value: 'admin', label: 'Административный' },
       ],
     },
+    // options у priority намеренно не заданы. Набор допустимых значений
+    // зависит от типа проекта: производственный - AOG/CRIT/NORM,
+    // административный - high/mid/low. Полный список из шести значений
+    // здесь вводил бы в заблуждение: форма его не использует (переопределяет
+    // через priorityOptionsForProjectType(payload.ptype)), а другие
+    // потребители метаданных могли бы воспринять его как «покажи это в
+    // селекте». Актуальный набор формирует priorityOptionsForProjectType
+    // из utils/constants; правило «какой приоритет у какого типа проекта»
+    // живёт там же, рядом с самими наборами.
     priority: {
       label: 'Приоритет',
       type: 'select',
-      options: [
-        { value: 'AOG', label: 'AOG' },
-        { value: 'CRIT', label: 'CRIT' },
-        { value: 'NORM', label: 'NORM' },
-        { value: 'high', label: 'Высокий (адм.)' },
-        { value: 'mid', label: 'Средний (адм.)' },
-        { value: 'low', label: 'Низкий (адм.)' },
-      ],
     },
-    budget: { label: 'Бюджет, ч', type: 'number' },
+    budget: { label: 'План (часы)', type: 'number' },
   }),
 });
 

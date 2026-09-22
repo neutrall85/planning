@@ -1,27 +1,58 @@
 // src/components/Modals/TaskModal/TaskFormTab.jsx
 import { FormField } from '../../FormField';
-import { Ic, ICONS } from '../../Icons';
 import { TemplateSelect } from '../../Templates';
+import { Ic, ICONS } from '../../Icons';
 
 /**
- * Вкладка «Данные» - поля карточки задачи.
+ * Вкладка «Данные» — поля карточки задачи.
+ *
  * Чистый presentational-компонент: вся логика (валидация, опции
- * селектов, применение шаблона) приходит снаружи, здесь только разметка
- * и обработчики onChange, ведущие обратно в форму.
+ * селектов, применение шаблона) приходит снаружи, здесь только
+ * разметка и обработчики onChange, ведущие обратно в форму.
+ *
+ * Вёрстка пар с кнопками-действиями.
+ *
+ * Раньше кнопка была обёрнута вместе с полем в .field-with-action
+ * (flex-column), и правое поле визуально «уезжало» вверх: пара
+ * полей в .fields-row выравнивалась по центру относительно
+ * двухстрочной колонки. Теперь:
+ *
+ *     .fields-with-action        ← группа
+ *       .fields-row              ← пара полей, одна горизонталь
+ *       .field-action-row        ← строка под парой, кнопка справа
+ *
+ * Кнопка садится ровно под правым полем пары: .field-action-row — та
+ * же сетка 1fr 1fr с тем же gap, что у .fields-row, а сама кнопка
+ * смещена во вторую колонку. Ничего не съезжает, поля читаются
+ * единой строкой.
+ *
+ * lockedField — имя поля, зафиксированного зависимостью ('start' или
+ * 'deadline'), либо null. Поле с этим именем блокируется.
  */
 export function TaskFormTab({
-  form, access, options, template, summary, onRequestHours,
+  form,
+  access,
+  options,
+  template,
+  summary,
+  onRequestHours,
+  onRequestDeadline,
+  lockedField,
 }) {
   const { values, handleChange, updateValues, touched, errors } = form;
+  const { canEditFields, isProjectLocked, isAdminProject } = access;
   const {
-    canEditFields, canChangeStatus, isAuthor, isAssignee,
-    isProjectLocked, isAdminProject,
-  } = access;
-  const {
-    projectOptions, assigneeOptionsList, priorityOptions, statusOptions,
-    dependencyOptions, dependencyTypeOptions,
+    projectOptions,
+    assigneeOptionsList,
+    priorityOptions,
+    statusOptions,
+    dependencyOptions,
+    dependencyTypeOptions,
   } = options;
   const { isNew, isCopy, appliedTemplateName, onApply } = template;
+
+  const startLocked    = lockedField === 'start';
+  const deadlineLocked = lockedField === 'deadline';
 
   return (
     <div className="project-info-fields">
@@ -46,7 +77,7 @@ export function TaskFormTab({
       />
 
       <div className="field-row">
-        <label className="field-label"></label>
+        <label className="field-label" />
         <div className="flex-1 flex gap-4">
           <label className="checkbox-inline">
             <input
@@ -91,20 +122,19 @@ export function TaskFormTab({
         inline
       />
 
-      <div className="fields-row">
-        <FormField
-          label="Исполнитель"
-          required
-          type="select"
-          options={assigneeOptionsList}
-          value={values.assigneeId ?? ''}
-          onChange={(v) => handleChange('assigneeId', v)}
-          error={touched.assigneeId && errors.assigneeId}
-          disabled={!canEditFields}
-          inline
-        />
-
-        <div className="field-with-action">
+      <div className="fields-with-action">
+        <div className="fields-row">
+          <FormField
+            label="Исполнитель"
+            required
+            type="select"
+            options={assigneeOptionsList}
+            value={values.assigneeId ?? ''}
+            onChange={(v) => handleChange('assigneeId', v)}
+            error={touched.assigneeId && errors.assigneeId}
+            disabled={!canEditFields}
+            inline
+          />
           <FormField
             label="Плановые часы"
             required={!isAdminProject}
@@ -117,7 +147,9 @@ export function TaskFormTab({
             disabled={!canEditFields || values.isHourly}
             inline
           />
-          {onRequestHours && (
+        </div>
+        {onRequestHours && (
+          <div className="field-action-row">
             <button
               type="button"
               className="btn request-hours field-action"
@@ -125,8 +157,8 @@ export function TaskFormTab({
             >
               <Ic d={ICONS.clock} size={14} /> Запросить изменение часов
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       <div className="fields-row">
@@ -149,32 +181,45 @@ export function TaskFormTab({
           value={values.status ?? ''}
           onChange={(v) => handleChange('status', v)}
           error={touched.status && errors.status}
-          disabled={!canChangeStatus && !isAuthor && !isAssignee}
+          disabled={!canEditFields}
           inline
         />
       </div>
 
-      <div className="fields-row">
-        <FormField
-          label="Начало"
-          required
-          type="date"
-          value={values.start}
-          onChange={(v) => updateValues({ start: v })}
-          error={touched.start && errors.start}
-          disabled={!canEditFields}
-          inline
-        />
-        <FormField
-          label="Срок исполнения"
-          required={!isAdminProject}
-          type="date"
-          value={values.deadline}
-          onChange={(v) => handleChange('deadline', v)}
-          error={touched.deadline && errors.deadline}
-          disabled={!canEditFields || isAdminProject || values.isHourly}
-          inline
-        />
+      <div className="fields-with-action">
+        <div className="fields-row">
+          <FormField
+            label="Начало"
+            required
+            type="date"
+            value={values.start}
+            onChange={(v) => updateValues({ start: v })}
+            error={touched.start && errors.start}
+            disabled={!canEditFields || startLocked}
+            inline
+          />
+          <FormField
+            label="Срок исполнения"
+            required={!isAdminProject}
+            type="date"
+            value={values.deadline}
+            onChange={(v) => handleChange('deadline', v)}
+            error={touched.deadline && errors.deadline}
+            disabled={!canEditFields || values.isHourly || deadlineLocked}
+            inline
+          />
+        </div>
+        {onRequestDeadline && (
+          <div className="field-action-row">
+            <button
+              type="button"
+              className="btn request-hours field-action"
+              onClick={onRequestDeadline}
+            >
+              <Ic d={ICONS.cal} size={14} /> Запросить изменение срока
+            </button>
+          </div>
+        )}
       </div>
 
       {values.isHourly && (
@@ -211,6 +256,7 @@ export function TaskFormTab({
         disabled={!canEditFields}
         inline
       />
+
       <FormField
         label="Тип зависимости"
         type="select"

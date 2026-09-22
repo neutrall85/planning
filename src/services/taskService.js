@@ -4,6 +4,12 @@ import { TASK_STATUSES, PRIORITIES } from '../utils/constants';
 import { isArchived } from '../utils/entityState';
 import { syncExecutorRolesFor } from './roleSync';
 import {
+  dependencyRule,
+  deriveLockedValue,
+  predecessorDelta,
+  shiftDates,
+} from '../utils/taskDependency';
+import {
   auditValue,
   auditHours,
   auditLabel,
@@ -68,6 +74,73 @@ export class TaskService {
     });
   }
 
+  /**
+   * Проставить зафиксированное зависимостью поле по предшественнику.
+   *
+   * Страховка на уровне сервиса: форма блокирует поле, но прямой
+   * вызов store.upsertTask / store.patchTask не должен оставлять
+   * задачу в несогласованном состоянии. Для часовой задачи оба конца
+   * (start === deadline) сходятся на вычисленное значение.
+   */
+  _applyDependency(task) {
+    if (!task?.dependencyId) return task;
+    const predecessor = this._taskRepo.findById(task.dependencyId);
+    if (!predecessor) return task;
+
+    const rule = dependencyRule(task.dependencyType);
+    if (!rule) return task;
+
+    const value = deriveLockedValue(task, predecessor);
+    if (value == null) return task;
+
+    if (task.isHourly) {
+      if (task.start === value && task.deadline === value) return task;
+      return { ...task, start: value, deadline: value };
+    }
+    if (task[rule.locked] === value) return task;
+    return { ...task, [rule.locked]: value };
+  }
+
+  /**
+   * Сдвинуть зависимые задачи вслед за изменением дат предшественника.
+   *
+   * Для каждой задачи B с B.dependencyId === after.id правило её типа
+   * определяет, какое поле after отслеживается. Если оно изменилось
+   * на delta дней, вся B сдвигается на ту же delta - так сохраняется
+   * длительность и согласованность зафиксированного поля. Дочерние
+   * задачи B (те, кто зависит от неё) сдвигаются рекурсивно.
+   *
+   * visited защищает от циклов в повреждённых данных.
+   */
+  _propagateDependencyShift(before, after, currentUserId, visited = new Set()) {
+    if (!before || !after || visited.has(after.id)) return;
+    visited.add(after.id);
+
+    const dependents = this._taskRepo.find(
+      (t) => t.dependencyId === after.id && !t.archived
+    );
+    if (dependents.length === 0) return;
+
+    const ts = Date.now();
+    for (const dep of dependents) {
+      const delta = predecessorDelta(dep.dependencyType, before, after);
+      if (!delta) continue;
+
+      const shifted = shiftDates(dep, delta);
+      const sign = delta > 0 ? '+' : '';
+      shifted.history = [
+        ...(shifted.history || []),
+        {
+          ts,
+          who: currentUserId,
+          text: `Даты сдвинуты на ${sign}${delta} дн. вследствие изменения «${after.title}»`,
+        },
+      ];
+      this._taskRepo.save(shifted);
+      this._propagateDependencyShift(dep, shifted, currentUserId, visited);
+    }
+  }
+
   upsertTask(task, currentUserId) {
     const existing = this._taskRepo.findById(task.id);
     const isNew = !existing;
@@ -99,6 +172,11 @@ export class TaskService {
     } else {
       task.actualHours = 0;
     }
+
+    // Страховка: зафиксированное зависимостью поле всегда согласовано
+    // с предшественником. Делаем до всех проверок бюджета и родителей -
+    // дальнейшая логика видит уже финальные значения.
+    task = this._applyDependency(task);
 
     if (isNew && task.isSummary && task.budgetHours === undefined) {
       task.budgetHours = task.plannedHours || 0;
@@ -132,7 +210,7 @@ export class TaskService {
         const sumChildren = children.reduce((acc, t) => acc + (parseFloat(t.plannedHours) || 0), 0);
         if (sumChildren > parseFloat(task.plannedHours)) {
           throw new Error(
-            `Сумма плановых часов подзадач (${sumChildren} ч) превышает новый бюджет задачи "${task.title}" (${task.plannedHours} ч).`
+            `Сумма плановых часов подзадач (${sumChildren} ч) превышает новый план задачи "${task.title}" (${task.plannedHours} ч).`
           );
         }
       }
@@ -243,6 +321,14 @@ export class TaskService {
 
     this._taskRepo.save(task);
 
+    // Сдвиг зависимых задач вслед за изменением дат этой задачи.
+    // Порядок: сначала сохранили себя, потом сдвинули тех, кто от нас
+    // зависит - иначе новый предшественник ещё не виден репозиторию в
+    // момент, когда начнём рекурсию.
+    if (!isNew) {
+      this._propagateDependencyShift(existing, task, currentUserId);
+    }
+
     if (isNew) {
       this._audit.addAudit('Создание задачи', task.title, 'task', task.id, currentUserId);
     } else if (isRestore) {
@@ -295,10 +381,12 @@ export class TaskService {
     if (!existing) throw new Error('Задача не найдена');
     if (isArchived(existing)) throw new Error('Задача в архиве - редактирование запрещено');
 
-    const updated = { ...existing, ...patch };
+    // let, а не const: _applyDependency может вернуть новый объект.
+    let updated = { ...existing, ...patch };
     if (patch.logs) {
       updated.actualHours = patch.logs.reduce((s, l) => s + (l.hours || 0), 0);
     }
+    updated = this._applyDependency(updated);
 
     const entries = this._historyEntries(existing, updated);
     if (entries.length > 0) {
@@ -310,6 +398,7 @@ export class TaskService {
     }
 
     this._taskRepo.save(updated);
+    this._propagateDependencyShift(existing, updated, currentUserId);
 
     const changes = this._describeChanges(existing, updated);
     if (Object.keys(changes).length > 0) {
@@ -599,13 +688,13 @@ export class TaskService {
 
     updated.history = [
       ...(updated.history || []),
-      { ts: Date.now(), who: currentUserId, text: `Бюджет: ${auditHours(oldBudget)} → ${auditHours(newBudget)}` },
+      { ts: Date.now(), who: currentUserId, text: `План: ${auditHours(oldBudget)} → ${auditHours(newBudget)}` },
     ];
     this._taskRepo.save(updated);
 
     this._audit.addAudit(
-      'Изменение бюджета задачи',
-      { Задача: updated.title, Бюджет: `${auditValue(oldBudget)} → ${newBudget}` },
+      'Изменение плановых часов задачи',
+      { Задача: updated.title, План: `${auditValue(oldBudget)} → ${newBudget}` },
       'task',
       taskId,
       currentUserId,

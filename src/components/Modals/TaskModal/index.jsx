@@ -1,53 +1,60 @@
 // src/components/Modals/TaskModal/index.jsx
-import { useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { ModalShell } from '../../ModalShell';
 import { Tabs } from '../../Tabs';
 import { FileManager } from '../../FileManager';
 import Discussion from '../../Discussion';
-import NoteEditorModal from '../NoteEditorModal';
-import {
-  useDataHelpers,
-  useTaskFormState,
-  useTaskTemplate,
-  useTaskSubtasks,
-  useTaskSelectOptions,
-  useTaskFileActions,
-  useTaskTimeLog,
-  useTaskNotes,
-  useTaskSave,
-  useTaskTabSync,
-} from '../../../hooks';
-import { useConfirm } from '../../../context/ConfirmContext';
-import { fmtDMY } from '../../../utils/date';
-import {
-  canEditTaskFields,
-  canChangeTaskStatus,
-  canCreateTask,
-} from '../../../utils/permissions';
-import { isArchived } from '../../../utils/entityState';
-
 import { HistoryTab } from '../../HistoryTab';
+import { Ic, ICONS } from '../../Icons';
+import NoteEditorModal from '../NoteEditorModal';
 import { TaskFormTab } from './TaskFormTab';
 import { TaskTimeTab } from './TaskTimeTab';
 import { TaskSubtasksTab } from './TaskSubtasksTab';
 import { TaskNotesTab } from './TaskNotesTab';
-import { TaskModalFooter } from './TaskModalFooter';
+import { TaskFooterActions } from './TaskFooterActions';
+import { useConfirm } from '../../../context/ConfirmContext';
+import { useDataHelpers } from '../../../hooks/useDataHelpers';
+import { useControlledTab } from '../../../hooks/useControlledTab';
+import { useStableModalHeight } from '../../../hooks/useStableModalHeight';
+import { useChatUnreadCount, useChatTotalCount } from '../../../hooks/useChatStats';
+import { useTaskFormState } from '../../../hooks/useTaskFormState';
+import { useTaskTemplate } from '../../../hooks/useTaskTemplate';
+import { useTaskSubtasks } from '../../../hooks/useTaskSubtasks';
+import { useTaskSelectOptions } from '../../../hooks/useTaskSelectOptions';
+import { useTaskFileActions } from '../../../hooks/useTaskFileActions';
+import { useTaskTimeLog } from '../../../hooks/useTaskTimeLog';
+import { useTaskNotes } from '../../../hooks/useTaskNotes';
+import { useTaskSave } from '../../../hooks/useTaskSave';
+import { useTaskTabSync } from '../../../hooks/useTaskTabSync';
+import {
+  canCreateTask,
+  canEditTaskFields,
+  canChangeTaskStatus,
+} from '../../../utils/permissions';
+import { isArchived } from '../../../utils/entityState';
+import { DOMAIN } from '../../../utils/constants';
 
-/**
- * Карточка задачи.
- *
- * Компонент-оркестратор: сам не хранит бизнес-логику, а собирает её из
- * хуков (форма, шаблон, подзадачи, опции селектов, файлы, учёт времени,
- * заметки, сохранение, вкладки) и раскладывает результат по
- * presentational-компонентам вкладок.
- */
 export const TaskModal = ({
-  db, ur, taskId, initialTab = 'form', parentTaskId, initialProjectId, returnToProjectId,
+  db,
+  ur,
+  taskId,
+  initialTab = 'form',
+  parentTaskId,
+  initialProjectId,
+  returnToProjectId,
   returnToTaskId,
   returnToEmployeeTasksId,
   copyFromId,
-  onClose, onSave, onDelete, onHoursReq, store,
-  openTask, toast, onCopy,
+  highlightFileId = null,
+  highlightFolderId = null,
+  onClose,
+  onSave,
+  onDelete,
+  onChangeReq,
+  store,
+  openTask,
+  toast,
+  onCopy,
   onTabChange,
 }) => {
   const { empName, getTaskSpent, vacOverlap } = useDataHelpers(db);
@@ -58,11 +65,18 @@ export const TaskModal = ({
   const isCopy = !existing && !!copySource;
   const isNew = !existing;
   const readOnly = !!(existing && isArchived(existing));
-  const canEditFields = !readOnly && (existing ? canEditTaskFields(ur, existing, db) : canCreateTask(ur));
-  const canChangeStatus = !readOnly && existing && canChangeTaskStatus(ur, existing, null, db);
+
+  const canEditFields = !readOnly && (existing
+    ? canEditTaskFields(ur, existing, db)
+    : canCreateTask(ur));
+  const canChangeStatus = !readOnly && existing
+    && canChangeTaskStatus(ur, existing, null, db);
   const isAssignee = existing && existing.assigneeId === ur.id;
   const isAuthor = existing && existing.creatorId === ur.id;
-  const canLog = !readOnly && (existing ? isAssignee : true) && !existing?.isSummary && !existing?.isHourly;
+  const canLog = !readOnly
+    && (existing ? isAssignee : true)
+    && !existing?.isSummary
+    && !existing?.isHourly;
   const canCreateFromTask = canCreateTask(ur);
   const isProjectLocked = !!(initialProjectId || parentTaskId);
 
@@ -76,11 +90,19 @@ export const TaskModal = ({
   }, [initialProjectId, parentTaskId, db.tasks]);
 
   const {
-    values, handleChange, updateValues, handleSubmit, errors, touched,
-    setFieldValue, isValid, isDirty,
+    values,
+    handleChange,
+    updateValues,
+    handleSubmit,
+    errors,
+    touched,
+    setFieldValue,
+    isValid,
+    isDirty,
+    lockedField,
   } = useTaskFormState({
-    existing, isCopy, copySource, isNew, isProjectLocked, effectiveProjectId,
-    parentTaskId, db, ur,
+    existing, isCopy, copySource, isNew, isProjectLocked,
+    effectiveProjectId, parentTaskId, db, ur,
   });
 
   const { appliedTemplateName, pendingTemplateSubtasks, applyTemplate } = useTaskTemplate({
@@ -93,7 +115,6 @@ export const TaskModal = ({
 
   const project = db.projects.find(p => p.id === values.projectId);
   const isAdminProject = project && project.ptype === 'admin';
-
   const isSummaryChecked = values.isSummary || subtasks.length > 0 || draftSubtasks.length > 0;
   const isSummaryDisabled = !canEditFields || subtasks.length > 0;
   const hasSubtasks = subtasks.length > 0 || values.isSummary || draftSubtasks.length > 0;
@@ -115,8 +136,8 @@ export const TaskModal = ({
   } = useTaskTimeLog({ values, existing, store, ur, toast, setFieldValue, getTaskSpent });
 
   const {
-    notesList, editingNote, openNewNote, openExistingNote, closeNoteEditor,
-    handleSaveNote, handleDeleteNote,
+    notesList, editingNote, openNewNote, openExistingNote,
+    closeNoteEditor, handleSaveNote, handleDeleteNote,
   } = useTaskNotes({ existing, ur, store, toast });
 
   const { saveHandler, deleteHandler } = useTaskSave({
@@ -124,22 +145,34 @@ export const TaskModal = ({
     subtasks, draftSubtasks, pendingTemplateSubtasks, confirm, store, empName,
   });
 
+  const chatUnread = useChatUnreadCount(ur.id, values.projectId, values.id);
+  const chatTotal = useChatTotalCount(values.projectId, values.id);
+
   const tabs = [
     { id: 'form', label: 'Данные' },
-    ...(!values.isHourly ? [{ id: 'time', label: `Учёт времени (${getTaskSpent(values)}/${values.plannedHours ?? '-'})` }] : []),
-    ...(hasSubtasks ? [{ id: 'subtasks', label: `Подзадачи (${displayedSubtasks.length})` }] : []),
+    ...(!values.isHourly
+      ? [{ id: 'time', label: `Учёт времени (${getTaskSpent(values)}/${values.plannedHours ?? '-'})` }]
+      : []),
+    ...(hasSubtasks
+      ? [{ id: 'subtasks', label: `Подзадачи (${displayedSubtasks.length})` }]
+      : []),
     ...(existing ? [
-      { id: 'chat', label: `Обсуждение (${store.getComments({ taskId: values.id }).length})` },
+      { id: 'chat', label: 'Обсуждение', count: chatTotal, badge: chatUnread },
       { id: 'files', label: `Вложения (${values.files?.length || 0})` },
-      { id: 'hist', label: 'История' }
+      { id: 'hist', label: 'История' },
     ] : []),
-    ...(isAssignee && !readOnly ? [{ id: 'notes', label: `Заметки (${notesList.length})` }] : []),
+    ...(isAssignee && !readOnly
+      ? [{ id: 'notes', label: `Заметки (${notesList.length})` }]
+      : []),
   ];
 
-  const { activeTab, handleTabChange, bodyRef } = useTaskTabSync(initialTab, onTabChange, tabs, values.isHourly);
+  const { activeTab, handleTabChange, bodyRef } = useTaskTabSync(
+    initialTab, onTabChange, tabs, values.isHourly,
+  );
 
   const showBackButton = returnToProjectId || returnToTaskId || returnToEmployeeTasksId;
-  const saveDisabled = !(canEditFields || (existing && canChangeStatus)) || (isNew ? !isValid : !isValid || !isDirty);
+  const saveDisabled = !(canEditFields || (existing && canChangeStatus))
+    || (isNew ? !isValid : !isValid || !isDirty);
 
   const modalTitle = readOnly
     ? 'Архивная задача - только чтение'
@@ -149,21 +182,57 @@ export const TaskModal = ({
         ? `Копирование задачи: ${copySource.title}`
         : 'Новая задача';
 
-  const footer = (
-    <TaskModalFooter
+  const modalSubtitle = useMemo(() => {
+    const author = existing?.creatorId
+      ? db.employees.find(e => e.id === existing.creatorId)
+      : null;
+    if (!author) return null;
+    const email = author.email ? `${author.email}@${DOMAIN}` : null;
+    return (
+      <>
+        <span>Задачу составил: {author.last} {author.first}</span>
+        {author.extension && (<> | вн. тел.: {author.extension}</>)}
+        {email && (
+          <>
+            {' | '} e-mail: {' '}
+            <a href={`mailto:${email}`} onClick={(e) => e.stopPropagation()}>
+              {email}
+            </a>
+          </>
+        )}
+      </>
+    );
+  }, [existing, db.employees]);
+
+  /**
+   * Колбэки запроса изменения. Оба показываются только исполнителю и
+   * только у существующей (не в архиве) задачи.
+   *
+   * Запрос срока скрыт для часовой задачи: у неё start === deadline, и
+   * сдвиг срока — это изменение сразу двух полей (режима задачи), а не
+   * согласование одного значения с руководителем. Кнопки запроса часов
+   * у часовой задачи тоже нет — там часы выводятся из startTime/endTime.
+   */
+  const canRequestChange = !readOnly && existing && isAssignee && !!onChangeReq;
+  const requestHours = canRequestChange && !values.isHourly
+    ? () => onChangeReq('hours', 'task', values.id)
+    : null;
+  const requestDeadline = canRequestChange && !values.isHourly
+    ? () => onChangeReq('deadline', 'task', values.id)
+    : null;
+
+  const footerActions = (
+    <TaskFooterActions
       readOnly={readOnly}
       existing={existing}
       canEditFields={canEditFields}
       isAuthor={isAuthor}
-      onDelete={deleteHandler}
-      onCopy={onCopy}
       canCreateFromTask={canCreateFromTask}
       values={values}
       db={db}
       toast={toast}
-      onClose={onClose}
-      onSubmit={handleSubmit(saveHandler)}
-      saveDisabled={saveDisabled}
+      onDelete={deleteHandler}
+      onCopy={onCopy}
     />
   );
 
@@ -171,18 +240,21 @@ export const TaskModal = ({
     <>
       <ModalShell
         title={modalTitle}
+        subtitle={modalSubtitle}
         onClose={onClose}
         width={800}
         className="modal-task"
-        showSave={false}
-        footer={footer}
+        actions={footerActions}
+        saveLabel={existing ? 'Сохранить' : 'Создать задачу'}
+        saveDisabled={saveDisabled}
+        onSave={handleSubmit(saveHandler)}
         bodyRef={bodyRef}
         showBack={!!showBackButton}
       >
         {readOnly && (
           <div className="info-box">
             {existing.archivedAt
-              ? `Задача в архиве с ${fmtDMY(existing.archivedAt)}. Редактирование запрещено.`
+              ? `Задача в архиве с ${existing.archivedAt}. Редактирование запрещено.`
               : `Задача ${existing.status === 'cancelled' ? 'отменена' : 'закрыта'}. Редактирование запрещено.`}
           </div>
         )}
@@ -192,15 +264,18 @@ export const TaskModal = ({
         {activeTab === 'form' && (
           <TaskFormTab
             form={{ values, handleChange, updateValues, touched, errors }}
-            access={{ canEditFields, canChangeStatus, isAuthor, isAssignee, isProjectLocked, isAdminProject }}
-            options={{ projectOptions, assigneeOptionsList, priorityOptions, statusOptions, dependencyOptions, dependencyTypeOptions }}
-            template={{ isNew, isCopy, appliedTemplateName, onApply: applyTemplate }}
+            access={{ canEditFields, isProjectLocked, isAdminProject }}
+            options={{
+              projectOptions, assigneeOptionsList, priorityOptions, statusOptions,
+              dependencyOptions, dependencyTypeOptions,
+            }}
+            template={{
+              isNew, isCopy, appliedTemplateName, onApply: applyTemplate,
+            }}
             summary={{ checked: isSummaryChecked, disabled: isSummaryDisabled }}
-            onRequestHours={
-              !readOnly && onHoursReq && existing && isAssignee && !values.isHourly
-                ? () => onHoursReq('task', values.id)
-                : null
-            }
+            onRequestHours={requestHours}
+            onRequestDeadline={requestDeadline}
+            lockedField={lockedField}
           />
         )}
 
@@ -211,12 +286,9 @@ export const TaskModal = ({
             logs={values.logs}
             empName={empName}
             canLog={canLog}
-            logDate={logDate}
-            setLogDate={setLogDate}
-            logHours={logHours}
-            setLogHours={setLogHours}
-            logNote={logNote}
-            setLogNote={setLogNote}
+            logDate={logDate} setLogDate={setLogDate}
+            logHours={logHours} setLogHours={setLogHours}
+            logNote={logNote} setLogNote={setLogNote}
             onAddLog={addLog}
           />
         )}
@@ -234,9 +306,7 @@ export const TaskModal = ({
               onClose();
               setTimeout(() => openTask(id, 'form', null, null, null, null, values.id), 50);
             }}
-            db={db}
-            getTaskSpent={getTaskSpent}
-            empName={empName}
+            db={db} getTaskSpent={getTaskSpent} empName={empName}
           />
         )}
 
@@ -257,6 +327,8 @@ export const TaskModal = ({
           <FileManager
             files={values.files}
             folders={values.folders}
+            highlightFileId={highlightFileId}
+            highlightFolderId={highlightFolderId}
             onUpload={handleFileUpload}
             onDelete={handleFileDelete}
             onCreateFolder={handleCreateFolder}

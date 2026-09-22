@@ -23,8 +23,8 @@ export function buildMockData() {
     { id: "d_gas", name: "Отдел газодинамики", kbId: "kb_ad" },
     { id: "d_stren", name: "Отдел прочности двигателей", kbId: "kb_ad" },
     { id: "d_sau", name: "Отдел систем автоматического управления", kbId: "kb_ad" },
-    { id: "d_av1", name: "Отдел бортового радиоэлектронного оборудования (ОБРЭО)", kbId: "kb_la" },
-    { id: "d_otk", name: "Отдел контроля качества инженерного центра", kbId: null },
+    { id: "d_av1", name: "ОБРЭО", kbId: "kb_la" },
+    { id: "d_otk", name: "ОКК ИЦ", kbId: null },
     { id: "d_hr", name: "Отдел управления персоналом", kbId: null },
     { id: "d_management", name: "Группа управления и развития", kbId: null },
   ];
@@ -60,11 +60,18 @@ export function buildMockData() {
     { id: "e_anokhin", last: "Анохин", first: "Сергей", email: "anokhin", pass: "Exec2026!", position: "Инженер по ОБРЭО", departments: [{ deptId: "d_av1", primary: true }], roles: ["executor"], kbIds: [], headDeptIds: [], phone: "+7 900 000-00-00", extension: "127", tab: "1027", notif: { deadlineEmail: true, overdueDigest: false, commentSub: true }, failed: 0, lockUntil: 0, fired: false, passwordHistory: [], photo: null },
   ];
 
+  /**
+   * Проект может относиться к нескольким подразделениям. Массив unitIds
+   * хранит id КБ (kb_*) или id отдела вне КБ (d_*). У производственного
+   * проекта это КБ - от этого зависят правила видимости главного
+   * конструктора (см. kbChiefOwnsProject в permissions). У
+   * административного проекта допустимы и отделы прямого подчинения.
+   */
   const projects = [
     {
       id: "p_lm24", code: "ЛМ-24", name: "Лёгкий многоцелевой самолёт ЛМ-24",
       desc: "ОКР по созданию лёгкого многоцелевого самолёта.",
-      kbId: "kb_la", managerId: "e_morozov", start: D(-25), end: D(50),
+      unitIds: ["kb_la"], managerId: "e_morozov", start: D(-25), end: D(50),
       status: "active", budget: 300, color: "#0ea5e9", ptype: "prod",
       archived: false, archivedAt: null, closedAt: null,
       creatorId: "aleksey.gendirov", customer: "Минобороны РФ", aircraftType: "Су-57",
@@ -74,7 +81,7 @@ export function buildMockData() {
     {
       id: "p_cert", code: "СЕРТ-24", name: "Сертификация самолёта ЛМ-24",
       desc: "Комплекс сертификационных работ.",
-      kbId: "kb_la", managerId: "e_fedorov", start: D(-10), end: D(45),
+      unitIds: ["kb_la"], managerId: "e_fedorov", start: D(-10), end: D(45),
       status: "active", budget: 90, color: "#8b5cf6", ptype: "prod",
       archived: false, archivedAt: null, closedAt: null,
       creatorId: "aleksey.gendirov", customer: "Росавиация", aircraftType: "Су-57",
@@ -84,7 +91,7 @@ export function buildMockData() {
     {
       id: "p_heli", code: "В-112", name: "Модернизация вертолёта В-112",
       desc: "Модернизация планера и систем.",
-      kbId: "kb_la", managerId: "e_gromov", start: D(-30), end: D(35),
+      unitIds: ["kb_la"], managerId: "e_gromov", start: D(-30), end: D(35),
       status: "active", budget: 120, color: "#f43f5e", ptype: "prod",
       archived: false, archivedAt: null, closedAt: null,
       creatorId: "aleksey.gendirov", customer: "ВКС РФ", aircraftType: "Ка-52",
@@ -94,7 +101,7 @@ export function buildMockData() {
     {
       id: "p_rd900", code: "РД-900", name: "Турбовинтовой двигатель РД-900",
       desc: "Перспективный ТВД.",
-      kbId: "kb_ad", managerId: "e_krylov", start: D(-20), end: D(60),
+      unitIds: ["kb_ad"], managerId: "e_krylov", start: D(-20), end: D(60),
       status: "active", budget: 200, color: "#f59e0b", ptype: "prod",
       archived: false, archivedAt: null, closedAt: null,
       creatorId: "aleksey.gendirov", customer: "ОАК", aircraftType: "Ил-76",
@@ -104,7 +111,7 @@ export function buildMockData() {
     {
       id: "p_apu", code: "ВСУ-14", name: "Вспомогательная силовая установка ВСУ-14",
       desc: "ВСУ для ЛМ-24.",
-      kbId: "kb_ad", managerId: "e_medvedev", start: D(-12), end: D(30),
+      unitIds: ["kb_ad"], managerId: "e_medvedev", start: D(-12), end: D(30),
       status: "active", budget: 70, color: "#10b981", ptype: "prod",
       archived: false, archivedAt: null, closedAt: null,
       creatorId: "aleksey.gendirov", customer: "Минобороны РФ", aircraftType: "Су-57",
@@ -114,7 +121,7 @@ export function buildMockData() {
     {
       id: "p_obr", code: "ОБРЭО-01", name: "Модернизация бортового оборудования",
       desc: "Замена аналоговых систем на цифровые.",
-      kbId: null, managerId: "nikolay.managerov", start: D(-5), end: D(20),
+      unitIds: [], managerId: "nikolay.managerov", start: D(-5), end: D(20),
       status: "active", budget: 150, color: "#f97316", ptype: "prod",
       archived: false, archivedAt: null, closedAt: null,
       creatorId: "nikolay.managerov", customer: "Ростех", aircraftType: "МиГ-35",
@@ -124,7 +131,7 @@ export function buildMockData() {
     {
       id: "p_event", code: "АДМ-1", name: "Внутренние мероприятия предприятия",
       desc: "Административный проект: организационные работы и мероприятия.",
-      kbId: null, managerId: "", start: D(-5), end: null,
+      unitIds: [], managerId: "", start: D(-5), end: null,
       status: "active", budget: null, color: "#14b8a6", ptype: "admin",
       archived: false, archivedAt: null, closedAt: null,
       creatorId: "aleksey.gendirov", customer: "ООО «ВДИ»", aircraftType: "Другой",
@@ -134,7 +141,7 @@ export function buildMockData() {
     {
       id: "p_old", code: "ИТ-15", name: "Модернизация локальной сети предприятия",
       desc: "Проект завершён более полугода назад - подлежит архивации.",
-      kbId: null, managerId: "e_morozov", start: D(-300), end: D(-230),
+      unitIds: [], managerId: "e_morozov", start: D(-300), end: D(-230),
       status: "closed", budget: 120, color: "#94a3b8", ptype: "prod",
       archived: true, archivedAt: D(-215), closedAt: D(-215),
       creatorId: "aleksey.gendirov", customer: "ООО «ВДИ»", aircraftType: "Другой",
@@ -144,7 +151,7 @@ export function buildMockData() {
     {
       id: "p_long", code: "АДМ-0", name: "Многолетняя программа внутренних мероприятий",
       desc: "Долгосрочный административный проект - исключение из архивации.",
-      kbId: null, managerId: "olga.personalova", start: D(-400), end: null,
+      unitIds: [], managerId: "olga.personalova", start: D(-400), end: null,
       status: "closed", budget: null, color: "#f59e0b", ptype: "admin", longterm: true,
       archived: false, archivedAt: null, closedAt: D(-300),
       creatorId: "aleksey.gendirov", customer: "ООО «ВДИ»", aircraftType: "Другой",
@@ -154,7 +161,7 @@ export function buildMockData() {
     {
       id: "p_aero", code: "АЭРО-24", name: "Аэродинамические исследования ЛМ-24",
       desc: "Исследования аэродинамических характеристик самолёта.",
-      kbId: "kb_la", managerId: "mikhail.otdelov", start: D(-10), end: D(30),
+      unitIds: ["kb_la"], managerId: "mikhail.otdelov", start: D(-10), end: D(30),
       status: "active", budget: 80, color: "#f97316", ptype: "prod",
       archived: false, archivedAt: null, closedAt: null,
       creatorId: "aleksey.gendirov", customer: "Минобороны РФ", aircraftType: "Су-57",
@@ -164,7 +171,7 @@ export function buildMockData() {
     {
       id: "p_proch", code: "ПРОЧ-24", name: "Прочностные испытания планера",
       desc: "Статические и усталостные испытания.",
-      kbId: "kb_la", managerId: "e_gromov", start: D(-5), end: D(20),
+      unitIds: ["kb_la"], managerId: "e_gromov", start: D(-5), end: D(20),
       status: "active", budget: 100, color: "#8b5cf6", ptype: "prod",
       archived: false, archivedAt: null, closedAt: null,
       creatorId: "aleksey.gendirov", customer: "ВКС РФ", aircraftType: "Су-57",
@@ -174,7 +181,7 @@ export function buildMockData() {
     {
       id: "p_sau", code: "САУ-24", name: "Система управления двигателем РД-900",
       desc: "Разработка цифровой системы управления.",
-      kbId: "kb_ad", managerId: "e_orlova", start: D(-2), end: D(25),
+      unitIds: ["kb_ad"], managerId: "e_orlova", start: D(-2), end: D(25),
       status: "active", budget: 120, color: "#14b8a6", ptype: "prod",
       archived: false, archivedAt: null, closedAt: null,
       creatorId: "aleksey.gendirov", customer: "ОАК", aircraftType: "Ил-76",
@@ -184,7 +191,7 @@ export function buildMockData() {
     {
       id: "p_obr_sw", code: "ОБРЭО-ПО", name: "Разработка ПО для ОБРЭО",
       desc: "Программное обеспечение для бортового оборудования.",
-      kbId: "kb_la", managerId: "nikolay.managerov", start: D(0), end: D(30),
+      unitIds: ["kb_la"], managerId: "nikolay.managerov", start: D(0), end: D(30),
       status: "active", budget: 90, color: "#0ea5e9", ptype: "prod",
       archived: false, archivedAt: null, closedAt: null,
       creatorId: "nikolay.managerov", customer: "Ростех", aircraftType: "МиГ-35",
@@ -194,7 +201,7 @@ export function buildMockData() {
     {
       id: "p_portal", code: "ПОРТ-24", name: "Внутренний портал сотрудника",
       desc: "Административный проект по созданию портала.",
-      kbId: null, managerId: "olga.personalova", start: D(-20), end: D(40),
+      unitIds: [], managerId: "olga.personalova", start: D(-20), end: D(40),
       status: "active", budget: null, color: "#f59e0b", ptype: "admin",
       archived: false, archivedAt: null, closedAt: null,
       creatorId: "aleksey.gendirov", customer: "ООО «ВДИ»", aircraftType: "Другой",
@@ -204,7 +211,7 @@ export function buildMockData() {
     {
       id: "p_bp", code: "БП-24", name: "Оптимизация бизнес-процессов",
       desc: "Анализ и оптимизация процессов.",
-      kbId: null, managerId: "erik.ekonomistov", start: D(-15), end: D(15),
+      unitIds: [], managerId: "erik.ekonomistov", start: D(-15), end: D(15),
       status: "active", budget: null, color: "#f43f5e", ptype: "admin",
       archived: false, archivedAt: null, closedAt: null,
       creatorId: "aleksey.gendirov", customer: "ООО «ВДИ»", aircraftType: "Другой",
@@ -214,7 +221,7 @@ export function buildMockData() {
     {
       id: "p_eng", code: "ИНЖ-01", name: "Инженерный стенд полунатурного моделирования",
       desc: "Стенд для отработки САУ и бортового ПО.",
-      kbId: "kb_ad", managerId: "e_orlova", start: D(-15), end: D(45),
+      unitIds: ["kb_ad"], managerId: "e_orlova", start: D(-15), end: D(45),
       status: "active", budget: 160, color: "#8b5cf6", ptype: "prod",
       archived: false, archivedAt: null, closedAt: null,
       creatorId: "aleksey.gendirov", customer: "ОАК", aircraftType: "Ил-76",
@@ -224,7 +231,7 @@ export function buildMockData() {
     {
       id: "p_material", code: "МАТ-25", name: "Композитные материалы для планера ЛМ-24",
       desc: "Разработка и сертификация новых ПКМ.",
-      kbId: "kb_la", managerId: "e_gromov", start: D(-40), end: D(70),
+      unitIds: ["kb_la"], managerId: "e_gromov", start: D(-40), end: D(70),
       status: "active", budget: 220, color: "#14b8a6", ptype: "prod",
       archived: false, archivedAt: null, closedAt: null,
       creatorId: "aleksey.gendirov", customer: "Минобороны РФ", aircraftType: "Су-57",
@@ -234,7 +241,7 @@ export function buildMockData() {
     {
       id: "p_recon", code: "БЛА-С", name: "Разведывательный БЛА среднего класса",
       desc: "ОКР по созданию разведывательного БЛА.",
-      kbId: "kb_la", managerId: "mikhail.otdelov", start: D(-22), end: D(80),
+      unitIds: ["kb_la"], managerId: "mikhail.otdelov", start: D(-22), end: D(80),
       status: "active", budget: 260, color: "#0ea5e9", ptype: "prod",
       archived: false, archivedAt: null, closedAt: null,
       creatorId: "aleksey.gendirov", customer: "Минобороны РФ", aircraftType: "Другой",
@@ -244,7 +251,7 @@ export function buildMockData() {
     {
       id: "p_energy", code: "ЭНЕР-25", name: "Система электроснабжения нового поколения",
       desc: "Разработка СЭС повышенной мощности.",
-      kbId: "kb_ad", managerId: "e_medvedev", start: D(-12), end: D(50),
+      unitIds: ["kb_ad"], managerId: "e_medvedev", start: D(-12), end: D(50),
       status: "active", budget: 140, color: "#f97316", ptype: "prod",
       archived: false, archivedAt: null, closedAt: null,
       creatorId: "aleksey.gendirov", customer: "Ростех", aircraftType: "МиГ-35",
@@ -254,7 +261,7 @@ export function buildMockData() {
     {
       id: "p_train", code: "УЧБ-01", name: "Программа обучения инженеров-конструкторов",
       desc: "Внутренняя программа повышения квалификации.",
-      kbId: null, managerId: "olga.personalova", start: D(-8), end: D(60),
+      unitIds: [], managerId: "olga.personalova", start: D(-8), end: D(60),
       status: "active", budget: null, color: "#f59e0b", ptype: "admin",
       archived: false, archivedAt: null, closedAt: null,
       creatorId: "olga.personalova", customer: "ООО «ВДИ»", aircraftType: "Другой",
@@ -264,7 +271,7 @@ export function buildMockData() {
     {
       id: "p_safety", code: "БЕЗ-25", name: "Программа производственной безопасности",
       desc: "Мероприятия по охране труда и технике безопасности.",
-      kbId: null, managerId: "sergey.adminov", start: D(-30), end: D(90),
+      unitIds: [], managerId: "sergey.adminov", start: D(-30), end: D(90),
       status: "active", budget: null, color: "#ef4444", ptype: "admin",
       archived: false, archivedAt: null, closedAt: null,
       creatorId: "sergey.adminov", customer: "ООО «ВДИ»", aircraftType: "Другой",
@@ -274,7 +281,7 @@ export function buildMockData() {
     {
       id: "p_quality", code: "КАЧ-25", name: "Внедрение системы менеджмента качества",
       desc: "Подготовка к сертификации СМК по ISO 9001.",
-      kbId: null, managerId: "e_otk_head", start: D(-18), end: D(75),
+      unitIds: [], managerId: "e_otk_head", start: D(-18), end: D(75),
       status: "active", budget: 60, color: "#3b82f6", ptype: "prod",
       archived: false, archivedAt: null, closedAt: null,
       creatorId: "aleksey.gendirov", customer: "ООО «ВДИ»", aircraftType: "Другой",
@@ -284,7 +291,7 @@ export function buildMockData() {
     {
       id: "p_export", code: "ЭКСП-25", name: "Экспортная поддержка ЛМ-24",
       desc: "Адаптация документации и обучение зарубежных партнёров.",
-      kbId: "kb_la", managerId: "e_fedorov", start: D(-5), end: D(55),
+      unitIds: ["kb_la"], managerId: "e_fedorov", start: D(-5), end: D(55),
       status: "active", budget: 80, color: "#ec4899", ptype: "prod",
       archived: false, archivedAt: null, closedAt: null,
       creatorId: "aleksey.gendirov", customer: "Ростех", aircraftType: "Су-57",
@@ -402,7 +409,7 @@ export function buildMockData() {
     }),
     T("t20", "Аудит качества сборки", "p_lm24", "sergey.adminov", 12, -8, 5, "new", "high", "Проверка соответствия технологии."),
     T("t21", "Утверждение стратегии развития", "p_bp", "aleksey.gendirov", 8, -5, 10, "new", "high", "Подготовка и утверждение стратегии."),
-    T("t22", "Анализ бюджетов проектов", "p_bp", "erik.ekonomistov", 16, -3, 12, "inwork", "mid", "Сравнение плановых и фактических затрат.", {
+    T("t22", "Анализ плановых часов проектов", "p_bp", "erik.ekonomistov", 16, -3, 12, "inwork", "mid", "Сравнение плановых и фактических затрат.", {
       logs: [ { id: uid(), userId: "erik.ekonomistov", date: makeDate(-2), hours: 8, note: "Сбор данных" } ]
     }),
     T("t23", "Руководство проектированием крыла", "p_lm24", "ivan.konstruktorov", 20, -10, 15, "inwork", "crit", "Общее руководство конструкторской группой."),
@@ -550,9 +557,60 @@ export function buildMockData() {
     { id: "v5", empId: "e_anokhin", start: D(-15), end: D(-3), type: "annual", comment: "Уже был", status: "approved", delegation: { enabled: false, subId: null, statuses: [], state: null } },
   ];
 
-  const hoursRequests = [
-    { id: "hr1", kind: "task", targetId: "t04", oldH: 32, newH: 48, reason: "Добавился расчёт усталостных трещин по требованию ОТК.", reqId: "e_morozov", status: "pending", ts: now - 3600000 * 5 },
-    { id: "hr2", kind: "project", targetId: "p_lm24", oldH: 180, newH: 210, reason: "Расширение scope: добавлены работы по сертификации.", reqId: "e_morozov", status: "pending", ts: now - 3600000 * 20 },
+  /**
+   * Запросы на изменение. Единый массив вместо пары hoursRequests +
+   * deadlineRequests: и часы, и срок — это один поток «исполнитель
+   * попросил → директор решил», различается только правило применения
+   * (см. utils/changeKinds). Поля:
+   *
+   *   changeKind — id правила: 'hours' | 'deadline';
+   *   targetType — 'task' | 'project';
+   *   targetId   — id целевой сущности;
+   *   oldValue   — старое значение (число для часов, ISO-дата для срока);
+   *   newValue   — новое значение;
+   *   status     — 'pending' | 'approved' | 'rejected';
+   *   rejectionReason — причина отклонения или null.
+   */
+  const changeRequests = [
+    {
+      id: 'cr1',
+      changeKind: 'hours',
+      targetType: 'task',
+      targetId: 't04',
+      oldValue: 32,
+      newValue: 48,
+      reason: 'Добавился расчёт усталостных трещин по требованию ОТК.',
+      reqId: 'e_morozov',
+      status: 'pending',
+      rejectionReason: null,
+      ts: now - 3600000 * 5,
+    },
+    {
+      id: 'cr2',
+      changeKind: 'hours',
+      targetType: 'project',
+      targetId: 'p_lm24',
+      oldValue: 180,
+      newValue: 210,
+      reason: 'Расширение scope: добавлены работы по сертификации.',
+      reqId: 'e_morozov',
+      status: 'pending',
+      rejectionReason: null,
+      ts: now - 3600000 * 20,
+    },
+    {
+      id: 'cr3',
+      changeKind: 'deadline',
+      targetType: 'task',
+      targetId: 't01',
+      oldValue: D(6),
+      newValue: D(12),
+      reason: 'Дополнительное согласование с ОТК, сдвиг контрольной точки.',
+      reqId: 'isaev',
+      status: 'pending',
+      rejectionReason: null,
+      ts: now - 3600000 * 8,
+    },
   ];
 
   const regRequests = [
@@ -560,63 +618,210 @@ export function buildMockData() {
   ];
 
   /**
-   * Уведомления. Покрывают ровно тех сотрудников, что показаны в плитках
-   * демо-доступов на LoginScreen, и все targetType, которые знает NotifPanel:
-   * task / project / hours / vacation / delegation / registration / employee.
-   *
-   * Поле targetTab проставлено только у уведомлений о комментариях/упоминаниях -
-   * там клик обязан вести в «Обсуждение». У остальных targetTab = null, и
-   * MainLayout подставит дефолтную вкладку раздела ('form' для задачи,
-   * 'info' для проекта).
+   * Уведомления. Для запросов на изменение targetType = 'changeRequest',
+   * а конкретная вкладка раздела «Запросы и заявки» — в targetTab
+   * (совпадает с changeKind). Остальные targetType — как раньше.
    */
   const notifications = [
-    // --- aleksey.gendirov (director) ---
-    { id: uid(), userId: "aleksey.gendirov", text: "Запрос на изменение плановых часов по задаче «Отчёт по прочности фюзеляжа» ожидает решения.", ts: now - 3600000 * 5, read: false, targetType: 'hours', targetId: 'hr1', targetTab: null },
-    { id: uid(), userId: "aleksey.gendirov", text: "Запрос на изменение бюджета проекта «Лёгкий многоцелевой самолёт ЛМ-24» ожидает решения.", ts: now - 3600000 * 20, read: false, targetType: 'hours', targetId: 'hr2', targetTab: null },
-    { id: uid(), userId: "aleksey.gendirov", text: "Проект «Экспортная поддержка ЛМ-24» переведён в статус «Активный».", ts: now - 3600000 * 60, read: true, targetType: 'project', targetId: 'p_export', targetTab: null },
+    // ---------- aleksey.gendirov (director) ----------
+    {
+      id: uid(), userId: 'aleksey.gendirov',
+      text: 'Запрос на изменение плановых часов по задаче «Отчёт по прочности фюзеляжа» ожидает решения.',
+      ts: now - 3600000 * 5, read: false,
+      targetType: 'changeRequest', targetId: 'cr1', targetTab: 'hours',
+    },
+    {
+      id: uid(), userId: 'aleksey.gendirov',
+      text: 'Запрос на изменение плановых часов проекта «Лёгкий многоцелевой самолёт ЛМ-24» ожидает решения.',
+      ts: now - 3600000 * 20, read: false,
+      targetType: 'changeRequest', targetId: 'cr2', targetTab: 'hours',
+    },
+    {
+      id: uid(), userId: 'aleksey.gendirov',
+      text: 'Запрос на изменение срока задачи «Расчёт подъёмной силы крыла» ожидает решения.',
+      ts: now - 3600000 * 8, read: false,
+      targetType: 'changeRequest', targetId: 'cr3', targetTab: 'deadline',
+    },
+    {
+      id: uid(), userId: 'aleksey.gendirov',
+      text: 'Проект «Экспортная поддержка ЛМ-24» переведён в статус «Активный».',
+      ts: now - 3600000 * 60, read: true,
+      targetType: 'project', targetId: 'p_export', targetTab: null,
+    },
 
-    // --- sergey.adminov (admin) ---
-    { id: uid(), userId: "sergey.adminov", text: "Новая заявка на регистрацию: Новиков Олег.", ts: now - 3600000 * 26, read: false, targetType: 'registration', targetId: 'rg1', targetTab: null },
-    { id: uid(), userId: "sergey.adminov", text: "Задача «Аудит рабочих мест по ТБ» просрочена.", ts: now - 3600000 * 12, read: false, targetType: 'task', targetId: 't46', targetTab: null },
-    { id: uid(), userId: "sergey.adminov", text: "Создан сотрудник Мельник Светлана.", ts: now - 3600000 * 240, read: true, targetType: 'employee', targetId: 'e_melnik', targetTab: null },
+    // ---------- sergey.adminov (admin) ----------
+    {
+      id: uid(), userId: 'sergey.adminov',
+      text: 'Новая заявка на регистрацию: Новиков Олег.',
+      ts: now - 3600000 * 26, read: false,
+      targetType: 'registration', targetId: 'rg1', targetTab: null,
+    },
+    {
+      id: uid(), userId: 'sergey.adminov',
+      text: 'Задача «Аудит рабочих мест по ТБ» просрочена.',
+      ts: now - 3600000 * 12, read: false,
+      targetType: 'task', targetId: 't46', targetTab: null,
+    },
+    {
+      id: uid(), userId: 'sergey.adminov',
+      text: 'Создан сотрудник Мельник Светлана.',
+      ts: now - 3600000 * 240, read: true,
+      targetType: 'employee', targetId: 'e_melnik', targetTab: null,
+    },
 
-    // --- erik.ekonomistov (economist) ---
-    { id: uid(), userId: "erik.ekonomistov", text: "Вам назначена задача «Экономический анализ проекта БЛА-С».", ts: now - 3600000 * 8, read: false, targetType: 'task', targetId: 't55', targetTab: null },
-    { id: uid(), userId: "erik.ekonomistov", text: "Проект «Оптимизация бизнес-процессов» требует обновления бюджета.", ts: now - 3600000 * 40, read: true, targetType: 'project', targetId: 'p_bp', targetTab: null },
+    // ---------- erik.ekonomistov (economist) ----------
+    {
+      id: uid(), userId: 'erik.ekonomistov',
+      text: 'Вам назначена задача «Экономический анализ проекта БЛА-С».',
+      ts: now - 3600000 * 8, read: false,
+      targetType: 'task', targetId: 't55', targetTab: null,
+    },
+    {
+      id: uid(), userId: 'erik.ekonomistov',
+      text: 'Вы назначены ответственным по проекту «Оптимизация бизнес-процессов».',
+      ts: now - 3600000 * 40, read: true,
+      targetType: 'project', targetId: 'p_bp', targetTab: null,
+    },
 
-    // --- ivan.konstruktorov (kb_chief ЛА) ---
-    { id: uid(), userId: "ivan.konstruktorov", text: "В КБ «ЛА» создан проект «Разведывательный БЛА среднего класса».", ts: now - 3600000 * 22, read: false, targetType: 'project', targetId: 'p_recon', targetTab: null },
-    { id: uid(), userId: "ivan.konstruktorov", text: "Задача «Руководство проектированием крыла» перешла в статус «В работе».", ts: now - 3600000 * 48, read: true, targetType: 'task', targetId: 't23', targetTab: null },
-    { id: uid(), userId: "ivan.konstruktorov", text: "Морозов К. упомянул(а) вас: «подключите, пожалуйста, отдел прочности…»", ts: now - 3600000 * 20, read: false, targetType: 'task', targetId: 't01', targetTab: 'chat' },
+    // ---------- ivan.konstruktorov (kb_chief ЛА) ----------
+    {
+      id: uid(), userId: 'ivan.konstruktorov',
+      text: 'В КБ «ЛА» создан проект «Разведывательный БЛА среднего класса».',
+      ts: now - 3600000 * 22, read: false,
+      targetType: 'project', targetId: 'p_recon', targetTab: null,
+    },
+    {
+      id: uid(), userId: 'ivan.konstruktorov',
+      text: 'Задача «Руководство проектированием крыла» перешла в статус «В работе».',
+      ts: now - 3600000 * 48, read: true,
+      targetType: 'task', targetId: 't23', targetTab: null,
+    },
 
-    // --- olga.personalova (hr) ---
-    { id: uid(), userId: "olga.personalova", text: "Тихонов Е. подал заявку на отпуск с делегированием задач.", ts: now - 3600000 * 8, read: false, targetType: 'vacation', targetId: 'v2', targetTab: null },
-    { id: uid(), userId: "olga.personalova", text: "Исаев Р. подал заявку на отпуск.", ts: now - 3600000 * 30, read: false, targetType: 'vacation', targetId: 'v4', targetTab: null },
-    { id: uid(), userId: "olga.personalova", text: "В проекте «Программа обучения инженеров-конструкторов» создана задача «Набор преподавателей».", ts: now - 3600000 * 50, read: true, targetType: 'task', targetId: 't44', targetTab: null },
-    { id: uid(), userId: "olga.personalova", text: "Создан сотрудник Анохин Сергей.", ts: now - 3600000 * 400, read: true, targetType: 'employee', targetId: 'e_anokhin', targetTab: null },
+    // ---------- e_belova (kb_chief АД) ----------
+    {
+      id: uid(), userId: 'e_belova',
+      text: 'В КБ «АД» создан проект «Система управления двигателем РД-900».',
+      ts: now - 3600000 * 22, read: false,
+      targetType: 'project', targetId: 'p_sau', targetTab: null,
+    },
+    {
+      id: uid(), userId: 'e_belova',
+      text: 'Задача «Термогазодинамический расчёт компрессора» перешла в статус «В работе».',
+      ts: now - 3600000 * 36, read: false,
+      targetType: 'task', targetId: 't10', targetTab: null,
+    },
+    {
+      id: uid(), userId: 'e_belova',
+      text: 'Проект «Система электроснабжения нового поколения» переведён в статус «Активный».',
+      ts: now - 3600000 * 60, read: true,
+      targetType: 'project', targetId: 'p_energy', targetTab: null,
+    },
 
-    // --- mikhail.otdelov (head, project_lead) ---
-    { id: uid(), userId: "mikhail.otdelov", text: "Вы назначены ответственным по проекту «Разведывательный БЛА среднего класса».", ts: now - 3600000 * 22, read: false, targetType: 'project', targetId: 'p_recon', targetTab: null },
-    { id: uid(), userId: "mikhail.otdelov", text: "Задача «Координация аэродинамических расчётов» требует внимания: срок близко.", ts: now - 3600000 * 18, read: false, targetType: 'task', targetId: 't25', targetTab: null },
-    { id: uid(), userId: "mikhail.otdelov", text: "Исаев Р. оставил(а) комментарий: «Принято, сегодня подготовлю исходные данные.»", ts: now - 3600000 * 18, read: false, targetType: 'task', targetId: 't01', targetTab: 'chat' },
-    { id: uid(), userId: "mikhail.otdelov", text: "Вам предложено временное принятие роли «Ответственный по проекту».", ts: now - 3600000 * 90, read: true, targetType: 'delegation', targetId: 'rd_demo_1', targetTab: null },
+    // ---------- olga.personalova (hr) ----------
+    {
+      id: uid(), userId: 'olga.personalova',
+      text: 'Тихонов Е. подал заявку на отпуск с делегированием задач.',
+      ts: now - 3600000 * 8, read: false,
+      targetType: 'vacation', targetId: 'v2', targetTab: null,
+    },
+    {
+      id: uid(), userId: 'olga.personalova',
+      text: 'Исаев Р. подал заявку на отпуск.',
+      ts: now - 3600000 * 30, read: false,
+      targetType: 'vacation', targetId: 'v4', targetTab: null,
+    },
+    {
+      id: uid(), userId: 'olga.personalova',
+      text: 'В проекте «Программа обучения инженеров-конструкторов» создана задача «Набор преподавателей».',
+      ts: now - 3600000 * 50, read: true,
+      targetType: 'task', targetId: 't44', targetTab: null,
+    },
+    {
+      id: uid(), userId: 'olga.personalova',
+      text: 'Создан сотрудник Анохин Сергей.',
+      ts: now - 3600000 * 400, read: true,
+      targetType: 'employee', targetId: 'e_anokhin', targetTab: null,
+    },
 
-    // --- nikolay.managerov (project_manager) ---
-    { id: uid(), userId: "nikolay.managerov", text: "Новая заявка на регистрацию: Новиков Олег.", ts: now - 3600000 * 26, read: false, targetType: 'registration', targetId: 'rg1', targetTab: null },
-    { id: uid(), userId: "nikolay.managerov", text: "Задача «Управление проектом ОБРЭО»: срок исполнения изменён.", ts: now - 3600000 * 40, read: false, targetType: 'task', targetId: 't27', targetTab: null },
-    { id: uid(), userId: "nikolay.managerov", text: "В проекте «Разработка ПО для ОБРЭО» создана задача «Перевод технических бюллетеней».", ts: now - 3600000 * 6, read: false, targetType: 'project', targetId: 'p_obr_sw', targetTab: null },
+    // ---------- mikhail.otdelov (head, project_lead) ----------
+    {
+      id: uid(), userId: 'mikhail.otdelov',
+      text: 'Вы назначены ответственным по проекту «Разведывательный БЛА среднего класса».',
+      ts: now - 3600000 * 22, read: false,
+      targetType: 'project', targetId: 'p_recon', targetTab: null,
+    },
+    {
+      id: uid(), userId: 'mikhail.otdelov',
+      text: 'Задача «Координация аэродинамических расчётов» требует внимания: срок близко.',
+      ts: now - 3600000 * 18, read: false,
+      targetType: 'task', targetId: 't25', targetTab: null,
+    },
+    {
+      id: uid(), userId: 'mikhail.otdelov',
+      text: 'Вам предложено временное принятие роли «Ответственный по проекту».',
+      ts: now - 3600000 * 90, read: true,
+      targetType: 'delegation', targetId: 'rd_demo_1', targetTab: null,
+    },
 
-    // --- kirill.proektov (project_lead) ---
-    { id: uid(), userId: "kirill.proektov", text: "Вам назначена задача «Перевод технических бюллетеней».", ts: now - 3600000 * 6, read: false, targetType: 'task', targetId: 't52', targetTab: null },
-    { id: uid(), userId: "kirill.proektov", text: "Задача «Планирование испытаний» перешла в статус «Новая».", ts: now - 3600000 * 200, read: true, targetType: 'task', targetId: 't26', targetTab: null },
-    { id: uid(), userId: "kirill.proektov", text: "Вам предложено временное принятие роли «Менеджер проектов».", ts: now - 3600000 * 80, read: false, targetType: 'delegation', targetId: 'rd_demo_2', targetTab: null },
+    // ---------- nikolay.managerov (project_manager) ----------
+    {
+      id: uid(), userId: 'nikolay.managerov',
+      text: 'Задача «Управление проектом ОБРЭО»: срок исполнения изменён.',
+      ts: now - 3600000 * 40, read: false,
+      targetType: 'task', targetId: 't27', targetTab: null,
+    },
+    {
+      id: uid(), userId: 'nikolay.managerov',
+      text: 'В проекте «Разработка ПО для ОБРЭО» создана задача «Перевод технических бюллетеней».',
+      ts: now - 3600000 * 6, read: false,
+      targetType: 'project', targetId: 'p_obr_sw', targetTab: null,
+    },
 
-    // --- isaev (executor) ---
-    { id: uid(), userId: "isaev", text: "Вам назначена задача «Аэродинамический расчёт БЛА-С».", ts: now - 3600000 * 10, read: false, targetType: 'task', targetId: 't36', targetTab: null },
-    { id: uid(), userId: "isaev", text: "Морозов К. упомянул(а) вас: «@Исаев Роман — подключите, пожалуйста, отдел прочности к пятнице.»", ts: now - 3600000 * 20, read: false, targetType: 'task', targetId: 't01', targetTab: 'chat' },
-    { id: uid(), userId: "isaev", text: "Ваш отпуск 10–17 числа утверждён.", ts: now - 3600000 * 30, read: true, targetType: 'vacation', targetId: 'v4', targetTab: null },
-    { id: uid(), userId: "isaev", text: "Запрос на изменение часов по задаче «Расчёт подъёмной силы крыла» ожидает решения.", ts: now - 3600000 * 12, read: false, targetType: 'hours', targetId: 'hr1', targetTab: null },
-    { id: uid(), userId: "isaev", text: "Создан сотрудник Новиков Олег (ожидает одобрения).", ts: now - 3600000 * 26, read: true, targetType: 'employee', targetId: 'rg1', targetTab: null },
+    // ---------- kirill.proektov (project_lead) ----------
+    {
+      id: uid(), userId: 'kirill.proektov',
+      text: 'Вам назначена задача «Перевод технических бюллетеней».',
+      ts: now - 3600000 * 6, read: false,
+      targetType: 'task', targetId: 't52', targetTab: null,
+    },
+    {
+      id: uid(), userId: 'kirill.proektov',
+      text: 'Задача «Планирование испытаний» перешла в статус «Новая».',
+      ts: now - 3600000 * 200, read: true,
+      targetType: 'task', targetId: 't26', targetTab: null,
+    },
+    {
+      id: uid(), userId: 'kirill.proektov',
+      text: 'Вам предложено временное принятие роли «Менеджер проектов».',
+      ts: now - 3600000 * 80, read: false,
+      targetType: 'delegation', targetId: 'rd_demo_2', targetTab: null,
+    },
+
+    // ---------- isaev (executor) ----------
+    {
+      id: uid(), userId: 'isaev',
+      text: 'Вам назначена задача «Аэродинамический расчёт БЛА-С».',
+      ts: now - 3600000 * 10, read: false,
+      targetType: 'task', targetId: 't36', targetTab: null,
+    },
+    {
+      id: uid(), userId: 'isaev',
+      text: 'Морозов К. упомянул(а) вас: «@Исаев Роман — подключите, пожалуйста, отдел прочности к пятнице.»',
+      ts: now - 3600000 * 20, read: false,
+      targetType: 'task', targetId: 't01', targetTab: 'chat',
+    },
+    {
+      id: uid(), userId: 'isaev',
+      text: 'Задача «Расчёт подъёмной силы крыла»: срок приближается.',
+      ts: now - 3600000 * 30, read: false,
+      targetType: 'task', targetId: 't01', targetTab: null,
+    },
+    {
+      id: uid(), userId: 'isaev',
+      text: 'Ваш отпуск с 17.10 по 24.10 находится на рассмотрении.',
+      ts: now - 3600000 * 30, read: true,
+      targetType: 'vacation', targetId: 'v4', targetTab: null,
+    },
   ];
 
   const audit = [
@@ -633,7 +838,7 @@ export function buildMockData() {
     projects,
     tasks,
     vacations,
-    hoursRequests,
+    changeRequests,
     roleDelegations: [],
     regRequests,
     notifications,

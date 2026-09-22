@@ -1127,7 +1127,7 @@ export function buildMockData() {
     { id: "d_stren", name: "Отдел прочности двигателей", kbId: "kb_ad" },
     { id: "d_sau", name: "Отдел систем автоматического управления", kbId: "kb_ad" },
     { id: "d_av1", name: "Отдел бортового радиоэлектронного оборудования (ОБРЭО)", kbId: "kb_la" },
-    { id: "d_otk", name: "Отдел контроля качества инженерного центра", kbId: null },
+    { id: "d_otk", name: "ОКК ИЦ", kbId: null },
     { id: "d_hr", name: "Отдел управления персоналом", kbId: null },
     { id: "d_management", name: "Группа управления и развития", kbId: null },
   ];
@@ -2913,6 +2913,30 @@ input, select, textarea {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
+
+/*
+ * Метка непрочитанных сообщений на карточке задачи/проекта.
+ * Родитель (.kcard, .pj-card.relative) уже position: relative -
+ * поэтому здесь только absolute без установки контекста.
+ * pointer-events: none - клик по бейджу должен проваливаться
+ * на карточку (открыть её), а не поглощаться меткой.
+ */
+.kcard-unread {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+  border-radius: 99px;
+  pointer-events: none;
+}
+
 .vac-note, .del-note {
   display: flex;
   gap: 5px;
@@ -11817,7 +11841,6 @@ export const VacationModal = ({ db, ur, vacationId, forEmpId, onClose, onSave })
                   {TASK_STATUSES[st].label}
                 </label>
               ))}
-              <span className="mut sm">пусто = все активные задачи</span>
             </div>
             <p className="mut sm">Делегирование утверждает руководитель до начала отпуска. Задачи вернутся автоматически после окончания отпуска. Задачи, где сотрудник - ответственный по проекту, передаются только через делегирование ролей.</p>
           </>

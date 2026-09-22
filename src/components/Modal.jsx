@@ -1,8 +1,26 @@
-import React, { useEffect, useLayoutEffect, useRef } from 'react';
+// src/components/Modal.jsx
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { Ic, ICONS } from './Icons';
 
+/**
+ * Базовое модальное окно.
+ *
+ * Внутри - оверлей, шапка (headerBefore + заголовок с опциональным
+ * подзаголовком + headerAfter + крестик), тело и футер. Специализации
+ * (ModalShell с кнопками «Отмена / Сохранить», TaskModal, ProjectModal)
+ * строятся поверх.
+ *
+ * subtitle - необязательная вторая строка под h3: метаданные сущности
+ * («Задачу составил…», «Создан 15.01.2026» и т.п.). Вынесен в h3-блок
+ * отдельным элементом, а не склеен в один title строкой: заголовок -
+ * крупный и тёмный, подзаголовок - мелкий и приглушённый, стили разные.
+ *
+ * Если subtitle не передан (null / undefined / пусто) - разметка не
+ * меняется, h3 остаётся как есть.
+ */
 export const Modal = ({
   title,
+  subtitle = null,
   onClose,
   children,
   footer = null,
@@ -14,15 +32,14 @@ export const Modal = ({
 }) => {
   const rootRef = useRef(null);
 
-  // Ширина передаётся через CSS-переменную, а не inline-стилем: значение
-  // по умолчанию живёт в styles.css рядом с остальным описанием .modal.
-  // Это устраняет style={{ maxWidth }} в JSX - разметка остаётся чистой.
   useLayoutEffect(() => {
     rootRef.current?.style.setProperty('--modal-max-w', `${width}px`);
   }, [width]);
 
   useEffect(() => {
-    const handler = (e) => { if (e.key === 'Escape') onClose(); };
+    const handler = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [onClose]);
@@ -35,8 +52,14 @@ export const Modal = ({
       <div ref={rootRef} className={`modal ${className}`}>
         <div className="modal-head">
           {headerBefore && <div className="modal-header-before">{headerBefore}</div>}
-          <h3>{title}</h3>
+
+          <div className="modal-title-block">
+            <h3>{title}</h3>
+            {subtitle && <div className="modal-subtitle">{subtitle}</div>}
+          </div>
+
           {headerAfter && <div className="modal-header-after">{headerAfter}</div>}
+
           <button className="icon-btn" onClick={onClose}>
             <Ic d={ICONS.x} size={16} />
           </button>

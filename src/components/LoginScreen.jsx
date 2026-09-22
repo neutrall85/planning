@@ -424,16 +424,14 @@ export default function LoginScreen({ registerEmployee, onLogin, toast }) {
                   Регистрация
                 </button>
               </div>
-              <div className="cookie-note">
-                Сессия хранится в cookie 30 дней (HttpOnly, Secure, SameSite=Lax - на стороне сервера).
-              </div>
               <div className="demo-title">Демо-доступы - клик сразу выполняет вход</div>
               <div className="demo-grid">
                 {[
                   { l: 'sergey.adminov@hor.ru',    p: 'Admin2026!',    t: 'Суперадминистратор' },
                   { l: 'aleksey.gendirov@hor.ru',  p: 'Director2026!', t: 'Генеральный директор' },
-                  { l: 'erik.ekonomistov@hor.ru',  p: 'Econ2026!',     t: 'Главный экономист' },
                   { l: 'ivan.konstruktorov@hor.ru',p: 'KbLa2026!',     t: 'Гл. конструктор КБ «ЛА»' },
+                  { l: 'belova@hor.ru',            p: 'KbAd2026!',     t: 'Гл. конструктор КБ «АД»' },
+                  { l: 'erik.ekonomistov@hor.ru',  p: 'Econ2026!',     t: 'Главный экономист' },
                   { l: 'olga.personalova@hor.ru',  p: 'Hr2026!',       t: 'HR-менеджер' },
                   { l: 'mikhail.otdelov@hor.ru',   p: 'Head2026!',     t: 'Руководитель отделов' },
                   { l: 'nikolay.managerov@hor.ru', p: 'Pm2026!',       t: 'Менеджер проектов' },

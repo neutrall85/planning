@@ -1,13 +1,14 @@
 // src/components/Calendar.jsx
 import { useState, useMemo, memo } from 'react';
 import { useToast } from '../context/ToastContext';
-import { computeScope, hasRole, taskVisible } from '../utils/permissions';
+import { computeScope, canSeeAllContent, taskVisible } from '../utils/permissions';
 import { isTaskActive } from '../utils/entityState';
 import { changeTaskStatus, deleteTask } from '../utils/taskActions';
 import { buildTaskMenu } from './menus';
 import FloatingMenu from './FloatingMenu';
 import Avatar from './Avatar';
 import { Ic, ICONS } from './Icons';
+import { ToggleSwitch } from './ToggleSwitch';
 import { fmtDMY, iso, addDays } from '../utils/date';
 import { useScheduleDb } from '../hooks/useDb';
 
@@ -41,10 +42,10 @@ function Calendar({ ur, openTask, store, openCopyTask, openTemplateFromTask }) {
   const [anchor, setAnchor] = useState(new Date());
   const [showOnlyMy, setShowOnlyMy] = useState(false);
 
-  const canSeeAll = hasRole(
-    ur,
-    'admin', 'director', 'economist', 'kb_chief', 'head', 'project_lead', 'project_manager',
-  );
+  // Единая точка правила «видит весь контент» - та же, что в TasksView
+  // и ProjectsView. Раньше список ролей был продублирован здесь строкой,
+  // и при изменении набора ролей приходилось править два файла.
+  const canSeeAll = canSeeAllContent(ur);
 
   const allTasks = useMemo(() => {
     let list = tasks.filter(t =>
@@ -195,14 +196,11 @@ function Calendar({ ur, openTask, store, openCopyTask, openTemplateFromTask }) {
             ))}
           </div>
           {canSeeAll && (
-            <label className="dept-pick ml-2">
-              <input
-                type="checkbox"
-                checked={showOnlyMy}
-                onChange={e => setShowOnlyMy(e.target.checked)}
-              />
-              <span className="text-sm">Мои задачи</span>
-            </label>
+            <ToggleSwitch
+              checked={showOnlyMy}
+              onChange={setShowOnlyMy}
+              label="Мои задачи"
+            />
           )}
         </div>
       </div>

@@ -9,6 +9,7 @@ import ProjectChat from '../ProjectChat';
 import { ProjectGallery } from '../ProjectGallery';
 import { Lightbox } from '../Lightbox';
 import { ProjectAccessModal } from './ProjectAccessModal';
+import { ProjectFooterActions } from './ProjectFooterActions';
 import { HistoryTab } from '../HistoryTab';
 import { useForm } from '../../hooks/useForm';
 import {
@@ -16,16 +17,17 @@ import {
   useControlledTab,
   useStableModalHeight,
 } from '../../hooks';
+import { useChatUnreadCount, useChatTotalCount } from '../../hooks/useChatStats';
 import { useConfirm } from '../../context/ConfirmContext';
 import {
   PROJECT_STATUSES,
   PROJECT_TYPES,
-  PROJECT_PRIORITIES,
-  ADMIN_PROJECT_PRIORITIES,
   DIALOGS,
   TOASTS,
   FILE_LIMITS,
   FILE_MESSAGES,
+  priorityOptionsForProjectType,
+  withSyncedPriority,
 } from '../../utils/constants';
 import { TODAY, iso, addDays, uid, fmtDMY } from '../../utils/date';
 import {
@@ -36,27 +38,25 @@ import {
   canManageProjectAccess,
   hasRole,
 } from '../../utils/permissions';
+import {
+  sanitizeUnitIdsForPtype,
+  unitOptionsForPtype,
+} from '../../utils/projectUnits';
 import { isArchived } from '../../utils/entityState';
 import { getProjectColor } from '../../utils/projectHelpers';
 import { prepareAttachments } from '../../utils/fileUpload';
 import { createFolder } from '../../utils/fileTree';
 import { Ic, ICONS } from '../Icons';
-import { TemplateSelect, TemplateActions } from '../Templates';
+import { TemplateSelect } from '../Templates';
 import { applyTemplatePayload } from '../../utils/templateSchemas';
 import { collectTaskPayloads } from '../../utils/templateNesting';
 
 const AIRCRAFT_TYPES = ['Су-57', 'МиГ-35', 'Ту-160', 'Ил-76', 'Ка-52', 'Другой'];
 const PROJECT_TYPE_OPTIONS = ['Ремонт', 'Модификация', 'КС', 'ИКУ'];
 
-const stripAccess = (project) => {
-  if (!project) return project;
-  const { access, ...rest } = project;
-  return rest;
-};
-
 const FORM_FIELDS = Object.freeze([
   'name', 'code', 'desc', 'ptype', 'customer', 'aircraftType', 'projectType',
-  'priority', 'kbId', 'managerId', 'start', 'end', 'budget', 'status', 'longterm',
+  'priority', 'unitIds', 'managerId', 'start', 'end', 'budget', 'status', 'longterm',
 ]);
 
 const readFileAsPhoto = (file, uploaderId) =>
@@ -74,6 +74,12 @@ const readFileAsPhoto = (file, uploaderId) =>
     reader.readAsDataURL(file);
   });
 
+const applyPtypeChange = (prev, nextPtype, db) => {
+  const next = withSyncedPriority(prev, nextPtype);
+  next.unitIds = sanitizeUnitIdsForPtype(next.unitIds, next.ptype, db);
+  return next;
+};
+
 export const ProjectModal = ({
   db,
   ur,
@@ -81,6 +87,8 @@ export const ProjectModal = ({
   initialTab = 'info',
   copyFromId,
   returnToProjectId,
+  highlightFileId = null,
+  highlightFolderId = null,
   onClose,
   onSave,
   onDelete,
@@ -121,10 +129,10 @@ export const ProjectModal = ({
   const bodyRef = useStableModalHeight(activeTab);
 
   const initialValues = existing
-    ? stripAccess(existing)
+    ? existing
     : isCopy
       ? {
-          ...stripAccess(copySource),
+          ...copySource,
           id: 'p_' + uid(),
           managerId: '',
           status: 'active',
@@ -135,6 +143,7 @@ export const ProjectModal = ({
           history: [
             { ts: Date.now(), who: ur.id, text: `Скопирован из «${copySource.name}»` },
           ],
+          access: { userIds: [] },
           files: [],
           folders: [],
           photos: [],
@@ -144,7 +153,7 @@ export const ProjectModal = ({
           code: '',
           name: '',
           desc: '',
-          kbId: '',
+          unitIds: [],
           managerId: '',
           start: TODAY,
           end: iso(addDays(new Date(), 30)),
@@ -162,6 +171,7 @@ export const ProjectModal = ({
           projectType: '',
           priority: 'NORM',
           history: [{ ts: Date.now(), who: ur.id, text: 'Проект создан' }],
+          access: { userIds: [] },
           files: [],
           folders: [],
           photos: [],
@@ -173,22 +183,57 @@ export const ProjectModal = ({
     if (!values.code?.trim()) errors.code = 'Код обязателен';
     if (!values.start) errors.start = 'Дата начала обязательна';
     if (!values.customer?.trim()) errors.customer = 'Заказчик обязателен';
+
     const isAdmin = values.ptype === 'admin';
+
     if (!isAdmin) {
       if (!values.aircraftType) errors.aircraftType = 'Выберите тип ВС';
       if (!values.projectType) errors.projectType = 'Выберите категорию';
       if (!values.managerId) errors.managerId = 'Ответственный обязателен';
+      if (!values.unitIds || values.unitIds.length === 0) {
+        errors.unitIds = 'Выберите хотя бы одно КБ';
+      }
       if (!values.end) errors.end = 'Дата окончания обязательна';
-      if (!values.kbId) errors.kbId = 'Выберите подразделение (КБ)';
-      if (!values.budget || +values.budget <= 0) errors.budget = 'Бюджет должен быть > 0';
     }
+
+    const budgetFilled = values.budget !== '' && values.budget !== null && values.budget !== undefined;
+    if (isAdmin) {
+      if (budgetFilled && (isNaN(+values.budget) || +values.budget <= 0)) {
+        errors.budget = 'Бюджет должен быть > 0';
+      }
+    } else if (!budgetFilled || isNaN(+values.budget) || +values.budget <= 0) {
+      errors.budget = 'Бюджет должен быть > 0';
+    }
+
     if (!values.priority) errors.priority = 'Приоритет обязателен';
     if (!values.status) errors.status = 'Статус обязателен';
     return errors;
   }, []);
 
-  const { values, handleChange, handleSubmit, errors, touched, setFieldValue, isValid, isDirty } =
-    useForm(initialValues, validate, { fields: FORM_FIELDS });
+  const {
+    values,
+    handleChange: rawHandleChange,
+    handleSubmit,
+    errors,
+    touched,
+    setFieldValue,
+    setValues,
+    isValid,
+    isDirty,
+  } = useForm(initialValues, validate, { fields: FORM_FIELDS });
+
+  const isAdminProject = values.ptype === 'admin';
+
+  const handleChange = (field, value) => {
+    if (field === 'ptype') {
+      setValues(prev => applyPtypeChange(prev, value, db));
+      return;
+    }
+    rawHandleChange(field, value);
+  };
+
+  const chatUnread = useChatUnreadCount(ur.id, values.id, null);
+  const chatTotal = useChatTotalCount(values.id, null);
 
   const draftTasks = useMemo(() => {
     if (!isNew || pendingTemplateTasks.length === 0) return [];
@@ -306,34 +351,16 @@ export const ProjectModal = ({
 
   const saveHandler = useCallback((vals) => {
     const isAdmin = vals.ptype === 'admin';
-    if (!vals.name.trim()) { toast('Укажите название', 'error'); return; }
-    if (!vals.code.trim()) { toast('Укажите код', 'error'); return; }
-    if (!vals.start) { toast('Укажите дату начала', 'error'); return; }
-    if (!vals.customer.trim()) { toast('Укажите заказчика', 'error'); return; }
-    if (!isAdmin) {
-      if (!vals.aircraftType) { toast('Выберите тип ВС', 'error'); return; }
-      if (!vals.projectType) { toast('Выберите категорию', 'error'); return; }
-      if (!vals.managerId) { toast('Ответственный обязателен', 'error'); return; }
-      if (!vals.end) { toast('Дата окончания обязательна', 'error'); return; }
-      if (!vals.kbId) { toast('Выберите подразделение (КБ)', 'error'); return; }
-      if (!vals.budget || +vals.budget <= 0) { toast('Бюджет должен быть больше 0', 'error'); return; }
-    }
-    if (!vals.priority) { toast('Выберите приоритет', 'error'); return; }
-    if (!vals.status) { toast('Выберите статус', 'error'); return; }
 
-    const finalColor = getProjectColor(vals);
-    const storeProject = db.projects.find(p => p.id === vals.id);
     const projectToSave = {
       ...vals,
-      color: finalColor,
-      kbId: vals.kbId || null,
-      budget: isAdmin ? null : +vals.budget,
+      color: getProjectColor(vals),
+      budget: vals.budget ? +vals.budget : null,
       managerId: isAdmin ? '' : vals.managerId,
-      end: isAdmin ? null : vals.end,
-      access: storeProject?.access || { userIds: [] },
+      end: vals.end || null,
     };
     onSave(projectToSave, isNew, { templateTasks: pendingTemplateTasks });
-  }, [isNew, db.projects, toast, onSave, pendingTemplateTasks]);
+  }, [isNew, onSave, pendingTemplateTasks]);
 
   const deleteHandler = useCallback(async () => {
     const ok = await confirm(DIALOGS.deleteProject(existing.name));
@@ -358,18 +385,30 @@ export const ProjectModal = ({
   const tabs = [
     { id: 'info', label: 'Информация' },
     { id: 'tasks', label: `Задачи (${tasksCount})` },
-    { id: 'chat', label: `Чат проекта (${store.getComments({ projectId: values.id }).length})` },
+    { id: 'chat', label: 'Чат проекта', count: chatTotal, badge: chatUnread },
     { id: 'files', label: `Вложения (${filesCount})` },
     ...(existing ? [{ id: 'hist', label: 'История' }] : []),
   ];
 
-  const kbOptions = useMemo(() => db.kbs.map(k => ({ value: k.id, label: k.name })), [db.kbs]);
-  const employeeOptions = useMemo(() => db.employees.filter(e => !e.fired).map(e => ({ value: e.id, label: `${e.last} ${e.first}` })), [db.employees]);
-  const priorityOptions = values.ptype === 'admin'
-    ? Object.entries(ADMIN_PROJECT_PRIORITIES).map(([k, v]) => ({ value: k, label: v.label }))
-    : Object.entries(PROJECT_PRIORITIES).map(([k, v]) => ({ value: k, label: v.label }));
-  const statusOptions = Object.entries(PROJECT_STATUSES).map(([k, v]) => ({ value: k, label: v }));
-  const isAdminProject = values.ptype === 'admin';
+  const employeeOptions = useMemo(
+    () => db.employees.filter(e => !e.fired).map(e => ({ value: e.id, label: `${e.last} ${e.first}` })),
+    [db.employees]
+  );
+
+  const unitOptions = useMemo(
+    () => unitOptionsForPtype(values.ptype, db),
+    [values.ptype, db.kbs, db.departments]
+  );
+
+  const priorityOptions = useMemo(
+    () => priorityOptionsForProjectType(values.ptype),
+    [values.ptype]
+  );
+
+  const statusOptions = useMemo(
+    () => Object.entries(PROJECT_STATUSES).map(([k, v]) => ({ value: k, label: v })),
+    []
+  );
 
   const candidates = useMemo(() => {
     const ids = new Set(
@@ -389,7 +428,9 @@ export const ProjectModal = ({
       setFieldValue('files', result.nextFiles);
       if (existing) store.patchProject(existing.id, { files: result.nextFiles });
       toast(
-        result.accepted === 1 ? TOASTS.fileUploaded : TOASTS.filesUploaded(result.accepted),
+        result.accepted === 1
+          ? TOASTS.fileUploaded(result.acceptedFiles[0].name)
+          : TOASTS.filesUploaded(result.accepted),
         'success'
       );
     }
@@ -433,54 +474,20 @@ export const ProjectModal = ({
         ? `Копирование проекта: ${copySource.name}`
         : 'Новый проект';
 
-  const footer = (
-    <div className="modal-foot">
-      {!readOnly && existing && hasRole(ur, 'admin') && (
-        <button className="btn danger" onClick={deleteHandler}>
-          <Ic d={ICONS.trash} size={14} /> Удалить проект
-        </button>
-      )}
-
-      {existing && onCopy && canCreateFromProject && (
-        <button
-          type="button"
-          className="btn ghost sm"
-          onClick={() => onCopy(existing.id)}
-          title="Создать новый проект на основе этого"
-        >
-          <Ic d={ICONS.copy} size={13} /> Копировать
-        </button>
-      )}
-
-      {canCreateFromProject && (
-        <TemplateActions
-          kind="project"
-          source={values}
-          nested={existing ? collectTaskPayloads(
-            db.tasks.filter(t => t.projectId === existing.id && !t.archived)
-          ) : []}
-          toast={toast}
-          disabled={!values.name?.trim()}
-        />
-      )}
-
-      {canManageAccess && (
-        <button
-          type="button"
-          className="btn ghost sm"
-          onClick={() => setAccessOpen(true)}
-          title="Управление доступом к проекту"
-        >
-          <Ic d={ICONS.shield} size={13} /> Доступ
-        </button>
-      )}
-
-      <div className="spacer" />
-      <button className="btn ghost" onClick={onClose}>Отмена</button>
-      <button className="btn primary" onClick={handleSubmit(saveHandler)} disabled={saveDisabled}>
-        {isNew ? 'Создать проект' : 'Сохранить'}
-      </button>
-    </div>
+  const footerActions = (
+    <ProjectFooterActions
+      readOnly={readOnly}
+      existing={existing}
+      ur={ur}
+      canCreateFromProject={canCreateFromProject}
+      canManageAccess={canManageAccess}
+      values={values}
+      db={db}
+      toast={toast}
+      onDelete={deleteHandler}
+      onCopy={onCopy}
+      onOpenAccess={() => setAccessOpen(true)}
+    />
   );
 
   return (
@@ -490,8 +497,10 @@ export const ProjectModal = ({
         onClose={onClose}
         width={900}
         className="modal-project"
-        showSave={false}
-        footer={footer}
+        actions={footerActions}
+        saveLabel={isNew ? 'Создать проект' : 'Сохранить'}
+        saveDisabled={saveDisabled}
+        onSave={handleSubmit(saveHandler)}
         bodyRef={bodyRef}
         showBack={showBackButton}
       >
@@ -537,7 +546,16 @@ export const ProjectModal = ({
                 <FormField label="Заказчик" required value={values.customer} onChange={(v) => handleChange('customer', v)} error={touched.customer && errors.customer} disabled={!canEditFields} inline />
 
                 <div className="fields-row">
-                  <FormField label="Тип проекта" required type="select" options={Object.entries(PROJECT_TYPES).map(([k, v]) => ({ value: k, label: v }))} value={values.ptype} onChange={(v) => handleChange('ptype', v)} disabled={!canEditFields} inline />
+                  <FormField
+                    label="Тип проекта"
+                    required
+                    type="select"
+                    options={Object.entries(PROJECT_TYPES).map(([k, v]) => ({ value: k, label: v }))}
+                    value={values.ptype}
+                    onChange={(v) => handleChange('ptype', v)}
+                    disabled={!canEditFields}
+                    inline
+                  />
                   <FormField label="Код" required value={values.code} onChange={(v) => handleChange('code', v)} error={touched.code && errors.code} disabled={!canEditFields} inline />
                 </div>
 
@@ -550,16 +568,27 @@ export const ProjectModal = ({
 
                 <div className="fields-row">
                   <FormField label="Приоритет" required type="select" options={priorityOptions} value={values.priority} onChange={(v) => handleChange('priority', v)} error={touched.priority && errors.priority} disabled={!canEditFields} inline />
-                  <FormField label="Подразделение" required={!isAdminProject} type="select" options={kbOptions} value={values.kbId} onChange={(v) => handleChange('kbId', v)} error={touched.kbId && errors.kbId} disabled={!canEditFields} inline />
+                  <FormField
+                    label="Подразделения"
+                    required={!isAdminProject}
+                    type="select"
+                    multiple
+                    options={unitOptions}
+                    value={values.unitIds}
+                    onChange={(v) => handleChange('unitIds', v)}
+                    error={touched.unitIds && errors.unitIds}
+                    disabled={!canEditFields}
+                    inline
+                  />
                 </div>
 
                 <div className="fields-row">
                   <FormField label="Дата начала" required type="date" value={values.start} onChange={(v) => handleChange('start', v)} error={touched.start && errors.start} disabled={!canEditFields} inline />
-                  <FormField label="Дата окончания" required={!isAdminProject} type="date" value={values.end} onChange={(v) => handleChange('end', v)} error={touched.end && errors.end} disabled={!canEditFields || isAdminProject} inline />
+                  <FormField label="Дата окончания" required={!isAdminProject} type="date" value={values.end} onChange={(v) => handleChange('end', v)} error={touched.end && errors.end} disabled={!canEditFields} inline />
                 </div>
 
                 <div className="fields-row">
-                  <FormField label="Бюджет, ч" required={!isAdminProject} type="number" min="0" step="0.5" value={values.budget} onChange={(v) => handleChange('budget', v)} error={touched.budget && errors.budget} disabled={!canEditFields || isAdminProject} inline />
+                  <FormField label="Бюджет, ч" required={!isAdminProject} type="number" min="0" step="0.5" value={values.budget} onChange={(v) => handleChange('budget', v)} error={touched.budget && errors.budget} disabled={!canEditFields} inline />
                   <FormField label="Статус" required type="select" options={statusOptions} value={values.status} onChange={(v) => handleChange('status', v)} error={touched.status && errors.status} disabled={!canChangeStatus} inline />
                 </div>
 
@@ -624,6 +653,8 @@ export const ProjectModal = ({
           <FileManager
             files={values.files || []}
             folders={values.folders || []}
+            highlightFileId={highlightFileId}
+            highlightFolderId={highlightFolderId}
             onUpload={handleFileUpload}
             onDelete={handleFileDelete}
             onCreateFolder={handleCreateFolder}

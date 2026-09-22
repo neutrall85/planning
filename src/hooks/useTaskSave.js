@@ -16,7 +16,7 @@ import { applyHourlyMode, hoursBetween } from '../utils/hourlyTask';
  * местах и рано или поздно рассинхронизировать формулировки ошибок.
  *
  * Здесь - только то, что не является валидацией формы:
- *   - бюджет проекта (сумма плановых часов по проекту);
+ *   - Плановые часы проекта (сумма плановых часов по проекту);
  *   - пересечение с отпуском исполнителя;
  *   - перегрузка исполнителя по плану.
  * Это доменные правила, требующие асинхронного подтверждения
@@ -43,7 +43,7 @@ export function useTaskSave({
     if (proj && proj.budget != null && !proj.archived && !isAdminProj) {
       const currentPlanSum = db.tasks.filter(t => t.projectId === proj.id && t.id !== vals.id).reduce((s, t) => s + (t.plannedHours || 0), 0);
       if (currentPlanSum + (parseFloat(vals.plannedHours) || 0) > proj.budget) {
-        toast(`Превышение бюджета проекта! Бюджет: ${proj.budget} ч, текущая сумма: ${currentPlanSum} ч`, 'error');
+        toast(`Превышение планируемых часов проекта! План: ${proj.budget} ч, текущая сумма: ${currentPlanSum} ч`, 'error');
         return;
       }
     }

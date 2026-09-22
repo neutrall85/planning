@@ -1,21 +1,27 @@
 // src/utils/routes.js
 //
 // Чистый модуль: превращает состояние навигации (view / открытая
-// задача / проект + активная вкладка) в хэш-фрагмент URL и обратно.
-// Единственное место, знающее форму ссылки. Ни React, ни DOM, ни
-// домен задач здесь нет - только строки.
+// задача / проект / файл / папка + активная вкладка) в хэш-фрагмент
+// URL и обратно. Единственное место, знающее форму ссылки. Ни React,
+// ни DOM, ни домен задач здесь нет - только строки.
 //
 // Формат (hash-роутинг - не требует rewrite-правил на хостинге):
 //   #/view/<viewId>
 //   #/task/<taskId>/<tab>
 //   #/project/<projectId>/<tab>
+//   #/file/<fileId>
+//   #/folder/<folderId>
 //
-// Переход на History API затронет только этот файл.
+// FILE и FOLDER - «ссылки-точки входа»: у них нет собственной вкладки,
+// они открывают владельца на вкладке «Вложения» и подсвечивают
+// соответствующий узел. Форма ссылки - плоская, без вкладки.
 
 export const ROUTE = Object.freeze({
   VIEW: 'view',
   TASK: 'task',
   PROJECT: 'project',
+  FILE: 'file',
+  FOLDER: 'folder',
 });
 
 // Вкладка по умолчанию - используется, когда в фрагменте её нет,
@@ -39,15 +45,7 @@ export const TABS = Object.freeze({
 // в MainLayout), а множество view, для которых существует case в
 // MainLayout.renderView(). Оба конца роутинга - parseRoute здесь и
 // route-эффект в MainLayout - обязаны опираться на этот список, а не
-// на список кнопок меню. Иначе:
-//   - кабинет (не в меню, но валидный экран) не открывается по URL;
-//   - пункты под роли (reports, journal) отсекаются по URL даже
-//     у пользователя с правами;
-//   - id, оставшийся от прошлой версии приложения, приводит
-//     на пустой экран (default: return null).
-//
-// Ранее здесь был 'workload' - рендера для него нет, workload
-// отображается под-вкладкой внутри Cabinet.
+// на список кнопок меню.
 export const VIEWS = Object.freeze([
   'tasks', 'gantt', 'calendar', 'projects', 'templates',
   'staff', 'reports', 'archive', 'requests',
@@ -74,6 +72,11 @@ export function buildRoute(route) {
   if (kind === ROUTE.VIEW) {
     return isKnownView(id) ? `#/view/${id}` : '';
   }
+  // FILE и FOLDER - плоские ссылки без вкладки. Тот же ID_RE, что и
+  // у сущностей: подмена id на мусор не должна создавать ссылку.
+  if (kind === ROUTE.FILE || kind === ROUTE.FOLDER) {
+    return ID_RE.test(String(id || '')) ? `#/${kind}/${id}` : '';
+  }
   if (kind === ROUTE.TASK || kind === ROUTE.PROJECT) {
     if (!ID_RE.test(String(id || ''))) return '';
     const safeTab = isKnownTab(kind, tab) ? tab : DEFAULT_TAB[kind];
@@ -96,6 +99,11 @@ export function parseRoute(hash) {
 
   if (head === ROUTE.VIEW) {
     return isKnownView(second) ? { kind: ROUTE.VIEW, id: second } : null;
+  }
+  if (head === ROUTE.FILE || head === ROUTE.FOLDER) {
+    return ID_RE.test(String(second || ''))
+      ? { kind: head, id: second }
+      : null;
   }
   if (head === ROUTE.TASK || head === ROUTE.PROJECT) {
     if (!ID_RE.test(String(second || ''))) return null;

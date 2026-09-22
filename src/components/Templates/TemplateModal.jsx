@@ -10,6 +10,10 @@ import {
   TEMPLATE_FIELDS_META,
   TEMPLATE_KIND_LABELS,
 } from '../../utils/templateSchemas';
+import {
+  priorityOptionsForProjectType,
+  withSyncedPriority,
+} from '../../utils/constants';
 import { countNestedTasks } from '../../utils/templateNesting';
 import { useNestedModalEscape } from './useNestedModalEscape';
 import TaskDraftModal from './TaskDraftModal';
@@ -98,9 +102,33 @@ export default function TemplateModal({
     return errors;
   }, []);
 
+  /**
+   * Единственная точка записи в payload.
+   *
+   * Развилка только одна: смена ptype у шаблона проекта. У производственного
+   * проекта набор приоритетов AOG / CRIT / NORM, у административного -
+   * high / mid / low. Если после смены ptype текущий приоритет в новый
+   * набор не входит, его надо переустановить на первый допустимый. Иначе
+   * форма молча сохранит несовместимую пару (тип: admin, приоритет: AOG),
+   * а getProjectColor и правила цвета дальше работают по priority в отрыве
+   * от ptype и показывают цвет из чужого набора.
+   *
+   * Сброс делаем только когда приоритет уже выставлен. Пустое значение
+   * не трогаем: пользователь мог ещё не дойти до поля, а валидатор сам
+   * подсветит его как обязательное.
+   *
+   * Все остальные поля - просто запись. Единый метод вместо пары
+   * setPayloadField / setField: два почти одинаковых сеттера рядом
+   * приглашали к ошибке «выбрал не тот».
+   */
   const setPayloadField = useCallback((field, value) => {
-    setPayload((prev) => ({ ...prev, [field]: value }));
-  }, []);
+    setPayload((prev) => {
+      if (field === 'ptype' && effectiveKind === 'project') {
+        return withSyncedPriority(prev, value);
+      }
+      return { ...prev, [field]: value };
+    });
+  }, [effectiveKind]);
 
   const setNested = useCallback((next) => {
     setPayload((prev) => {
@@ -223,6 +251,15 @@ export default function TemplateModal({
     );
   };
 
+  /**
+   * Вкладка «Информация».
+   *
+   * Все поля идут прямыми потомками .project-info-fields (flex-column
+   * с gap: 10px). Раньше блок «Параметры» был обёрнут в <div className="mt-3">,
+   * и gap родителя до его содержимого не доходил - поля слипались. Теперь
+   * обёртки нет, mt-3 повешен на заголовок секции, а field-row внутри
+   * получают тот же gap, что и поля до секции.
+   */
   const renderInfoTab = () => (
     <>
       {isView && (
@@ -259,24 +296,37 @@ export default function TemplateModal({
       </div>
 
       {Object.keys(fieldsMeta).length > 0 && (
-        <div className="mt-3">
-          <div className="rep-panel-title">Параметры</div>
+        <>
+          <div className="rep-panel-title mt-3">Параметры</div>
           {renderProjectField()}
-          {Object.entries(fieldsMeta).map(([field, meta]) => (
-            <FormField
-              key={field}
-              label={meta.label}
-              required={meta.required}
-              type={meta.type || 'text'}
-              options={meta.options}
-              rows={meta.type === 'textarea' ? 2 : undefined}
-              value={payload[field] ?? ''}
-              onChange={(v) => setPayloadField(field, v)}
-              disabled={readOnly}
-              inline
-            />
-          ))}
-        </div>
+          {Object.entries(fieldsMeta).map(([field, meta]) => {
+            // Options для приоритета проекта зависят от выбранного типа:
+            // производственный - AOG / CRIT / NORM, административный -
+            // высокий / средний / низкий. В схеме (TEMPLATE_FIELDS_META)
+            // options для project.priority намеренно не заданы - там был
+            // бы полный список из шести значений, и форма, читающая его
+            // напрямую, показывала бы лишние пункты. Актуальный набор
+            // формирует priorityOptionsForProjectType по payload.ptype.
+            const options = effectiveKind === 'project' && field === 'priority'
+              ? priorityOptionsForProjectType(payload.ptype)
+              : meta.options;
+
+            return (
+              <FormField
+                key={field}
+                label={meta.label}
+                required={meta.required}
+                type={meta.type || 'text'}
+                options={options}
+                rows={meta.type === 'textarea' ? 2 : undefined}
+                value={payload[field] ?? ''}
+                onChange={(v) => setPayloadField(field, v)}
+                disabled={readOnly}
+                inline
+              />
+            );
+          })}
+        </>
       )}
     </>
   );

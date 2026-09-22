@@ -34,3 +34,4 @@ export { useTaskTimeLog } from './useTaskTimeLog';
 export { useTaskNotes } from './useTaskNotes';
 export { useTaskSave } from './useTaskSave';
 export { useTaskTabSync } from './useTaskTabSync';
+export { useChatUnreadCount, useUnreadCommentIndex, useChatReadLookup } from './useChatStats';

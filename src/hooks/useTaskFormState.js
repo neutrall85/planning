@@ -3,6 +3,7 @@ import { useCallback, useEffect } from 'react';
 import { useForm } from './useForm';
 import { TODAY, iso, addDays, uid } from '../utils/date';
 import { applyHourlyMode, hoursBetween } from '../utils/hourlyTask';
+import { dependencyRule } from '../utils/taskDependency';
 
 /**
  * Убирает поле notes из задачи перед подачей в useForm.
@@ -62,6 +63,8 @@ function buildInitialValues({ existing, isCopy, copySource, isNew, effectiveProj
       archivedAt: null,
       closedAt: null,
       creatorId: ur.id,
+      // Копия не наследует зависимость: сроки копии берутся из
+      // источника, а не подтягиваются к чужому предшественнику.
       dependencyId: null,
       files: [],
       folders: [],
@@ -107,6 +110,10 @@ function buildInitialValues({ existing, isCopy, copySource, isNew, effectiveProj
  * поэтому здесь, а не в saveHandler, живёт вся проверка обязательных
  * полей. Дублировать её в обработчике сохранения не нужно: это была бы
  * одна и та же проверка в двух местах, которые легко рассинхронизировать.
+ *
+ * Зависимость задачи: зафиксированное поле (start для FS/SS,
+ * deadline для FF/SF) подставляется из предшественника и возвращается
+ * наружу как lockedField - форма блокирует его для правки.
  */
 export function useTaskFormState({
   existing, isCopy, copySource, isNew, isProjectLocked, effectiveProjectId,
@@ -172,8 +179,47 @@ export function useTaskFormState({
     }
   }, [parentTaskId, db.tasks, isNew, values.projectId, setFieldValue]);
 
+  /**
+   * Правило зависимости для текущего выбора. lockedFieldName - какое
+   * поле задачи зафиксировано (start / deadline / null);
+   * lockedValue - вычисленное значение из предшественника.
+   *
+   * Если предшественник не найден (задача удалена, выбор сброшен) -
+   * правило не применяется, поле остаётся редактируемым.
+   */
+  const predRule = values.dependencyId
+    ? dependencyRule(values.dependencyType)
+    : null;
+  const predecessor = values.dependencyId
+    ? db.tasks.find(t => t.id === values.dependencyId)
+    : null;
+  const lockedFieldName = predRule?.locked ?? null;
+  const lockedValue = (predecessor && predRule)
+    ? predecessor[predRule.source] ?? null
+    : null;
+  const currentLockedValue = lockedFieldName ? values[lockedFieldName] : null;
+
+  /**
+   * Синхронизация формы с предшественником.
+   *
+   * Срабатывает, когда пользователь выбрал зависимость, сменил её тип
+   * или (теоретически) предшественник изменился, пока форма открыта.
+   * Для часовой задачи держим инвариант start === deadline: оба поля
+   * сходятся на вычисленное значение.
+   */
+  useEffect(() => {
+    if (!lockedFieldName || lockedValue == null) return;
+    if (currentLockedValue === lockedValue) return;
+    setValues(prev => prev.isHourly
+      ? { ...prev, start: lockedValue, deadline: lockedValue }
+      : { ...prev, [lockedFieldName]: lockedValue });
+  }, [lockedFieldName, lockedValue, currentLockedValue, setValues]);
+
   return {
     values, handleChange, updateValues, handleSubmit, errors, touched,
     setValues, setTouched, setFieldValue, isValid, isDirty,
+    // Имя поля, реально заблокированного (только если есть чему его
+    // научить); null - все поля дат редактируемы.
+    lockedField: lockedValue != null ? lockedFieldName : null,
   };
 }

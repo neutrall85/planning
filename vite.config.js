@@ -6,13 +6,12 @@ export default defineConfig({
   plugins: [react()],
   define: {
     // React и react-jsx-runtime выбирают dev/prod сборку по этому флагу.
-    // Ставим 'development' - попадёт development-сборка с полными
-    // предупреждениями вместо "Minified React error #...".
-    'process.env.NODE_ENV': JSON.stringify('development'),
+    // 'production' — попадает production-сборка React (без dev-предупреждений).
+    'process.env.NODE_ENV': JSON.stringify('production'),
   },
   build: {
-    minify: false,                  // отключаем минификацию
-    cssMinify: false,               // CSS тоже не минифицируем
+    minify: false,                  // без минификации
+    cssMinify: false,               // CSS тоже как есть
     sourcemap: true,                // удобно для отладки
     rollupOptions: {
       output: {

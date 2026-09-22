@@ -103,7 +103,7 @@ export const useWorkloadDb = () => {
 };
 
 export const useRequestsDb = () => {
-  const hoursRequests   = useSelector(s => s.hoursRequests);
+  const changeRequests  = useSelector(s => s.changeRequests);
   const vacations       = useSelector(s => s.vacations);
   const roleDelegations = useSelector(s => s.roleDelegations);
   const regRequests     = useSelector(s => s.regRequests);
@@ -113,10 +113,10 @@ export const useRequestsDb = () => {
 
   return useMemo(
     () => ({
-      hoursRequests, vacations, roleDelegations, regRequests,
+      changeRequests, vacations, roleDelegations, regRequests,
       tasks, projects, employees,
     }),
-    [hoursRequests, vacations, roleDelegations, regRequests,
+    [changeRequests, vacations, roleDelegations, regRequests,
      tasks, projects, employees],
   );
 };

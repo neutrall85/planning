@@ -66,6 +66,69 @@ export const ADMIN_PROJECT_PRIORITIES = {
   low:  { label: 'Низкий',  color: '#10b981', order: 3 },
 };
 
+// ---------------------------------------------------------------------------
+// Приоритеты проекта - в зависимости от типа
+// ---------------------------------------------------------------------------
+//
+// Набор допустимых приоритетов различается по типу проекта: производственный
+// работает с AOG / CRIT / NORM, административный - с высокий / средний / низкий.
+// Пересечения нет: значение из одного набора не имеет смысла в другом.
+//
+// Функции лежат рядом с самими наборами, а не в модалках: правило
+// «какой приоритет у какого типа проекта» - доменное знание, и оно
+// должно быть одно на все формы (ProjectModal, TemplateModal и любые
+// будущие). Раньше это правило было инлайн в ProjectModal, а
+// TemplateModal брал полный список из TEMPLATE_FIELDS_META - и позволял
+// сохранить несовместимую пару (тип: admin, приоритет: AOG).
+//
+// Три функции разделены сознательно:
+//   priorityOptionsForProjectType  - «что показать в селекте»;
+//   isPriorityValidForProjectType  - «подходит ли значение типу»;
+//   withSyncedPriority             - «привести сущность к новому типу»
+//                                    (переключить ptype и, если надо,
+//                                    почистить несовместимый приоритет).
+//
+// Третья вынесена отдельно, а не размазана по модалкам: обе формы
+// (ProjectModal, TemplateModal) выполняют одну и ту же операцию - замену
+// ptype с проверкой приоритета. Держать её в двух файлах означало бы
+// дублировать правило и однажды забыть про одно из мест.
+//
+// defaultPtype: если ptype не задан (шаблон создаётся «с нуля», source={}),
+// считаем проект производственным - это первое значение в PROJECT_TYPES.
+// Согласовано с валидацией формы, где пустой ptype тоже трактуется как prod.
+export function priorityOptionsForProjectType(ptype) {
+  const source = ptype === 'admin' ? ADMIN_PROJECT_PRIORITIES : PROJECT_PRIORITIES;
+  return Object.entries(source).map(([value, def]) => ({
+    value,
+    label: def.label,
+  }));
+}
+
+export function isPriorityValidForProjectType(ptype, priority) {
+  if (!priority) return false;
+  const source = ptype === 'admin' ? ADMIN_PROJECT_PRIORITIES : PROJECT_PRIORITIES;
+  return Object.prototype.hasOwnProperty.call(source, priority);
+}
+
+/**
+ * Возвращает новую сущность с проставленным ptype. Если текущий priority
+ * в новый набор не входит (было AOG, стало admin), заменяет его на первый
+ * допустимый. Пустой priority не трогает - валидатор сам подсветит поле.
+ *
+ * Не мутирует входной объект: возвращает новый, что совместимо и с
+ * useState-апдейтером (setValues(prev => withSyncedPriority(prev, v))),
+ * и с явным применением (const next = withSyncedPriority(entity, v)).
+ */
+export function withSyncedPriority(entity, newPtype) {
+  const next = { ...entity, ptype: newPtype };
+  if (next.priority && !isPriorityValidForProjectType(newPtype, next.priority)) {
+    const fallback = priorityOptionsForProjectType(newPtype)[0]?.value;
+    if (fallback) next.priority = fallback;
+    else delete next.priority;
+  }
+  return next;
+}
+
 export const PROJECT_STATUS_ORDER = ['inactive', 'active', 'closed', 'cancelled'];
 
 export const PROJECT_TYPES = { prod: "Производственный", admin: "Административный" };
@@ -262,7 +325,7 @@ export const TOASTS = {
   commentDeleted: 'Комментарий удалён',
   photoDeleted: 'Фото удалено',
   fileDeleted: 'Файл удалён',
-  fileUploaded: 'Файл загружен',
+  fileUploaded: (name) => `Файл «${name}» загружен`,
   filesUploaded: (n) => `Загружено файлов: ${n}`,
   filesRejected: (list) => `Пропущено: ${list}`,
   projectClosed: 'Проект закрыт',

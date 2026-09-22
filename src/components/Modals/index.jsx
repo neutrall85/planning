@@ -1,7 +1,7 @@
 export { TaskModal } from './TaskModal';
 export { ProjectModal } from './ProjectModal';
 export { ProjectAccessModal } from './ProjectAccessModal';
-export { HoursRequestModal } from './HoursRequestModal';
+export { ChangeRequestModal } from './ChangeRequestModal';
 export { RolesModal } from './RolesModal';
 export { DeptsModal } from './DeptsModal';
 export { VacationModal } from './VacationModal';

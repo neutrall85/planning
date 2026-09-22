@@ -37,8 +37,64 @@ export function useModals({ store, user }) {
     type: 'project', projectId, initialTab, returnToProjectId, returnToProjectTab,
   }), [open]);
 
-  const openHoursReq = useCallback((kind, targetId) =>
-    open({ type: 'hours', kind, targetId }), [open]);
+  /**
+   * Открытие владельца по share-ссылке на файл или папку.
+   *
+   * Общая идея: share-ссылка не открывает собственное окно - она
+   * открывает карточку владельца (задачи или проекта) на вкладке
+   * «Вложения» и просит FileManager подсветить конкретный узел.
+   *
+   * highlightFileId / highlightFolderId - транзитные поля дескриптора:
+   * их читает ModalRenderer и прокидывает в TaskModal/ProjectModal,
+   * оттуда - в FileManager. Сама модалка их семантику не знает, для
+   * неё это «пожелание сфокусироваться на узле».
+   *
+   * Раздельные методы openAtFile / openAtFolder, а не один openAt с
+   * kind-параметром: вызовы читаются лучше (openAtFile(...) понятнее,
+   * чем openAt('file', ...)), а внутренняя ветка task/project всё
+   * равно дублируется в обоих.
+   */
+  const openAtFile = useCallback((ownerKind, ownerId, fileId) => {
+    if (ownerKind === 'task') {
+      open({ type: 'task', taskId: ownerId, initialTab: 'files', highlightFileId: fileId });
+    } else {
+      open({ type: 'project', projectId: ownerId, initialTab: 'files', highlightFileId: fileId });
+    }
+  }, [open]);
+
+  const openAtFolder = useCallback((ownerKind, ownerId, folderId) => {
+    if (ownerKind === 'task') {
+      open({ type: 'task', taskId: ownerId, initialTab: 'files', highlightFolderId: folderId });
+    } else {
+      open({ type: 'project', projectId: ownerId, initialTab: 'files', highlightFolderId: folderId });
+    }
+  }, [open]);
+
+  /**
+   * Отдельный тип модалки под управление доступом к проекту.
+   *
+   * Внутри карточки проекта доступ открывается локальным состоянием
+   * ProjectModal (кнопка в футере), но из контекстного меню карточки
+   * канбана/списка самой карточки нет - клик должен открывать модалку
+   * доступа сразу, минуя карточку. Тот же приём, что у openEmployeeTasks:
+   * собственный тип модалки на самостоятельное окно.
+   */
+  const openProjectAccess = useCallback((projectId) =>
+    open({ type: 'projectAccess', projectId }), [open]);
+
+  /**
+   * Открыть модалку запроса на изменение.
+   *
+   * changeKind — id правила из utils/changeKinds ('hours' | 'deadline').
+   * targetType — 'task' | 'project' (у deadline — только task).
+   * targetId   — id целевой сущности.
+   *
+   * Единый метод вместо отдельного openHoursReq/openDeadlineReq: вид
+   * изменения — параметр, а не повод для отдельной точки входа. Новые
+   * виды изменений (приоритет, статус) не потребуют правок здесь.
+   */
+  const openChangeReq = useCallback((changeKind, targetType, targetId) =>
+    open({ type: 'changeReq', changeKind, targetType, targetId }), [open]);
 
   const openRoles = useCallback((empId) =>
     open({ type: 'roles', empId }), [open]);
@@ -68,9 +124,6 @@ export function useModals({ store, user }) {
   //   без опции - открыто из канбана/списка/календаря (контекстное меню
   //     карточки). Возврат не задан: закрытие просто закрывает модалку,
   //     пользователь остаётся на исходном экране.
-  // Различие выражается одним булевым флагом в дескрипторе модалки;
-  // closeTaskWithReturn / closeProjectWithReturn уже читают его через
-  // modal.returnToTaskId / modal.returnToProjectId.
   const openCopyTask = useCallback((sourceTaskId, options) => {
     const returnToModal = options?.returnToModal === true;
     return open({
@@ -114,7 +167,10 @@ export function useModals({ store, user }) {
 
   return {
     modal,
-    openTask, openProject, openHoursReq, openRoles, openDepts,
+    openTask, openProject, openProjectAccess,
+    openAtFile, openAtFolder,
+    openChangeReq,
+    openRoles, openDepts,
     openVacation, openDelegation, openVacNow, openYearCalendar,
     openEmployeeTasks, openCopyTask, openCopyProject,
     openTemplateFromTask, openTemplateFromProject,
