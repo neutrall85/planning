@@ -5,7 +5,7 @@ import { Select } from './Select';
 import { SearchBox } from './SearchBox';
 import Avatar from './Avatar';
 import { useFilters } from '../hooks/useFilters';
-import { useScheduleDb } from '../hooks/useDb';
+import { useScopeDb } from '../hooks/useDb';
 import { useDataHelpers } from '../hooks/useDataHelpers';
 import { computeScope, taskVisible } from '../utils/permissions';
 import { TASK_STATUSES, PRIORITIES } from '../utils/constants';
@@ -384,7 +384,7 @@ const ROW_HEIGHT = 46;
 const GROUP_HEADER_HEIGHT = 40;
 
 function Gantt({ ur, openTask, openProject, store }) {
-  const db = useScheduleDb();
+  const db = useScopeDb();
   const { tasks, projects, employees } = db;
   const { getTaskSpent, vacOverlap } = useDataHelpers(db);
 

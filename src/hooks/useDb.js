@@ -3,47 +3,46 @@ import { useMemo } from 'react';
 import { useSelector } from '../context/StoreContext';
 
 /**
- * Хуки-пресеты для сборки «db» - объекта с срезами стора, которые
- * нужны конкретной вьюхе.
+ * Точечные подписки на срезы стора, из которых собирается «db» для
+ * конкретной вьюхи.
  *
- * Зачем пресеты, а не точечные useSelector в каждой вьюхе.
- *
- * До этого файла в восьми вьюхах лежал один и тот же паттерн:
- *
- *     const tasks = useSelector(s => s.tasks);
- *     const projects = useSelector(s => s.projects);
- *     const employees = useSelector(s => s.employees);
- *     const departments = useSelector(s => s.departments);
- *     const db = useMemo(() => ({ tasks, projects, employees, departments }),
- *       [tasks, projects, employees, departments]);
- *
- * Проблемы:
- *   - при добавлении нового среза в стор нужно было помнить, каким
- *     вьюхам он нужен, и руками править шесть строк в каждой;
- *   - состав db у двух вьюх с одинаковой ролью мог разъехаться без
- *     видимой причины (например, в одной появлялся vacations, в другой нет);
- *   - шесть строк boilerplate в каждой вьюхе ничего не сообщают о смысле:
- *     «вьюхе нужен db из tasks/projects/employees/departments» читается
- *     хуже, чем «вьюхе нужен useTasksDb()».
- *
- * Почему восемь отдельных хуков, а не один useDb('tasks', 'projects', ...).
- * Аргументы-строки пришлось бы сравнивать каждый рендер (массив
- * пересоздаётся), либо требовать от вызывающего стабильную ссылку на
- * список. Первое ломает мемоизацию, второе - Rules of Hooks
- * (useSelector нельзя вызывать в цикле). Явные пресеты - стабильный
- * контракт: каждый пресет описывает свой набор срезов и не требует
- * от потребителя никаких договорённостей.
- *
- * Пресеты именованы по роли вьюхи, а не по составу. Если состав
- * изменится (вьюхе понадобится ещё срез), поменяется тело одного
- * пресета - все его потребители получат новые срезы автоматически.
+ * ВАЖНО. Любой пресет, чьи потребители вызывают computeScope / taskVisible /
+ * projectVisible, ОБЯЗАН включать departments: computeBaseScope обращается
+ * к db.departments при расчёте видимости для ролей kb_chief / head.
+ * Отсутствие departments — молчаливое падение с TypeError, как было
+ * в useScheduleDb (Gantt / Calendar ломались под КБ-ролями).
  */
 
+// Пресеты, которым нужен полный набор полей для scope-вычислений.
+// Используйте useTasksDb / useScopeDb, если компонент вызывает
+// computeScope, taskVisible или projectVisible.
+
 export const useTasksDb = () => {
-  const tasks       = useSelector(s => s.tasks);
-  const projects    = useSelector(s => s.projects);
-  const employees   = useSelector(s => s.employees);
-  const departments = useSelector(s => s.departments);
+  const tasks = useSelector((s) => s.tasks);
+  const projects = useSelector((s) => s.projects);
+  const employees = useSelector((s) => s.employees);
+  const departments = useSelector((s) => s.departments);
+
+  return useMemo(
+    () => ({ tasks, projects, employees, departments }),
+    [tasks, projects, employees, departments],
+  );
+};
+
+/**
+ * Явный пресет для компонентов, которым нужен «db, полный по scope».
+ *
+ * По составу идентичен useTasksDb, но имя выражает намерение: «я буду
+ * звать computeScope / taskVisible и мне нужны все четыре среза».
+ * Если однажды computeScope начнёт требовать ещё какой-то срез,
+ * правится только этот хук — и все его потребители получат его
+ * автоматически.
+ */
+export const useScopeDb = () => {
+  const tasks = useSelector((s) => s.tasks);
+  const projects = useSelector((s) => s.projects);
+  const employees = useSelector((s) => s.employees);
+  const departments = useSelector((s) => s.departments);
 
   return useMemo(
     () => ({ tasks, projects, employees, departments }),
@@ -52,22 +51,23 @@ export const useTasksDb = () => {
 };
 
 export const useScheduleDb = () => {
-  const tasks     = useSelector(s => s.tasks);
-  const projects  = useSelector(s => s.projects);
-  const employees = useSelector(s => s.employees);
+  const tasks = useSelector((s) => s.tasks);
+  const projects = useSelector((s) => s.projects);
+  const employees = useSelector((s) => s.employees);
+  const departments = useSelector((s) => s.departments);
 
   return useMemo(
-    () => ({ tasks, projects, employees }),
-    [tasks, projects, employees],
+    () => ({ tasks, projects, employees, departments }),
+    [tasks, projects, employees, departments],
   );
 };
 
 export const useStaffDb = () => {
-  const employees   = useSelector(s => s.employees);
-  const departments = useSelector(s => s.departments);
-  const kbs         = useSelector(s => s.kbs);
-  const vacations   = useSelector(s => s.vacations);
-  const tasks       = useSelector(s => s.tasks);
+  const employees = useSelector((s) => s.employees);
+  const departments = useSelector((s) => s.departments);
+  const kbs = useSelector((s) => s.kbs);
+  const vacations = useSelector((s) => s.vacations);
+  const tasks = useSelector((s) => s.tasks);
 
   return useMemo(
     () => ({ employees, departments, kbs, vacations, tasks }),
@@ -76,12 +76,12 @@ export const useStaffDb = () => {
 };
 
 export const useReportsDb = () => {
-  const tasks       = useSelector(s => s.tasks);
-  const projects    = useSelector(s => s.projects);
-  const employees   = useSelector(s => s.employees);
-  const departments = useSelector(s => s.departments);
-  const kbs         = useSelector(s => s.kbs);
-  const vacations   = useSelector(s => s.vacations);
+  const tasks = useSelector((s) => s.tasks);
+  const projects = useSelector((s) => s.projects);
+  const employees = useSelector((s) => s.employees);
+  const departments = useSelector((s) => s.departments);
+  const kbs = useSelector((s) => s.kbs);
+  const vacations = useSelector((s) => s.vacations);
 
   return useMemo(
     () => ({ tasks, projects, employees, departments, kbs, vacations }),
@@ -90,11 +90,11 @@ export const useReportsDb = () => {
 };
 
 export const useWorkloadDb = () => {
-  const employees   = useSelector(s => s.employees);
-  const departments = useSelector(s => s.departments);
-  const kbs         = useSelector(s => s.kbs);
-  const projects    = useSelector(s => s.projects);
-  const tasks       = useSelector(s => s.tasks);
+  const employees = useSelector((s) => s.employees);
+  const departments = useSelector((s) => s.departments);
+  const kbs = useSelector((s) => s.kbs);
+  const projects = useSelector((s) => s.projects);
+  const tasks = useSelector((s) => s.tasks);
 
   return useMemo(
     () => ({ employees, departments, kbs, projects, tasks }),
@@ -103,27 +103,29 @@ export const useWorkloadDb = () => {
 };
 
 export const useRequestsDb = () => {
-  const changeRequests  = useSelector(s => s.changeRequests);
-  const vacations       = useSelector(s => s.vacations);
-  const roleDelegations = useSelector(s => s.roleDelegations);
-  const regRequests     = useSelector(s => s.regRequests);
-  const tasks           = useSelector(s => s.tasks);
-  const projects        = useSelector(s => s.projects);
-  const employees       = useSelector(s => s.employees);
+  const changeRequests = useSelector((s) => s.changeRequests);
+  const vacations = useSelector((s) => s.vacations);
+  const roleDelegations = useSelector((s) => s.roleDelegations);
+  const regRequests = useSelector((s) => s.regRequests);
+  const tasks = useSelector((s) => s.tasks);
+  const projects = useSelector((s) => s.projects);
+  const employees = useSelector((s) => s.employees);
 
   return useMemo(
     () => ({
       changeRequests, vacations, roleDelegations, regRequests,
       tasks, projects, employees,
     }),
-    [changeRequests, vacations, roleDelegations, regRequests,
-     tasks, projects, employees],
+    [
+      changeRequests, vacations, roleDelegations, regRequests,
+      tasks, projects, employees,
+    ],
   );
 };
 
 export const useJournalDb = () => {
-  const audit     = useSelector(s => s.audit);
-  const employees = useSelector(s => s.employees);
+  const audit = useSelector((s) => s.audit);
+  const employees = useSelector((s) => s.employees);
 
   return useMemo(
     () => ({ audit, employees }),
@@ -132,19 +134,22 @@ export const useJournalDb = () => {
 };
 
 export const useCabinetDb = () => {
-  const tasks           = useSelector(s => s.tasks);
-  const projects        = useSelector(s => s.projects);
-  const employees       = useSelector(s => s.employees);
-  const departments     = useSelector(s => s.departments);
-  const kbs             = useSelector(s => s.kbs);
-  const vacations       = useSelector(s => s.vacations);
-  const roleDelegations = useSelector(s => s.roleDelegations);
+  const tasks = useSelector((s) => s.tasks);
+  const projects = useSelector((s) => s.projects);
+  const employees = useSelector((s) => s.employees);
+  const departments = useSelector((s) => s.departments);
+  const kbs = useSelector((s) => s.kbs);
+  const vacations = useSelector((s) => s.vacations);
+  const roleDelegations = useSelector((s) => s.roleDelegations);
 
   return useMemo(
     () => ({
       tasks, projects, employees, departments,
       kbs, vacations, roleDelegations,
     }),
-    [tasks, projects, employees, departments, kbs, vacations, roleDelegations],
+    [
+      tasks, projects, employees, departments,
+      kbs, vacations, roleDelegations,
+    ],
   );
 };

@@ -109,7 +109,10 @@ const ProjectCard = memo(function ProjectCard({
               })}
             </div>
           </div>
-          <UnreadBadge count={unread} />
+          <UnreadBadge
+            count={unread}
+            onClick={() => openProject(project.id, 'chat')}
+          />
         </div>
       )}
     />

@@ -140,7 +140,10 @@ export default function Projects({
                       })}
                     </div>
                   </div>
-                  <UnreadBadge count={unread} />
+                  <UnreadBadge
+                    count={unread}
+                    onClick={() => openProject(p.id, 'chat')}
+                  />
                 </div>
               )}
             </FloatingMenu>

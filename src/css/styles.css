@@ -2112,7 +2112,20 @@ textarea.inp {
   font-weight: 700;
   line-height: 1.4;
   border-radius: 99px;
-  pointer-events: none;
+}
+
+.kcard-unread--clickable {
+  cursor: pointer;
+  transition: filter 0.15s ease;
+}
+
+.kcard-unread--clickable:hover {
+  filter: brightness(1.1);
+}
+
+.kcard-unread--clickable:focus-visible {
+  outline: 2px solid var(--acc, #3b82f6);
+  outline-offset: 1px;
 }
 
 .vac-note,

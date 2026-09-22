@@ -71,9 +71,9 @@ function MainLayout({ store, user }) {
 
   const navItems = useMemo(() => [
     { id: 'tasks', label: 'Задачи', icon: ICONS.tasks },
-    { id: 'gantt', label: 'Диаграмма Ганта', icon: ICONS.gantt },
-    { id: 'calendar', label: 'Календарь', icon: ICONS.cal },
     { id: 'projects', label: 'Проекты', icon: ICONS.folder },
+    { id: 'calendar', label: 'Календарь', icon: ICONS.cal },
+    { id: 'gantt', label: 'Диаграмма Ганта', icon: ICONS.gantt },
     { id: 'templates', label: 'Шаблоны', icon: ICONS.bookmark },
     { id: 'staff', label: 'Персонал', icon: ICONS.users },
     ...(canExport(user) || hasRole(user, 'kb_chief', 'head', 'project_lead', 'hr')

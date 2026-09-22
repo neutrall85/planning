@@ -97,7 +97,10 @@ export default function TasksList({
                 <div className="pj-foot">
                   {overdue && <span className="red text-12 font-semibold">Просрочено</span>}
                 </div>
-                <UnreadBadge count={unread} />
+                <UnreadBadge
+                  count={unread}
+                  onClick={() => openTask(task.id, 'chat')}
+                />
               </div>
             )}
           </FloatingMenu>

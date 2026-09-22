@@ -391,6 +391,24 @@ export const canEditVacationDelegation = (user, vacationOwnerId) => {
 // Область видимости (scope)
 // ============================================================================
 
+const EMPTY_ARRAY = Object.freeze([]);
+
+/**
+ * Нормализация db к безопасному виду.
+ *
+ * Узкие use*Db-пресеты (useScheduleDb до фикса, кастомные селекторы в
+ * новых вьюхах) могут не содержать всех четырёх срезов. Scope-функции
+ * не должны на этом падать: пустой срез читается как «данных нет»,
+ * а не как ошибка программиста. Диагностика — на уровне ESLint и
+ * code-review, а не через TypeError в рантайме на проде.
+ */
+const normalizeScopeDb = (raw) => ({
+  employees:   (raw && raw.employees)   || EMPTY_ARRAY,
+  projects:    (raw && raw.projects)    || EMPTY_ARRAY,
+  departments: (raw && raw.departments) || EMPTY_ARRAY,
+  tasks:       (raw && raw.tasks)       || EMPTY_ARRAY,
+});
+
 /**
  * Базовая видимость пользователя - без явного доступа к проектам.
  *
@@ -405,8 +423,10 @@ export const canEditVacationDelegation = (user, vacationOwnerId) => {
  * видимости и явного оверрайда - это граница между «по роли» и
  * «персонально».
  */
-function computeBaseScope(u, db) {
-  if (!u || !db) return { all: false, empIds: new Set(), projIds: new Set() };
+function computeBaseScope(u, rawDb) {
+  if (!u || !rawDb) return { all: false, empIds: new Set(), projIds: new Set() };
+
+  const db = normalizeScopeDb(rawDb);
 
   const allE = new Set(db.employees.filter(e => !e.fired).map(e => e.id));
   const allP = new Set(db.projects.map(p => p.id));
@@ -454,10 +474,12 @@ function computeBaseScope(u, db) {
  * Единственная точка расширения: любое новое правило видимости
  * добавляет id в projIds здесь, а не растекается по компонентам.
  */
-export function computeScope(u, db) {
-  const scope = computeBaseScope(u, db);
+export function computeScope(u, rawDb) {
+  const scope = computeBaseScope(u, rawDb);
   if (scope.all) return scope;
-  db.projects.forEach(p => {
+
+  const projects = (rawDb && rawDb.projects) || EMPTY_ARRAY;
+  projects.forEach(p => {
     if (hasProjectAccess(u, p)) scope.projIds.add(p.id);
   });
   return scope;
@@ -472,13 +494,14 @@ export function computeScope(u, db) {
  * вызова (в нём проекты, а не задачи), а taskVisible запрашивается
  * точечно по конкретной задаче, и ему важно посчитать «прямо сейчас».
  */
-export function taskVisible(u, scope, t, db) {
+export function taskVisible(u, scope, t, rawDb) {
   if (!scope || !t) return false;
   if (scope.all) return true;
   if (t.assigneeId && scope.empIds.has(t.assigneeId)) return true;
   if (!scope.projIds.has(t.projectId)) return false;
 
-  const proj = db.projects.find(p => p.id === t.projectId);
+  const projects = (rawDb && rawDb.projects) || EMPTY_ARRAY;
+  const proj = projects.find(p => p.id === t.projectId);
   if (!proj) return false;
 
   if (hasProjectAccess(u, proj)) return true;

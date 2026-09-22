@@ -118,7 +118,10 @@ const TaskCard = memo(function TaskCard({
                 : 'без дедлайна'}
             </span>
           </div>
-          <UnreadBadge count={unread} />
+          <UnreadBadge
+            count={unread}
+            onClick={() => openTask(task.id, 'chat')}
+          />
         </div>
       )}
     />
